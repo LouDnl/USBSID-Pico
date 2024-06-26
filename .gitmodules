@@ -1,0 +1,3 @@
+[submodule "examples/sidberry"]
+	path = examples/sidberry
+	url = https://github.com/LouDnl/SidBerry
