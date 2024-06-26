@@ -1,3 +1,6 @@
 [submodule "examples/sidberry"]
 	path = examples/sidberry
 	url = https://github.com/LouDnl/SidBerry
+[submodule "examples/vice"]
+	path = examples/vice
+	url = https://github.com/LouDnl/Vice-USBSID.git
