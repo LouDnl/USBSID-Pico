@@ -1,0 +1,20 @@
+# Ignore everything by default
+*
+
+# extensions
+!*.md
+!*.c
+!*.cpp
+!*.h
+!*.pio
+
+# specific files
+!.gitignore
+!LICENSE
+!CMakeLists.txt
+
+# folders
+!src
+!examples
+!examples/sidberry
+
