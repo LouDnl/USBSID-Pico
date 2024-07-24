@@ -34,6 +34,7 @@ The firmware is still in development
   - Remaps known SID addresses to $D400, $D420, $D440 & $D460
 - Quad SID support (addresses remixed) with SIDKick-Pico (firmware specific)
   - SID2->SID3 SID3->SID2
+- Onboard LED acts as VUE meter calculated by the voices of SID1
 - Uses the [TinyUSB](https://github.com/hathach/tinyusb) stack
 
 
