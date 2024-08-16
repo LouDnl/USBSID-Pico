@@ -4,3 +4,6 @@
 [submodule "examples/vice"]
 	path = examples/vice
 	url = https://github.com/LouDnl/Vice-USBSID.git
+[submodule "examples/retrodebugger"]
+	path = examples/retrodebugger
+	url = git@github.com:LouDnl/RetroDebugger.git

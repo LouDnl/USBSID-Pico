@@ -16,5 +16,6 @@
 # folders
 !src
 !examples
+!examples/retrodebugger
 !examples/sidberry
 !examples/vice
