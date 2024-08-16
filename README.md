@@ -37,6 +37,8 @@ The firmware is still in development
 - Quad SID support (addresses remixed) with SIDKick-Pico (firmware specific)
   - SID2->SID3 SID3->SID2
 - Onboard LED acts as VUE meter calculated by the voices of SID1
+- Onboard RGB LED acts as second VUE meter calculated by the voices of SID1 and SID2
+  - Requires Black Pico clone board!
 - Uses the [TinyUSB](https://github.com/hathach/tinyusb) stack
 
 
@@ -71,7 +73,8 @@ Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-2
 
 # Examples with USBSID-Pico support
 [**Vice**](https://github.com/LouDnl/Vice-USBSID) fork is available @ https://github.com/LouDnl/Vice-USBSID \
-[**SidBerry**](https://github.com/LouDnl/SidBerry) fork is available @ https://github.com/LouDnl/SidBerry
+[**SidBerry**](https://github.com/LouDnl/SidBerry) fork is available @ https://github.com/LouDnl/SidBerry \
+[**RetroDebugger**](https://github.com/LouDnl/RetroDebugger) fork is available @ https://github.com/LouDnl/RetroDebugger
 
 # Notes
 While in development any of the above here mentioned items are subject to change.
