@@ -1,3 +1,9 @@
+# NOTICE 01-09-2024
+I have identified some issues in the current firmware that I think must be resolved before I can release anything. This mostly has to do with cycle based emulators, bus timing, digiplay and usb timeouts. I need to get rid of some unnecessary overhead. Vus timings from buffer to SID are fixed and exactly as specified in the datasheet. Anyone with tips is welcome to contact me.
+Due to this I haven't had time to finish the final board version yet.
+The current firmware does work for normal emulator use, asid play and midi (although not finished yet).
+
+ 
 # USBSID-Pico
 USBSID-Pico is a RPi Pico based board for interfacing one or two MOS SID chips and/or hardware SID emulators with your PC over USB.
 
