@@ -1,4 +1,4 @@
-# HardSID USB / Sidblaster USB
+# HardSID USB / SidBlaster USB
 This folder contains a Linux driver example for software that support HardSID USB / Sidblaster USB.
 
 # Software link

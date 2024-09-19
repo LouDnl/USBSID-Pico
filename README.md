@@ -95,7 +95,8 @@ While in development any videos and/or audio links are subject to be changed or 
 
 Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-29KQ) and other socials or the [SHOWCASE](SHOWCASE.md) page to see more examples.
 ### Software
-_Available examples with USBSID-Pico support_<br>
+_Available examples with USBSID-Pico support:_<br>
+[**HardSID USB / SidBlaster USB**](examples/hardsid-sidblaster) driver example<br>
 [**Vice**](https://github.com/LouDnl/Vice-USBSID) fork is available @ https://github.com/LouDnl/Vice-USBSID<br>
 [**SidBerry**](https://github.com/LouDnl/SidBerry) fork is available @ https://github.com/LouDnl/SidBerry<br>
 [**RetroDebugger**](https://github.com/LouDnl/RetroDebugger) fork is available @ https://github.com/LouDnl/RetroDebugger<br>
