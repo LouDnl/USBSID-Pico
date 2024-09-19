@@ -2,7 +2,6 @@
 ![USBSID-Pico](images/usbsid.png)![LouD](images/loud.png)
 # USBSID-Pico
 USBSID-Pico is a RasberryPi Pico based board for interfacing one or two MOS SID chips and/or hardware SID emulators with your PC over USB.
-## INDEX
 * [Project status](#project-status)
 * [Firmware](#firmware)
 * [Hardware](#hardware)
