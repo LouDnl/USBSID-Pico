@@ -1,5 +1,5 @@
-![USBSID-Pico](doc/pcbv0.2.png)<br>
-![USBSID-Pico](doc/usbsid.png)![LouD](doc/loud.png)
+![USBSID-Pico](images/pcbv0.2.png)<br>
+![USBSID-Pico](images/usbsid.png)![LouD](images/loud.png)
 # USBSID-Pico
 USBSID-Pico is a RasberryPi Pico based board for interfacing one or two MOS SID chips and/or hardware SID emulators with your PC over USB.
 ## INDEX
@@ -69,7 +69,7 @@ An assembled board - minus Pico - will be available at PCBWay when v1.0 is finis
   - if no external clock is detected USBSID-Pico will generate a 1 MHz square wave using pio
   - if an external clock is detected will read the external clock signal
 - Power via USB
-  - 5v stepup for clean 5v VCC to both SID chips
+  - 5v stepup for clean 5v V CC to both SID chips
   - 12v or 9v stepup for clean VDD to both SID chips
     - 12v/9v jumper, defautls to 12v ~ inspired by [SIDBlaster-Nano](https://codeberg.org/CBMretro/SIDBlaster-USB_Nano) design
 - Audio out filter as in the [C64 schematics](https://www.zimmers.net/anonftp/pub/cbm/schematics/computers/c64/250469-rev.A-right.gif)
