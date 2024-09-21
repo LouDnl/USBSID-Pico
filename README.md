@@ -78,11 +78,11 @@ An assembled board - minus Pico - will be available at PCBWay when v1.0 is finis
   - SID1 audio left & SID2 audio right
 ### PCB Development
 * v1.0 in development<br>
-<img src="images/pcbv1.0.jpg" width="30%">
+  <img src="images/pcbv1.0.jpg" width="30%">
 * v0.2 improved testboard<br>
-<img src="https://github.com/user-attachments/assets/7fef5747-a0c0-4f19-8eb0-a5afc29294dd" width="30%">
+  <img src="https://github.com/user-attachments/assets/7fef5747-a0c0-4f19-8eb0-a5afc29294dd" width="30%">
 * v0.1 testboard<br>
-<img src="https://github.com/user-attachments/assets/6e2e1ac0-b5a5-4d62-a71d-1be0ada15490" width="30%">
+  <img src="https://github.com/user-attachments/assets/6e2e1ac0-b5a5-4d62-a71d-1be0ada15490" width="30%">
 
 
 # Examples
