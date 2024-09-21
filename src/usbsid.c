@@ -25,46 +25,34 @@
 
 #include "usbsid.h"
 
+
 /*--------------------------------------------------------------------
  * GLOBAL VARS / FUNCTION DECLARING
  *--------------------------------------------------------------------*/
 
-uint8_t memory[65536];
-uint16_t vue;
-midi_machine midimachine;
-extern void midi_init(void);
-
-
-/*--------------------------------------------------------------------
- * MAIN LOOPS
- *--------------------------------------------------------------------*/
+static semaphore_t core1_init;
+/* The following 2 lines (var naming changed) are copied from SKPico code by frenetic */
+register uint32_t b asm( "r10" );
+volatile const uint32_t *BUSState = &sio_hw->gpio_in;
+/* https://github.com/frntc/SIDKick-pico */
 
 void core1_main(void)
 {
   if (detect_clock() == 0) {
     gpio_deinit(PHI);
     square_wave();
-  } else {
-    /* Do nothing gpio is input pulled low */
-  }
+  }  /* Do nothing gpio makes input pulled low */
 
-  #if defined(USE_RGB)
-  if (detect_smps() == 1) {
-    init_rgb();
-    rgb_mode = true;
-  } else {
-    /* Do nothing gpio is input pulled low */
-    rgb_mode = false;
-  }
-  #endif
-
-  init_memory();
-
+  memset(sid_memory, 0, sizeof sid_memory);
   int x = 0;
+  initVUE();
+  sem_release(&core1_init);  /* Release semaphore when core 1 is started */
   while (1)
   {
+    /* tight_loop_contents(); */
     usbdata == 1 ? led_vuemeter_task() : led_breathe_task();
     if (vue == 0) x++;
+    // x = usbdata = x >= 10 ? 0 : x;
     if (x >= 10) {
       x = 0;
       usbdata = 0;
@@ -74,42 +62,28 @@ void core1_main(void)
 
 int main()
 {
-  // set_sys_clock_pll(120 * MHZ,1,1);  /* 120MHz ? */
-  // set_sys_clock_pll( 1500000000, 6, 2 );  /* 125MHz */
   set_sys_clock_pll( 1500000000, 6, 2 );  /* 300MHz */
-  memset(buffer, 0, sizeof buffer);  /* clear USB read buffer */
-  memset(data, 0, sizeof data);  /* clear USB write buffer */
 
   /* Init board */
   board_init();
   /* Init USB */
   tud_init(BOARD_TUD_RHPORT);
 
-  /* Init SID */
-  initPins();
-
   /* Init logging */
   init_logging();  /* Initialize logging ~ placed after board_init as this resets something making the first print not print */
 
-  // multicore_reset_core1();  /* Reset core 1 before use */
+  sem_init(&core1_init, 0, 1);  /* Create a blocking semaphore to wait until init of core 1 is complete */
   multicore_launch_core1(core1_main);  /* Init core 1 */
+  sem_acquire_blocking(&core1_init);   /* Wait for core 1 to finish */
 
-  sleep_us(100);  /* wait for core1 init */
-  resetSID();     /* reset the SID */
-  sleep_us(100);  /* Give the SID time to boot */
-
-  midi_init();
+  initPins();
+  setupPioBus();
 
   /* Loop IO tasks forever */
   while (1) {
     if (tud_task_event_ready())
     {
       tud_task();  // tinyusb device task
-      read_task();  // cdc read task
-      webserial_read_task();  // webusb read task
-      midi_task();  // midi read task
-      // sysex_task();  // sysex read task
-      /* midi_task(); */  // Disabled for now
     }
   }
 }
@@ -122,7 +96,7 @@ int main()
 void init_logging(void)
 {
   #if defined(USBSID_UART)
-  uint baud_rate = 115200;
+  uint baud_rate = BAUD_RATE;
   int tx_pin = TX;
   int rx_pin = RX;
   stdio_uart_init_full(uart0,
@@ -134,132 +108,81 @@ void init_logging(void)
   #endif
 }
 
-void init_memory(void)
-{
-  for (unsigned int i = 0; i < 65536; i++) {
-    memory[i] = 0x00; // fill with NOPs
-  }
-}
-
 void square_wave(void)
 {
-  PIO pio = pio0;
-  uint offset = pio_add_program(pio, &clock_program);
-  uint sm = pio_claim_unused_sm(pio, true);
-  // clock_program_init(pio, sm, offset, PHI, 30.0f);  // 2.08Mhz @ GPIO22
-  // clock_program_init(pio, sm, offset, PHI, 60.0f);  // 1.04Mhz with clock at 125Mhz and 300Mhz @ GPIO22
-  clock_program_init(pio, sm, offset, PHI, 62.5f);  // 1.00Mhz with clock at 125Mhz and 300Mhz @ GPIO22
+  uint offset_clock = pio_add_program(pio, &clock_program);
+  uint sm_clock = pio_claim_unused_sm(pio, true);
+  clock_program_init(pio, sm_clock, offset_clock, PHI, 62.5f);  // 1.00Mhz with clock at 125Mhz and 300Mhz @ GPIO22
 }
 
 int detect_clock(void)
 {
-  uint32_t b;
-  extern uint32_t *BUSState;
   int c = 0, r = 0;
   gpio_init(PHI);
   gpio_set_pulls(PHI, false, true);
   for (int i = 0; i < 20; i++)
   {
-    extern uint32_t *BUSState;
     b = *BUSState; /* read complete bus */
+    DBG("[PHI2] 0x%x ", b);
     r |= c = (b & bPIN(PHI)) >> PHI;
+    DBG("[C] %d [R] %d\r\n", c, r);
   }
+  DBG("[R] RESULT %d\r\n", r);
   return r;  /* 1 if clock detected */
 }
-
-#if defined(USE_RGB)
-void init_rgb(void)
-{
-  // ws2812_sm = initProgramWS2812();
-  // pio_sm_put(pio1, ws2812_sm, 0xffffff);
-  // pio_sm_put( pio1, ws2812_sm, 0 );
-	r_ = g_ = b_ = 0;
-
-  PIO pio = pio1;
-  ws2812_sm = pio_claim_unused_sm(pio, true);
-  uint offset = pio_add_program(pio, &ws2812_program);
-  ws2812_program_init(pio, ws2812_sm, offset, WS2812_PIN, 800000, IS_RGBW);
-  put_pixel(urgb_u32(0,0,0));
-}
-
-int detect_smps(void)
-{  // TODO: FINISH!
-   rgb_mode = false;
-   return !(gpio_get(24));
-}
-#endif
 
 
 /*--------------------------------------------------------------------
  * BUFFER TASKS
  *--------------------------------------------------------------------*/
 
-void handle_buffer_task(unsigned char buff[4])
+void __not_in_flash_func(handle_buffer_task)(void)
 {
-  // pause = ((buff[0] & 0x80) >> 7);
-  // reset = ((buff[0] & 0x40) >> 6);
-  // rw    = ((buff[0] & 0x10) >> 4);
-  addr  = ((buff[1] << 8) | buff[2]);
-  val   = (buff[3] & 0xFF);
-  memory[addr] = val;
-
-
+  /* Generate address for calculation */
+  addr = ((buffer[1] << 8) | buffer[2]);
   /* Set address for SID no# */
-  addr = sid_address(addr);
-
-
-  switch (buff[0])
-  {
-  // if (pause == 1)
-  // {
-  case PAUSE:
-    pauseSID();
-    break;
-  // }
-  // if (reset == 1)
-  // {  /* ignore everything else if reset is true */
-  case RESET_SID:
-    resetSID();
-    break;
-  // }
-  // switch (rw)
-  // {
-  case RESET_USB:
-    RESET_PICO();
-    break;
-  case READ:
-    memset(data, 0, sizeof data);  /* clear write buffer */
-    memset(rdata, 0, sizeof rdata);  /* clear read buffer */
-    rdata[0] = readSID(addr);  /* read the SID datapins */
-    for (int i = 0; i < sizeof(data); i++)
-    {
-      // data[i] = readSID(addr);  /* assign the result to teach of the 4 bytes */
-      data[i] = rdata[0];  /* assign the result to teach of the 4 bytes */
-    }
-    /* write the result to the USB client */
-    if (dtype == cdc) {
-      write_task();
-    } else if (dtype == wusb) {
-      webserial_write_task();
-    }
-    break;
-  case WRITE:
-    writeSID(addr, val);  /* write the address and value to the SID */
-    break;
-  default:
-    break;
+  addr = (SIDTYPE == SIDTYPE0)
+    ? (addr & 0x1f)
+    : (sid_address(addr) & 0x7f);
+  /* Apply mask to value and memory for vue */
+  sid_memory[addr] = val = (buffer[3] & 0xFF);
+  sid_pause = 0;
+  switch (buffer[0]) {
+    case PAUSE:
+      sid_pause = 1;
+      pauseSID();
+      break;
+    case RESET_SID:
+      resetSID();
+      break;
+    case RESET_USB:
+      // RESET_PICO(); /* Not implemented yet */
+      break;
+    case READ:
+      data[0] = bus_operation((0x10 | READ), addr, val);  /* write the address to the SID and read the data back */
+      /* write the result to the USB client */
+      switch (dtype) {
+        case 'C':
+          write_task();
+          break;
+        case 'W':
+        default:
+          break;
+      }
+      break;
+    case WRITE:
+      bus_operation(0x10, addr, val);  /* write the address and value to the SID */
+      #if defined(DEBUG_TIMING)
+      uint64_t calc;
+      t2 = time_us_64();
+      wdiff = t2 - t1;
+      calc = wdiff / 1000;
+      TIMING("[W]%llu μs\r\n", wdiff, t1, t2);
+      #endif
+      break;
+    default:
+      break;
   }
-  return;
-}
-
-void handle_asidbuffer_task(uint8_t a, uint8_t d)
-{
-  dtype = asid;
-  addr = (0xD400 | a);
-  val  = d;
-  memory[addr] = val;
-  addr = sid_address(addr);
-  writeSID(addr, val);
   return;
 }
 
@@ -268,92 +191,59 @@ void handle_asidbuffer_task(uint8_t a, uint8_t d)
  * IO TASKS
  *--------------------------------------------------------------------*/
 
-void read_task(void)
+void __not_in_flash_func(read_task)(void)
 {
   if (tud_cdc_connected()) {
-    while (tud_cdc_available()) {  /* NOTICE: If disabled this breaks the Pico USB availability  */
-      usbdata = 1;
-      read = tud_cdc_read(buffer, sizeof(buffer)); /* Read data from client */
+    if (tud_cdc_available()) {  /* NOTICE: If disabled this breaks the Pico USB availability  */
+      /* DBG("%s\r\n", __func__); */
+      // usbdata = 1;
+      cdcread = tud_cdc_read(buffer, sizeof(buffer)); /* Read data from client */
       tud_cdc_read_flush();
-      if (read == 4) {  /* 4 as in exactly 4 bytes */
-        dtype = cdc;
-        handle_buffer_task(buffer);
+      if (cdcread == BYTES_EXPECTED) {  /* 4 as in exactly 4 bytes */
+        #if defined(DEBUG_TIMING)
+        switch (buffer[0]) {
+          case 0:
+            t1 = time_us_64();
+            break;
+          case 1:
+            t3 = time_us_64();
+           break;
+        }
+        #endif
+        handle_buffer_task();
+       /*  int d = 0;
+        // printf("[B] ");
+        for (int i = 0; i < BYTES_EXPECTED; i++) {
+          d += buffer[i];
+          // printf("$%02x ", buffer[i]);
+        }
+        // printf(" [D]%d\n", d);
+        if (d != 0) handle_buffer_task();
+ */
       }
-      memset(buffer, 0, sizeof buffer);  /* clear read buffer */
+      memset(buffer, 0, sizeof buffer);  /* clear in buffer */
+
     }
   }
 }
 
-void write_task(void)
+void __not_in_flash_func(write_task)(void)
 {
-  if (tud_cdc_connected()) {
+  if (tud_cdc_connected()) { /* not needed as we know its connected since this is only called from inside the loop */
     if (tud_cdc_write_available()) {  /* NOTICE: Still testing */ // <- this uses IF instead of WHILE on purpose to avoid a write back loop
-      write = tud_cdc_write(data, sizeof(data));  /* write data to client */
-      // write = tud_cdc_write(rxdata, sizeof(rxdata));  /* write data to client */
+      tud_cdc_write(data, 1);  /* write exactly 1 byte of data to client */
       tud_cdc_write_flush();
-      memset(data, 0, sizeof data);  /* clear write buffer */
+
+      #if defined(DEBUG_TIMING)
+      uint64_t calc;
+      t4 = time_us_64();
+      rdiff = t4 - t3;
+      calc = rdiff / 1000;
+      DBG("[R]%llu μs\r\n", rdiff);
+      #endif
     }
   }
 }
-
-void webserial_read_task(void)
-{
-  if ( web_serial_connected )
-  {
-    while ( tud_vendor_available() ) {
-      usbdata = 1;
-      read = tud_vendor_read(buffer, sizeof(buffer));
-      tud_vendor_read_flush();
-      if (read == 4) { /* 4 as in exactly 4 bytes */
-      // NOTE: This 4 byte minimum renders any webserial test useless
-        dtype = wusb;
-        handle_buffer_task(buffer);
-      }
-      memset(buffer, 0, sizeof buffer);  /* clear read buffer */
-    }
-  }
-}
-
-void webserial_write_task(void)
-{
-  if (web_serial_connected) {
-    // if (tud_vendor_available()) {
-    if (tud_vendor_mounted()) {
-      write = tud_vendor_write(data, sizeof(data));
-      tud_vendor_flush();
-      memset(data, 0, sizeof data);  /* clear write buffer */
-    }
-  }
-}
-
-void midi_task(void)
-{
-  while ( tud_midi_n_available(0, 0) ) {
-    usbdata = 1;
-    // tud_midi_packet_read(sysexMachine.packetbuffer);  /* WORKS ~ PACKET IS 4 BYTES */
-    // tud_midi_stream_read(midimachine.readbuffer, 1);  /* WORKS ~ Handles 2 Byte at a time */
-    // memset(midimachine.streambuffer, 0, sizeof midimachine.streambuffer);
-
-    /* Working stream config */
-    // int s = tud_midi_stream_read(midimachine.streambuffer, sizeof(midimachine.streambuffer));  /* WORKS ~ STREAM IS WHAT EVER THE MAX USB BUFFER SIZE IS! */
-    // process_stream(midimachine.streambuffer);
-
-
-    /* Working config */
-    int s = tud_midi_n_stream_read(0, 0, midimachine.readbuffer, 1);  /* WORKS ~ Handles 1 Byte at a time */
-    process_buffer(midimachine.readbuffer[0]);
-  }
-}
-
-// void midi_task(void)
-// {
-//   while ( tud_midi_n_available(1, 0) ) {
-//     usbdata = 1;
-//     /* Working packet config */
-//     int p = tud_midi_n_packet_read(1, midimachine.packetbuffer);  /* WORKS ~ PACKET IS 4 BYTES */
-
-//   }
-// }
 
 
 /*--------------------------------------------------------------------
@@ -362,36 +252,45 @@ void midi_task(void)
 
 void led_vuemeter_task(void)
 {
-  uint8_t osc1, osc2, osc3, osc4, osc5, osc6;
-  osc1 = (memory[0xD400] * 0.596);  /* Frequency in Hz of SID1 @ $D400 Oscillator 1 */
-  osc2 = (memory[0xD407] * 0.596);  /* Frequency in Hz of SID1 @ $D400 Oscillator 2 */
-  osc3 = (memory[0xD40E] * 0.596);  /* Frequency in Hz of SID1 @ $D400 Oscillator 3 */
-  #if defined(USE_RGB)
-  osc4 = (memory[0xD420] * 0.596);  /* Frequency in Hz of SID2 @ $D400 Oscillator 1 */
-  osc5 = (memory[0xD427] * 0.596);  /* Frequency in Hz of SID2 @ $D400 Oscillator 2 */
-  osc6 = (memory[0xD42E] * 0.596);  /* Frequency in Hz of SID2 @ $D400 Oscillator 3 */
-  #endif
+  if (sid_pause != 1 && usbdata == 1 ) {
+    uint8_t osc1, osc2, osc3;
+    osc1 = (sid_memory[0x00] * 0.596);  /* Frequency in Hz of SID1 @ $D400 Oscillator 1 */
+    osc2 = (sid_memory[0x07] * 0.596);  /* Frequency in Hz of SID1 @ $D400 Oscillator 2 */
+    osc3 = (sid_memory[0x0E] * 0.596);  /* Frequency in Hz of SID1 @ $D400 Oscillator 3 */
+    #if defined(USE_RGB)
+    uint8_t osc4, osc5, osc6;
+    osc4 = (sid_memory[0x20] * 0.596);  /* Frequency in Hz of SID2 @ $D400 Oscillator 1 */
+    osc5 = (sid_memory[0x27] * 0.596);  /* Frequency in Hz of SID2 @ $D400 Oscillator 2 */
+    osc6 = (sid_memory[0x2E] * 0.596);  /* Frequency in Hz of SID2 @ $D400 Oscillator 3 */
+    #endif
 
-  vue = abs((osc1 + osc2 + osc3) / 3.0f);
-  vue = map(vue, 0, HZ_MAX, 0, VUE_MAX);
+    vue = abs((osc1 + osc2 + osc3) / 3.0f);
+    vue = map(vue, 0, HZ_MAX, 0, VUE_MAX);
 
-  pwm_set_gpio_level(BUILTIN_LED, vue);
+    pwm_set_gpio_level(BUILTIN_LED, vue);
 
-  #if defined(USE_RGB)
-  if (rgb_mode) {  // TODO: r_, g_ and b_ should be the modulo of the additions
-    r_ = 0, g_ = 0, b_ = 0, o1 = 0, o2 = 0, o3 = 0, o4 = 0, o5 = 0, o6 = 0;
-    o1 = map(osc1, 0, 255, 0, 43);
-    o2 = map(osc2, 0, 255, 0, 43);
-    o3 = map(osc3, 0, 255, 0, 43);
-    o4 = map(osc4, 0, 255, 0, 43);
-    o5 = map(osc5, 0, 255, 0, 43);
-    o6 = map(osc6, 0, 255, 0, 43);
-    r_ += color_LUT[o1][0][0] + color_LUT[o2][1][0] + color_LUT[o3][2][0] + color_LUT[o4][3][0] + color_LUT[o5][4][0] + color_LUT[o6][5][0] ;
-    g_ += color_LUT[o1][0][1] + color_LUT[o2][1][1] + color_LUT[o3][2][1] + color_LUT[o4][3][1] + color_LUT[o5][4][1] + color_LUT[o6][5][1] ;
-    b_ += color_LUT[o1][0][2] + color_LUT[o2][1][2] + color_LUT[o3][2][2] + color_LUT[o4][3][2] + color_LUT[o5][4][2] + color_LUT[o6][5][2] ;
-    put_pixel(urgb_u32(rgbb(r_), rgbb(g_), rgbb(b_)));
+    #if defined(USE_RGB)
+    if (rgb_mode) {  // TODO: r_, g_ and b_ should be the modulo of the additions
+      r_ = 0, g_ = 0, b_ = 0, o1 = 0, o2 = 0, o3 = 0, o4 = 0, o5 = 0, o6 = 0;
+      o1 = map(osc1, 0, 255, 0, 43);
+      o2 = map(osc2, 0, 255, 0, 43);
+      o3 = map(osc3, 0, 255, 0, 43);
+      o4 = map(osc4, 0, 255, 0, 43);
+      o5 = map(osc5, 0, 255, 0, 43);
+      o6 = map(osc6, 0, 255, 0, 43);
+      r_ += color_LUT[o1][0][0] + color_LUT[o2][1][0] + color_LUT[o3][2][0] + color_LUT[o4][3][0] + color_LUT[o5][4][0] + color_LUT[o6][5][0] ;
+      g_ += color_LUT[o1][0][1] + color_LUT[o2][1][1] + color_LUT[o3][2][1] + color_LUT[o4][3][1] + color_LUT[o5][4][1] + color_LUT[o6][5][1] ;
+      b_ += color_LUT[o1][0][2] + color_LUT[o2][1][2] + color_LUT[o3][2][2] + color_LUT[o4][3][2] + color_LUT[o5][4][2] + color_LUT[o6][5][2] ;
+      put_pixel(urgb_u32(rgbb(r_), rgbb(g_), rgbb(b_)));
+    }
+    #endif
+
+    MDBG("[%c] [VOL]$%02x [PWM]$%04x | [V1] $%02X%02X %02X%02X %02X %02X %02X | [V2] $%02X%02X %02X%02X %02X %02X %02X | [V3] $%02X%02X %02X%02X %02X %02X %02X \n",
+        dtype, sid_memory[0x18], vue,
+        sid_memory[0x00], sid_memory[0x01], sid_memory[0x02], sid_memory[0x03], sid_memory[0x04], sid_memory[0x05], sid_memory[0x06],
+        sid_memory[0x07], sid_memory[0x08], sid_memory[0x09], sid_memory[0x0A], sid_memory[0x0B], sid_memory[0x0C], sid_memory[0x0D],
+        sid_memory[0x0E], sid_memory[0x0F], sid_memory[0x10], sid_memory[0x11], sid_memory[0x12], sid_memory[0x13], sid_memory[0x14]);
   }
-  #endif
 }
 
 void led_breathe_task(void)
@@ -419,70 +318,63 @@ void led_breathe_task(void)
 
 
 /*--------------------------------------------------------------------
- * SUPPORTING FUNCTIOMS
+ * SUPPORTING FUNCTIONS
  *--------------------------------------------------------------------*/
 
-uint16_t sid_address(uint16_t addr)
-{ /* Set address for SID no# */
+uint16_t __not_in_flash_func(sid_address)(uint16_t addr)
+{
+  /* Set address for SID no# */
   /* D500, DE00 or DF00 is the second sid in SIDTYPE1, 3 & 4 */
-  /* D500, DE00 or DF00 is the third sid in all other SIDTYPES */
-  if (((addr) & SIDUMASK) != SID1ADDR) {  /* Not in $D400 range but in D5, DE or DF */
-    switch (SIDTYPES) {
-      case SIDTYPE1:
-      case SIDTYPE2:
-        addr = (SID2ADDR | (addr & SID1MASK));
-        break;
-      case SIDTYPE3:
-        addr = (SID3ADDR | (addr & SID1MASK));
-        break;
-      case SIDTYPE4:
-        addr = (SID3ADDR | (addr & SID2MASK));
-        break;
-      case SIDTYPE5: /* UNTESTED */
-        addr = (SID1ADDR | (addr & SIDUMASK));
+  /* D500, DE00 or DF00 is the third sid in all other SIDTYPE */
+  switch (addr) {
+    case 0xD400 ... 0xD499:
+      switch (SIDTYPE) {
+        case SIDTYPE1:
+        case SIDTYPE3:
+        case SIDTYPE4:
+          return addr; /* $D400 -> $D479 */
+          break;
+        case SIDTYPE2:
+          return ((addr & SIDLMASK) >= 0x20) ? (SID2ADDR | (addr & SID1MASK)) : addr;
+          break;
+        case SIDTYPE5:
+          return ((addr & SIDLMASK) >= 0x20) && ((addr & SIDLMASK) <= 0x39) /* $D420~$D439 -> $D440~$D459 */
+                  ? (addr + 0x20)
+                  : ((addr & SIDLMASK) >= 0x40) && ((addr & SIDLMASK) <= 0x59) /* $D440~$D459 -> $D420~$D439 */
+                  ? (addr - 0x20)
+                  : addr;
+          break;
       }
-  } else {  /* $D400 */
-    switch (SIDTYPES) {
-    case SIDTYPE1:
-    case SIDTYPE3:
-    case SIDTYPE4:
-      addr; /* $D400 -> $D479 */
       break;
-    case SIDTYPE2:
-      addr = ((addr & SIDLMASK) >= 0x20) ? (SID2ADDR | (addr & SID1MASK)) : addr ; /* */
+    case 0xD500 ... 0xD599:
+    case 0xDE00 ... 0xDF99:
+      switch (SIDTYPE) {
+        case SIDTYPE1:
+        case SIDTYPE2:
+          return (SID2ADDR | (addr & SID1MASK));
+          break;
+        case SIDTYPE3:
+          return (SID3ADDR | (addr & SID1MASK));
+          break;
+        case SIDTYPE4:
+          return (SID3ADDR | (addr & SID2MASK));
+          break;
+        case SIDTYPE5:
+          return (SID1ADDR | (addr & SIDUMASK));
+          break;
+      }
       break;
-    case SIDTYPE5:
-      addr =
-          ((addr & SIDLMASK) >= 0x20) && ((addr & SIDLMASK) <= 0x39) /* $D420~$D439 -> $D440~$D459 */
-              ? (addr + 0x20)
-              : ((addr & SIDLMASK) >= 0x40) && ((addr & SIDLMASK) <= 0x59) /* $D440~$D459 -> $D420~$D439 */
-                    ? (addr - 0x20)                    : addr;
+    default:
+      return addr;
       break;
-    }
   }
-  return addr;
+
 }
 
 long map(long x, long in_min, long in_max, long out_min, long out_max)
 {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
-
-#if defined(USE_RGB)
-void put_pixel(uint32_t pixel_grb) {
-  pio_sm_put_blocking(pio1, ws2812_sm, pixel_grb << 8u);
-}
-
-uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b) {
-  return ((uint32_t) (r) << 8) | ((uint32_t) (g) << 16) | (uint32_t) (b);
-}
-
-uint8_t rgbb(double inp)
-{
-  int r = abs((inp / 255) * BRIGHTNESS);
-  return (uint8_t)r;
-};
-#endif
 
 
 /*--------------------------------------------------------------------
@@ -491,25 +383,28 @@ uint8_t rgbb(double inp)
 
 void tud_mount_cb(void)
 {
-  // NOTE: Disabled for now, causes dual volume write with a CLICK sound on PWM
-  // enableSID(); /* NOTICE: Testing if this is causing the random lockups */
+  usb_connected = 1;
+  DBG("%s\r\n", __func__);
 }
 
 void tud_umount_cb(void)
 {
-  // NOTE: Disabled for now, causes dual volume write with a CLICK sound on PWM
-  // disableSID();  /* NOTICE: Testing if this is causing the random lockups */
+  usb_connected = 0, usbdata = 0;
+  disableSID();  /* NOTICE: Testing if this is causing the random lockups */
+  DBG("%s\r\n", __func__);
 }
 
 void tud_suspend_cb(bool remote_wakeup_en)
 {
-  (void) remote_wakeup_en;
-  tud_mounted() ? enableSID() : disableSID();  /* NOTICE: Testing if this is causing the random lockups */
+  /* (void) remote_wakeup_en; */
+  usb_connected = 0, usbdata = 0;;
+  DBG("%s %d\r\n", __func__, remote_wakeup_en);
 }
 
 void tud_resume_cb(void)
 {
-  tud_mounted() ? enableSID() : disableSID();  /* NOTICE: Testing if this is causing the random lockups */
+  usb_connected = 1;
+  DBG("%s\r\n", __func__);
 }
 
 
@@ -519,28 +414,38 @@ void tud_resume_cb(void)
 
 void tud_cdc_rx_cb(uint8_t itf)
 {
-  (void)itf;
+  (void)itf; /* itf = 0 */
+  // DBG("%s: %x\r\n", __func__, itf);
+  usbdata = 1;
+  dtype = cdc;
+  read_task();  // cdc read task
 }
 
 void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char)
 {
-  (void)itf;
-  (void)wanted_char;
+  // (void)itf;
+  // (void)wanted_char;
+  DBG("%s: %x, %s\r\n", __func__, itf, wanted_char);
+  // write_task();
 }
 
 void tud_cdc_tx_complete_cb(uint8_t itf)
 {
   (void)itf;
+  /* DBG("[R] $%02x [D] $%02x $%02x $%02x $%02x [S]%d\r\n", rdata, data[0], data[1], data[2], data[3], sizeof(data) / sizeof(*data)); */
+  // memset(rdata, 0, sizeof data);  /* clear in buffer */
+  // DBG("%s: %x\r\n", __func__, itf);
 }
 
 void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
 {
-  (void) itf;
-  (void) rts;
+  /* (void) itf; */
+  /* (void) rts; */
+  DBG("%s: %x, %d %d\r\n", __func__, itf, dtr, rts);
 
   if ( dtr ) {
     /* Terminal connected */
-    usbdata = 1;
+    /* usbdata = 1; */
   }
   else
   {
@@ -552,14 +457,16 @@ void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
 
 void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* p_line_coding)
 {
-  (void)itf;
-  (void)p_line_coding;
+  /* (void)itf; */
+  /* (void)p_line_coding; */
+  DBG("%s: %x, %d %d %d %d\r\n", __func__, itf, p_line_coding->bit_rate, p_line_coding->stop_bits, p_line_coding->parity, p_line_coding->data_bits);
 }
 
 void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 {
-  (void)itf;
-  (void)duration_ms;
+  /* (void)itf; */
+  /* (void)duration_ms; */
+  DBG("%s: %x, %x\r\n", __func__, itf, duration_ms);
 }
 
 
@@ -568,7 +475,8 @@ void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
  *--------------------------------------------------------------------*/
 
 bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const * request)
-{
+{ /* BUG: WHEN WEBUSB CALLS THIS, CDC WILL BREAK! LINESTATE IS NOT SET THEN! */
+  DBG("%s: %x, %x\r\n", __func__, rhport, stage);
   // nothing to with DATA & ACK stage
   if (stage != CONTROL_STAGE_SETUP) return true;
 

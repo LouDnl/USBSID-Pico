@@ -39,6 +39,7 @@
 
 #include "usbsid.h"
 
+
 #define USB_PID 0x4011  /* USBSID uses TinyUSB default ~ 1x CDC + 1x MIDI (Vendor not included) */
 #define USB_VID 0xCAFE  /* USBSID uses TinyUSB default - Previous versions used 0x5553 */
 #define USB_BCD 0x0210
@@ -47,6 +48,7 @@
 //--------------------------------------------------------------------+
 // Device Descriptors
 //--------------------------------------------------------------------+
+
 tusb_desc_device_t const desc_device =
 {
     .bLength            = sizeof(tusb_desc_device_t),
@@ -79,10 +81,10 @@ uint8_t const * tud_descriptor_device_cb(void)
   return (uint8_t const *) &desc_device;
 }
 
-
 //--------------------------------------------------------------------+
 // Configuration Descriptor
 //--------------------------------------------------------------------+
+
 enum
 {
   ITF_NUM_CDC = 0,
@@ -106,8 +108,8 @@ enum
 #define USBD_MIDI_IN_OUT_MAX_SIZE    64
 #define USBD_VENDOR_IN_OUT_MAX_SIZE  64
 
+#define CONFIG_TOTAL_LEN   (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_MIDI_DESC_LEN + TUD_VENDOR_DESC_LEN)
 
-#define CONFIG_TOTAL_LEN  (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_MIDI_DESC_LEN + TUD_VENDOR_DESC_LEN)
 
 // full speed configuration
 uint8_t const desc_fs_configuration[] =

@@ -35,6 +35,11 @@
 #include "asid.h"
 #include "usbsid.h"
 
+#ifdef ASID_DEBUG
+#define ASDBG(...) printf(__VA_ARGS__)
+#else
+#define ASDBG(...) ((void)0)
+#endif
 
 void handle_asid_message(uint8_t sid ,uint8_t* buffer, int size)
 {
