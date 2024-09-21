@@ -68,20 +68,21 @@ An assembled board - minus Pico - will be available at PCBWay when v1.0 is finis
   - if no external clock is detected USBSID-Pico will generate a 1 MHz square wave using pio
   - if an external clock is detected will read the external clock signal
 - Power via USB
-  - 5v stepup for clean 5v V CC to both SID chips
+  - 5v stepup for clean 5v VCC to both SID chips
   - 12v or 9v stepup for clean VDD to both SID chips
     - 12v/9v jumper, defautls to 12v ~ inspired by [SIDBlaster-Nano](https://codeberg.org/CBMretro/SIDBlaster-USB_Nano) design
 - Audio out filter as in the [C64 schematics](https://www.zimmers.net/anonftp/pub/cbm/schematics/computers/c64/250469-rev.A-right.gif)
-  - With optional 8580 cap, be sure to leave out/or remove for 8580 SID!
+  - With optional 8580 cap, solder the 8580 jumper pad in each audio circuit for this.
 - Audio jumper
   - SID1 audio left & right
   - SID1 audio left & SID2 audio right
 ### PCB Development
-* v1.0 in development
+* v1.0 in development<br>
+<img src="images/pcbv1.0.jpg" width="30%">
 * v0.2 improved testboard<br>
-  <img src="https://github.com/user-attachments/assets/7fef5747-a0c0-4f19-8eb0-a5afc29294dd" width="30%">
+<img src="https://github.com/user-attachments/assets/7fef5747-a0c0-4f19-8eb0-a5afc29294dd" width="30%">
 * v0.1 testboard<br>
-  <img src="https://github.com/user-attachments/assets/6e2e1ac0-b5a5-4d62-a71d-1be0ada15490" width="30%">
+<img src="https://github.com/user-attachments/assets/6e2e1ac0-b5a5-4d62-a71d-1be0ada15490" width="30%">
 
 
 # Examples
@@ -92,7 +93,7 @@ While in development any videos and/or audio links are subject to be changed or 
 |:-:|:-:|
 | [![MOS8580](https://img.youtube.com/vi/lXxlArB3VS4/1.jpg)](https://www.youtube.com/watch?v=lXxlArB3VS4) | [![MOS8580](https://img.youtube.com/vi/B4iYnZELbSc/1.jpg)](https://www.youtube.com/watch?v=B4iYnZELbSc) |
 
-Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-29KQ) and other socials or the [SHOWCASE](SHOWCASE.md) page to see more examples.
+Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-29KQ), [other socials](https://github.com/LouDnl) or the [SHOWCASE](SHOWCASE.md) page to see more examples.
 ### Software
 _Available examples with USBSID-Pico support:_<br>
 [**HardSID USB / SidBlaster USB**](examples/hardsid-sidblaster) driver example<br>
@@ -101,8 +102,12 @@ _Available examples with USBSID-Pico support:_<br>
 [**RetroDebugger**](https://github.com/LouDnl/RetroDebugger) fork is available @ https://github.com/LouDnl/RetroDebugger<br>
 
 # Acknowledgements
-Some portions of this code is heavily inspired on project by other great people. Some of those projects are - in no particular order:
+Special thanks goes out to [Tobozo](https://github.com/tobozo/) for making the USBSID-Pico logo and for his (mental🤣) since starting this project.
+
+Some portions of this code and board are heavily inspired on projects by other great people.
+Some of those projects are - in no particular order:
 * [SIDKICK-pico by Frenetic](https://github.com/frntc/SIDKick-pico)
+* [SIDBlaster USB Nano by CBMretro](https://codeberg.org/CBMretro/SIDBlaster-USB_Nano)
 * [TherapSID by Twisted Electrons](https://github.com/twistedelectrons/TherapSID)
 * [TeensyROM by Sensorium Embedded](https://github.com/SensoriumEmbedded/TeensyROM)
 * [SID Factory II by Chordian](https://github.com/Chordian/sidfactory2)
