@@ -102,7 +102,7 @@ _Available examples with USBSID-Pico support:_<br>
 [**RetroDebugger**](https://github.com/LouDnl/RetroDebugger) fork is available @ https://github.com/LouDnl/RetroDebugger<br>
 
 # Acknowledgements
-Special thanks goes out to [Tobozo](https://github.com/tobozo/) for making the USBSID-Pico logo and for his (mental🤣) since starting this project.
+Special thanks goes out to [Tobozo](https://github.com/tobozo/) for making the USBSID-Pico logo and for his (mental🤣) support since starting this project.
 
 Some portions of this code and board are heavily inspired on projects by other great people.
 Some of those projects are - in no particular order:
