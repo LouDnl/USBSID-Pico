@@ -1,0 +1,65 @@
+;
+; USBSID-Pico is a RPi Pico (RP2040) based board for interfacing one or two
+; MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer,
+; phone or ASID supporting player
+;
+; bus_control.pio
+; This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
+; File author: LouD
+;
+; This program is free software: you can redistribute it and/or modify
+; it under the terms of the GNU General Public License as published by
+; the Free Software Foundation, version 2.
+;
+; This program is distributed in the hope that it will be useful, but
+; WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+; General Public License for more details.
+;
+; You should have received a copy of the GNU General Public License
+; along with this program. If not, see <http://www.gnu.org/licenses/>.
+;
+; Description:
+; Repeatedly get one word of data from the TX FIFO, stalling when the FIFO is
+; empty. Write the least significant bit to the OUT pin group.
+;
+
+.define PUBLIC PHI 22
+
+; Bus control program
+.program bus_control
+.wrap_target
+    pull block              ; Pull data from FIFO
+    wait 1 gpio PHI         ; Wait for clock to go high
+    wait 0 gpio PHI         ; Wait for clock to go low
+    nop [31]                ; Wait for ~103ns
+    out pins, 3             ; Set control pins (19-21)
+    wait 1 gpio PHI         ; Wait for clock to go high
+    nop [31]                ; Wait for ~103ns
+    jmp pin read            ; Jump to read if IN pin is high
+    nop [9]                 ; Wait for ~30ns
+    jmp done                ; Jump to done
+read:
+    nop [31]
+    in pins, 8              ; Read data bus into isr
+    push block              ; Push isr to fifo
+done:
+    nop [9]                 ; Wait for ~30ns
+    wait 0 gpio PHI         ; Wait for clock to go low
+    out pins, 3             ; Set control to next 3 bits from fifo
+.wrap
+
+; Data and address bus program
+.program data_bus
+.wrap_target
+    pull block       ; Pull data from FIFO
+    wait 1 gpio PHI  ; Wait for clock to go high
+    wait 0 gpio PHI  ; Wait for clock to go low
+    nop [31]         ; Wait for ~103ns
+    out pins, 16     ; Set data bus pins
+    out pindirs 16   ; Set pin directions
+    wait 1 gpio PHI  ; Wait for clock to go high
+    nop [31]         ; Wait for ~103ns
+    nop [31]         ; Wait for ~103ns
+    nop [9]          ; Wait for ~30ns
+.wrap

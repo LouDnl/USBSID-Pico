@@ -22,9 +22,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#pragma once
+
 #ifndef SID_H_
 #define SID_H_
+#pragma once
 
 #include <stdint.h>
 

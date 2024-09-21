@@ -32,6 +32,7 @@
 
 #ifndef _TUSB_CONFIG_H_
 #define _TUSB_CONFIG_H_
+#pragma once
 
 #ifdef __cplusplus
  extern "C" {
@@ -68,7 +69,7 @@
 #endif
 
 #ifndef CFG_TUSB_DEBUG
-#define CFG_TUSB_DEBUG        1
+#define CFG_TUSB_DEBUG        0 /* 3 == VERBOSE LOGGING */
 #endif
 
 // Enable Device stack
@@ -97,10 +98,10 @@
 //--------------------------------------------------------------------
 
 #ifndef CFG_TUD_ENDPOINT0_SIZE
-#define CFG_TUD_ENDPOINT0_SIZE    64
+#define CFG_TUD_ENDPOINT0_SIZE  64
 #endif
 
-#define CFG_TUD_TASK_QUEUE_SZ 64  /* WHAT DOES THIS BUTTON DO!? */
+#define CFG_TUD_TASK_QUEUE_SZ   64  /* WHAT DOES THIS BUTTON DO!? */
 
 //------------- CLASS -------------//
 #define CFG_TUD_CDC              1
@@ -109,12 +110,12 @@
 #define CFG_TUD_MIDI             1
 #define CFG_TUD_VENDOR           1
 
+// CDC Endpoint transfer buffer size, more is faster
+#define CFG_TUD_CDC_EP_BUFSIZE    (TUD_OPT_HIGH_SPEED ? 512 : 64)
+
 // CDC FIFO size of TX and RX
 #define CFG_TUD_CDC_RX_BUFSIZE    (TUD_OPT_HIGH_SPEED ? 512 : 64)
 #define CFG_TUD_CDC_TX_BUFSIZE    (TUD_OPT_HIGH_SPEED ? 512 : 64)
-
-// CDC Endpoint transfer buffer size, more is faster
-#define CFG_TUD_CDC_EP_BUFSIZE    (TUD_OPT_HIGH_SPEED ? 512 : 64)
 
 // MIDI FIFO size of TX and RX
 #define CFG_TUD_MIDI_RX_BUFSIZE   (TUD_OPT_HIGH_SPEED ? 512 : 64)

@@ -41,26 +41,10 @@
 #include "hardware/structs/sio.h"  /* Pico SIO structs */
 #include "hardware/pwm.h"          /* Hardware Pulse Width Modulation (PWM) API */
 
-
 /* Uart */
+#define BAUD_RATE 115200
 #define TX 16    /* uart 0 tx */
 #define RX 17    /* uart 0 rx */
-
-/* IO pins */
-#define RES 18   /* Reset */
-#define RW  19   /* Read/ Write enable */
-#define CS  20   /* Chip Select for 1 or 1 & 2 with SKPico */
-#define CS2 21   /* Chip Select for 2 or 3 & 4 with SKPico */
-#define PHI 22   /* Pico 1Mhz PWM out ~ External Clock In */
-
-/* Address pins ~ output only */
-#define A0 8
-#define A1 9
-#define A2 10
-#define A3 11
-#define A4 12
-#define A5 13  /* $D420+ or FM on SKPico */
-#define A8 14  /* $D500. $DE00, $DF00 or external CS on SKPico */
 
 /* Data pins ~ output/input */
 #define D0 0
@@ -72,62 +56,62 @@
 #define D6 6
 #define D7 7
 
+/* Address pins ~ output only */
+#define A0 8
+#define A1 9
+#define A2 10
+#define A3 11
+#define A4 12
+#define A5 13  /* $D420+ or FM on SKPico */
+
+/* IO pins */
+#define RES 18   /* Reset */
+#define RW  19   /* Read/ Write enable */
+#define CS1 20   /* Chip Select for 1 or 1 & 2 with SKPico */
+#define CS2 21   /* Chip Select for 2 or 3 & 4 with SKPico */
+#define PHI 22   /* Pico 1Mhz PWM out ~ External Clock In */
+
 /* Other */
 #define BUILTIN_LED PICO_DEFAULT_LED_PIN  /* 25 */
 #define WS2812_PIN 23
 
 /* Unused */
+#define NIL0 14
 #define NIL1 15
 #define NIL2 26
 #define NIL3 27
 #define NIL4 28
 
 #define bPIN(i) ( 1 << i )
-#define bADDR 8
-#define bDATA 0
 
-#define BUS_PINMASK      0x3FFFFF  /* 0b00000000001111111111111111111111 21 GPIO pins */
-#define ADDRPINS_PINMASK 0x7F00    /* 0b0111111100000000 */
-#define DATAPINS_PINMASK 0xFF      /* 0b0000000011111111 */
-#define INIT_MASK (bPIN(RW) | bPIN(CS) | bPIN(CS2) | bPIN(RES))
-#define CS_MASK (bPIN(CS) | bPIN(CS2))
-#define RW_MASK bPIN(RW)
-#define CSRW_MASK (bPIN(RW) | bPIN(CS) | bPIN(CS2))
+#define PIO_PINDIRMASK   0x3C3FFF  /* 0b00000000001111000011111111111111 17 GPIO pins */
 
-#define A8_MASK    0x100  /* 0b100000000 */
-#define A5_MASK    0x20   /*  0b00100000 */
+static PIO pio = pio0;
+static uint sm_clock, offset_clock;
+static uint sm_control, sm_data, offset_control, offset_data;
+static int dma_tx_control, dma_tx_data, dma_rx_data;
 
-#define ADDR_MASK  (0x1F | A5_MASK)   /*  0b00111111 */
-#define DATA_MASK  0xFF               /*  0b11111111 */
+static uint16_t control_word;
+static uint32_t data_word, read_data, dir_mask;
 
-/* The following 4 lines are a direct copy (var naming changed) from frenetic his SKPico code */
-#define bPHI bPIN( PHI )
-#define VIC_HALF_CYCLE( b )	( !( (b) & bPHI ) )  /* low */
-#define CPU_HALF_CYCLE( b )	(  ( (b) & bPHI ) )  /* high */
-#define WAIT_FOR_VIC_HALF_CYCLE { do { b = *BUSState; } while ( !( VIC_HALF_CYCLE( b ) ) ); }  /* while !0 == Falling edge*/
-#define WAIT_FOR_CPU_HALF_CYCLE { do { b = *BUSState; } while ( !( CPU_HALF_CYCLE( b ) ) ); }  /* while !1 == Rising edge*/
-/* https://github.com/frntc/SIDKick-pico */
-
-/* Pins 0->20 (except TX and RX) to sio and output */
+/* Set up the bus pins for pio use */
 void initPins(void);
-/* Clears and de-inits all pins */
-void resetPins(void);
+/* Set up the pio bus */
+void setupPioBus(void);
 /* Sets the address and databus pins to LOW */
 void clearBus(void);
 /* Pauses any operation by cetting CS high */
 void pauseSID(void);
 /* Reset the SID and clears the bus */
 void resetSID(void);
-/* Enable the SID by setting RES to HIGH */
-/* Enable the SID by setting RW to LOW and CS & RES to HIGH */
+/* Enable the SID by setting Volume to 15 and RES to HIGH */
 void enableSID(void);
-/* Disable the SID by setting RES to LOW */
-/* Disable the SID by setting RW & RES to LOW and CS to HIGH*/
+/* Disable the SID by setting Volume to 0, RW to LOW and CS1/CS2 to HIGH */
 void disableSID(void);
-/* Read  val at SID addr hex value */
-uint8_t readSID(uint16_t addr);
-/* Write val to sid at addr hex value */
-void writeSID(uint16_t addr, uint8_t val);
+/* Perform a read or write bus operation */
+uint8_t bus_operation(uint8_t command, uint8_t address, uint8_t data);
+
+void initVUE(void);
 
 #ifdef __cplusplus
  }

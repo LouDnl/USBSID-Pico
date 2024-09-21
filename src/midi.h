@@ -30,6 +30,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
+
 #ifndef _MIDI_H_
 #define _MIDI_H_
 #pragma once
@@ -40,6 +41,7 @@
 #include <string.h>
 #include <math.h>
 #include "usbsid.h"
+#include "macros.h"
 
 typedef enum {
   CLAIMED,
@@ -59,6 +61,8 @@ typedef enum {
   ASID
 } midi_type;
 
+extern int midi_bytes;
+
 typedef struct {
   bus_state bus;
   sysex_state state;
@@ -66,7 +70,7 @@ typedef struct {
   uint8_t readbuffer[1];
   // uint8_t packetbuffer[4];  // 20240723 ~ disabled, unused
   uint8_t streambuffer[64];  /* Normal speed max buffer for TinyUSB */
-  uint8_t sid_states[4][29];  /* Stores states of each SID */
+  uint8_t sid_states[4][32];  /* Stores states of each SID ~ 4 sids max*/
   uint8_t sidaddress;
   int fmopl;
   unsigned int index;

@@ -27,52 +27,59 @@
 #define _USBSID_H_
 #pragma once
 
+// #define _GNU_SOURCE
 
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/time.h>
+#include <time.h>
 
+/* Pico libs */
 #include "pico/stdlib.h"
-#include "pico/types.h"      /* absolute_time_t */
+#include "pico/types.h"            /* absolute_time_t */
 // #define __STDC_FORMAT_MACROS
 // #include <inttypes.h>
-#include "pico/multicore.h"  /* Multicore */
-#include "hardware/pio.h"    /* Programmable I/O (PIO) API */
+#include "pico/multicore.h"        /* Multicore */
+#include "pico/sem.h"              /* Semaphores */
+#include "hardware/pio.h"          /* Programmable I/O (PIO) API */
+#include "hardware/dma.h"
+#include "hardware/irq.h"          /* Hardware interrupt handling */
+// #include "hardware/adc.h"          /* Analog to Digital Converter (ADC) API */
+#include "hardware/pwm.h"          /* Hardware Pulse Width Modulation (PWM) API */
+#include "hardware/uart.h"
 #include "hardware/clocks.h"
-// #include "hardware/irq.h"    /* Hardware interrupt handling */
-// #include "hardware/adc.h"    /* Analog to Digital Converter (ADC) API */
+#include "hardware/timer.h"
+#include "hardware/gpio.h"
+#include "hardware/structs/sio.h"  /* Pico SIO structs */
 
+/* TinyUSB libs */
+#if __has_include("bsp/board_api.h") /* Needed to account for update in tinyUSB */
+#include "bsp/board_api.h"
+#else
 #include "bsp/board.h"       /* Tiny USB Boards Abstraction Layer */
+#endif
 #include "tusb.h"            /* Tiny USB stack */
 #include "tusb_config.h"     /* Tiny USB configuration */
 
+/* PIO */
 #include "clock.pio.h"       /* Square wave generator */
+#include "bus_control.pio.h" /* Busje komt zo! */
 #if defined(USE_RGB)
 #include "ws2812.pio.h"      /* RGB led handler */
 #endif
 
-/* Debugging enabling overrides */
-/* #define USBSID_UART */
-/* #define MEM_DEBUG */
-/* #define USBSID_DEBUG */
-/* #define ADDR_DEBUG */
-/* #define USBIO_DEBUG */
-/* #define ASID_DEBUG */
-/* #define USBSIDGPIO_DEBUG */
-
+#include "logging.h"
 #include "mcu.h"   /* rp2040 mcu */
 #include "gpio.h"  /* GPIO configuration */
-#include "midi.h"  /* Midi */
-#include "asid.h"  /* ASID */
-#include "sid.h"   /* SID */
 
 #ifdef __cplusplus
     extern "C" {
 #endif
 
-
-/* SIDTYPES ~ Defaults to 0
+/* SIDTYPE ~ Defaults to 0
  *
  * 0: Single SID config
  *    SID socket 1 filled with either of
@@ -123,14 +130,14 @@
 #define SIDTYPE5 5
 
 /* Default config for SID type */
-#ifndef SIDTYPES
-#define SIDTYPES SIDTYPE0
+#ifndef SIDTYPE
+#define SIDTYPE SIDTYPE0
 #endif
 
 /* SID type masks for GPIO */
 #define SIDUMASK 0xFF00
 #define SIDLMASK 0xFF
-#if SIDTYPES == SIDTYPE0
+#if SIDTYPE == SIDTYPE0
 #define NUMSIDS  1
 #define SID1ADDR 0xD400  /* SID 1 - socket 1 */
 #define SID1MASK 0x1F
@@ -140,7 +147,7 @@
 #define SID3MASK 0x0
 #define SID4ADDR 0x0
 #define SID4MASK 0x0
-#elif SIDTYPES == SIDTYPE1
+#elif SIDTYPE == SIDTYPE1
 #define NUMSIDS  2
 #define SID1ADDR 0xD400  /* SID 1 - socket 1 */
 #define SID1MASK 0x1F
@@ -150,7 +157,7 @@
 #define SID3MASK 0x0
 #define SID4ADDR 0x0
 #define SID4MASK 0x0
-#elif SIDTYPES == SIDTYPE2
+#elif SIDTYPE == SIDTYPE2
 #define NUMSIDS  2
 #define SID1ADDR 0xD400  /* SID 1 - socket 1 */
 #define SID1MASK 0x1F
@@ -160,7 +167,7 @@
 #define SID3MASK 0x0
 #define SID4ADDR 0x0
 #define SID4MASK 0x0
-#elif SIDTYPES == SIDTYPE3
+#elif SIDTYPE == SIDTYPE3
 #define NUMSIDS  3
 #define SID1ADDR 0xD400  /* SID 1 - socket 1 */
 #define SID1MASK 0x1F
@@ -170,7 +177,7 @@
 #define SID3MASK 0x5F
 #define SID4ADDR 0x0
 #define SID4MASK 0x0
-#elif SIDTYPES == SIDTYPE4  /* SKPico only */
+#elif SIDTYPE == SIDTYPE4  /* SKPico only */
 #define NUMSIDS  4
 #define SID1ADDR 0xD400  /* SID 1 - socket 1 */
 #define SID1MASK 0x1F
@@ -180,7 +187,7 @@
 #define SID3MASK 0x5F
 #define SID4ADDR 0xD460  /* SID 4 - socket 2 */
 #define SID4MASK 0x7F
-#elif SIDTYPES == SIDTYPE5  /* SKPico only */
+#elif SIDTYPE == SIDTYPE5  /* SKPico only */
 #define NUMSIDS  4
 #define SID1ADDR 0xD400  /* SID 1 - socket 1 */
 #define SID1MASK 0x1F
@@ -192,6 +199,13 @@
 #define SID4MASK 0x7F
 #endif
 
+#define BYTES_EXPECTED 4
+
+#if defined(DEBUG_TIMING)
+uint64_t t1, t2, t3, t4 = 0;
+uint64_t wdiff, wwdiff, rdiff, rrdiff = 0;
+uint8_t debug_n = 0;
+#endif
 
 /* Global vars */
 
@@ -201,7 +215,8 @@ enum
   READ,
   PAUSE,
   RESET_SID,
-  RESET_USB
+  RESET_USB,
+  CLEAR_BUS
 };
 
 enum  /* LED breathe levels */
@@ -214,74 +229,14 @@ enum  /* LED breathe levels */
   HZ_MAX = 40
 };
 
-extern uint8_t memory[65536];
-extern uint16_t vue;
+static uint8_t sid_memory[(0x20 * NUMSIDS)];
+static uint16_t vue;
 static uint32_t breathe_interval_ms = BREATHE_ON;
-static uint32_t read = 0, write = 0;
-static intptr_t usbdata = 0, pwm_value = 0, updown = 1;
-static uintptr_t pause, reset, rw, addr, val;
+static uint32_t cdcread = 0, cdcwrite = 0;
+static intptr_t usb_connected = 0, usbdata = 0, pwm_value = 0, updown = 1;
+static uintptr_t addr, val;
 static char dtype = 'E', cdc = 'C', asid = 'A', midi = 'M', wusb = 'W';
-
-// static uint64_t read_uS, write_uS;
-
-#if defined(USE_RGB)  /* RGB LED */
-
-#define IS_RGBW false
-#define BRIGHTNESS 127  /* Half of max brightness */
-
-static bool rgb_mode;
-static uint ws2812_sm;
-static uint8_t r_ = 0, g_ = 0, b_ = 0;
-static unsigned char o1 = 0, o2 = 0, o3 = 0, o4 = 0, o5 = 0, o6 = 0;
-static const __not_in_flash( "mydata" ) unsigned char color_LUT[ 43 ][ 6 ][ 3 ] =
-{
-  /* Red Green Blue Yellow Cyan Purple*/
-  {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}},
-  {{6, 0, 0}, {0, 6, 0}, {0, 0, 6}, {6, 6, 0}, {0, 6, 6}, {6, 0, 6}},
-  {{12, 0, 0}, {0, 12, 0}, {0, 0, 12}, {12, 12, 0}, {0, 12, 12}, {12, 0, 12}},
-  {{18, 0, 0}, {0, 18, 0}, {0, 0, 18}, {18, 18, 0}, {0, 18, 18}, {18, 0, 18}},
-  {{24, 0, 0}, {0, 24, 0}, {0, 0, 24}, {24, 24, 0}, {0, 24, 24}, {24, 0, 24}},
-  {{30, 0, 0}, {0, 30, 0}, {0, 0, 30}, {30, 30, 0}, {0, 30, 30}, {30, 0, 30}},
-  {{36, 0, 0}, {0, 36, 0}, {0, 0, 36}, {36, 36, 0}, {0, 36, 36}, {36, 0, 36}},
-  {{42, 0, 0}, {0, 42, 0}, {0, 0, 42}, {42, 42, 0}, {0, 42, 42}, {42, 0, 42}},
-  {{48, 0, 0}, {0, 48, 0}, {0, 0, 48}, {48, 48, 0}, {0, 48, 48}, {48, 0, 48}},
-  {{54, 0, 0}, {0, 54, 0}, {0, 0, 54}, {54, 54, 0}, {0, 54, 54}, {54, 0, 54}},
-  {{60, 0, 0}, {0, 60, 0}, {0, 0, 60}, {60, 60, 0}, {0, 60, 60}, {60, 0, 60}},
-  {{66, 0, 0}, {0, 66, 0}, {0, 0, 66}, {66, 66, 0}, {0, 66, 66}, {66, 0, 66}},
-  {{72, 0, 0}, {0, 72, 0}, {0, 0, 72}, {72, 72, 0}, {0, 72, 72}, {72, 0, 72}},
-  {{78, 0, 0}, {0, 78, 0}, {0, 0, 78}, {78, 78, 0}, {0, 78, 78}, {78, 0, 78}},
-  {{84, 0, 0}, {0, 84, 0}, {0, 0, 84}, {84, 84, 0}, {0, 84, 84}, {84, 0, 84}},
-  {{90, 0, 0}, {0, 90, 0}, {0, 0, 90}, {90, 90, 0}, {0, 90, 90}, {90, 0, 90}},
-  {{96, 0, 0}, {0, 96, 0}, {0, 0, 96}, {96, 96, 0}, {0, 96, 96}, {96, 0, 96}},
-  {{102, 0, 0}, {0, 102, 0}, {0, 0, 102}, {102, 102, 0}, {0, 102, 102}, {102, 0, 102}},
-  {{108, 0, 0}, {0, 108, 0}, {0, 0, 108}, {108, 108, 0}, {0, 108, 108}, {108, 0, 108}},
-  {{114, 0, 0}, {0, 114, 0}, {0, 0, 114}, {114, 114, 0}, {0, 114, 114}, {114, 0, 114}},
-  {{120, 0, 0}, {0, 120, 0}, {0, 0, 120}, {120, 120, 0}, {0, 120, 120}, {120, 0, 120}},
-  {{126, 0, 0}, {0, 126, 0}, {0, 0, 126}, {126, 126, 0}, {0, 126, 126}, {126, 0, 126}},
-  {{132, 0, 0}, {0, 132, 0}, {0, 0, 132}, {132, 132, 0}, {0, 132, 132}, {132, 0, 132}},
-  {{138, 0, 0}, {0, 138, 0}, {0, 0, 138}, {138, 138, 0}, {0, 138, 138}, {138, 0, 138}},
-  {{144, 0, 0}, {0, 144, 0}, {0, 0, 144}, {144, 144, 0}, {0, 144, 144}, {144, 0, 144}},
-  {{150, 0, 0}, {0, 150, 0}, {0, 0, 150}, {150, 150, 0}, {0, 150, 150}, {150, 0, 150}},
-  {{156, 0, 0}, {0, 156, 0}, {0, 0, 156}, {156, 156, 0}, {0, 156, 156}, {156, 0, 156}},
-  {{162, 0, 0}, {0, 162, 0}, {0, 0, 162}, {162, 162, 0}, {0, 162, 162}, {162, 0, 162}},
-  {{168, 0, 0}, {0, 168, 0}, {0, 0, 168}, {168, 168, 0}, {0, 168, 168}, {168, 0, 168}},
-  {{174, 0, 0}, {0, 174, 0}, {0, 0, 174}, {174, 174, 0}, {0, 174, 174}, {174, 0, 174}},
-  {{180, 0, 0}, {0, 180, 0}, {0, 0, 180}, {180, 180, 0}, {0, 180, 180}, {180, 0, 180}},
-  {{186, 0, 0}, {0, 186, 0}, {0, 0, 186}, {186, 186, 0}, {0, 186, 186}, {186, 0, 186}},
-  {{192, 0, 0}, {0, 192, 0}, {0, 0, 192}, {192, 192, 0}, {0, 192, 192}, {192, 0, 192}},
-  {{198, 0, 0}, {0, 198, 0}, {0, 0, 198}, {198, 198, 0}, {0, 198, 198}, {198, 0, 198}},
-  {{204, 0, 0}, {0, 204, 0}, {0, 0, 204}, {204, 204, 0}, {0, 204, 204}, {204, 0, 204}},
-  {{210, 0, 0}, {0, 210, 0}, {0, 0, 210}, {210, 210, 0}, {0, 210, 210}, {210, 0, 210}},
-  {{216, 0, 0}, {0, 216, 0}, {0, 0, 216}, {216, 216, 0}, {0, 216, 216}, {216, 0, 216}},
-  {{222, 0, 0}, {0, 222, 0}, {0, 0, 222}, {222, 222, 0}, {0, 222, 222}, {222, 0, 222}},
-  {{228, 0, 0}, {0, 228, 0}, {0, 0, 228}, {228, 228, 0}, {0, 228, 228}, {228, 0, 228}},
-  {{234, 0, 0}, {0, 234, 0}, {0, 0, 234}, {234, 234, 0}, {0, 234, 234}, {234, 0, 234}},
-  {{240, 0, 0}, {0, 240, 0}, {0, 0, 240}, {240, 240, 0}, {0, 240, 240}, {240, 0, 240}},
-  {{246, 0, 0}, {0, 246, 0}, {0, 0, 246}, {246, 246, 0}, {0, 246, 246}, {246, 0, 246}},
-  {{252, 0, 0}, {0, 252, 0}, {0, 0, 252}, {252, 252, 0}, {0, 252, 252}, {252, 0, 252}}
-};
-#endif
-
+static int sid_pause = 0;
 
 /* WebUSB Vars */
 
@@ -294,8 +249,6 @@ enum
 extern uint8_t const desc_ms_os_20[];
 
 #define URL  "github.com/LouDnl/USBSID-Pico"
-
-// extern const tusb_desc_webusb_url_t desc_url;
 
 static const tusb_desc_webusb_url_t desc_url =
 {
@@ -318,35 +271,15 @@ static bool web_serial_connected = false;
  * Byte 2 ~ address destination byte
  * Byte 3 ~ data byte
  *
- * 4 byte build up MSB -> LSB:
-`* Byte 0 : see enum above
- * Byte 1 : address range e.g. $D4
- * Byte 2 : address e.g. $1C
- * Byte 3 : value to write e.g. $FF
- *
- * Example MSB -> LSB:
- * 0x00D4181A
- * Byte 0 0x10 ~ 0b00010000 no reset, write mode
- * Byte 1 0xD4 ~ address range $D400 ~ $DFFF
- * Byte 2 0x18 ~ address
- * Byte 3 0x1A ~ value to write
-*/
-static unsigned char buffer[4];
+ */
+static uint8_t buffer[4];
 
 /* Outgoing USB data buffer
  *
- * 4 bytes:
+ * 1 byte:
  * byte 0 : value to return
- * byte 1~3 : copies of value to return
  */
-static unsigned char data[4];
-
-/* SID read data buffer
- *
- * Exactly 1 byte with data pin values:
- * byte 0 : value read from the SID
- */
-static unsigned char rdata[1];
+static uint8_t data[1];
 
 
 /* Setup */
@@ -356,41 +289,26 @@ static unsigned char rdata[1];
  * _WILL_ slow down SID play
  */
 void init_logging(void);
-/* Create fake 16bit memory filled with nops */
-void init_memory(void);
 /* Init 1MHz square wave output */
 void square_wave(void);
 /* Detect clock signal */
 int detect_clock(void);
-#if defined(USE_RGB)
-/* Init the RGB LED pio */
-void init_rgb(void);
-/* Experimental function for detecting the SMPS
- * type on GPIO23/GPIO24 */
-int detect_smps(void);
-#endif
 
 
 /* Buffer tasks */
 
-/* Handle the received data */
-void handle_buffer_task(unsigned char buff[4]);
-/* Handle the received Sysex ASID data */
-void handle_asidbuffer_task(uint8_t a, uint8_t d);
+/* Process received cdc data */
+void __not_in_flash_func(handle_buffer_task)(void);
+/* Process received Sysex ASID data */
+// void handle_asidbuffer_task(uint8_t a, uint8_t d);
 
 
 /* IO Tasks */
 
 /* Read from host to device */
-void read_task(void);
+void __not_in_flash_func(read_task)(void);
 /* Write from device to host */
-void write_task(void);
-/* Read from host to device */
-void webserial_read_task(void);
-/* Write from device to host */
-void webserial_write_task(void);
-/* Handle incoming midi data */
-void midi_task(void);
+void __not_in_flash_func(write_task)(void);
 
 
 /* LED tasks */
@@ -404,18 +322,10 @@ void led_breathe_task(void);
 /* Supporting functions */
 
 /* Address conversion */
-uint16_t sid_address(uint16_t addr);
+uint16_t __not_in_flash_func(sid_address)(uint16_t addr);
 /* Map n in range x to range y
  * Source: https://stackoverflow.com/a/61000581 */
 long map(long x, long in_min, long in_max, long out_min, long out_max);
-#if defined(USE_RGB)
-/* Write a single RGB pixel */
-void put_pixel(uint32_t pixel_grb);
-/* Generate uint32_t with RGB colors */
-uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b);
-/* Generate RGB brightness */
-uint8_t rgbb(double inp);
-#endif
 
 
 /* Device callbacks */
@@ -435,11 +345,11 @@ void tud_resume_cb(void);
 
 /* CDC callbacks */
 
-/* Invoked when received new data */
+/* Invoked when new data is received from tud_task() */
 void tud_cdc_rx_cb(uint8_t itf);
 /* Invoked when received `wanted_char` */
 void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char);
-/* Invoked when last rx transfer finished */
+/* Invoked when last rx transfer is completed */
 void tud_cdc_tx_complete_cb(uint8_t itf);
 /* Invoked when line state DTR & RTS are changed via SET_CONTROL_LINE_STATE */
 void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts);
