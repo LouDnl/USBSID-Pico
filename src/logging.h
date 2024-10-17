@@ -26,35 +26,24 @@
 #pragma once
 
 #ifdef __cplusplus
- extern "C" {
+  extern "C" {
 #endif
 
-#ifdef USBSID_UART
 
+/* Binary printing */
 #include "macros.h"
 
-#ifdef USBSID_DEBUG
-#define DBG(...) printf(__VA_ARGS__)
-#else
-#define DBG(...) ((void)0)
-#endif
-
-#ifdef BUFF_DEBUG
-#define BDBG(...) printf(__VA_ARGS__)
-#else
-#define BDBG(...) ((void)0)
-#endif
-
-#ifdef ADDR_DEBUG
-#define ADBG(...) printf(__VA_ARGS__)
-#else
-#define ADBG(...) ((void)0)
-#endif
 
 #ifdef MEM_DEBUG
 #define MDBG(...) printf(__VA_ARGS__)
 #else
 #define MDBG(...) ((void)0)
+#endif
+
+#ifdef USBSID_DEBUG
+#define DBG(...) printf(__VA_ARGS__)
+#else
+#define DBG(...) ((void)0)
 #endif
 
 #ifdef USBIO_DEBUG
@@ -63,22 +52,33 @@
 #define IODBG(...) ((void)0)
 #endif
 
+#ifdef CONFIG_DEBUG
+#define CFG(...) printf(__VA_ARGS__)
+#else
+#define CFG(...) ((void)0)
+#endif
+
 #ifdef USBSIDGPIO_DEBUG
 #define GPIODBG(...) printf(__VA_ARGS__)
 #else
-#define GPIODBG(...)
+#define GPIODBG(...) ((void)0)
 #endif
 
-#ifdef DEBUG_TIMING
-#define TIMING(...) printf(__VA_ARGS__)
+#ifdef MIDI_DEBUG
+#define MIDBG(...) printf(__VA_ARGS__)
 #else
-#define TIMING(...)
+#define MIDBG(...) ((void)0)
 #endif
 
-#endif /* USBSID_UART */
+#ifdef MIDIVOICE_DEBUG
+#define MVDBG(...) printf(__VA_ARGS__)
+#else
+#define MVDBG(...) ((void)0)
+#endif
+
 
 #ifdef __cplusplus
- }
+  }
 #endif
 
 #endif /* _USBSID_LOGGING_H_ */

@@ -27,6 +27,11 @@
 #define _MACROS_H_
 #pragma once
 
+#ifdef __cplusplus
+ extern "C" {
+#endif
+
+
 /* --- PRINTF_BYTE_TO_BINARY macro's --- */
 #define PRINTF_BINARY_PATTERN_INT8 "%c%c%c%c%c%c%c%c"
 #define PRINTF_BYTE_TO_BINARY_INT8(i) \
@@ -51,5 +56,10 @@
   PRINTF_BINARY_PATTERN_INT32 PRINTF_BINARY_PATTERN_INT32
 #define PRINTF_BYTE_TO_BINARY_INT64(i) \
   PRINTF_BYTE_TO_BINARY_INT32((i) >> 32), PRINTF_BYTE_TO_BINARY_INT32(i)
+
+
+#ifdef __cplusplus
+ }
+#endif
 
 #endif /* _MACROS_H_ */

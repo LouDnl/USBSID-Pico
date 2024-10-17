@@ -3,15 +3,11 @@
  * MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer,
  * phone or ASID supporting player
  *
- * mcu.h
+ * globals.h
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
- * The contents of this file are based upon and heavily inspired by the sourcecode from
- * BusPirate5 by DangerousPrototypes:
- * https://github.com/DangerousPrototypes/BusPirate5-firmware/blob/main/pirate/mcu.h
- *
- * Any licensing conditions from the above named source apply to this code
+ * Copyright (c) 2024 LouD
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,23 +23,46 @@
  *
  */
 
-#ifndef _MCU_H_
-#define _MCU_H_
+#ifndef _USBSIDGLOBALS_H_
+#define _USBSIDGLOBALS_H_
 #pragma once
 
-#include "pico/stdlib.h"
+#ifdef __cplusplus
+  extern "C" {
+#endif
 
-/* https://forums.raspberrypi.com/viewtopic.php?p=1928868#p1928868 */
-/* Reset rp2040 register */
-#define AIRCR_Register (*((volatile uint32_t*)(PPB_BASE + 0x0ED0C)))
-/* Reset rp2040 using the reset register */
-#define RESET_PICO() AIRCR_Register = 0x5FA0004;
 
-/* Retrieve the rp2040 mcu unique id */
-uint64_t mcu_get_unique_id(void);
-/* Reset the rp2040 mcu */
-void mcu_reset(void);
-/* Jump to rp2040 mcu bootloader */
-void mcu_jump_to_bootloader(void);
+/* Default includes */
+#include <stdint.h>
 
-#endif /* _MCU_H_ */
+
+/* USBSID command byte */
+enum
+{
+  WRITE = 0,      /* 0 */
+  READ,           /* 1 */
+  PAUSE,          /* 2 */
+  RESET_SID,      /* 3 */
+  RESET_MCU,      /* 4 */
+  CLEAR_BUS,      /* 5 */
+  BOOTLOADER,     /* 6 */
+};
+
+/* USB data type */
+extern char dtype, ntype, cdc, asid, midi, wusb;
+
+/* WebUSB globals */
+#define URL  "/github.com/LouDnl/USBSID-Pico"
+enum
+{
+  VENDOR_REQUEST_WEBUSB = 1,
+  VENDOR_REQUEST_MICROSOFT = 2
+};
+extern uint8_t const desc_ms_os_20[];
+
+
+#ifdef __cplusplus
+  }
+#endif
+
+#endif /* _USBSIDGLOBALS_H_ */

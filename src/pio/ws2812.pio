@@ -7,9 +7,13 @@
 ; This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
 ; File author: LouD
 ;
+; Copyright (c) 2024 LouD
+;
+; The contents of this file are based upon and heavily inspired by the sourcecode from
 ; Source: https://github.com/raspberrypi/pico-examples/blob/master/pio/ws2812/ws2812.pio
 ;
-; Any licensing conditions from the above named source automatically apply to this code
+; Any licensing conditions from the above named source automatically
+; apply to this code
 ;
 ; This program is free software: you can redistribute it and/or modify
 ; it under the terms of the GNU General Public License as published by
@@ -22,10 +26,6 @@
 ;
 ; You should have received a copy of the GNU General Public License
 ; along with this program. If not, see <http://www.gnu.org/licenses/>.
-;
-; Description:
-; Repeatedly get one word of data from the TX FIFO, stalling when the FIFO is
-; empty. Write the least significant bit to the OUT pin group.
 ;
 
 .program ws2812
@@ -61,7 +61,6 @@ static inline void ws2812_program_init(PIO pio, uint sm, uint offset, uint pin, 
   sm_config_set_sideset_pins(&c, pin);
   sm_config_set_out_shift(&c, false, true, rgbw ? 32 : 24);
   sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
-
   int cycles_per_bit = ws2812_T1 + ws2812_T2 + ws2812_T3;
   float div = clock_get_hz(clk_sys) / (freq * cycles_per_bit);
   sm_config_set_clkdiv(&c, div);
