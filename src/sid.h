@@ -23,31 +23,56 @@
  *
  */
 
-#ifndef SID_H_
-#define SID_H_
+#ifndef _SID_H_
+#define _SID_H_
 #pragma once
 
+#ifdef __cplusplus
+  extern "C" {
+#endif
+
+
+/* Default includes */
 #include <stdint.h>
 
+
+/* Clock speeds */
 typedef enum {
-    CLOCK_DEFAULT = 1000000,
-    CLOCK_PAL     = 985248,
-    CLOCK_NTSC    = 1022727,
-    CLOCK_DREAN   = 1023440
+    CLOCK_DEFAULT  = 1000000,  /* @125MHz clock ~ 125000000 / 62,5f = 2000000 / 2 = 1000000 == 1.00MHz @ 125MHz and 1.06MHz @ 133MHz */
+    CLOCK_PAL      = 985248,   /* @125MHz clock ~ 125000000 / 63,435804995f = 1970496,000009025 / 2 = 985248,000004513 */
+    CLOCK_NTSC     = 1022727,  /* @125MHz clock ~ 125000000 / 61,111127407f = 2045454,000013782 / 2 = 1022727,000006891 */
+    CLOCK_DREAN    = 1023440   /* @125MHz clock ~ 125000000 / 61,068553115f = 2046879,999999489 / 2 = 1023439,999999745 */
 } clock_rates;
 
+/* Clock speed translation */
+enum config_clockrates
+{
+    DEFAULT = CLOCK_DEFAULT,  /* 0 */
+    PAL     = CLOCK_PAL,      /* 1 */
+    NTSC    = CLOCK_NTSC,     /* 2 */
+    DREAN   = CLOCK_DREAN,    /* 3 */
+};
+
+/* Clock speed array */
+static const enum config_clockrates clockrates[] = { DEFAULT, PAL, NTSC, DREAN };
+
+/* Hertz ~ refresh rates */
 typedef enum {
     HZ_DEFAULT = 20000, // 50Hz ~ 20000 == 20us
     HZ_50 = 19950,      // 50Hz ~ 20000 == 20us / 50.125Hz ~ 19.950124688279us exact
     HZ_60 = 16715       // 60Hz ~ 16667 == 16.67us / 59.826Hz ~ 16.715140574332 exact
 } hertz_values;
 
+/* Masks 🤿 we use */
 typedef enum {
-    DEFAULT = 0xFF,
+    BYTE = 0xFF,
     L_NIBBLE = 0xF0,
-    R_NIBBLE = 0x0F,
-    VOICE_FREQLO = DEFAULT,
-    VOICE_FREQHI = DEFAULT,
+    R_NIBBLE = 0xF,
+    TRIPLE_NIBBLE = 0xFFF,
+    NIBBLE_3 = 0xF00,
+    H_BYTE = 0xFF00,
+    VOICE_FREQLO = BYTE,
+    VOICE_FREQHI = BYTE,
 } register_masks;
 
 /*
@@ -83,6 +108,28 @@ static const uint8_t sid_registers[] =
     0x1B,
     /* Envelope Voice 3 */
     0x1C
+};
+
+enum {
+  /* sid_states ~  SID registers */
+  /* VOICE 1 */
+  NOTELO = 0,
+  NOTEHI = 1,
+  PWMLO  = 2,
+  PWMHI  = 3,
+  CONTR  = 4,
+  ATTDEC = 5,
+  SUSREL = 6,
+  /* VOICE 2 = + 7 */
+  /* VOICE 3 = + 14 */
+  FC_LO  = 21,
+  FC_HI  = 22,
+  RESFLT = 23,
+  MODVOL = 24,
+  POTX   = 25,
+  POTY   = 26,
+  V3_OSC = 27,
+  V3_ENV = 28
 };
 
 /* HEX DEC Attack(Time/Cycle) Decay(Time/Cycle) */
@@ -209,6 +256,12 @@ static const uint32_t musical_scale_values[] =
     0x102F0,  // 95   B7    3951.06   66288
 };
 
-// static const uint16_t notes[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "H"};
+/* 12 musical note notations */
+static const char notes[12][2] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "H"};
 
-#endif /* SID_H_ */
+
+#ifdef __cplusplus
+  }
+#endif
+
+#endif /* _SID_H_ */

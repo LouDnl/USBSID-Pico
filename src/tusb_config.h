@@ -32,17 +32,17 @@
 
 #ifndef _TUSB_CONFIG_H_
 #define _TUSB_CONFIG_H_
-#pragma once
 
 #ifdef __cplusplus
- extern "C" {
+  extern "C" {
 #endif
+
 
 //--------------------------------------------------------------------+
 // Board Specific Configuration
 //--------------------------------------------------------------------+
 
-#define CFG_TUSB_MCU    OPT_MCU_RP2040
+#define CFG_TUSB_MCU OPT_MCU_RP2040
 
 // RHPort number used for device can be defined by board.mk, default to port 0
 #ifndef BOARD_TUD_RHPORT
@@ -51,7 +51,7 @@
 
 // RHPort max operational speed can defined by board.mk
 #ifndef BOARD_TUD_MAX_SPEED
-#define BOARD_TUD_MAX_SPEED   OPT_MODE_FULL_SPEED
+#define BOARD_TUD_MAX_SPEED   OPT_MODE_FULL_SPEED  /* Boo! Can't use HIGH speed 😢 */
 #define CFG_TUSB_RHPORT0_MODE (OPT_MODE_DEVICE | BOARD_TUD_MAX_SPEED)  /* High speed with TinyUSB is not available for rp2040*/
 #endif
 
@@ -126,8 +126,9 @@
 #define CFG_TUD_VENDOR_RX_BUFSIZE (TUD_OPT_HIGH_SPEED ? 512 : 64)
 #define CFG_TUD_VENDOR_TX_BUFSIZE (TUD_OPT_HIGH_SPEED ? 512 : 64)
 
+
 #ifdef __cplusplus
- }
+  }
 #endif
 
 #endif /* _TUSB_CONFIG_H_ */

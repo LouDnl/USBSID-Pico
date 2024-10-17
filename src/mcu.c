@@ -28,11 +28,12 @@
  */
 
 #include <stdio.h>
+
+#include "hardware/watchdog.h"
 #include "pico/stdlib.h"
 #include "pico/unique_id.h"
-#include "hardware/watchdog.h"
 #include "pico/bootrom.h"
-#include "mcu.h"
+
 
 uint64_t mcu_get_unique_id(void)
 {
@@ -44,7 +45,9 @@ uint64_t mcu_get_unique_id(void)
 
 void mcu_reset(void)
 {
- 	watchdog_enable(1, 1);
+ 	sleep_ms(100);  // sleep some ms to let commands prior to reset settle or finish
+	/* watchdog_enable(1, 1); */
+	watchdog_reboot( 0, 0, 0 );
 	while(1);
 }
 

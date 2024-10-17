@@ -7,6 +7,8 @@
 ; This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
 ; File author: LouD
 ;
+; Copyright (c) 2024 LouD
+;
 ; This program is free software: you can redistribute it and/or modify
 ; it under the terms of the GNU General Public License as published by
 ; the Free Software Foundation, version 2.
@@ -18,10 +20,6 @@
 ;
 ; You should have received a copy of the GNU General Public License
 ; along with this program. If not, see <http://www.gnu.org/licenses/>.
-;
-; Description:
-; Repeatedly get one word of data from the TX FIFO, stalling when the FIFO is
-; empty. Write the least significant bit to the OUT pin group.
 ;
 
 .define PUBLIC PHI 22

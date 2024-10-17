@@ -21,112 +21,253 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 ####
-cmake_minimum_required(VERSION 3.23)
 
-set(PROJECT_NAME usbsidpico)  # projectname
-set(PROJECT_VERSION "0.0.2-ALPHA")
-set(CMAKE_BUILD_TYPE Debug)  # build with debug symbols
+### Cmake minimum
+cmake_minimum_required(VERSION 3.17)
+
+### Project
+set(PROJECT_NAME usbsidpico)
+set(PROJECT_VERSION "0.2.0-BETA.20241016")  # Must be the same as in config.h
+set(MAGIC_SMOKE "20241016")  # DATEOFRELEASE
+
+### Optimization and debugging
+SET(DEBUG_SYMBOLS 0)
+SET(DEBUGGING 0)
+SET(OPTIMIZATIONS 3)
+
+### Enable debug logging
+# NOTICE: ENABLING THESE DEBUGGING DEFINITIONS WILL HAVE SIGNIFICANT IMPACT AND WILL DELAY PLAYING!
+set(USBSID_DEBUGGING 1)   # Enable UART ~ mandatory enable for all other logging types
+set(MEMORY_LOGGING 0)     # Enable memory map of SID 1 voices printing
+set(DEFAULT_DEBUGGING 1)  # Enable debugging in usbsid.c
+set(USBIO_DEBUGGING 0)    # Enable debugging in usbsid.c
+set(CONFIG_DEBUGGING 1)   # Enable debugging in config.c
+set(GPIOBUS_DEBUGGING 0)  # Enable debugging in gpio.c
+set(MIDI_DEBUGGING 0)     # Enable debugging in midi.c
+set(MIDIVOICE_DEBUGGING 0)     # Enable debugging in midi.c
+
+
+#### You no touchy after this line
+
+### Target board
+# set(PICO_PLATFORM rp2350-arm-s)
+# set(PICO_BOARD pico2)
+
+### Version validation
+if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/src/config.h)
+  file(STRINGS ${CMAKE_CURRENT_LIST_DIR}/src/config.h VALIDATION_FILE)
+  set(VALIDATION_SUCCESS False)
+  set(VALIDATION_LINE "#define PROJECT_VERSION")
+  while(VALIDATION_FILE)
+    list(POP_FRONT VALIDATION_FILE LINE)
+    if (LINE MATCHES ${VALIDATION_LINE})
+      string(REGEX REPLACE "^${VALIDATION_LINE} " "" VERSION ${LINE})
+      if(${VERSION} MATCHES ${PROJECT_VERSION})
+        set(REDUCTION_SUCCESS True)
+        message("VALIDATED config version ${VERSION} matches project version \"${PROJECT_VERSION}\"")
+        break()
+      else()
+      message("ERROR config version ${VERSION} does not match project version \"${PROJECT_VERSION}\"")
+        set(REDUCTION_SUCCESS False)
+        return()
+      endif()
+    endif()
+  endwhile()
+else()
+  message("ERROR config.h missing")
+endif()
+
+### Cmake compiler standard versions
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
+
+### Compilers to use for C and C++
+# set(CMAKE_C_COMPILER   arm-none-eabi-gcc)
+# set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
+set(PICO_COMPILER pico_arm_gcc)
+
+### Target environment path
+set(CMAKE_FIND_ROOT_PATH $ENV{PICO_ENV_PATH})
 set(TINYUSB_PATH ${PICO_SDK_PATH}/lib/tinyusb)
-# where is the target environment toolchain is located
-set(CMAKE_FIND_ROOT_PATH /home/loud/.pico-sdk/toolchain/13_2_Rel1/)
 
-set(FAMILY "rp2040")
-set(BOARD "raspberry_pi_pico")
+### Optimizations
+set(PICO_DEFAULT_FLOAT_IMPL pico_float_default)
+set(PICO_DEFAULT_DOUBLE_IMPL pico_double_default)
 
-### Executables
-list(APPEND FILENAMES
-  ${PROJECT_NAME}-singlesid
-  ${PROJECT_NAME}-singleskpico
-  ${PROJECT_NAME}-dualsid
-  ${PROJECT_NAME}-skpico-singlesid
-  ${PROJECT_NAME}-dualskpico
-  ${PROJECT_NAME}-dualskpico-mixed
+### Build with debug symbols
+if(DEBUG_SYMBOLS EQUAL 1)
+  set(CMAKE_BUILD_TYPE Debug)  # for debugging
+  set(PICO_DEOPTIMIZED_DEBUG 1)
+endif()
+
+### Define compile time debugging
+if(DEBUGGING EQUAL 0)
+  set(D_OPT -DNDEBUG)
+elseif(DEBUGGING EQUAL 1)
+  set(D_OPT -g1)
+elseif(DEBUGGING EQUAL 2)
+  set(D_OPT -g2)
+elseif(DEBUGGING EQUAL 3)
+  set(D_OPT -g3)
+endif()
+
+### Define compile time optimizations
+if(OPTIMIZATIONS EQUAL 0)
+  set(C_OPT -O0)
+elseif(OPTIMIZATIONS EQUAL 1)
+  set(C_OPT -Og)
+elseif(OPTIMIZATIONS EQUAL 2)
+  set(C_OPT -Ofast)
+elseif(OPTIMIZATIONS EQUAL 3)
+  set(C_OPT -O3)
+endif()
+
+### Compiler options
+# set(COMPILE_OPTS PRIVATE -Wno-maybe-uninitialized -save-temps -fverbose-asm -Ofast -fomit-frame-pointer -fmodulo-sched -fmodulo-sched-allow-regmoves -fgcse-sm -fgcse-las -finline-small-functions -fdelete-null-pointer-checks -fexpensive-optimizations)  # test
+set(COMPILE_OPTS PRIVATE
+  ${D_OPT}
+  -Wall
+  -Wunused
+  -Werror
+  -Wno-format
+  -Wno-unused-function
+  -Wno-maybe-uninitialized
+  -save-temps
+  ${C_OPT}
+  -fverbose-asm
+  -Wl,--wrap=ceil
+  -Wl,--wrap=memcpy
+  -Wl,--wrap=memset
+  -Wl,--wrap=__aeabi_memcpy
+  -Wl,--wrap=__aeabi_memset
+  -Wl,--wrap=__aeabi_memcpy4
+  -Wl,--wrap=__aeabi_memset4
+  -Wl,--wrap=__aeabi_memcpy8
+  -Wl,--wrap=__aeabi_memset8
+  -Wl,--wrap=printf
+  -Wl,--wrap=vprintf
+  -Wl,--wrap=puts
 )
-list(APPEND SIDTYPE 0 1 2 3 4 5)
 
-# default environment options
+message("Compile time flags: ${COMPILE_OPTS}")
+
+### Executable names
+list(APPEND FILENAMES
+  ${PROJECT_NAME}
+  ${PROJECT_NAME}-rgb
+)
+list(APPEND PICOTYPES "LED" "RGB")
+
+### Source files to compile
 set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/usbsid.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/config.c
   ${CMAKE_CURRENT_LIST_DIR}/src/gpio.c
-  # ${CMAKE_CURRENT_LIST_DIR}/src/midi.c
-  # ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/mcu.c
   ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c
-  )
-# COMPILE_OPTS -Wall -Werror -Wno-maybe-uninitialized -save-temps -fverbose-asm)
-set(COMPILE_OPTS PRIVATE -Wno-maybe-uninitialized -fverbose-asm)
+)
+
+### Libraries to link
 set(TARGET_LL
+  hardware_clocks
+  hardware_dma
+  hardware_flash
+  hardware_gpio
+  hardware_pio
+  hardware_pwm
+  hardware_resets
+  hardware_sync
+  hardware_timer
+  hardware_uart
+  pico_flash
+  pico_mem_ops
+  pico_multicore
   pico_stdlib
   pico_unique_id
-  pico_multicore
-  pico_stdio_usb
-  pico_stdio_uart
   pico_usb_reset_interface
   tinyusb_device
   tinyusb_board
-  hardware_gpio
-  hardware_clocks
-  hardware_resets
-  hardware_uart
-  hardware_irq
-  hardware_dma
-  hardware_timer
-  # hardware_adc
-  hardware_pwm
-  hardware_pio
 )
-set(PIO_BUS ${CMAKE_CURRENT_LIST_DIR}/src/bus_control.pio)
-set(PIO_CLOCK ${CMAKE_CURRENT_LIST_DIR}/src/clock.pio)
-# set(PIO_RGB ${CMAKE_CURRENT_LIST_DIR}/src/ws2812.pio)
+
+### Pio files
+set(PIO_BUS ${CMAKE_CURRENT_LIST_DIR}/src/pio/bus_control.pio)
+set(PIO_CLOCK ${CMAKE_CURRENT_LIST_DIR}/src/pio/clock.pio)
+set(PIO_RGB ${CMAKE_CURRENT_LIST_DIR}/src/pio/ws2812.pio)
+
+### Header folders to include
 set(TARGET_INCLUDE_DIRS PRIVATE
   .
   src
-  $ENV{PICO_SDK_PATH}/lib/tinyusb/hw
-  $ENV{PICO_SDK_PATH}/lib/tinyusb/src)
+  ${TINYUSB_PATH}/hw
+  ${TINYUSB_PATH}/src
+)
 
-# rp2040 sdk
+### Pico sdk path
+include($ENV{PICO_SDK_PATH}/pico_sdk_init.cmake)
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 include($ENV{PICO_EXTRAS_PATH}/external/pico_extras_import.cmake)
 
-# project
+### Project type
 project(${PROJECT_NAME} C CXX ASM)
 
-# init sdk
+### init sdk
 pico_sdk_init()
 
+### Include
 include_directories(".")
 
-# NOTICE: ENABLING THESE DEBUGGING DEFINITIONS WILL SIGNIFICANTLY DELAY PLAYING!
-## Enable UART
-add_compile_definitions(USBSID_UART=1)
-## Enable memory map of SID 1 voices printing
-add_compile_definitions(MEM_DEBUG=1)
-## Enable debugging in usbsid.c
-add_compile_definitions(USBSID_DEBUG=1)
-# add_compile_definitions(USBIO_DEBUG=1)
-# add_compile_definitions(ADDR_DEBUG=1)
-# add_compile_definitions(BUFF_DEBUG=1)
-## Enable debugging in midi.c
-# add_compile_definitions(MIDI_DEBUG=1)
-# add_compile_definitions(IOMIDI_DEBUG=1)
-## Enable debugging in asid.c
-# add_compile_definitions(ASID_DEBUG=1)
-## Enable debugging in gpio.c
-# add_compile_definitions(USBSIDGPIO_DEBUG=1)
+### Logging definitions
+if(USBSID_DEBUGGING EQUAL 1)
+  add_compile_definitions(USBSID_UART=1)
+  if(DEFAULT_DEBUGGING EQUAL 1)
+    add_compile_definitions(USBSID_DEBUG=1)
+  endif()
+  if(MEMORY_LOGGING EQUAL 1)
+    add_compile_definitions(MEM_DEBUG=1)
+  endif()
+  if(CONFIG_DEBUGGING EQUAL 1)
+    add_compile_definitions(CONFIG_DEBUG=1)
+  endif()
+  if(USBIO_DEBUGGING EQUAL 1)
+    add_compile_definitions(USBIO_DEBUG=1)
+  endif()
+  if(MIDI_DEBUGGING EQUAL 1)
+    add_compile_definitions(MIDI_DEBUG=1)
+  endif()
+  if(MIDIVOICE_DEBUGGING EQUAL 1)
+    add_compile_definitions(MIDIVOICE_DEBUG=1)
+  endif()
+  if(GPIOBUS_DEBUGGING EQUAL 1)
+    add_compile_definitions(USBSIDGPIO_DEBUG=1)
+  endif()
+endif()
 
-foreach(FILENAME SIDTYPE IN ZIP_LISTS FILENAMES SIDTYPE)
+### It escapes every damn time!
+add_compile_definitions(MAGIC_SMOKE=${MAGIC_SMOKE})
+
+### Compile targets
+foreach(FILENAME PICOTYPE IN ZIP_LISTS FILENAMES PICOTYPES)
   # set filename
   set(BUILD ${FILENAME})
-  message(STATUS "Building ${FILENAME} with SIDTYPE=${SIDTYPE}")
+  message(STATUS "Building ${FILENAME} with PICOTYPE=${PICOTYPE} and MAGIC_SMOKE=${MAGIC_SMOKE}")
   # executable
   add_executable(${BUILD} ${SOURCEFILES})
+  if(PICOTYPE STREQUAL "RGB")
+    target_compile_definitions(${BUILD} PRIVATE USBSID USE_RGB=1)
+  else()
+    target_compile_definitions(${BUILD} PRIVATE USBSID)
+  endif()
   # pio addition
   pico_generate_pio_header(${BUILD} ${PIO_BUS})
   pico_generate_pio_header(${BUILD} ${PIO_CLOCK})
+  if(PICOTYPE STREQUAL "RGB")
+    pico_generate_pio_header(${BUILD} ${PIO_RGB})
+  endif()
   # source files to compile
   target_sources(${BUILD} PUBLIC ${SOURCEFILES})
   target_compile_options(${BUILD} ${COMPILE_OPTS})
-  target_compile_definitions(${BUILD} PRIVATE USBSID SIDTYPE=${SIDTYPE})
   # tell the linker what libraries to link
   target_link_libraries(${BUILD} ${TARGET_LL})
   # target sid types
@@ -136,35 +277,6 @@ foreach(FILENAME SIDTYPE IN ZIP_LISTS FILENAMES SIDTYPE)
   # create map/bin/hex/uf2 file in addition to ELF.
   pico_add_extra_outputs(${BUILD})
   # enable uart output, disable usb output
-  pico_enable_stdio_uart(${BUILD} 1)
+  pico_enable_stdio_uart(${BUILD} 1)  # essentialy the same as LL pico_stdio_uart
   pico_enable_stdio_usb(${BUILD} 0)
 endforeach()
-
-# foreach(FILENAME SIDTYPE IN ZIP_LISTS FILENAMES SIDTYPES)
-#   # override filename for rgb compile
-#   set(FILENAME ${FILENAME}-rgb)
-#   # set filename
-#   set(BUILD ${FILENAME})
-#   message(STATUS "Building ${FILENAME} with SIDTYPE=${SIDTYPE}")
-#   # executable
-#   add_executable(${BUILD} ${SOURCEFILES})
-#   # pio addition
-#   pico_generate_pio_header(${BUILD} ${PIO_BUS})
-#   pico_generate_pio_header(${BUILD} ${PIO_CLOCK})
-#   pico_generate_pio_header(${BUILD} ${PIO_RGB})
-#   # source files to compile
-#   target_sources(${BUILD} PUBLIC ${SOURCEFILES})
-#   target_compile_options(${BUILD} ${COMPILE_OPTS})
-#   target_compile_definitions(${BUILD} PRIVATE USBSID SIDTYPES=${SIDTYPE} USE_RGB=1)
-#   # tell the linker what libraries to link
-#   target_link_libraries(${BUILD} ${TARGET_LL})
-#   # target sid types
-#   target_include_directories(${BUILD} ${TARGET_INCLUDE_DIRS})
-#   pico_set_program_name(${BUILD} "USBSIDPico")
-#   pico_set_program_version(${BUILD} $PROJECT_VERSION)
-#   # create map/bin/hex/uf2 file in addition to ELF.
-#   pico_add_extra_outputs(${BUILD})
-#   # enable uart output, disable usb output
-#   pico_enable_stdio_uart(${BUILD} 1)
-#   pico_enable_stdio_usb(${BUILD} 0)
-# endforeach()

@@ -33,17 +33,16 @@
 
 #include "midi.h"
 #include "asid.h"
-#include "usbsid.h"
+#include "globals.h"
 
-#ifdef ASID_DEBUG
-#define ASDBG(...) printf(__VA_ARGS__)
-#else
-#define ASDBG(...) ((void)0)
-#endif
 
-void handle_asid_message(uint8_t sid ,uint8_t* buffer, int size)
+/* GPIO externals */
+extern uint8_t bus_operation(uint8_t command, uint8_t address, uint8_t data);
+
+/* Well, it does what it does */
+void handle_asid_message(uint8_t sid, uint8_t* buffer, int size)
 {
-  (void)size;  /* unused at the moment */
+  (void)size;  /* Stop calling me fat, I'm just big boned! */
 
   unsigned int reg = 0;
   for (uint8_t mask = 0; mask < 4; mask++) {  /* no more then 4 masks */
@@ -54,13 +53,15 @@ void handle_asid_message(uint8_t sid ,uint8_t* buffer, int size)
           register_value |= 0x80;  /* the register_value needs its 8th MSB bit */
         }
         uint8_t address = asid_sid_registers[mask * 7 + bit];
-        handle_asidbuffer_task((address |= sid), register_value);
+        dtype = asid;  /* Set data type to asid */
+        bus_operation(0x10, (address |= sid), register_value);
         reg++;
       }
     }
   }
 }
 
+/* Spy vs Spy ? */
 void decode_asid_message(uint8_t* buffer, int size)
 {
   switch(buffer[2]) {
@@ -85,18 +86,20 @@ void decode_asid_message(uint8_t* buffer, int size)
       handle_asid_message(64, buffer, size);
       break;
     case 0x60:
-      midimachine.fmopl = 1;
-      #if defined(SIDTYPE1)
-      /* Not implemented yet */
-      #endif
+      midimachine.fmopl = 1;  /* Not implemented yet */
     default:
       break;
   }
 }
 
-void process_sysex(uint8_t* buffer, int size) // NOTE: UNNESCESSARY OVERHEAD IF ASID ONLY
+/* Is it ? */
+void process_sysex(uint8_t* buffer, int size)
 {
-  if (buffer[1] == 0x2D) {  /* 0x2D = ASID sysex message */
-    decode_asid_message(buffer, size);
-  }  // room for other sysex protocols
+  switch(buffer[1]) {
+    case 0x2D:  /* 0x2D = ASID sysex message */
+      decode_asid_message(buffer, size);
+      break;
+    default:
+      break;
+  }
 }

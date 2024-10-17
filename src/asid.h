@@ -35,12 +35,21 @@
 #define _ASID_H_
 #pragma once
 
+#ifdef __cplusplus
+  extern "C" {
+#endif
+
+
+/* Default includes */
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
+
+/* Pico libs */
+#include "pico/mem_ops.h"
 
 
+/* SID Register order for ASID */
 static const uint8_t asid_sid_registers[] =
 {
   /* register, bit */
@@ -74,6 +83,9 @@ static const uint8_t asid_sid_registers[] =
   0x12, // 27 <= secondary for reg 18
 };
 
-void process_sysex(uint8_t *buffer, int size);
+
+#ifdef __cplusplus
+  }
+#endif
 
 #endif /* _ASID_H_ */

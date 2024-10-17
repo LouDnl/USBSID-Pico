@@ -7,6 +7,9 @@
 ; This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
 ; File author: LouD
 ;
+; Copyright (c) 2024 LouD
+;
+; The contents of this file are based upon and heavily inspired by the sourcecode from
 ; Source: https://forums.raspberrypi.com/viewtopic.php?t=355595#p2131828
 ; Source: https://parthssharma.github.io/Pico/PIOSquareWave.html
 ;
@@ -33,14 +36,14 @@
 .program clock
 
 .wrap_target ; Free 0 cycle unconditional jump
-set pins, 1 ;Drive pin high, binary 1 <--- 250 ns execution time with 4MHz clock
-set pins, 2 ;Drive pin low,  binary 0 <--- 250 ns ;total 500 ns period
+set pins, 1  ; Drive pin high, binary 1 <--- 250 ns execution time with 4MHz clock
+set pins, 2  ; Drive pin low,  binary 0 <--- 250 ns ;total 500 ns period
 .wrap
 
 
 %c-sdk{
   /* Program to initialize the PIO */
-  static inline void clock_program_init(PIO pio, uint sm, uint offset, uint pin, float clk_div){
+  static inline void clock_program_init(PIO pio, uint sm, uint offset, uint pin, float clk_div) {
     pio_sm_config c = clock_program_get_default_config(offset); /* Get default configurations for the PIO state machine */
     sm_config_set_set_pins(&c, pin, 1);                         /* Set the state machine configurations on the given pin */
     sm_config_set_clkdiv(&c, clk_div);                          /* Set the state machine clock divider */
@@ -48,5 +51,11 @@ set pins, 2 ;Drive pin low,  binary 0 <--- 250 ns ;total 500 ns period
     pio_sm_set_consecutive_pindirs(pio, sm, pin, 2, true);      /* Use a state machine to set the pin direction for one pins for the PIO instance */
     pio_sm_init(pio, sm, offset, &c);                           /* Resets the state machine to a consistent state, and configures it */
     pio_sm_set_enabled(pio, sm, true);                          /* Enable or disable a PIO state machine */
+  }
+
+  static inline void clock_program_deinit(PIO pio, uint sm, uint offset, const struct pio_program clock_program) {
+    pio_sm_set_enabled(pio, sm, false);               /* Disable the PIO state machine */
+    pio_remove_program(pio, &clock_program, offset);  /* Remove the clock program at provided offset from the PIO state machine */
+    pio_sm_unclaim(pio, sm);                          /* Free the claimed PIO state machine */
   }
 %}

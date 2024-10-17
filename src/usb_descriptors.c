@@ -35,20 +35,19 @@
 #include "pico/stdlib.h"
 #include "pico/unique_id.h"
 #include "tusb.h"
-#include "mcu.h"
 
-#include "usbsid.h"
+#include "globals.h"
 
 
-#define USB_PID 0x4011  /* USBSID uses TinyUSB default ~ 1x CDC + 1x MIDI (Vendor not included) */
+/* MCU externals */
+extern uint64_t mcu_get_unique_id(void);
+
+/* USB Constants */
+#define USB_PID 0x4011  /* USBSID uses TinyUSB variation ~ 1x CDC + 1x MIDI (Vendor not included) */
 #define USB_VID 0xCAFE  /* USBSID uses TinyUSB default - Previous versions used 0x5553 */
 #define USB_BCD 0x0210
 
-
-//--------------------------------------------------------------------+
-// Device Descriptors
-//--------------------------------------------------------------------+
-
+/* Device Descriptors */
 tusb_desc_device_t const desc_device =
 {
     .bLength            = sizeof(tusb_desc_device_t),
@@ -74,17 +73,16 @@ tusb_desc_device_t const desc_device =
     .bNumConfigurations = 0x01
 };
 
-// Invoked when received GET DEVICE DESCRIPTOR
-// Application return pointer to descriptor
+/* Descriptor callback
+ * Invoked when received GET DEVICE DESCRIPTOR
+ * Application return pointer to descriptor
+ */
 uint8_t const * tud_descriptor_device_cb(void)
 {
   return (uint8_t const *) &desc_device;
 }
 
-//--------------------------------------------------------------------+
-// Configuration Descriptor
-//--------------------------------------------------------------------+
-
+/* Configuration Descriptor */
 enum
 {
   ITF_NUM_CDC = 0,
@@ -95,6 +93,7 @@ enum
   ITF_NUM_TOTAL
 };
 
+/* Endpoint config constants */
 #define EPNUM_CDC_NOTIF   0x81
 #define EPNUM_CDC_OUT     0x02
 #define EPNUM_CDC_IN      0x82
@@ -110,8 +109,7 @@ enum
 
 #define CONFIG_TOTAL_LEN   (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_MIDI_DESC_LEN + TUD_VENDOR_DESC_LEN)
 
-
-// full speed configuration
+/* Full speed configuration */
 uint8_t const desc_fs_configuration[] =
 {
   // Config number, interface count, string index, total length, attribute, power in mA
@@ -128,11 +126,11 @@ uint8_t const desc_fs_configuration[] =
 
 };
 
-
+/* Some Microsoft mumbo jumbo 🪄 */
 #define BOS_TOTAL_LEN      (TUD_BOS_DESC_LEN + TUD_BOS_WEBUSB_DESC_LEN + TUD_BOS_MICROSOFT_OS_DESC_LEN)
 #define MS_OS_20_DESC_LEN  0xB2
 
-// BOS Descriptor is required for webUSB
+/* BOS Descriptor is required for WebUSB */
 uint8_t const desc_bos[] =
 {
   // total length, number of device caps
@@ -145,11 +143,13 @@ uint8_t const desc_bos[] =
   TUD_BOS_MS_OS_20_DESCRIPTOR(MS_OS_20_DESC_LEN, VENDOR_REQUEST_MICROSOFT)
 };
 
+/* BOS Descriptor callback */
 uint8_t const * tud_descriptor_bos_cb(void)
 {
   return desc_bos;
 }
 
+/* MS hassle */
 uint8_t const desc_ms_os_20[] =
 {
   // Set header: length, type, windows version, total length
@@ -182,9 +182,11 @@ TU_VERIFY_STATIC(sizeof(desc_ms_os_20) == MS_OS_20_DESC_LEN, "Incorrect size");
 
 extern uint8_t const desc_ms_os_20[];
 
-// Invoked when received GET CONFIGURATION DESCRIPTOR
-// Application return pointer to descriptor
-// Descriptor contents must exist long enough for transfer to complete
+/* Device descriptor configuration callback
+ * Invoked when received GET CONFIGURATION DESCRIPTOR
+ * Application return pointer to descriptor
+ * Descriptor contents must exist long enough for transfer to complete
+ */
 uint8_t const * tud_descriptor_configuration_cb(uint8_t index)
 {
   (void) index; // for multiple configurations
@@ -192,11 +194,7 @@ uint8_t const * tud_descriptor_configuration_cb(uint8_t index)
   return desc_fs_configuration;
 }
 
-//--------------------------------------------------------------------+
-// String Descriptors
-//--------------------------------------------------------------------+
-
-
+/* String Descriptors */
 char const *string_desc_arr[] =
 {
     (const char[]){0x09, 0x04},  // 0: is supported language is English (0x0409)
@@ -208,22 +206,25 @@ char const *string_desc_arr[] =
     "USBSID-Pico WebUSB",        // 6: WebUSB Vendor Interface
 };
 
-// automatically update if an additional string is later added to the table
+/* automatically update if an additional string is later added to the table */
 #define STRING_DESC_ARR_ELEMENT_COUNT (sizeof(string_desc_arr)/sizeof(string_desc_arr[0]))
 
-// temporary buffer returned from tud_descriptor_string_cb()
-// relies on only a single outstanding call to this function
-// until the buffer is no longer used by caller.
-// "contents must exist long enough for transfer to complete"
-// Safe because each string descriptor is a separate transfer,
-// and only one is handled at a time.
-// Use of "length" is ambiguous (byte count?  element count?),
-// so use more explicit "BYTE_COUNT" or "ELEMENT_COUNT" instead.
+/* temporary buffer returned from tud_descriptor_string_cb()
+ * relies on only a single outstanding call to this function
+ * until the buffer is no longer used by caller.
+ * "contents must exist long enough for transfer to complete"
+ * Safe because each string descriptor is a separate transfer,
+ * and only one is handled at a time.
+ * Use of "length" is ambiguous (byte count?  element count?),
+ * so use more explicit "BYTE_COUNT" or "ELEMENT_COUNT" instead.
+ * */
 #define MAXIMUM_DESCRIPTOR_STRING_ELEMENT_COUNT 32
 static uint16_t _desc_str[MAXIMUM_DESCRIPTOR_STRING_ELEMENT_COUNT];
 
-// Invoked when received GET STRING DESCRIPTOR request
-// Application return pointer to descriptor, whose contents must exist long enough for transfer to complete
+/* Descriptor string callback
+ * Invoked when received GET STRING DESCRIPTOR request
+ * Application return pointer to descriptor, whose contents must exist long enough for transfer to complete
+ */
 uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 {
   (void) langid;
@@ -232,7 +233,7 @@ uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 
   if ( index == 0)
   {
-    memcpy(&_desc_str[1], string_desc_arr[0], 2);
+    __builtin_memcpy(&_desc_str[1], string_desc_arr[0], 2);
     chr_count = 1;
   } else if ( index == 3 ) { // special-case for USB Serial number
     /* BOARD ID */

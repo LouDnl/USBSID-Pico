@@ -35,13 +35,20 @@
 #define _MIDI_H_
 #pragma once
 
+#ifdef __cplusplus
+  extern "C" {
+#endif
+
+
+/* Default includes */
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 #include <math.h>
-#include "usbsid.h"
-#include "macros.h"
+
+/* Pico libs */
+#include "pico/mem_ops.h"
+
 
 typedef enum {
   CLAIMED,
@@ -64,28 +71,50 @@ typedef enum {
 extern int midi_bytes;
 
 typedef struct {
+  /* comms */
   bus_state bus;
   sysex_state state;
   midi_type type;
+  // unsigned int index;
+  uint8_t index;
   uint8_t readbuffer[1];
-  // uint8_t packetbuffer[4];  // 20240723 ~ disabled, unused
-  uint8_t streambuffer[64];  /* Normal speed max buffer for TinyUSB */
-  uint8_t sid_states[4][32];  /* Stores states of each SID ~ 4 sids max*/
+  uint8_t streambuffer[64];   /* Normal speed max buffer for TinyUSB */
+  /* states */
+  // uint8_t sid_states[4][32];  /* Stores register states of each SID ~ 4 sids max */
+  // uint8_t sid_extras[4][32];  /* Stores extra settings of each SID ~ 4 sids max */
+  uint8_t channel_states[16][4][32];  /* Stores channel states of each SID ~ 4 sids max */
+  // uint8_t channelkey_notestates[16][4][128];  /* Stores channelkey states of each SID ~ 4 sids max */
+  uint8_t channelkey_states[16][4][4];  /* Stores channelkey states of each SID ~ 4 sids max */
+  uint8_t channelbank[16];  /* [Channel][Bank(0)] relation */
+  uint8_t channelprogram[16];  /* [Channel][Patch/Program(1)] relation */
   uint8_t sidaddress;
   int fmopl;
-  unsigned int index;
+
 } midi_machine;
 
 extern midi_machine midimachine;
+extern int curr_midi_channel;
 
-/* Processes the 1 byte incoming midi buffer
- * Figures out if we're receiving midi or sysex */
-void process_buffer(uint8_t buffer);
+enum {
+  N_KEYS = 0,  /* n keys pressed */
+  V1_ACTIVE = 1,
+  V2_ACTIVE = 2,
+  V3_ACTIVE = 3,
+};
 
 /* Initialize the midi handlers */
 void midi_init(void);
 
+/* Processes a 1 byte incoming midi buffer
+ * Figures out if we're receiving midi or sysex */
+void process_buffer(uint8_t buffer);
+
 /* Processes the received Midi stream */
 // void process_stream(uint8_t* buffer);  // 20240723 ~ disabled, unused
+
+
+#ifdef __cplusplus
+  }
+#endif
 
 #endif /* _MIDI_H_ */
