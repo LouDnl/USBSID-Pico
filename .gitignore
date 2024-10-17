@@ -8,7 +8,10 @@
 !*.h
 !*.pio
 !*.jpg
+!*.xcf
 !*.png
+!*.pdf
+!*.html
 
 # specific files
 !.gitignore
@@ -17,7 +20,9 @@
 
 # folders
 !src
+!src/pio
 !images
+!resources
 !examples
 !examples/retrodebugger
 !examples/sidberry
