@@ -149,7 +149,6 @@ void load_config(Config* config)
   __builtin_memcpy(config, (void *)(XIP_BASE + FLASH_TARGET_OFFSET), sizeof(Config));
   stdio_flush();
   if (config->magic != MAGIC_SMOKE) {
-
       default_config(config);
       return;
   }
