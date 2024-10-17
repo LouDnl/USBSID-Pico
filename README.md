@@ -3,6 +3,8 @@
 # USBSID-Pico
 USBSID-Pico is a RPi Pico (RP2040) based board for interfacing one or two MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer, phone, ASID supporting player or USB midi controller.  
 
+* [Features](#features)
+* [Questions & Support](#questions-and-support)
 * [Project status](#project-status)
 * [Firmware](#firmware)
 * [Hardware](#hardware)
@@ -19,7 +21,7 @@ USBSID-Pico is a RPi Pico (RP2040) based board for interfacing one or two MOS SI
 Information about and explanation of features are _Coming Soon™_  
 ![USBSID-Pico](images/pcbv0.2.png)
 
-# Questions & Support
+# Questions and Support
 Any questions about or support with USBSID-Pico can be asked in the [discussions](https://github.com/LouDnl/USBSID-Pico/discussions).
 
 # Project status
