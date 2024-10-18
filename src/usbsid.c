@@ -671,12 +671,8 @@ void core1_main(void)
 {
   /* Set core locking for flash saving ~ note this makes SIO_IRQ_PROC1 unavailable */
   flash_safe_execute_core_init();
-  /* Load config before init of USBSID settings */
-  load_config(&usbsid_config);
   /* Apply saved config to used vars */
   apply_config();
-  /* Check for default config bit */
-  detect_default_config();
   /* Detect optional external crystal */
   if (detect_clock() == 0) {
     usbsid_config.external_clock = false;
@@ -730,12 +726,16 @@ int main()
   init_logging();
   /* Log reset reason */
   reset_reason();
+  /* Load config before init of USBSID settings ~ NOTE: This cannot be run from Core 1! */
+  load_config(&usbsid_config);
   /* Create a blocking semaphore to wait until init of core 1 is complete */
   sem_init(&core1_init, 0, 1);
   /* Init core 1 */
   multicore_launch_core1(core1_main);
   /* Wait for core 1 to finish */
   sem_acquire_blocking(&core1_init);
+  /* Check for default config bit ~ NOTE: This cannot be run from Core 1! */
+  detect_default_config();
   /* Init GPIO */
   init_gpio();
   /* Init PIO */

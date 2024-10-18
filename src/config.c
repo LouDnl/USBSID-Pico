@@ -456,7 +456,7 @@ void apply_config(void)
 
 void detect_default_config(void)
 {
-  CFG("[IS DEFAULT CONFIG]%d\n", usbsid_config.default_config);
+  CFG("[IS DEFAULT CONFIG?] %s\n", (usbsid_config.default_config ? "True" : "False"));
   if(usbsid_config.default_config == 1) {
     CFG("[DETECTED DEFAULT CONFIG]\n");
     usbsid_config.default_config = 0;
