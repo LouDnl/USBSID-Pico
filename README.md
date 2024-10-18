@@ -8,14 +8,14 @@ USBSID-Pico is a RPi Pico (RP2040) based board for interfacing one or two MOS SI
 * [Project status](#project-status)
 * [Firmware](#firmware)
 * [Hardware](#hardware)
-* [Important PCB information](#important-pcb-information)
 * [Schematic and BOM](#schematic-and-bom)
+* [Important PCB information](#important-pcb-information)
 * [PCB in action](#usbsid-pico-in-action)
 * [Software examples](#software)
 * [Acknowledgements](#acknowledgements)
 * [Disclaimer](#disclaimer)
 * [License](#license)
-* [Changelog](#changelog)
+* [Changelog](CHANGELOG.md)
 
 # Features
 Information about and explanation of features are _Coming Soon™_  
@@ -68,6 +68,8 @@ You can build the firmware using the Pico SDK 2.0.0 and TinyUSB from it's Github
 ### Where to buy
 You can buy assembled boards (minus Pico) while available from me - send me a message on any of my socials - or at [PCBWay here](https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html).  
 Ordering at PCBWay will require you to order atleast 5 boards + assembly.
+### Schematic and BOM
+If you're up to it you can create your own development board by using the provided [schematic](resources/v1.0-schematic.pdf) and [interactive BOM](https://loudnl.github.io/).
 ### PCB Features
 - Supports all MOS SID chips e.g. MOS6581, MOS6582 & MOS8580
 - Supports SID chip replacements e.g. [SIDKick-Pico](https://github.com/frntc/SIDKick-pico), [SwinSID](https://github.com/dmantione/swinsid), ARMSID (untested), FPGASID (untested)
@@ -91,46 +93,60 @@ Ordering at PCBWay will require you to order atleast 5 boards + assembly.
 * v0.2 improved testboard<br>
   <img src="images/v0.2-top.png" width="30%">
 * v0.1 testboard<br>
-  <img src="images/v0.1-top.png" width="30%">
+  <img src="images/v0.1-top.png" width="30%">  
 
-# Important PCB information
+## Important PCB information
 [<img src="images/v1.0-explained.png" width="30%">](images/v1.0-explained.png)<br/>
 _Click image for larger view_
-1. 12 volt or 9 volt selection jumper
+1. 12 volt or 9 volt selection jumper  
+  ![Voltage jumper](images/voltage-jumper-smaller.png)
   - open = 12 volt (for 6581 SID only!!)
   - closed = 9 volt (for 8580 SID)
-2. Socket 2 6581 / 8580 SID type selection jumpers
+2. Socket 2 6581 / 8580 SID type selection jumpers  
+  ![SID2 selection jumper](images/SID2-jumper-smaller.png)
   - both closed left = 6581
   - both closed right = 8580
-3. Socket 1 6581 / 8580 SID type selection jumpers
+3. Socket 1 6581 / 8580 SID type selection jumpers  
+  ![SID1 selection jumper](images/SID1-jumper-smaller.png)
   - both closed left = 6581
   - both closed right = 8580
-4. Audio channel selection jumper
+4. Audio channel selection jumper  
+  ![Audio jumper](images/audio-jumper-smaller.png)
   - closed on Socket 1 side = left & right channel for socket 1
   - closed on Socket 2 side = left channel for socket 2 & right channel for socket 1
-5. Address line A5 for adressess above $1F (SKPico 2nd SID for example)
-6. Uart debugging output port
-7. Optional 330k pulldown resistor hooked up to EXT-IN for 8580 filter bypass in socket 2
+5. Address line A5 for adressess above $1F (SKPico 2nd SID for example)  
+  ![Address 5 pins](images/A5-pins-smaller.png)
+  - both pins are routed to the same GPIO for using adresses higher then $20
+6. Uart debugging output port  
+  ![UART port](images/uart-port-smaller.png)
+  - TX on the right
+  - RX on the left
+7. Optional 330k pulldown resistor hooked up to EXT-IN for 8580 filter bypass in socket 2  
+    ![EXTIN bypass](images/SID2-extin-bypass-smaller.png)
   - solder closed = enabled
-8. Optional 330k pulldown resistor hooked up to EXT-IN for 8580 filter bypass in socket 1
+8. Optional 330k pulldown resistor hooked up to EXT-IN for 8580 filter bypass in socket 1  
+  ![EXTIN bypass](images/SID1-extin-bypass-smaller.png)
   - solder pad closed = enabled
-9. Optional 1MHz crystal socket (not included in BOM)
+9. Optional 1MHz crystal socket (not included in BOM)  
+  ![Optional Crystal](images/optional-crystal-smaller.png)
   - solder pad closed = enabled (when a crystal is socketed) 
   - this disables the internal clock generation on the Pico
 10. Optional 1k resistor for 6581 SID in socket 2
-  - ATTENTION: This solder pad label is incorrect, it should read 6581
+  - **ATTENTION!**: _This solder pad label is incorrect, it should read 6581!_  
+  ![6581 jumper](images/SID2-audio-solderjumper-smaller.png)
   - solder pad closed = enabled
 11. Optional 1k resistor for 6581 SID in socket 2
-  - ATTENTION: This solder pad label is incorrect, it should read 6581
+  - **ATTENTION!**: _This solder pad label is incorrect, it should read 6581!_  
+  ![6581 jumper](images/SID1-audio-solderjumper-smaller.png)
   - solder pad closed = enabled
-12. Socket 2 audio out via dupont connector
+12. Socket 2 audio out via dupont connector  
+  ![Audio out](images/audio-out-smaller.png)
   - Ground and S2 as labeled
-13. Socket 1 audio out via dupont connector
+13. Socket 1 audio out via dupont connector  
+  ![Audio out](images/audio-out-smaller.png)
   - Ground and S1 as labeled
-14. Reset button
-
-# Schematic and BOM
-If you're up to it you can create your own development board by using the provided [schematic](resources/v1.0-schematic.pdf) and [interactive BOM](https://loudnl.github.io/).
+14. Reset button  
+  ![Reset button](images/reset-button-smaller.png)
 
 # Examples
 ### USBSID-Pico in action
@@ -149,7 +165,7 @@ _Available examples with USBSID-Pico support:_<br>
 [**RetroDebugger**](https://github.com/LouDnl/RetroDebugger) fork is available @ https://github.com/LouDnl/RetroDebugger<br>
 
 # Acknowledgements
-Special thanks goes out to [Tobozo](https://github.com/tobozo/) for making the USBSID-Pico logo and for his (mental🤣) since starting this project.
+Special thanks goes out to [Tobozo](https://github.com/tobozo/) for making the USBSID-Pico logo and for his (mental🤣) support since starting this project.
 
 Some portions of this code and board are heavily inspired on projects by other great people.
 Some of those projects are - in no particular order:
@@ -169,26 +185,3 @@ All code written by me in this repository islicensed under the terms of the GNU 
 Any code in this repository that is not written by me automatically falls under the licensing conditions by the authors of said code as mentioned in the source code header.
 ### Hardware License ~ Creative Commons
 <p xmlns:cc="http://creativecommons.org/ns#" xmlns:dct="http://purl.org/dc/terms/"><a property="dct:title" rel="cc:attributionURL" href="https://github.com/LouDnl/USBSID-Pico">USBSID-Pico PCB</a> by <a rel="cc:attributionURL dct:creator" property="cc:attributionName" href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/?ref=chooser-v1" target="_blank" rel="license noopener noreferrer" style="display:inline-block;">Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International<img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/cc.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/by.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/nc.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/nd.svg?ref=chooser-v1" alt=""></a></p>
-
-# Changelog
-__Version: 0.2.0-BETA__
-* Basic Midi support
-  * Fixed to 6 voices polyfonic with 2 SID's up to 12 voices with 2x SKPico.
-* WebUSB support
-  * Proof of concept available in examples folder
-  * Currently uses an adapted version of Hermit's emulator
-* Improved GPIO handling
-  * Bus control via DMA and PIO for cycle exact writes and reads
-* Customizable config (config tool in development) 
-__Version: 0.0.1-ALPHA__
-* Basic working functions
-  * Multiple firmware binaries per config type
-  * SID control via GPIO
-  * USB support
-    - see examples
-  * Midi support
-    - messy and unfinished
-  * ASID support
-    - basic functionality
-  * Onboard LED works as VU
-    - RGB LED support for clone Pico boards
