@@ -183,6 +183,7 @@ set(TARGET_LL
   hardware_uart
   pico_flash
   pico_mem_ops
+  pico_mem_ops_compiler
   pico_multicore
   pico_stdlib
   pico_unique_id
