@@ -15,6 +15,7 @@
 
 # specific files
 !.gitignore
+!.gitattributes
 !LICENSE
 !CMakeLists.txt
 
