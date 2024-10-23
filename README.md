@@ -38,9 +38,9 @@ USBSID-Pico acts as Midi device and supports basic Midi in ~ note that Midi is s
 Any questions about or support with USBSID-Pico can be asked in the [discussions](https://github.com/LouDnl/USBSID-Pico/discussions).
 
 # Project status
-PCB has reached v1.0 🥳  
+Visit the [Project Page](https://github.com/users/LouDnl/projects/1) for an up-to-date list of things being worked on.
 Firmware is in beta stage and still in development.  
-While in development any mentioned features, options, etc. are subject to change.
+While in development any mentioned features, options, etc. are subject to change.  
 ### Supported platforms
 _In development_  
 Linux: Vice, RetroDebugger, SidBerry, JSidplay2, USB Midi, ASID (in webbrowser) SID Play  
