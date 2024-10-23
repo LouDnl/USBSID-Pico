@@ -7,8 +7,11 @@ USBSID-Pico is a RPi Pico (RP2040) based board for interfacing one or two MOS SI
 * [Questions & Support](#questions-and-support)
 * [Project status](#project-status)
 * [Firmware](#firmware)
+  * [Firmware versions](#firmware-versions)
+  * [How to flash new firmware](#how-to-flash)
 * [Hardware](#hardware)
-* [Schematic and BOM](#schematic-and-bom)
+  * [Where to buy](#where-to-buy)
+  * [Schematic and BOM](#schematic-and-bom)
 * [Important PCB information](#important-pcb-information)
 * [PCB in action](#usbsid-pico-in-action)
 * [Software examples](#software)
@@ -20,6 +23,16 @@ USBSID-Pico is a RPi Pico (RP2040) based board for interfacing one or two MOS SI
 # Features
 Information about and explanation of features are _Coming Soon™_  
 ![USBSID-Pico](images/pcbv0.2.png)
+#### SID Playing
+USBSID-Pico supports various ways of playing SID files.  
+Out-of-the box playing is supported by using [Deepsid by Chordian](https://deepsid.chordian.net) by selecting `ASID (MIDI)` as player in the pulldown menu.  
+[SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux with up to 4 SIDs supported.  
+Unofficial support is added to a fork of [Vice](https://github.com/LouDnl/Vice-USBSID), up to 3 SIDs are supported in vsid and up to 4 in xs64.  
+Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouDnl/RetroDebugger), up to 4 SIDs are supported.
+##### C64 Music trackers
+When using Vice or RetroDebugger you can freely use applications like [SID-Wizard](https://sourceforge.net/projects/sid-wizard/) for music creation.
+#### Midi
+USBSID-Pico acts as Midi device and supports basic Midi in ~ note that Midi is still in development and in Beta phase.
 
 # Questions and Support
 Any questions about or support with USBSID-Pico can be asked in the [discussions](https://github.com/LouDnl/USBSID-Pico/discussions).
@@ -39,6 +52,23 @@ See the [firmware changelog](#changelog) for more information on what's changed 
 Use `usbsidpico.uf2` for regular green rp2040 Pico boards.  
 Use `usbsidpico-rgb.uf2` for black clone rp2040 Pico boards with RGB LED onboard.  
 **WARNING!** Do _NOT_ use the RGB firmware for the regular green rp2040 Pico boards.
+### How to flash
+A Raspberry Pi Pico board is incredibly easy to flash, as it comes with a built in bootloader for flashing new firmwares in the `uf2` format. 
+In order to flash a new firmware to your USBSID-Pico you will need to put the Pico into bootloader mode. This can be done in 2 ways:
+1. While the Pico is seated on the USBSID-Pico board and with the USB cable plugged into your computer and the Pico do the following:
+	- Press and hold the `BOOTSEL` button on the Pico.
+	- Press and release the `RST` button on the USBSID-Pico board.
+	- Now release the `BOOTSEL` button.
+	- A new drive should appear on your computer called `RPI-RP2`.
+	- Copy the correct `uf2` firmware file to this folder.
+	- After copying the Pico will reboot and your Pico is flashed.
+2. When flashing a Pico that is not seated on the board do the following:
+	- Plug in the USB cable to your Pico and not into your computer.
+	- While holding the `BOOTSEL` button on the Pico plugin the other end of the USB cable into your computer.
+	- Now release the `BOOTSEL` button.
+	- A new drive should appear on your computer called `RPI-RP2`.
+	- Copy the correct `uf2` firmware file to this folder.
+	- After copying the Pico will reboot and your Pico is flashed.
 ### Firmware features ~ version 0.2.0-BETA
 The firmware is still in development so features might change, be added or removed.
 - By default both sockets are enabled and the configuration is set to 2 SID's.
@@ -66,11 +96,12 @@ You can build the firmware using the Pico SDK 2.0.0 and TinyUSB from it's Github
 
 # Hardware
 ### Where to buy
-You can buy assembled boards (minus Pico) while available from me - send me a message on any of my socials - or at [PCBWay here](https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html).  
-Ordering at PCBWay will require you to order atleast 5 boards + assembly.
+Assembled boards while available (and minus Pico) can be purchased from me - send me a message on any of my socials.  
+At a minimum of 5 assembled boards it is also possible to purchase at [PCBWay here](https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html).  
+I am currently negotiating the possibility for the boards to be purchasable at an online store here in NL. 
 ### Schematic and BOM
-If you're up to it you can create your own development board by using the provided [schematic](resources/v1.0-schematic.pdf) and [interactive BOM](https://loudnl.github.io/).
-### PCB Features
+If you want and are up to it you can create your own development board by using the provided [schematic](resources/v1.0-schematic.pdf) and [interactive BOM](https://loudnl.github.io/).
+### PCB Features ~ v1.0
 - Supports all MOS SID chips e.g. MOS6581, MOS6582 & MOS8580
 - Supports SID chip replacements e.g. [SIDKick-Pico](https://github.com/frntc/SIDKick-pico), [SwinSID](https://github.com/dmantione/swinsid), ARMSID (untested), FPGASID (untested)
 - 1 MHz oscillator (external optional, enabled via jumper pad)
