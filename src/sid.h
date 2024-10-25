@@ -71,8 +71,12 @@ typedef enum {
     TRIPLE_NIBBLE = 0xFFF,
     NIBBLE_3 = 0xF00,
     H_BYTE = 0xFF00,
+    F_MASK_HI = 0x7F8,
+    F_MASK_LO = 0x7,
     VOICE_FREQLO = BYTE,
     VOICE_FREQHI = BYTE,
+    SHIFT_3 = 3,
+    SHIFT_8 = 8,
 } register_masks;
 
 /*
