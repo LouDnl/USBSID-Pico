@@ -112,6 +112,61 @@ void process_buffer(uint8_t buffer);
 /* Processes the received Midi stream */
 // void process_stream(uint8_t* buffer);  // 20240723 ~ disabled, unused
 
+/* Custom values from CMakeLists import */
+// TODO: Create import file to use
+/* Default values */
+// TODO: Add all Control Change values that are custom here and define them!
+// 0x14 ~ 0x1F
+// 0x66 ~ 0x77
+#ifndef CC_VALUES  /* Customizable CC Bytes */
+#define CC_VALUES  /* Fallback for backwards compatibility */
+
+#ifndef CC_FFC
+#define CC_FFC 0x6E  /* 110 ~ Filter Frequency Cutoff */
+#endif /* CC_FFC */
+
+#ifndef CC_RES
+#define CC_RES 0x6F  /* 111 ~ Filter resonance */
+#endif /* CC_RES */
+
+#ifndef CC_3OFF
+#define CC_3OFF 0x70  /* 112 ~ Voice 3 disconnect */
+#endif /* CC_3OFF */
+
+#ifndef CC_FLT1
+#define CC_FLT1 0x71  /* 113 ~ Filter channel 1 */
+#endif /* CC_FLT1 */
+
+#ifndef CC_FLT2
+#define CC_FLT2 0x72  /* 114 ~ Filter channel 2 */
+#endif /* CC_FLT2 */
+
+#ifndef CC_FLT3
+#define CC_FLT3 0x73  /* 115 ~ Filter channel 3 */
+#endif /* CC_FLT3 */
+
+#ifndef CC_FLTE
+#define CC_FLTE 0x74  /* 116 ~ Filter external */
+#endif /* CC_FLTE */
+
+#ifndef CC_HPF
+#define CC_HPF 0x75  /* 117 ~ High pass */
+#endif /* CC_HPF */
+
+#ifndef CC_BPF
+#define CC_BPF 0x76  /* 118 ~ Band pass */
+#endif /* CC_BPF */
+
+#ifndef CC_LPF
+#define CC_LPF 0x77  /* 119 ~ Low pass */
+#endif /* CC_LPF */
+
+#endif /* CC_VALUES */
+
+/* Fixed CC Bytes */
+#define CC_BMSB 0x00  /*   0 ~ Bank Select MSB */
+#define CC_BLSB 0x20  /*  32 ~ Bank Select LSB */
+#define CC_VOL  0x07  /*   7 ~ Set Master Volume */
 
 #ifdef __cplusplus
   }

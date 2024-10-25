@@ -36,7 +36,7 @@
 #include "config.h"
 #include "sid.h"
 #include "logging.h"
-#include "midipatches.h"
+#include "midi_patch_cynthcart.h"
 
 
 /* GPIO externals */
@@ -57,15 +57,21 @@ uint8_t addr, val;
 clock_rates clock_rate = CLOCK_DEFAULT;
 hertz_values hertz = HZ_50;
 int midi_bytes = 3;
+int st[12] = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 4, 4 };  /* SID table */
+int vt[12] = { 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2 };  /* Voice table */
+int voices[12] = {0};
+int voice = 0;
+int curr_midi_channel;
+// int freevoice = 0;
 
 void midi_bus_operation(uint8_t a, uint8_t b);
 
 void midi_init(void)
 {
   /* Clear buffers once */
-  __builtin_memset(midimachine.readbuffer, 0, sizeof midimachine.readbuffer);
-  __builtin_memset(midimachine.streambuffer, 0, sizeof midimachine.streambuffer);
-  __builtin_memset(midimachine.channelkey_states, 0, sizeof midimachine.channelkey_states);
+  memset(midimachine.readbuffer, 0, sizeof midimachine.readbuffer);
+  memset(midimachine.streambuffer, 0, sizeof midimachine.streambuffer);
+  memset(midimachine.channelkey_states, 0, sizeof midimachine.channelkey_states);
 
   /* Initial state and index */
   midimachine.bus = FREE;
@@ -75,6 +81,9 @@ void midi_init(void)
 
   /* NOTE: Midi state is not loaded from config on init, needs LOAD_MIDI_STATE command once */
 }
+
+
+/* Write helper functions */
 
 void midi_bus_operation(uint8_t a, uint8_t b)
 {
@@ -115,6 +124,9 @@ void write_gate(int channel, int sidno, int voice)
   addr = (0x20 * sidno) | (CONTR + voice);
   midi_bus_operation(addr, midimachine.channel_states[channel][sidno][CONTR + voice]);
 }
+
+
+/* Bank helper functions */
 
 void bank_null(int channel, int sidno, int program)
 {
@@ -164,6 +176,130 @@ void bank_null(int channel, int sidno, int program)
   }
 }
 
+void bank_zero_sidsetter_dual(int channel, int val, int hi, int lo, int himask, int lomask, int hishift)
+{
+  for (int sid = 0; sid < numsids; sid++) {  /* For each active SID */
+    /* Dual Hi */
+    midimachine.channel_states[channel][sid][hi] = ((val & himask) >> hishift);
+    write(channel, sid, hi);  /* HI REG */
+    /* Dual Lo */
+    midimachine.channel_states[channel][sid][lo] = (val & lomask);
+    write(channel, sid, lo);  /* LO REG */
+  }
+}
+
+void bank_one_sidsetter_dual(int channel, int sidno, int voiceno, int val, int hi, int lo, int himask, int lomask, int hishift)
+{
+  /* Dual Hi */
+  midimachine.channel_states[channel][sidno][hi] = ((val & himask) >> hishift);
+  write(channel, sidno, hi);
+  /* Dual Lo */
+  midimachine.channel_states[channel][sidno][lo] = (val & lomask);
+  write(channel, sidno, lo);
+}
+
+void bank_zero_voicesetter_dual(int channel, int val, int hi, int lo, int himask, int lomask, int hishift)
+{
+  for (int sid = 0; sid < numsids; sid ++) {  /* For each active SID */
+    for (int i = 0; i < 3; i++) {  /* For each voice per SID */
+      /* Dual Hi */
+      midimachine.channel_states[channel][sid][(i * 7) + hi] = ((val & himask) >> hishift);
+      /* Dual Lo */
+      midimachine.channel_states[channel][sid][(i * 7) + lo] = (val & lomask);
+    }
+    write_triple(channel, sid, hi);  /* HI REG */
+    write_triple(channel, sid, lo);  /* LO REG */
+  }
+}
+
+void bank_one_voicesetter_dual(int channel, int sidno, int voiceno, int val, int hi, int lo, int himask, int lomask, int hishift)
+{
+  /* Dual Hi */
+  midimachine.channel_states[channel][sidno][(voiceno * 7) + hi] = ((val & himask) >> hishift);
+  write(channel, sidno, ((voiceno * 7) + hi));
+  /* Dual Lo */
+  midimachine.channel_states[channel][sidno][(voiceno * 7) + lo] = (val & lomask);
+  write(channel, sidno, ((voiceno * 7) + lo));
+}
+
+void bank_zero_sidsetter_single_withkeep(int channel, int val, int reg, int mask)
+{
+  for (int sid = 0; sid < numsids; sid ++) {
+    uint8_t keep_state;
+    keep_state = midimachine.channel_states[channel][sid][reg];
+    keep_state &= mask;
+    val = keep_state | val;
+    midimachine.channel_states[channel][sid][reg] = val;
+    write(channel, sid, reg);
+  }
+}
+
+void bank_one_sidsetter_single_withkeep(int channel, int sidno, int voiceno, int val, int reg, int mask)
+{
+  uint8_t keep_state;
+  keep_state = midimachine.channel_states[channel][sidno][reg];
+  keep_state &= mask;
+  val = keep_state | val;
+  midimachine.channel_states[channel][sidno][reg] = val;
+  write(channel, sidno, reg);
+}
+
+void bank_zero_sidsetter_toggle_withkeep(int channel, int val, int reg, uint8_t toggle)
+{
+  for (int sid = 0; sid < numsids; sid++) {
+    uint8_t keep_state;
+    keep_state = midimachine.channel_states[channel][sid][reg];
+    val = val == 1 ? keep_state |= toggle : keep_state ^ toggle;
+    midimachine.channel_states[channel][sid][reg] = val;
+    write(channel, sid, reg);
+  }
+}
+
+void bank_one_sidsetter_toggle_withkeep(int channel, int sidno, int voiceno, int val, int reg, uint8_t toggle)
+{
+  uint8_t keep_state;
+  keep_state = midimachine.channel_states[channel][sidno][reg];
+  val = val == 1 ? keep_state |= toggle : keep_state ^ toggle;
+  midimachine.channel_states[channel][sidno][reg] = val;
+  write(channel, sidno, reg);
+}
+
+void bank_zero_setter_single(int channel, int val, int reg, int mask)
+{
+  for (int sid = 0; sid < numsids; sid++) {
+    midimachine.channel_states[channel][sid][reg] = val;
+    write(channel, sid, reg);
+  }
+}
+
+void bank_one_setter_single(int channel, int sidno, int voiceno, int val, int reg, int mask)
+{
+  midimachine.channel_states[channel][sidno][reg] = val;
+  write(channel, sidno, reg);
+}
+
+// void bank_zero_toggle_single(int channel, int val, int reg, uint8_t toggle)
+// {
+//   for (int sid = 0; sid < numsids; sid ++) {
+//     uint8_t keep_state;
+//     keep_state = midimachine.channel_states[channel][sid][reg];
+//     val = val == 1 ? keep_state |= toggle : keep_state ^ toggle;
+//     midimachine.channel_states[channel][sid][reg] = val;
+//     write(channel, sid, reg);
+//   }
+// }
+
+// void bank_one_toggle_single(int channel, int sidno, int voiceno, int val, int reg, uint8_t toggle)
+// {
+//   uint8_t keep_state;
+//   keep_state = midimachine.channel_states[channel][sidno][reg];
+//   val = val == 1 ? keep_state |= toggle : keep_state ^ toggle;
+//   midimachine.channel_states[channel][sidno][reg] = val;
+//   write(channel, sidno, reg);
+// }
+
+/* Bank noteon ~ noteoff functions */
+
 void bank_null_off(int channel, int sidno)
 {
   // sidno = midimachine.channelkey_states[channel][sidno][N_KEYS];
@@ -205,31 +341,124 @@ void bank_null_on(int channel, int sidno, uint8_t Flo, uint8_t Fhi)
   write_triple(channel, sidno, NOTEHI);
   midimachine.channelkey_states[channel][sidno][N_KEYS]++;
 }
-int vt[12] = { 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2 };
-int voices[12] = {0};
-int voice = 0;
-int curr_midi_channel;
-// int freevoice = 0;
+
+void bank_zero_off(int channel, int sidno, uint8_t note)
+{
+  // if (midimachine.channelkey_states[channel][sidno][N_KEYS] < 0) midimachine.channelkey_states[channel][sidno][N_KEYS] = 0;
+  // midimachine.channelkey_states[channel][sidno][V1_ACTIVE] == 1 && midimachine.channelkey_notestates[channel][sidno][note_index] == 1
+  // ? voice = 0, midimachine.channelkey_states[channel][sidno][V1_ACTIVE] = 0, midimachine.channelkey_notestates[channel][sidno][note_index] = 0
+  // : midimachine.channelkey_states[channel][sidno][V2_ACTIVE] == 1 && midimachine.channelkey_notestates[channel][sidno][note_index] == 2
+  // ? voice = 1, midimachine.channelkey_states[channel][sidno][V2_ACTIVE] = 0, midimachine.channelkey_notestates[channel][sidno][note_index] = 0
+  // : midimachine.channelkey_states[channel][sidno][V3_ACTIVE] == 1 && midimachine.channelkey_notestates[channel][sidno][note_index] == 3
+  // ? voice = 2, midimachine.channelkey_states[channel][sidno][V3_ACTIVE] = 0, midimachine.channelkey_notestates[channel][sidno][note_index] = 0
+  // : 0; /* ISSUE: EVERY NOTE AFTER 3 KEYS GOES TO VOICE 1 */
+
+  // if (midimachine.channelkey_states[channel][sidno][N_KEYS] < 0) midimachine.channelkey_states[channel][sidno][N_KEYS] = 0;
+
+  for (int i = 0; i < ((numsids * 3) - 1); i++) {
+    // if (voices[i] == buffer[1]) {
+    if (voices[i] == note) {
+      voice = i;
+      voices[i] = 0;
+      // freevoice = voice;
+    }
+  }
+  sidno = abs(voice / 3);
+  midimachine.channel_states[channel][sidno][CONTR + (vt[voice] * 7)] = (midimachine.channel_states[channel][sidno][CONTR + (vt[voice] * 7)] & 0xFE);
+  if (midimachine.channelkey_states[channel][sidno][N_KEYS] != 0) midimachine.channelkey_states[channel][sidno][N_KEYS]--;
+  write_gate(channel, sidno, (vt[voice] * 7));
+  voices[voice] = 0;
+  for (int i = 0; i < ((numsids * 3) - 1); i++) {
+    if (voices[i] == 0) {
+      voice = i;
+      break;
+    }
+  }
+  // voice = voice == 2 ? voice : voice--;
+  // if (voice != 0) voice--;
+}
+
+void bank_zero_on(int channel, int sidno, uint8_t note, uint8_t Flo, uint8_t Fhi)
+{
+  // midimachine.channelkey_states[channel][sidno][V1_ACTIVE] == 0 && midimachine.channelkey_notestates[channel][sidno][note_index] != 1
+  //   ? voice = 0, midimachine.channelkey_states[channel][sidno][V1_ACTIVE] = 1, midimachine.channelkey_notestates[channel][sidno][note_index] = 1
+  //   : midimachine.channelkey_states[channel][sidno][V2_ACTIVE] == 0 && midimachine.channelkey_notestates[channel][sidno][note_index] != 2
+  //   ? voice = 1, midimachine.channelkey_states[channel][sidno][V2_ACTIVE] = 1, midimachine.channelkey_notestates[channel][sidno][note_index] = 2
+  //   : midimachine.channelkey_states[channel][sidno][V3_ACTIVE] == 0 && midimachine.channelkey_notestates[channel][sidno][note_index] != 3
+  //   ? voice = 2, midimachine.channelkey_states[channel][sidno][V3_ACTIVE] = 1, midimachine.channelkey_notestates[channel][sidno][note_index] = 3
+  //   : 0;
+  // for (int i = 0; i < 3; i++) {
+  //   if (voices[i] == 0) voice = i;
+  //   break;
+  // }
+  // voices[voice] = buffer[1];
+  voices[voice] = note;
+  sidno = abs(voice / 3);
+  midimachine.channelkey_states[channel][sidno][N_KEYS]++;
+  /* write(channel, sid, MODVOL); */
+  /* write_voice(channel, sid, (voice * 7)); */
+  /* Note Lo & Hi */
+  midimachine.channel_states[channel][sidno][NOTELO + (vt[voice] * 7)] = Flo;
+  midimachine.channel_states[channel][sidno][NOTEHI + (vt[voice] * 7)] = Fhi;
+  write_note(channel, sidno, (vt[voice] * 7));
+  /* Control ~ Gate bit on */
+  val = midimachine.channel_states[channel][sidno][CONTR + (vt[voice] * 7)] & 0xFE;
+  val |= 0x1;
+  midimachine.channel_states[channel][sidno][CONTR + (vt[voice] * 7)] = val;
+  write_gate(channel, sidno, (vt[voice] * 7));
+  // prevvoice = voice;
+  // if (voice < 3) voice++;
+  if (voice < ((numsids * 3) - 1)) voice++;
+  if (voice > ((numsids * 3) - 1)) voice = 0;
+}
+
+void bank_one_off(int channel, int sidno, int voiceno, uint8_t note)
+{
+  midimachine.channel_states[channel][sidno][CONTR + (voiceno * 7)] = (midimachine.channel_states[channel][sidno][CONTR + (voiceno * 7)] & 0xFE);
+  write_gate(channel, sidno, (voiceno * 7));
+  voices[voiceno] = 0;
+}
+
+void bank_one_on(int channel, int sidno, int voiceno, uint8_t note, uint8_t Flo, uint8_t Fhi)
+{
+  /* Keepstate */
+  voices[voice] = note;
+  /* Note Lo & Hi */
+  midimachine.channel_states[channel][sidno][NOTELO + (voiceno * 7)] = Flo;
+  midimachine.channel_states[channel][sidno][NOTEHI + (voiceno * 7)] = Fhi;
+  write_note(channel, sidno, (voiceno * 7));
+  /* Control ~ Gate bit on */
+  int val;
+  val = midimachine.channel_states[channel][sidno][CONTR + (voiceno * 7)] & 0xFE;
+  val |= 0x1;
+  midimachine.channel_states[channel][sidno][CONTR + (voiceno * 7)] = val;
+  write_gate(channel, sidno, (voiceno * 7));
+}
+
+
+/* Midi processing */
+
 void process_midi(uint8_t *buffer, int size)
 {
-  // for (int n = 0; n <= size; n++) MIDBG(" [B%d]$%02x#%d ", n, buffer[n]);
   uint8_t note_index = buffer[1];
-  /* uint8_t note_velocity = buffer[2]; */
   uint16_t frequency = musical_scale_values[note_index];
   uint8_t Flo, Fhi;
   Flo = (frequency & VOICE_FREQLO);
   Fhi = ((frequency >> 8) >= VOICE_FREQHI ? VOICE_FREQHI : (frequency >> 8));
 
-  int in, out, val, volume, /* add, */ channel/* , voice_start */;
-  uint8_t mask, modevol_state, /* voice_state, */ keep_state;
-  uint16_t fltres_state;
+  int in, out, /* val, */ volume, channel, voiceno/*, add, voice_start */;
+  uint8_t mask /*,*/ /* modevol_state, */ /* keep_state *//* voice_state, */;
+  /* uint16_t fltres_state; */
 
-  int sidno = 0;  // NOTICE: TEMPORARY
-
+  int sidno, bank, program;
+  curr_midi_channel = channel = (buffer[0] & R_NIBBLE);  /* 1 -> 16 ~ 0x0 -> 0xF */
+  bank = midimachine.channelbank[channel];  /* Set Bank */
+  program = midimachine.channelprogram[channel]; /* Set Program */
   // int val1, val2, val3;
-  curr_midi_channel = channel = (buffer[0] & R_NIBBLE); /* 1 -> 16 ~ 0x0 -> 0xF */
+  voiceno = vt[(int)channel];  /* Sets the sid voice according the the channel we're on, max voices is 12 with 4x SID */ // TODO: Limit at max voices
+  sidno = (bank == 1) ? st[voiceno] : 0;  /* Sets the SID number according to the voice we're on */
   volume = midimachine.channel_states[channel][sidno][MODVOL] & R_NIBBLE;
-  addr = 0x0;
+  addr = 0x0;  /* Set starting address */
   /* int voice; */
 
   // voice = voice < 0 ? 0 : voice > 2 ? 2 : voice;
@@ -249,45 +478,24 @@ void process_midi(uint8_t *buffer, int size)
   }
   // if (voicecount > 0 && voicecount <= (numsids * 3) && midimachine.channelkey_states[channel][sidno][N_KEYS] != 0) midimachine.channelkey_states[channel][sidno][N_KEYS] = 0;
   if (voicecount == ((numsids * 3) - 1) && midimachine.channelkey_states[channel][sidno][N_KEYS] != 0) midimachine.channelkey_states[channel][sidno][N_KEYS] = 0;
-  int bank, program;
+// TODO:
+// Add waveform toggling besides the program number thats chosen
+// Add gate toggling besides the note being played that toggles the gate
+// Any other missing links
+// TODO:
+// Reorder the items below into preset CC's and custom CC's
+  /* Start Status byte handling */
   switch (buffer[0]) {
     case 0x80 ... 0x8F:  /* Channel 0~16 Note Off */
       bank = midimachine.channelbank[channel];
       switch (bank) {
-        case 0:
-            // if (midimachine.channelkey_states[channel][sidno][N_KEYS] < 0) midimachine.channelkey_states[channel][sidno][N_KEYS] = 0;
-            // midimachine.channelkey_states[channel][sidno][V1_ACTIVE] == 1 && midimachine.channelkey_notestates[channel][sidno][note_index] == 1
-            // ? voice = 0, midimachine.channelkey_states[channel][sidno][V1_ACTIVE] = 0, midimachine.channelkey_notestates[channel][sidno][note_index] = 0
-            // : midimachine.channelkey_states[channel][sidno][V2_ACTIVE] == 1 && midimachine.channelkey_notestates[channel][sidno][note_index] == 2
-            // ? voice = 1, midimachine.channelkey_states[channel][sidno][V2_ACTIVE] = 0, midimachine.channelkey_notestates[channel][sidno][note_index] = 0
-            // : midimachine.channelkey_states[channel][sidno][V3_ACTIVE] == 1 && midimachine.channelkey_notestates[channel][sidno][note_index] == 3
-            // ? voice = 2, midimachine.channelkey_states[channel][sidno][V3_ACTIVE] = 0, midimachine.channelkey_notestates[channel][sidno][note_index] = 0
-            // : 0; /* ISSUE: EVERY NOTE AFTER 3 KEYS GOES TO VOICE 1 */
-
-            // if (midimachine.channelkey_states[channel][sidno][N_KEYS] < 0) midimachine.channelkey_states[channel][sidno][N_KEYS] = 0;
-
-            for (int i = 0; i < ((numsids * 3) - 1); i++) {
-              if (voices[i] == buffer[1]) {
-                voice = i;
-                voices[i] = 0;
-                // freevoice = voice;
-              }
-            }
-            sidno = abs(voice / 3);
-            midimachine.channel_states[channel][sidno][CONTR + (vt[voice] * 7)] = (midimachine.channel_states[channel][sidno][CONTR + (vt[voice] * 7)] & 0xFE);
-            if (midimachine.channelkey_states[channel][sidno][N_KEYS] != 0) midimachine.channelkey_states[channel][sidno][N_KEYS]--;
-            write_gate(channel, sidno, (vt[voice] * 7));
-            voices[voice] = 0;
-            for (int i = 0; i < ((numsids * 3) - 1); i++) {
-              if (voices[i] == 0) {
-                voice = i;
-                break;
-              }
-            }
-            // voice = voice == 2 ? voice : voice--;
-            // if (voice != 0) voice--;
+        case 0:  /* Bank 0 */
+          bank_zero_off(channel, sidno, buffer[1]);
           break;
-        case 9:
+        case 1:  /* Bank 1 */
+          bank_one_off(channel, sidno, voiceno, buffer[1]);
+          break;
+        case 9:  /* Bank 9 */
           bank_null_off(channel, sidno);
         default:
           break;
@@ -296,38 +504,13 @@ void process_midi(uint8_t *buffer, int size)
     case 0x90 ... 0x9F:  /* Channel 0~16 Note On */
       bank = midimachine.channelbank[channel];
       switch (bank) {
-        case 0:
-          // midimachine.channelkey_states[channel][sidno][V1_ACTIVE] == 0 && midimachine.channelkey_notestates[channel][sidno][note_index] != 1
-          //   ? voice = 0, midimachine.channelkey_states[channel][sidno][V1_ACTIVE] = 1, midimachine.channelkey_notestates[channel][sidno][note_index] = 1
-          //   : midimachine.channelkey_states[channel][sidno][V2_ACTIVE] == 0 && midimachine.channelkey_notestates[channel][sidno][note_index] != 2
-          //   ? voice = 1, midimachine.channelkey_states[channel][sidno][V2_ACTIVE] = 1, midimachine.channelkey_notestates[channel][sidno][note_index] = 2
-          //   : midimachine.channelkey_states[channel][sidno][V3_ACTIVE] == 0 && midimachine.channelkey_notestates[channel][sidno][note_index] != 3
-          //   ? voice = 2, midimachine.channelkey_states[channel][sidno][V3_ACTIVE] = 1, midimachine.channelkey_notestates[channel][sidno][note_index] = 3
-          //   : 0;
-          // for (int i = 0; i < 3; i++) {
-          //   if (voices[i] == 0) voice = i;
-          //   break;
-          // }
-          voices[voice] = buffer[1];
-          sidno = abs(voice / 3);
-          midimachine.channelkey_states[channel][sidno][N_KEYS]++;
-          /* write(channel, sid, MODVOL); */
-          /* write_voice(channel, sid, (voice * 7)); */
-          /* Note Lo & Hi */
-          midimachine.channel_states[channel][sidno][NOTELO + (vt[voice] * 7)] = Flo;
-          midimachine.channel_states[channel][sidno][NOTEHI + (vt[voice] * 7)] = Fhi;
-          write_note(channel, sidno, (vt[voice] * 7));
-          /* Control ~ Gate bit on */
-          val = midimachine.channel_states[channel][sidno][CONTR + (vt[voice] * 7)] & 0xFE;
-          val |= 0x1;
-          midimachine.channel_states[channel][sidno][CONTR + (vt[voice] * 7)] = val;
-          write_gate(channel, sidno, (vt[voice] * 7));
-          // prevvoice = voice;
-          // if (voice < 3) voice++;
-          if (voice < ((numsids * 3) - 1)) voice++;
-          if (voice > ((numsids * 3) - 1)) voice = 0;
+        case 0:  /* Bank 0 */
+          bank_zero_on(channel, sidno, buffer[1], Flo, Fhi);
           break;
-        case 9:
+        case 1:  /* Bank 1 */
+          bank_one_on(channel, sidno, voiceno, buffer[1], Flo, Fhi);
+          break;
+        case 9:  /* Bank 9 */
           bank_null_on(channel, sidno, Flo, Fhi);
         default:
           break;
@@ -336,214 +519,217 @@ void process_midi(uint8_t *buffer, int size)
     case 0xA0 ... 0xAF:  /* Channel 0~16 Polyphonic Key Pressure (Aftertouch) */
       break;
     case 0xB0 ... 0xBF:  /* Channel 0~16 Control/Mode Change */
-      switch (buffer[1]) { /* MSB or LSB for Control/Mode Change */
-        /* Bank ~ Patch select */
-        case 0x00:  /* 0  ~ Bank Select MSB */
-          /* Ignore ~ only 1 bank for now */
-          break;
-        case 0x20:  /* 20 ~ Bank Select LSB */
-          midimachine.channelbank[channel] = buffer[2];
-          break;
-        /* After touch something? */
-        case 0x01:  /* 1  ~ Modulation wheel */
-        /* Voice settings */
-        case 0x07:  /* 7  ~ Set Master Volume */
-          in = buffer[2];
-          volume = map(in, 0, 127, 0, 15);
-          mask = L_NIBBLE; /* Inverted */
-          for (int sid = 0; sid < numsids; sid ++) {
-            modevol_state = midimachine.channel_states[channel][sid][MODVOL];
-            keep_state = (modevol_state & mask);
-            val = keep_state | volume;
-            midimachine.channel_states[channel][sid][MODVOL] = val;
-            write(channel, sid, MODVOL);
+      switch (bank) { /* QUESTION: Should this be/stay bank independent!? */
+        case 0:  /* Bank 0 ~ Polyfonic stacking */
+        case 1:  /* Bank 1 ~ Single voices */
+        case 9:  /* Bank 9 ~ Cynthcart */ // NOTE: None of these work yet for Bank 9
+          switch (buffer[1]) { /* MSB or LSB for Control/Mode Change */
+            /* Bank ~ Patch select */
+            case CC_BMSB:  /* Bank Select MSB */
+              /* Ignore ~ only 1 bank for now */
+              break;
+            case CC_BLSB:  /* Bank Select LSB */
+              bank = midimachine.channelbank[channel] = buffer[2];  /* Set Bank */
+              break;
+            /* Per SID settings */
+            case CC_VOL:   /* Set Master Volume */
+              in = buffer[2];
+              volume = map(in, 0, 127, 0, 15);
+              if (bank == 0) bank_zero_sidsetter_single_withkeep(channel, volume, MODVOL, L_NIBBLE);
+              if (bank == 1) bank_one_sidsetter_single_withkeep(channel, sidno, voiceno, volume, MODVOL, L_NIBBLE);
+              break;
+            case CC_FFC:   /* Filter Frequency Cutoff */
+              in = buffer[2];
+              out = map(in, 0, 127, 0, 2047);
+              if (bank == 0) bank_zero_sidsetter_dual(channel, out, FC_HI, FC_LO, F_MASK_HI, F_MASK_LO, SHIFT_3); /* writes all available sids */
+              if (bank == 1) bank_one_sidsetter_dual(channel, sidno, voiceno, out, FC_HI, FC_LO, F_MASK_HI, F_MASK_LO, SHIFT_3); /* writes a single sid */
+              // for (int sid = 0; sid < numsids; sid ++) {
+              //   val = (out & 0x7);
+              //   midimachine.channel_states[channel][sid][FC_LO] = val;
+              //   val = (out & 0x7F8) >> 3;
+              //   midimachine.channel_states[channel][sid][FC_HI] = val;
+              //   write(channel, sid, FC_LO);
+              //   write(channel, sid, FC_HI);
+              // }
+              break;
+            case CC_RES:   /* Filter resonance */
+              in = buffer[2];
+              out = map(in, 0, 127, 0, 15);
+              if (bank == 0) bank_zero_sidsetter_single_withkeep(channel, (out << 4), RESFLT, R_NIBBLE);
+              if (bank == 1) bank_one_sidsetter_single_withkeep(channel, sidno, voiceno, (out << 4), RESFLT, R_NIBBLE);
+              // mask = R_NIBBLE;  /* Inverted */
+              // for (int sid = 0; sid < numsids; sid ++) {
+              //   midimachine.channel_states[channel][sid][RESFLT] = (out << 4) | (midimachine.channel_states[channel][sid][RESFLT] & mask);
+              //   write(channel, sid, RESFLT);
+              // }
+              break;
+            case CC_3OFF:  /* Voice 3 disconnect */
+              in = buffer[2];
+              out = map(in, 0, 127, 0, 1);
+              if (bank == 0) bank_zero_sidsetter_toggle_withkeep(channel, out, MODVOL, 0x80);
+              if (bank == 1) bank_one_sidsetter_toggle_withkeep(channel, sidno, voiceno, out, MODVOL, 0x80);
+              // for (int sid = 0; sid < numsids; sid ++) {
+              //   keep_state = midimachine.channel_states[channel][sid][MODVOL];
+              //   val = out == 1 ? keep_state |= 0x80 : keep_state ^ 0x80;
+              //   midimachine.channel_states[channel][sid][MODVOL] = val;
+              //   write(channel, sid, MODVOL);
+              // }
+              /* write(channel, sidno, MODVOL); */
+              break;
+            case CC_FLT1:  /* Filter channel 1 */
+            case CC_FLT2:  /* Filter channel 2 */
+            case CC_FLT3:  /* Filter channel 3 */
+            case CC_FLTE:  /* Filter external */
+              in = buffer[2];
+              out = map(in, 0, 127, 0, 1);
+              uint8_t fltchannel = buffer[1] == 0x14 ? 0x1
+                : buffer[1] == 0x15 ? 0x2
+                : buffer[1] == 0x16 ? 0x4
+                : buffer[1] == 0x17 ? 0x8
+                : 0; // <<- fallback
+              if (bank == 0) bank_zero_sidsetter_toggle_withkeep(channel, out, RESFLT, fltchannel);
+              if (bank == 1) bank_one_sidsetter_toggle_withkeep(channel, sidno, voiceno, out, RESFLT, fltchannel);
+              // for (int sid = 0; sid < numsids; sid++) {
+              //   fltres_state = midimachine.channel_states[channel][sid][RESFLT];
+              //   val = out == 1 ? fltres_state |= fltchannel : fltres_state ^ fltchannel;
+              //   midimachine.channel_states[channel][sid][RESFLT] = val;
+              //   write(channel, sid, RESFLT);
+              // }
+              /* write(channel, sidno, RESFLT); */
+              break;
+            case CC_HPF:   /* High pass */
+              in = buffer[2];
+              out = map(in, 0, 127, 0, 1);
+              if (bank == 0) bank_zero_sidsetter_toggle_withkeep(channel, out, MODVOL, 0x40);
+              if (bank == 1) bank_one_sidsetter_toggle_withkeep(channel, sidno, voiceno, out, MODVOL, 0x40);
+              // for (int sid = 0; sid < numsids; sid ++) {
+              //   keep_state = midimachine.channel_states[channel][sid][MODVOL];
+              //   val = out == 1 ? keep_state |= 0x40 : keep_state ^ 0x40;
+              //   midimachine.channel_states[channel][sid][MODVOL] = val;
+              //   write(channel, sid, MODVOL);
+              // }
+              /* write(channel, sidno, MODVOL); */
+              break;
+            case CC_BPF:   /* Band pass */
+              in = buffer[2];
+              out = map(in, 0, 127, 0, 1);
+              if (bank == 0) bank_zero_sidsetter_toggle_withkeep(channel, out, MODVOL, 0x20);
+              if (bank == 1) bank_one_sidsetter_toggle_withkeep(channel, sidno, voiceno, out, MODVOL, 0x20);
+              // for (int sid = 0; sid < numsids; sid ++) {
+              //   keep_state = midimachine.channel_states[channel][sid][MODVOL];
+              //   val = out == 1 ? keep_state |= 0x20 : keep_state ^ 0x20;
+              //   midimachine.channel_states[channel][sid][MODVOL] = val;
+              //   write(channel, sid, MODVOL);
+              // }
+              /* write(channel, sidno, MODVOL); */
+              break;
+            case CC_LPF:   /* Low pass */
+              in = buffer[2];
+              out = map(in, 0, 127, 0, 1);
+              if (bank == 0) bank_zero_sidsetter_toggle_withkeep(channel, out, MODVOL, 0x10);
+              if (bank == 1) bank_one_sidsetter_toggle_withkeep(channel, sidno, voiceno, out, MODVOL, 0x10);
+              // for (int sid = 0; sid < numsids; sid ++) {
+              //   keep_state = midimachine.channel_states[channel][sid][MODVOL];
+              //   val = out == 1 ? keep_state |= 0x10 : keep_state ^ 0x10;
+              //   midimachine.channel_states[channel][sid][MODVOL] = val;
+              //   write(channel, sid, MODVOL);
+              // }
+              /* write(channel, sidno, MODVOL); */
+              break;
+            /* Per voice settings */
+            case 0x01:  /* 1  ~ Pulse Width Modulation (Modulation wheel) */
+              in = buffer[2];
+              out = map(in, 0, 0x7F, 0, 0xFFF);
+              /* Pulse width Hi & Lo*/
+              if (bank == 0) bank_zero_voicesetter_dual(channel, out, PWMHI, PWMLO, NIBBLE_3, BYTE, SHIFT_8); /* writes all 3 voices of a sid */
+              if (bank == 1) bank_one_voicesetter_dual(channel, sidno, voiceno, out, PWMHI, PWMLO, NIBBLE_3, BYTE, SHIFT_8); /* writes a single voice */
+              break;
+            case 0x14:  /* 21 ~ Note frequency */
+            case 0x15:  /* 21 ~ Noise waveform */
+            case 0x16:  /* 22 ~ Pulse waveform */
+            case 0x17:  /* 23 ~ Sawtooth waveform */
+            case 0x18:  /* 24 ~ Triangle waveform */
+            case 0x19:  /* 25 ~ Test bit */
+            case 0x1A:  /* 26 ~ Ring modulator bit */
+              for (int sid = 0; sid < numsids; sid ++) {
+                midimachine.channel_states[channel][sid][CONTR] = ((midimachine.channel_states[channel][sid][CONTR] & R_NIBBLE) ^ 0x4);
+                midimachine.channel_states[channel][sid][CONTR + 7] = ((midimachine.channel_states[channel][sid][CONTR + 7] & R_NIBBLE) ^ 0x4);
+                midimachine.channel_states[channel][sid][CONTR + 14] = ((midimachine.channel_states[channel][sid][CONTR + 14] & R_NIBBLE) ^ 0x4);
+                write_triple(channel, sid, CONTR);
+              }
+              /* write_triple(channel, sidno, CONTR); */
+              break;
+            case 0x1B:  /* 27 ~ Sync bit */
+              for (int sid = 0; sid < numsids; sid ++) {
+                midimachine.channel_states[channel][sid][CONTR] = ((midimachine.channel_states[channel][sid][CONTR] & R_NIBBLE) ^ 0x2);
+                midimachine.channel_states[channel][sid][CONTR + 7] = ((midimachine.channel_states[channel][sid][CONTR + 7] & R_NIBBLE) ^ 0x2);
+                midimachine.channel_states[channel][sid][CONTR + 14] = ((midimachine.channel_states[channel][sid][CONTR + 14] & R_NIBBLE) ^ 0x2);
+                write_triple(channel, sid, CONTR);
+              }
+              /* write_triple(channel, sidno, CONTR); */
+              break;
+            case 0x1C:  /* 28 ~ Gate bit */
+            case 0x49:  /* 73 ~ Attack */
+              in = buffer[2];
+              out = map(in, 0, 127, 0, 15);
+              mask = R_NIBBLE; /* Inverted */
+              for (int sid = 0; sid < numsids; sid ++) {
+                for (int i = 0; i < 3; i++) {
+                  midimachine.channel_states[channel][sid][(i * 7) + ATTDEC] = (out << 4) | (midimachine.channel_states[channel][sid][(i * 7) + ATTDEC] & mask);
+                }
+                write_triple(channel, sid, ATTDEC);
+              }
+              /* write_triple(channel, sidno, ATTDEC); */
+              break;
+            case 0x4B:  /* 75 ~ Decay */
+              in = buffer[2];
+              out = map(in, 0, 127, 0, 15);
+              mask = L_NIBBLE;  /* Inverted */
+              for (int sid = 0; sid < numsids; sid ++) {
+                for (int i = 0; i < 3; i++) {
+                  midimachine.channel_states[channel][sid][(i * 7) + ATTDEC] = (midimachine.channel_states[channel][sid][(i * 7) + ATTDEC] & mask) | out;
+                }
+                write_triple(channel, sid, ATTDEC);
+              }
+              /* write_triple(channel, sidno, ATTDEC); */
+              break;
+            case 0x40:  /* 64 ~ Sustain */
+              in = buffer[2];
+              out = map(in, 0, 127, 0, 15);
+              mask = R_NIBBLE;  /* Inverted */
+              for (int sid = 0; sid < numsids; sid ++) {
+                for (int i = 0; i < 3; i++) {
+                  midimachine.channel_states[channel][sid][(i * 7) + SUSREL] = (out << 4) | (midimachine.channel_states[channel][sid][(i * 7) + SUSREL] & mask);
+                }
+                write_triple(channel, sid, SUSREL);
+              }
+              /* write_triple(channel, sidno, SUSREL); */
+              break;
+            case 0x48:  /* 72 ~ Release */
+              in = buffer[2];
+              out = map(in, 0, 127, 0, 15);
+              mask = L_NIBBLE;  /* Inverted */
+              for (int sid = 0; sid < numsids; sid ++) {
+                for (int i = 0; i < 3; i++) {
+                  midimachine.channel_states[channel][sid][(i * 7) + SUSREL] = (midimachine.channel_states[channel][sid][(i * 7) + SUSREL] & mask) | out;
+                }
+                write_triple(channel, sid, SUSREL);
+              }
+              /* write_triple(channel, sidno, SUSREL); */
+              break;
+            default:
+              break;
           }
-          /* write(channel, sidno, MODVOL); */
-          break;
-        case 0x10:  /* 16 ~ Low pass */
-          in = buffer[2];
-          out = map(in, 0, 127, 0, 1);
-          for (int sid = 0; sid < numsids; sid ++) {
-            keep_state = midimachine.channel_states[channel][sid][MODVOL];
-            val = out == 1 ? keep_state |= 0x10 : keep_state ^ 0x10;
-            midimachine.channel_states[channel][sid][MODVOL] = val;
-            write(channel, sid, MODVOL);
-          }
-          /* write(channel, sidno, MODVOL); */
-          break;
-        case 0x11:  /* 17 ~ Band pass */
-          in = buffer[2];
-          out = map(in, 0, 127, 0, 1);
-          for (int sid = 0; sid < numsids; sid ++) {
-            keep_state = midimachine.channel_states[channel][sid][MODVOL];
-            val = out == 1 ? keep_state |= 0x20 : keep_state ^ 0x20;
-            midimachine.channel_states[channel][sid][MODVOL] = val;
-            write(channel, sid, MODVOL);
-          }
-          /* write(channel, sidno, MODVOL); */
-          break;
-        case 0x12:  /* 18 ~ High pass */
-          in = buffer[2];
-          out = map(in, 0, 127, 0, 1);
-          for (int sid = 0; sid < numsids; sid ++) {
-            keep_state = midimachine.channel_states[channel][sid][MODVOL];
-            val = out == 1 ? keep_state |= 0x40 : keep_state ^ 0x40;
-            midimachine.channel_states[channel][sid][MODVOL] = val;
-            write(channel, sid, MODVOL);
-          }
-          /* write(channel, sidno, MODVOL); */
-          break;
-        case 0x13:  /* 19 ~ Voice 3 disconnect */
-          in = buffer[2];
-          out = map(in, 0, 127, 0, 1);
-          for (int sid = 0; sid < numsids; sid ++) {
-            keep_state = midimachine.channel_states[channel][sid][MODVOL];
-            val = out == 1 ? keep_state |= 0x80 : keep_state ^ 0x80;
-            midimachine.channel_states[channel][sid][MODVOL] = val;
-            write(channel, sid, MODVOL);
-          }
-          /* write(channel, sidno, MODVOL); */
-          break;
-        case 0x14:  /* 20 ~ Filter channel 1 */
-        case 0x15:  /* 21 ~ Filter channel 2 */
-        case 0x16:  /* 22 ~ Filter channel 3 */
-        case 0x17:  /* 23 ~ Filter external */
-          in = buffer[2];
-          out = map(in, 0, 127, 0, 1);
-          uint8_t fltchannel = buffer[1] == 0x14 ? 0x1
-            : buffer[1] == 0x15 ? 0x2
-            : buffer[1] == 0x16 ? 0x4
-            : buffer[1] == 0x17 ? 0x8
-            : 0; // <<- fallback
-          for (int sid = 0; sid < numsids; sid ++) {
-            fltres_state = midimachine.channel_states[channel][sid][RESFLT];
-            val = out == 1 ? fltres_state |= fltchannel : fltres_state ^ fltchannel;
-            midimachine.channel_states[channel][sid][RESFLT] = val;
-            write(channel, sid, RESFLT);
-          }
-          /* write(channel, sidno, RESFLT); */
-          break;
-        case 0x42:  /* 66 ~ Ring modulator */
-          for (int sid = 0; sid < numsids; sid ++) {
-            midimachine.channel_states[channel][sid][CONTR] = ((midimachine.channel_states[channel][sid][CONTR] & R_NIBBLE) ^ 0x4);
-            midimachine.channel_states[channel][sid][CONTR + 7] = ((midimachine.channel_states[channel][sid][CONTR + 7] & R_NIBBLE) ^ 0x4);
-            midimachine.channel_states[channel][sid][CONTR + 14] = ((midimachine.channel_states[channel][sid][CONTR + 14] & R_NIBBLE) ^ 0x4);
-            write_triple(channel, sid, CONTR);
-          }
-          /* write_triple(channel, sidno, CONTR); */
-          break;
-        case 0x43:  /* 67 ~ Sync */
-          for (int sid = 0; sid < numsids; sid ++) {
-            midimachine.channel_states[channel][sid][CONTR] = ((midimachine.channel_states[channel][sid][CONTR] & R_NIBBLE) ^ 0x2);
-            midimachine.channel_states[channel][sid][CONTR + 7] = ((midimachine.channel_states[channel][sid][CONTR + 7] & R_NIBBLE) ^ 0x2);
-            midimachine.channel_states[channel][sid][CONTR + 14] = ((midimachine.channel_states[channel][sid][CONTR + 14] & R_NIBBLE) ^ 0x2);
-            write_triple(channel, sid, CONTR);
-          }
-          /* write_triple(channel, sidno, CONTR); */
-          break;
-        case 0x49:  /* 73 ~ Attack */
-          in = buffer[2];
-          out = map(in, 0, 127, 0, 15);
-          mask = R_NIBBLE; /* Inverted */
-          for (int sid = 0; sid < numsids; sid ++) {
-            for (int i = 0; i < 3; i++) {
-              midimachine.channel_states[channel][sid][(i * 7) + ATTDEC] = (out << 4) | (midimachine.channel_states[channel][sid][(i * 7) + ATTDEC] & mask);
-            }
-            write_triple(channel, sid, ATTDEC);
-          }
-          /* write_triple(channel, sidno, ATTDEC); */
-          break;
-        case 0x4B:  /* 75 ~ Decay */
-          in = buffer[2];
-          out = map(in, 0, 127, 0, 15);
-          mask = L_NIBBLE;  /* Inverted */
-          for (int sid = 0; sid < numsids; sid ++) {
-            for (int i = 0; i < 3; i++) {
-              midimachine.channel_states[channel][sid][(i * 7) + ATTDEC] = (midimachine.channel_states[channel][sid][(i * 7) + ATTDEC] & mask) | out;
-            }
-            write_triple(channel, sid, ATTDEC);
-          }
-          /* write_triple(channel, sidno, ATTDEC); */
-          break;
-        case 0x40:  /* 64 ~ Sustain */
-          in = buffer[2];
-          out = map(in, 0, 127, 0, 15);
-          mask = R_NIBBLE;  /* Inverted */
-          for (int sid = 0; sid < numsids; sid ++) {
-            for (int i = 0; i < 3; i++) {
-              midimachine.channel_states[channel][sid][(i * 7) + SUSREL] = (out << 4) | (midimachine.channel_states[channel][sid][(i * 7) + SUSREL] & mask);
-            }
-            write_triple(channel, sid, SUSREL);
-          }
-          /* write_triple(channel, sidno, SUSREL); */
-          break;
-        case 0x48:  /* 72 ~ Release */
-          in = buffer[2];
-          out = map(in, 0, 127, 0, 15);
-          mask = L_NIBBLE;  /* Inverted */
-          for (int sid = 0; sid < numsids; sid ++) {
-            for (int i = 0; i < 3; i++) {
-              midimachine.channel_states[channel][sid][(i * 7) + SUSREL] = (midimachine.channel_states[channel][sid][(i * 7) + SUSREL] & mask) | out;
-            }
-            write_triple(channel, sid, SUSREL);
-          }
-          /* write_triple(channel, sidno, SUSREL); */
-          break;
-        case 0x46:  /* 70 ~ Filter resonance */
-          in = buffer[2];
-          out = map(in, 0, 127, 0, 15);
-          mask = R_NIBBLE;  /* Inverted */
-          for (int sid = 0; sid < numsids; sid ++) {
-            midimachine.channel_states[channel][sid][RESFLT] = (out << 4) | (midimachine.channel_states[channel][sid][RESFLT] & mask);
-            write(channel, sid, RESFLT);
-          }
-          /* write(channel, sidno, RESFLT); */
-          break;
-        case 0x47:  /* 71 ~ Filter */
-          in = buffer[2];
-          out = map(in, 0, 127, 0, 2047);
-          for (int sid = 0; sid < numsids; sid ++) {
-            val = (out & 0x7);
-            midimachine.channel_states[channel][sid][FC_LO] = val;
-            val = (out & 0x7F8) >> 3;
-            midimachine.channel_states[channel][sid][FC_HI] = val;
-              write(channel, sid, FC_LO);
-            write(channel, sid, FC_HI);
-          }
-          /* write(channel, sidno, FC_LO); */
-          /* write(channel, sidno, FC_HI); */
-          break;
-        case 0x4A:  /* 74 ~ Unused */
-          break;
-        case 0x4C:  /* 76 ~ Pulse Width */
-          in = buffer[2];
-          out = map(in, 0, 0x7F, 0, 0xFFF);
-          /* Pulse width Hi */
-          // midimachine.sid_states[sidno][PWMHI + voice_start] = ((out & NIBBLE_3) >> 8);
-          /* Pulse width Lo */
-          // midimachine.sid_states[sidno][PWMLO + voice_start] = (out & BYTE);
-          // midi_bus_operation((addr | 0x02), midimachine.sid_states[sidno][PWMLO + voice_start]);  /* PW LO */
-          // midi_bus_operation((addr | 0x03), midimachine.sid_states[sidno][PWMHI + voice_start]);  /* PW HI */
-          for (int sid = 0; sid < numsids; sid ++) {
-            for (int i = 0; i < 3; i++) {
-              midimachine.channel_states[channel][sid][(i * 7) + PWMHI] = ((out & NIBBLE_3) >> 8);
-              midimachine.channel_states[channel][sid][(i * 7) + PWMLO] = (out & BYTE);
-            }
-            write_triple(channel, sid, PWMHI);
-            write_triple(channel, sid, PWMLO);
-          }
-          /* write_triple(channel, sidno, PWMHI); */
-          /* write_triple(channel, sidno, PWMLO); */
           break;
         default:
           break;
       }
       break;
     case 0xC0 ... 0xCF:  /* Channel 0~16 Program change */
-      program = midimachine.channelprogram[channel] = buffer[1];
-      bank = midimachine.channelbank[channel];
+      program = midimachine.channelprogram[channel] = buffer[1];  /* Set Program */
+      // bank = midimachine.channelbank[channel];
       switch (bank) {
-        case 0:  /* 3VoiceSID */
+        case 0:  /* Bank 0 ~ Polyfonic stacking */
           switch (program) {
             case 0:  /* Noise */
               for (int sid = 0; sid < numsids; sid ++) {
@@ -552,7 +738,6 @@ void process_midi(uint8_t *buffer, int size)
                 }
                 write_triple(channel, sid, CONTR);
               }
-              /* write_triple(channel, sidno, CONTR); */
               break;
             case 1:  /* Pulse */
               for (int sid = 0; sid < numsids; sid ++) {
@@ -561,7 +746,6 @@ void process_midi(uint8_t *buffer, int size)
                 }
                 write_triple(channel, sid, CONTR);
                }
-              /* write_triple(channel, sidno, CONTR); */
               break;
             case 2:  /* Sawtooth */
               for (int sid = 0; sid < numsids; sid ++) {
@@ -570,7 +754,6 @@ void process_midi(uint8_t *buffer, int size)
                 }
                 write_triple(channel, sid, CONTR);
               }
-              /* write_triple(channel, sidno, CONTR); */
               break;
             case 3:  /* Triangle */
               for (int sid = 0; sid < numsids; sid ++) {
@@ -579,11 +762,30 @@ void process_midi(uint8_t *buffer, int size)
                 }
                 write_triple(channel, sid, CONTR);
               }
-              /* write_triple(channel, sidno, CONTR); */
               break;
           };
           break;
-        case 9:
+        case 1:  /* Bank 1 ~ Single voices */
+          switch (program) {
+            case 0:  /* Noise */
+              midimachine.channel_states[channel][sidno][(voiceno * 7) + CONTR] = ((midimachine.channel_states[channel][sidno][(voiceno * 7) + CONTR] & R_NIBBLE) | 0x80);
+              write(channel, sidno, CONTR);
+              break;
+            case 1:  /* Pulse */
+              midimachine.channel_states[channel][sidno][(voiceno * 7) + CONTR] = ((midimachine.channel_states[channel][sidno][(voiceno * 7) + CONTR] & R_NIBBLE) | 0x40);
+              write(channel, sidno, CONTR);
+              break;
+            case 2:  /* Sawtooth */
+              midimachine.channel_states[channel][sidno][(voiceno * 7) + CONTR] = ((midimachine.channel_states[channel][sidno][(voiceno * 7) + CONTR] & R_NIBBLE) | 0x20);
+              write(channel, sidno, CONTR);
+              break;
+            case 3:  /* Triangle */
+              midimachine.channel_states[channel][sidno][(voiceno * 7) + CONTR] = ((midimachine.channel_states[channel][sidno][(voiceno * 7) + CONTR] & R_NIBBLE) | 0x10);
+              write(channel, sidno, CONTR);
+              break;
+          }
+          break;
+        case 9:  /* Patches */
           for (int n = 1; n <= numsids; n++) {
             bank_null(channel, (n - 1), program);
           }
@@ -599,13 +801,7 @@ void process_midi(uint8_t *buffer, int size)
       break;
   };
   if (midimachine.channelkey_states[channel][sidno][N_KEYS] == 0) voice = 0;
-  // MVDBG("[S]%d[N]%d[V~%d][V%d]%02x%02x%02x %02x%02x%02x  %02x%02x%02x  %02x%02x%02x\r\n",
-  //     sidno, midimachine.channelkey_states[channel][sidno][N_KEYS], // N
-  //     voice, vt[voice], voices[0],voices[1],voices[2], //V
-  //     voices[3],voices[4],voices[5], //V
-  //     voices[6],voices[7],voices[8], //V
-  //     voices[9],voices[10],voices[11] //V
-  //   );
+
   MVDBG("[N]%d[V%d]%02x%02x%02x[1][$%04x][$%04x][$%02x][$%02x][$%02x][2][$%04x][$%04x][$%02x][$%02x][$%02x][3][$%04x][$%04x][$%02x][$%02x][$%02x][R][$%02x%01x][$%02x][$%02x]\r\n",
     midimachine.channelkey_states[channel][sidno][N_KEYS], // N
     voice,voices[0],voices[1],voices[2], //V
