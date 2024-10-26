@@ -263,6 +263,7 @@ void cdc_write(uint8_t * itf, uint32_t n)
 { /* No need to check if write available with current driver code */
   tud_cdc_n_write(*itf, write_buffer, n);  /* write n bytes of data to client */
   tud_cdc_n_write_flush(*itf);
+  vue = vue == 0 ? 100 : vue;  /* NOTICE: Testfix for core1 setting dtype to 0 */
   IODBG("[O] [%c] DAT[0x%02x] \r\n", dtype, write_buffer[0]);
 }
 
@@ -271,6 +272,7 @@ void webserial_write(uint8_t * itf, uint32_t n)
 { /* No need to check if write available with current driver code */
   tud_vendor_write(write_buffer, n);
   tud_vendor_flush();
+  vue = vue == 0 ? 100 : vue;  /* NOTICE: Testfix for core1 setting dtype to 0 */
   IODBG("[O] [%c] DAT[0x%02x] \r\n", dtype, write_buffer[0]);
 }
 
