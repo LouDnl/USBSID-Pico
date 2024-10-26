@@ -87,6 +87,7 @@ typedef struct {
   uint8_t channelkey_states[16][4][4];  /* Stores channelkey states of each SID ~ 4 sids max */
   uint8_t channelbank[16];  /* [Channel][Bank(0)] relation */
   uint8_t channelprogram[16];  /* [Channel][Patch/Program(1)] relation */
+  bool bank1channelgate[16];  /* Auto gate on/off per channel on noteon and noteoff */
   uint8_t sidaddress;
   int fmopl;
 
@@ -114,51 +115,73 @@ void process_buffer(uint8_t buffer);
 
 /* Custom values from CMakeLists import */
 // TODO: Create import file to use
-/* Default values */
-// TODO: Add all Control Change values that are custom here and define them!
-// 0x14 ~ 0x1F
-// 0x66 ~ 0x77
+
 #ifndef CC_VALUES  /* Customizable CC Bytes */
 #define CC_VALUES  /* Fallback for backwards compatibility */
 
+/* Default Control Change Byte values */
+#ifndef CC_PWM
+#define CC_PWM  0x01  /*   1 ~ Pulse Width Modulation (Modulation wheel) */
+#endif /* CC_PWM */
+#ifndef CC_NOTE
+#define CC_NOTE 0x14  /*  20 ~ Note frequency */
+#endif /* CC_NOTE */
+#ifndef CC_NOIS
+#define CC_NOIS 0x15  /*  21 ~ Noise waveform */
+#endif /* CC_NOIS */
+#ifndef CC_PULS
+#define CC_PULS 0x16  /*  22 ~ Pulse waveform */
+#endif /* CC_PULS */
+#ifndef CC_SAWT
+#define CC_SAWT 0x17  /*  23 ~ Sawtooth waveform */
+#endif /* CC_SAWT */
+#ifndef CC_TRIA
+#define CC_TRIA 0x18  /*  24 ~ Triangle waveform */
+#endif /* CC_TRIA */
+#ifndef CC_TEST
+#define CC_TEST 0x19  /*  25 ~ Test bit */
+#endif /* CC_TEST */
+#ifndef CC_RMOD
+#define CC_RMOD 0x1A  /*  26 ~ Ring modulator bit */
+#endif /* CC_RMOD */
+#ifndef CC_SYNC
+#define CC_SYNC 0x1B  /*  27 ~ Sync bit */
+#endif /* CC_SYNC */
+#ifndef CC_GATE
+#define CC_GATE 0x1C  /*  28 ~ Gate bit */
+#endif /* CC_GATE */
+#ifndef CC_GTEN
+#define CC_GTEN 0x1D  /*  28 ~ Gate auto enabled on noteon note off */
+#endif /* CC_GTEN */
 #ifndef CC_FFC
-#define CC_FFC 0x6E  /* 110 ~ Filter Frequency Cutoff */
+#define CC_FFC 0x6E   /* 110 ~ Filter Frequency Cutoff */
 #endif /* CC_FFC */
-
 #ifndef CC_RES
-#define CC_RES 0x6F  /* 111 ~ Filter resonance */
+#define CC_RES 0x6F   /* 111 ~ Filter resonance */
 #endif /* CC_RES */
-
 #ifndef CC_3OFF
 #define CC_3OFF 0x70  /* 112 ~ Voice 3 disconnect */
 #endif /* CC_3OFF */
-
 #ifndef CC_FLT1
 #define CC_FLT1 0x71  /* 113 ~ Filter channel 1 */
 #endif /* CC_FLT1 */
-
 #ifndef CC_FLT2
 #define CC_FLT2 0x72  /* 114 ~ Filter channel 2 */
 #endif /* CC_FLT2 */
-
 #ifndef CC_FLT3
 #define CC_FLT3 0x73  /* 115 ~ Filter channel 3 */
 #endif /* CC_FLT3 */
-
 #ifndef CC_FLTE
 #define CC_FLTE 0x74  /* 116 ~ Filter external */
 #endif /* CC_FLTE */
-
 #ifndef CC_HPF
-#define CC_HPF 0x75  /* 117 ~ High pass */
+#define CC_HPF 0x75   /* 117 ~ High pass */
 #endif /* CC_HPF */
-
 #ifndef CC_BPF
-#define CC_BPF 0x76  /* 118 ~ Band pass */
+#define CC_BPF 0x76   /* 118 ~ Band pass */
 #endif /* CC_BPF */
-
 #ifndef CC_LPF
-#define CC_LPF 0x77  /* 119 ~ Low pass */
+#define CC_LPF 0x77   /* 119 ~ Low pass */
 #endif /* CC_LPF */
 
 #endif /* CC_VALUES */
@@ -167,6 +190,10 @@ void process_buffer(uint8_t buffer);
 #define CC_BMSB 0x00  /*   0 ~ Bank Select MSB */
 #define CC_BLSB 0x20  /*  32 ~ Bank Select LSB */
 #define CC_VOL  0x07  /*   7 ~ Set Master Volume */
+#define CC_ATT  0x49  /*  73 ~ Attack */
+#define CC_DEL  0x4B  /*  75 ~ Decay */
+#define CC_SUS  0x40  /*  64 ~ Sustain */
+#define CC_REL  0x48  /*  72 ~ Release */
 
 #ifdef __cplusplus
   }
