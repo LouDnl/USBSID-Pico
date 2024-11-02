@@ -75,16 +75,14 @@ typedef struct {
   bus_state bus;
   sysex_state state;
   midi_type type;
-  // unsigned int index;
   uint8_t index;
   uint8_t readbuffer[1];
+  uint8_t usbstreambuffer[64];   /* Normal speed max buffer for TinyUSB */
+  uint8_t copybuffer[64];   /* Normal speed max buffer for TinyUSB */
   uint8_t streambuffer[64];   /* Normal speed max buffer for TinyUSB */
-  /* states */
-  // uint8_t sid_states[4][32];  /* Stores register states of each SID ~ 4 sids max */
-  // uint8_t sid_extras[4][32];  /* Stores extra settings of each SID ~ 4 sids max */
   uint8_t channel_states[16][4][32];  /* Stores channel states of each SID ~ 4 sids max */
-  // uint8_t channelkey_notestates[16][4][128];  /* Stores channelkey states of each SID ~ 4 sids max */
   uint8_t channelkey_states[16][4][4];  /* Stores channelkey states of each SID ~ 4 sids max */
+  uint8_t channelkey_notestates[16][4][128];  /* Stores channelkey states of each SID ~ 4 sids max */
   uint8_t channelbank[16];  /* [Channel][Bank(0)] relation */
   uint8_t channelprogram[16];  /* [Channel][Patch/Program(1)] relation */
   bool bank1channelgate[16];  /* Auto gate on/off per channel on noteon and noteoff */
@@ -151,7 +149,7 @@ void process_buffer(uint8_t buffer);
 #define CC_GATE 0x1C  /*  28 ~ Gate bit */
 #endif /* CC_GATE */
 #ifndef CC_GTEN
-#define CC_GTEN 0x1D  /*  28 ~ Gate auto enabled on noteon note off */
+#define CC_GTEN 0x1D  /*  29 ~ Gate auto enabled on noteon note off */
 #endif /* CC_GTEN */
 #ifndef CC_FFC
 #define CC_FFC 0x6E   /* 110 ~ Filter Frequency Cutoff */
