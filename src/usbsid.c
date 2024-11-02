@@ -79,6 +79,7 @@ extern void mcu_jump_to_bootloader(void);
 
 /* Midi externals */
 midi_machine midimachine;
+extern void process_stream(uint8_t *buffer, size_t size);
 
 /* RGB LED */
 #if defined(USE_RGB)
@@ -160,6 +161,7 @@ static const tusb_desc_webusb_url_t desc_url =
 /* Log reset reason */
 void reset_reason(void)
 {
+#if PICO_RP2040
   io_rw_32 *rr = (io_rw_32 *) (VREG_AND_CHIP_RESET_BASE + VREG_AND_CHIP_RESET_CHIP_RESET_OFFSET);
   if (*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_POR_BITS)
     DBG("[RESET] Caused by power on or brownout detection\n");
@@ -167,6 +169,7 @@ void reset_reason(void)
     DBG("[RESET] Caused by RUN pin trigger ~ manual or ISA RESET signal\n");
   if(*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_PSM_RESTART_BITS)
     DBG("[RESET] Caused by debug port\n");
+#endif
 }
 
 /* Detect clock signal */
@@ -575,20 +578,18 @@ void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 
 /* USB MIDI CLASS CALLBACKS */
 
-/* Handle incoming midi data */
 void tud_midi_rx_cb(uint8_t itf)
 {
   usbdata = 1, dtype = midi;
   if (tud_midi_n_mounted(itf)) {
     int nmidi = tud_midi_n_available(itf, 0);
-    tud_midi_n_stream_read(itf, 0, midimachine.streambuffer, nmidi);  /* Reads all available bytes at once */
-    IODBG("[I][#%d][%c]MIDI", nmidi, dtype);
-    for (int n = 0; n < nmidi; n++) {
-      IODBG(" %x", midimachine.streambuffer[n]);
-      process_buffer(midimachine.streambuffer[n]);
-    }
-    IODBG("\n");
-    __builtin_memset(midimachine.streambuffer, 0, count_of(midimachine.streambuffer));
+    tud_midi_n_stream_read(itf, 0, midimachine.usbstreambuffer, nmidi);  /* Reads all available bytes at once */
+    memcpy(midimachine.copybuffer, midimachine.usbstreambuffer, nmidi);
+    if (midimachine.copybuffer[0] == 0xF0) dtype = asid;
+    process_stream(midimachine.copybuffer, nmidi);
+    /* Clear buffers after use */
+    __builtin_memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer));
+    __builtin_memset(midimachine.copybuffer, 0, count_of(midimachine.copybuffer));
   }
 }
 
