@@ -29,12 +29,6 @@
  *
  */
 
-/* Bank 0
- * Equal settings for each 3 voices & SIDs */
-
-/* Bank 1
- * Individual settings for each voice per SID */
-
 /* Bank 9 */
 /* Hard coded patches */
 // static char patchNAMES[30][20] = {

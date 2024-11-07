@@ -57,7 +57,11 @@
 #include "hardware/structs/sio.h"  /* Pico SIO structs */
 
 /* Reboot type logging */
+#if PICO_RP2040
 #include "hardware/regs/vreg_and_chip_reset.h"
+#else
+#include "hardware/regs/powman.h"
+#endif
 #include "hardware/vreg.h"
 
 /* TinyUSB libs */
