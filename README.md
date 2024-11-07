@@ -15,6 +15,7 @@ USBSID-Pico is a RPi Pico (RP2040) based board for interfacing one or two MOS SI
 * [Important PCB information](#important-pcb-information)
 * [PCB in action](#usbsid-pico-in-action)
 * [Software examples](#software)
+  * [Pre compiled Vice binaries](#precompiled-vice-binaries)
 * [Acknowledgements](#acknowledgements)
 * [Disclaimer](#disclaimer)
 * [License](#license)
@@ -41,9 +42,14 @@ Any questions about or support with USBSID-Pico can be asked in the [discussions
 Visit the [Project Page](https://github.com/users/LouDnl/projects/1) for an up-to-date list of things being worked on.
 Firmware is in beta stage and still in development.  
 While in development any mentioned features, options, etc. are subject to change.  
+### Test your board
+I have set up a small test player using Hermit's JsSID implementation (borrowed from Deepsid).  
+You can test your board with USB Midi and ASID here: [USBSID](https://usbsid.loudai.nl/).  
+If needed you can change your SID count configuration after selecting WebUSB.
 ### Supported platforms
 _In development_  
 Linux: Vice, RetroDebugger, SidBerry, JSidplay2, USB Midi, ASID (in webbrowser) SID Play  
+Windows: Vice  
 Windows/Android: USB Midi, ASID (in webbrowser) SID Play
 
 # Firmware
@@ -194,6 +200,8 @@ _Available examples with USBSID-Pico support:_<br>
 [**Vice**](https://github.com/LouDnl/Vice-USBSID) fork is available @ https://github.com/LouDnl/Vice-USBSID<br>
 [**SidBerry**](https://github.com/LouDnl/SidBerry) fork is available @ https://github.com/LouDnl/SidBerry<br>
 [**RetroDebugger**](https://github.com/LouDnl/RetroDebugger) fork is available @ https://github.com/LouDnl/RetroDebugger<br>
+### Precompiled Vice binaries
+Pre compiled Vice binaries are available in my fork @ https://github.com/LouDnl/Vice-USBSID/tree/main/builds
 
 # Acknowledgements
 Special thanks goes out to [Tobozo](https://github.com/tobozo/) for making the USBSID-Pico logo and for his (mental🤣) support since starting this project.
