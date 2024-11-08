@@ -61,6 +61,7 @@ extern void save_config(const Config * config);
 extern void handle_config_request(uint8_t * buffer);
 extern void apply_config(void);
 extern void detect_default_config(void);
+extern void verify_clockrate(void);
 
 /* GPIO externals */
 extern PIO bus_pio;
@@ -283,10 +284,10 @@ void webserial_write(uint8_t * itf, uint32_t n)
 /* BUFFER HANDLING */
 
 /* Process received usb data */
-void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)  /* TODO: COMPACT */
+void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
 {
   switch (*n) {
-    case BACKWARD_BYTES:  /* TODO: UNTESTED */
+    case BACKWARD_BYTES:  /* For backward compatability */
       read_buffer[1] = read_buffer[2];
       read_buffer[2] = read_buffer[3];
     case BYTES_EXPECTED:
@@ -436,7 +437,9 @@ void led_vuemeter_task(void)
 
     vue = abs((osc1 + osc2 + osc3) / 3.0f);
     vue = map(vue, 0, HZ_MAX, 0, VUE_MAX);
-    pwm_set_gpio_level(BUILTIN_LED, vue);
+    if (usbsid_config.LED.enabled) {
+      pwm_set_gpio_level(BUILTIN_LED, vue);
+    }
 
     MDBG("[%c:%d] [VOL]$%02x [PWM]$%04x | [V1] $%02X%02X %02X%02X %02X %02X %02X | [V2] $%02X%02X %02X%02X %02X %02X %02X | [V3] $%02X%02X %02X%02X %02X %02X %02X \n",
       dtype, usbdata, sid_memory[0x18], vue,
@@ -471,9 +474,11 @@ void led_breathe_task(void)
 
     if (updown == 0 && pwm_value >= 0)
       pwm_value -= BREATHE_STEP;
-    pwm_set_gpio_level(BUILTIN_LED, pwm_value);
+    if (usbsid_config.LED.enabled && usbsid_config.LED.idle_breathe) {
+      pwm_set_gpio_level(BUILTIN_LED, pwm_value);
+    }
     #if defined(USE_RGB)
-    if (usbsid_config.RGBLED.enabled) {
+    if (usbsid_config.RGBLED.enabled && usbsid_config.RGBLED.idle_breathe) {
       int rgb_ = map(pwm_value, 0, VUE_MAX, 0, 43);
       r_ = color_LUT[rgb_][_rgb][0];
       g_ = color_LUT[rgb_][_rgb][1];
@@ -639,7 +644,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
           // return tud_control_xfer(rhport, request, (void*)(uintptr_t) &desc_url, desc_url.bLength); /* Do we want this? */
           return tud_control_status(rhport, request);
         case VENDOR_REQUEST_MICROSOFT:
-          if ( request->wIndex == 7 ) {
+          if (request->wIndex == 7) {
             /* Get Microsoft OS 2.0 compatible descriptor */
             uint16_t total_len;
             __builtin_memcpy(&total_len, desc_ms_os_20+8, 2);
@@ -739,6 +744,8 @@ int main()
   sem_acquire_blocking(&core1_init);
   /* Check for default config bit ~ NOTE: This cannot be run from Core 1! */
   detect_default_config();
+  /* Verify the clockrare in the config is not out of bounds */
+  verify_clockrate();
   /* Init GPIO */
   init_gpio();
   /* Init PIO */
