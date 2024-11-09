@@ -1,6 +1,11 @@
 # Changelog
 
-#### Version: 0.2.1-BETA (UNRELEASED)
+#### Version: 0.2.2-BETA (Unreleased)
+* Continue work on Midi handling
+#### Version: 0.2.1-BETA
+* Start on update for Midi handling
+  * Details will follow at a later time when finished
+* Fix ASID play
 * Fix config save error
 #### Version: 0.2.0-BETA
 * Basic Midi support

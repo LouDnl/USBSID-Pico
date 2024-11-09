@@ -231,11 +231,11 @@ void handle_config_request(uint8_t * buffer)
           switch (buffer[2]) {
             case 0: /* enabled */
               if (buffer[3] <= 1)  /* 1 or 0 */
-                usbsid_config.RGBLED.enabled = (buffer[3] == 1) ? true : false;
+                usbsid_config.LED.enabled = (buffer[3] == 1) ? true : false;
               break;
             case 1: /* idle_breathe */
               if (buffer[3] <= 1)  /* 1 or 0 */
-                usbsid_config.RGBLED.enabled = (buffer[3] == 1) ? true : false;
+                usbsid_config.LED.idle_breathe = (buffer[3] == 1) ? true : false;
               break;
             default:
               break;
@@ -249,7 +249,7 @@ void handle_config_request(uint8_t * buffer)
               break;
             case 1: /* idle_breathe */
               if (buffer[3] <= 1)  /* 1 or 0 */
-                usbsid_config.RGBLED.enabled = (buffer[3] == 1) ? true : false;
+                usbsid_config.RGBLED.idle_breathe = (buffer[3] == 1) ? true : false;
               break;
             case 2: /* brightness */
               usbsid_config.RGBLED.brightness = buffer[3];
@@ -378,6 +378,7 @@ void handle_config_request(uint8_t * buffer)
     case SET_CLOCK: /* Change SID clock frequency */
       CFG("[SET_CLOCK]\n");
       if (!usbsid_config.external_clock) {
+        CFG("[CLOCK FROM]%d [CLOCK TO]%d\n", usbsid_config.clock_rate, clockrates[(int)buffer[1]]);
         usbsid_config.clock_rate = clockrates[(int)buffer[1]];
         deinit_sidclock();
         init_sidclock();
@@ -439,10 +440,10 @@ void apply_config(void)
   two = (sock_two && numsids == 2)
     ? (1 << 1)   // CS1 high, CS2 low
     : (1 << 2);  // CS1 low, CS2 high
-  three = (numsids >= 3 ) || (sock_two && numsids == 2)
+  three = (numsids >= 3) || (sock_two && numsids == 2)
     ? (1 << 1)              // CS1 high, CS2 low
     : (1 << 1) | (1 << 2);  // CS1 high, CS2 high
-  four = (numsids == 4 )
+  four = (numsids == 4)
     ? (1 << 1)              // CS1 high, CS2 low
     : (1 << 1) | (1 << 2);  // CS1 high, CS2 high
 
@@ -463,4 +464,24 @@ void detect_default_config(void)
     save_config(&usbsid_config);
   }
   CFG("[CONFIG LOAD FINISHED]\n");
+}
+
+void verify_clockrate(void)
+{
+  if (!usbsid_config.external_clock) {
+    switch (usbsid_config.clock_rate) {
+      case CLOCK_DEFAULT:
+      case CLOCK_PAL:
+      case CLOCK_NTSC:
+      case CLOCK_DREAN:
+        break;
+      default:
+        CFG("[CLOCK ERROR] Detected unconventional clockrate (%ld) error in config, revert to default\n", usbsid_config.clock_rate);
+        usbsid_config.clock_rate = clockrates[0];
+        save_config(&usbsid_config);
+        load_config(&usbsid_config);
+        mcu_reset();
+        break;
+    }
+  }
 }

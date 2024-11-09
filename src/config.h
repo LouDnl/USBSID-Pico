@@ -51,7 +51,7 @@
 /* Config constants */
 #define FLASH_TARGET_OFFSET (PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE)
 #define CONFIG_SIZE (FLASH_SECTOR_SIZE / 4)  /* 1024 Bytes */
-#define PROJECT_VERSION "0.2.0-BETA.20241017"
+#define PROJECT_VERSION "0.2.1-BETA.20241109"
 /* Compile time variable settings */
 #ifndef MAGIC_SMOKE
 #define MAGIC_SMOKE 19700101  /* DATEOFRELEASE */
