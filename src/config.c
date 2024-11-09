@@ -440,10 +440,10 @@ void apply_config(void)
   two = (sock_two && numsids == 2)
     ? (1 << 1)   // CS1 high, CS2 low
     : (1 << 2);  // CS1 low, CS2 high
-  three = (numsids >= 3 ) || (sock_two && numsids == 2)
+  three = (numsids >= 3) || (sock_two && numsids == 2)
     ? (1 << 1)              // CS1 high, CS2 low
     : (1 << 1) | (1 << 2);  // CS1 high, CS2 high
-  four = (numsids == 4 )
+  four = (numsids == 4)
     ? (1 << 1)              // CS1 high, CS2 low
     : (1 << 1) | (1 << 2);  // CS1 high, CS2 high
 
