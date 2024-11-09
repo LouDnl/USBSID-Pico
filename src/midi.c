@@ -71,7 +71,6 @@ void midi_init(void)
   /* Clear buffers once */
   memset(midimachine.streambuffer, 0, sizeof midimachine.streambuffer);
   memset(midimachine.usbstreambuffer, 0, sizeof midimachine.usbstreambuffer);
-  memset(midimachine.copybuffer, 0, sizeof midimachine.copybuffer);
   memset(midimachine.channelkey_states, 0, sizeof midimachine.channelkey_states);
   memset(midimachine.bank1channelgate, true, sizeof midimachine.bank1channelgate);
 
@@ -936,10 +935,9 @@ void process_buffer(uint8_t buffer)
     switch (buffer) {
       /* System Exclusive */
       case 0xF0:  /* System Exclusive Start */
-        if (midimachine.bus != CLAIMED) {
-          /* MIDBG("[M][B%d]$%02x#%03d", midimachine.index, buffer, buffer); */
-          midimachine.type = SYSEX;
+        if (midimachine.bus != CLAIMED && midimachine.type == NONE) {
           midimachine.state = RECEIVING;
+          midimachine.type = SYSEX;
           midimachine.bus = CLAIMED;
           midimachine.index = 0;
           midimachine.streambuffer[midimachine.index] = buffer;
@@ -947,14 +945,14 @@ void process_buffer(uint8_t buffer)
         }
         break;
       case 0xF7:  /* System Exclusive End of SysEx (EOX) */
-        /* MIDBG(" [M][B%d]$%02x#%03d\n", midimachine.index, buffer, buffer); */
-        midimachine.streambuffer[midimachine.index] = buffer;
-        process_sysex(midimachine.streambuffer, midimachine.index);
-        midimachine.index = 0;
-        midimachine.state = IDLE;
-        midimachine.bus = FREE;
-        midimachine.type = NONE;
-        /* MIDBG("[E]\r\n"); */
+        if (midimachine.bus == CLAIMED && midimachine.type == SYSEX) {
+          midimachine.streambuffer[midimachine.index] = buffer;
+          midimachine.index++;
+          process_sysex(midimachine.streambuffer, midimachine.index);
+          midimachine.bus = FREE;
+          midimachine.type = NONE;
+          midimachine.state = IDLE;
+        }
         break;
       case 0xF1:  /* System Exclusive MIDI Time Code Qtr. Frame */
       case 0xF2:  /* System Exclusive Song Position Pointer */
@@ -1007,7 +1005,6 @@ void process_buffer(uint8_t buffer)
     }
   } else { /* Handle continuing byte stream */
     if (midimachine.state == RECEIVING) {
-      // if (midimachine.index < sizeof(midimachine.streambuffer) / sizeof(*midimachine.streambuffer)) {
       if (midimachine.index < count_of(midimachine.streambuffer)) {
         /* Add midi data to the buffer ~ SysEx & Midi */
         midimachine.streambuffer[midimachine.index++] = buffer;
@@ -1023,24 +1020,22 @@ void process_buffer(uint8_t buffer)
               midimachine.bus = FREE;
               midimachine.type = NONE;
             }
-          /* } */
         }
       } else {
         /* Buffer is full, receiving to much data too handle, wait for message to end */
         midimachine.state = WAITING_FOR_END;
-        printf("%02d %02d? %02x \n", stream_size, midimachine.index, buffer);
+        MIDBG("[EXCESS][IDX]%02d %02x \n", midimachine.index, buffer);
       }
     } else if (midimachine.state == WAITING_FOR_END) {
       /* Consuming SysEx messages, nothing else to do */
-      printf("%02d %02d?? %02x \n", stream_size, midimachine.index, buffer);
+      MIDBG("[EXCESS][IDX]%02d %02x \n", midimachine.index, buffer);
     }
   }
 }
 
 void process_stream(uint8_t *buffer, size_t size)
 {
-  int n = midimachine.index = 0;
-  stream_size = size;
+  int n = 0;
   while (1) {
     process_buffer(buffer[n++]);
     if (n == size) return;

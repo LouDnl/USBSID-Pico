@@ -38,6 +38,7 @@
 
 /* GPIO externals */
 extern uint8_t bus_operation(uint8_t command, uint8_t address, uint8_t data);
+extern void pause_sid(void);
 
 /* Well, it does what it does */
 void handle_asid_message(uint8_t sid, uint8_t* buffer, int size)
@@ -71,6 +72,7 @@ void decode_asid_message(uint8_t* buffer, int size)
       break;
     case 0x4D:
       /* Play stop */
+      pause_sid();
       midimachine.bus = FREE;
       break;
     case 0x4F:

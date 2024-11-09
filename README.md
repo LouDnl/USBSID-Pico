@@ -26,7 +26,9 @@ Information about and explanation of features are _Coming Soon™_
 ![USBSID-Pico](images/pcbv0.2.png)
 #### SID Playing
 USBSID-Pico supports various ways of playing SID files.  
-Out-of-the box playing is supported by using [Deepsid by Chordian](https://deepsid.chordian.net) by selecting `ASID (MIDI)` as player in the pulldown menu.  
+Out-of-the box playing is supported by using [Deepsid by Chordian](https://deepsid.chordian.net)  
+by selecting `WebUSB (Hermit)` as player in the pulldown menu or  
+by selecting `ASID (MIDI)` as player in the pulldown menu.  
 [SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux with up to 4 SIDs supported.  
 Unofficial support is added to a fork of [Vice](https://github.com/LouDnl/Vice-USBSID), up to 3 SIDs are supported in vsid and up to 4 in xs64.  
 Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouDnl/RetroDebugger), up to 4 SIDs are supported.
@@ -42,9 +44,9 @@ Any questions about or support with USBSID-Pico can be asked in the [discussions
 Visit the [Project Page](https://github.com/users/LouDnl/projects/1) for an up-to-date list of things being worked on.
 Firmware is in beta stage and still in development.  
 While in development any mentioned features, options, etc. are subject to change.  
-### Test your board
+### Test and config your board
 I have set up a small test player using Hermit's JsSID implementation (borrowed from Deepsid).  
-You can test your board with USB Midi and ASID here: [USBSID](https://usbsid.loudai.nl/).  
+You can test (and config) your board with WebUSB and ASID here: [USBSID](https://usbsid.loudai.nl/).  
 If needed you can change your SID count configuration after selecting WebUSB.
 ### Supported platforms
 _In development_  
@@ -52,7 +54,7 @@ Linux: Vice, RetroDebugger, SidBerry, JSidplay2, USB Midi, ASID (in webbrowser) 
 Windows: Vice  
 Windows/Android: USB Midi, ASID (in webbrowser) SID Play
 
-# Firmware
+# Firmware (current version 0.2.1-BETA)
 See the [firmware changelog](#changelog) for more information on what's changed and previous releases.
 ### Firmware versions
 Use `usbsidpico.uf2` for regular green rp2040 Pico boards.  
@@ -75,10 +77,11 @@ In order to flash a new firmware to your USBSID-Pico you will need to put the Pi
 	- A new drive should appear on your computer called `RPI-RP2`.
 	- Copy the correct `uf2` firmware file to this folder.
 	- After copying the Pico will reboot and your Pico is flashed.
-### Firmware features ~ version 0.2.0-BETA
+### Firmware features
 The firmware is still in development so features might change, be added or removed.
 - By default both sockets are enabled and the configuration is set to 2 SID's.
 - Custom CDC protocol for playing SID files or usage with emulators
+- WebUSB support using the same CDC protocol for WebUSB supporting players
 - Midi (in) ASID support (heavily inspired by multiple sources)
   - Play SID files in your (midi supporting) browser via [Deepsid](https://deepsid.chordian.net/) by Chordian
   - Play SID files in your (midi supporting) browser via [IneSID](https://inesid.fazibear.me/) by Fazibear

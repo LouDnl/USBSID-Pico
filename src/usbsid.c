@@ -61,6 +61,7 @@ extern void save_config(const Config * config);
 extern void handle_config_request(uint8_t * buffer);
 extern void apply_config(void);
 extern void detect_default_config(void);
+extern void verify_clockrate(void);
 
 /* GPIO externals */
 extern PIO bus_pio;
@@ -283,10 +284,10 @@ void webserial_write(uint8_t * itf, uint32_t n)
 /* BUFFER HANDLING */
 
 /* Process received usb data */
-void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)  /* TODO: COMPACT */
+void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
 {
   switch (*n) {
-    case BACKWARD_BYTES:  /* TODO: UNTESTED */
+    case BACKWARD_BYTES:  /* For backward compatability */
       read_buffer[1] = read_buffer[2];
       read_buffer[2] = read_buffer[3];
     case BYTES_EXPECTED:
@@ -436,7 +437,9 @@ void led_vuemeter_task(void)
 
     vue = abs((osc1 + osc2 + osc3) / 3.0f);
     vue = map(vue, 0, HZ_MAX, 0, VUE_MAX);
-    pwm_set_gpio_level(BUILTIN_LED, vue);
+    if (usbsid_config.LED.enabled) {
+      pwm_set_gpio_level(BUILTIN_LED, vue);
+    }
 
     MDBG("[%c:%d] [VOL]$%02x [PWM]$%04x | [V1] $%02X%02X %02X%02X %02X %02X %02X | [V2] $%02X%02X %02X%02X %02X %02X %02X | [V3] $%02X%02X %02X%02X %02X %02X %02X \n",
       dtype, usbdata, sid_memory[0x18], vue,
@@ -471,9 +474,11 @@ void led_breathe_task(void)
 
     if (updown == 0 && pwm_value >= 0)
       pwm_value -= BREATHE_STEP;
-    pwm_set_gpio_level(BUILTIN_LED, pwm_value);
+    if (usbsid_config.LED.enabled && usbsid_config.LED.idle_breathe) {
+      pwm_set_gpio_level(BUILTIN_LED, pwm_value);
+    }
     #if defined(USE_RGB)
-    if (usbsid_config.RGBLED.enabled) {
+    if (usbsid_config.RGBLED.enabled && usbsid_config.RGBLED.idle_breathe) {
       int rgb_ = map(pwm_value, 0, VUE_MAX, 0, 43);
       r_ = color_LUT[rgb_][_rgb][0];
       g_ = color_LUT[rgb_][_rgb][1];
@@ -582,14 +587,12 @@ void tud_midi_rx_cb(uint8_t itf)
 {
   usbdata = 1, dtype = midi;
   if (tud_midi_n_mounted(itf)) {
-    int nmidi = tud_midi_n_available(itf, 0);
-    tud_midi_n_stream_read(itf, 0, midimachine.usbstreambuffer, nmidi);  /* Reads all available bytes at once */
-    memcpy(midimachine.copybuffer, midimachine.usbstreambuffer, nmidi);
-    if (midimachine.copybuffer[0] == 0xF0) dtype = asid;
-    process_stream(midimachine.copybuffer, nmidi);
-    /* Clear buffers after use */
+    while (tud_midi_n_available(itf, 0)) {  /* Loop as long as there is data available */
+      uint32_t available = tud_midi_n_stream_read(itf, 0, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
+      process_stream(midimachine.usbstreambuffer, available);
+    }
+    /* Clear usb buffer after use */
     __builtin_memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer));
-    __builtin_memset(midimachine.copybuffer, 0, count_of(midimachine.copybuffer));
   }
 }
 
@@ -624,22 +627,32 @@ void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
 /* Handle incoming vendor and webusb data */
 bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const * request)
 {
-  DBG("[%s] rhport:%x, stage:%x\r\n", __func__, rhport, stage);
-  /* Do nothing with DATA & ACK stage */
-  if (stage != CONTROL_STAGE_SETUP) return true;
-  DBG("[%s] rhport:%x, bRequest:0x%x, wValue:%d, bittype:%x\r\n", __func__, rhport, request->bRequest, request->wValue, request->bmRequestType_bit.type);
+  DBG("[%s] rhport:%x, stage:%x, bRequest:0x%x, wValue:%d, bittype:%x\r\n", __func__, stage, rhport, request->bRequest, request->wValue, request->bmRequestType_bit.type);
+  /* Do nothing with IDLE (0), DATA (2) & ACK (3) stages */
+  if (stage != CONTROL_STAGE_SETUP) return true;  /* Stage 1 */
 
-  switch (request->bmRequestType_bit.type) {
-    case TUSB_REQ_TYPE_VENDOR:
+  switch (request->bmRequestType_bit.type) { /* BitType */
+    case TUSB_REQ_TYPE_STANDARD:  /* 0 */
+      break;
+    case TUSB_REQ_TYPE_CLASS:  /* 1 */
+      if (request->bRequest == 0x22) {
+        /* Webserial simulates the CDC_REQUEST_SET_CONTROL_LINE_STATE (0x22) to connect and disconnect */
+        web_serial_connected = (request->wValue != 0);
+        /* Respond with status OK */
+        return tud_control_status(rhport, request);
+      }
+      break;
+    case TUSB_REQ_TYPE_VENDOR:  /* 2 */
       switch (request->bRequest) {
         case VENDOR_REQUEST_WEBUSB:
           /* Match vendor request in BOS descriptor
-           * Get landing page url
+           * Get landing page url and return it
            */
-          // return tud_control_xfer(rhport, request, (void*)(uintptr_t) &desc_url, desc_url.bLength); /* Do we want this? */
+          // Disabled for now due to constant opening of url on plugin of device
+          /* return tud_control_xfer(rhport, request, (void*)(uintptr_t) &desc_url, desc_url.bLength); */
           return tud_control_status(rhport, request);
         case VENDOR_REQUEST_MICROSOFT:
-          if ( request->wIndex == 7 ) {
+          if (request->wIndex == 7) {
             /* Get Microsoft OS 2.0 compatible descriptor */
             uint16_t total_len;
             __builtin_memcpy(&total_len, desc_ms_os_20+8, 2);
@@ -651,13 +664,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
           break;
       }
       break;
-    case TUSB_REQ_TYPE_CLASS:
-      if (request->bRequest == 0x22) {
-        /* Webserial simulates the CDC_REQUEST_SET_CONTROL_LINE_STATE (0x22) to connect and disconnect */
-        web_serial_connected = (request->wValue != 0);
-        /* Respond with status OK */
-        return tud_control_status(rhport, request);
-      }
+    case TUSB_REQ_TYPE_INVALID:  /* 3 */
       break;
     default:
       break;
@@ -739,6 +746,8 @@ int main()
   sem_acquire_blocking(&core1_init);
   /* Check for default config bit ~ NOTE: This cannot be run from Core 1! */
   detect_default_config();
+  /* Verify the clockrare in the config is not out of bounds */
+  verify_clockrate();
   /* Init GPIO */
   init_gpio();
   /* Init PIO */
