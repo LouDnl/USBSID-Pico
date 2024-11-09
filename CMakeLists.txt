@@ -27,8 +27,8 @@ cmake_minimum_required(VERSION 3.17)
 
 ### Project
 set(PROJECT_NAME usbsidpico)
-set(PROJECT_VERSION "0.2.0-BETA.20241017")  # Must be the same as in config.h
-set(MAGIC_SMOKE "20241017")  # DATEOFRELEASE
+set(PROJECT_VERSION "0.2.1-BETA.20241109")  # Must be the same as in config.h
+set(MAGIC_SMOKE "20241109")  # DATEOFRELEASE
 
 ### Optimization and debugging
 SET(DEBUG_SYMBOLS 0)
