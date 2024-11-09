@@ -76,9 +76,7 @@ typedef struct {
   sysex_state state;
   midi_type type;
   uint8_t index;
-  uint8_t readbuffer[1];
   uint8_t usbstreambuffer[64];   /* Normal speed max buffer for TinyUSB */
-  uint8_t copybuffer[64];   /* Normal speed max buffer for TinyUSB */
   uint8_t streambuffer[64];   /* Normal speed max buffer for TinyUSB */
   uint8_t channel_states[16][4][32];  /* Stores channel states of each SID ~ 4 sids max */
   uint8_t channelkey_states[16][4][4];  /* Stores channelkey states of each SID ~ 4 sids max */

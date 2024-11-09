@@ -587,14 +587,12 @@ void tud_midi_rx_cb(uint8_t itf)
 {
   usbdata = 1, dtype = midi;
   if (tud_midi_n_mounted(itf)) {
-    int nmidi = tud_midi_n_available(itf, 0);
-    tud_midi_n_stream_read(itf, 0, midimachine.usbstreambuffer, nmidi);  /* Reads all available bytes at once */
-    memcpy(midimachine.copybuffer, midimachine.usbstreambuffer, nmidi);
-    if (midimachine.copybuffer[0] == 0xF0) dtype = asid;
-    process_stream(midimachine.copybuffer, nmidi);
-    /* Clear buffers after use */
+    while (tud_midi_n_available(itf, 0)) {  /* Loop as long as there is data available */
+      uint32_t available = tud_midi_n_stream_read(itf, 0, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
+      process_stream(midimachine.usbstreambuffer, available);
+    }
+    /* Clear usb buffer after use */
     __builtin_memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer));
-    __builtin_memset(midimachine.copybuffer, 0, count_of(midimachine.copybuffer));
   }
 }
 
@@ -629,19 +627,29 @@ void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
 /* Handle incoming vendor and webusb data */
 bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const * request)
 {
-  DBG("[%s] rhport:%x, stage:%x\r\n", __func__, rhport, stage);
-  /* Do nothing with DATA & ACK stage */
-  if (stage != CONTROL_STAGE_SETUP) return true;
-  DBG("[%s] rhport:%x, bRequest:0x%x, wValue:%d, bittype:%x\r\n", __func__, rhport, request->bRequest, request->wValue, request->bmRequestType_bit.type);
+  DBG("[%s] rhport:%x, stage:%x, bRequest:0x%x, wValue:%d, bittype:%x\r\n", __func__, stage, rhport, request->bRequest, request->wValue, request->bmRequestType_bit.type);
+  /* Do nothing with IDLE (0), DATA (2) & ACK (3) stages */
+  if (stage != CONTROL_STAGE_SETUP) return true;  /* Stage 1 */
 
-  switch (request->bmRequestType_bit.type) {
-    case TUSB_REQ_TYPE_VENDOR:
+  switch (request->bmRequestType_bit.type) { /* BitType */
+    case TUSB_REQ_TYPE_STANDARD:  /* 0 */
+      break;
+    case TUSB_REQ_TYPE_CLASS:  /* 1 */
+      if (request->bRequest == 0x22) {
+        /* Webserial simulates the CDC_REQUEST_SET_CONTROL_LINE_STATE (0x22) to connect and disconnect */
+        web_serial_connected = (request->wValue != 0);
+        /* Respond with status OK */
+        return tud_control_status(rhport, request);
+      }
+      break;
+    case TUSB_REQ_TYPE_VENDOR:  /* 2 */
       switch (request->bRequest) {
         case VENDOR_REQUEST_WEBUSB:
           /* Match vendor request in BOS descriptor
-           * Get landing page url
+           * Get landing page url and return it
            */
-          // return tud_control_xfer(rhport, request, (void*)(uintptr_t) &desc_url, desc_url.bLength); /* Do we want this? */
+          // Disabled for now due to constant opening of url on plugin of device
+          /* return tud_control_xfer(rhport, request, (void*)(uintptr_t) &desc_url, desc_url.bLength); */
           return tud_control_status(rhport, request);
         case VENDOR_REQUEST_MICROSOFT:
           if (request->wIndex == 7) {
@@ -656,13 +664,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
           break;
       }
       break;
-    case TUSB_REQ_TYPE_CLASS:
-      if (request->bRequest == 0x22) {
-        /* Webserial simulates the CDC_REQUEST_SET_CONTROL_LINE_STATE (0x22) to connect and disconnect */
-        web_serial_connected = (request->wValue != 0);
-        /* Respond with status OK */
-        return tud_control_status(rhport, request);
-      }
+    case TUSB_REQ_TYPE_INVALID:  /* 3 */
       break;
     default:
       break;
