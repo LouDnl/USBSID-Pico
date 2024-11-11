@@ -39,7 +39,7 @@ USBSID-Pico acts as Midi device and supports basic Midi in ~ note that Midi is s
 
 # Questions and Support
 Any questions about or support with USBSID-Pico can be asked 
-* on [Discord](https://discord.gg/Hw7WqB9x)
+* on [Discord](https://discord.gg/zG2rxXuT2g)
 * or in the [discussions](https://github.com/LouDnl/USBSID-Pico/discussions).
 
 # Project status
