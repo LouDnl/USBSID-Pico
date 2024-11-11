@@ -38,7 +38,9 @@ When using Vice or RetroDebugger you can freely use applications like [SID-Wizar
 USBSID-Pico acts as Midi device and supports basic Midi in ~ note that Midi is still in development and in Beta phase.
 
 # Questions and Support
-Any questions about or support with USBSID-Pico can be asked in the [discussions](https://github.com/LouDnl/USBSID-Pico/discussions).
+Any questions about or support with USBSID-Pico can be asked 
+* on [Discord](https://discord.gg/Hw7WqB9x)
+* or in the [discussions](https://github.com/LouDnl/USBSID-Pico/discussions).
 
 # Project status
 Visit the [Project Page](https://github.com/users/LouDnl/projects/1) for an up-to-date list of things being worked on.
