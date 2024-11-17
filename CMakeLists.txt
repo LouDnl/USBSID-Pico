@@ -27,8 +27,10 @@ cmake_minimum_required(VERSION 3.17)
 
 ### Project
 set(PROJECT_NAME usbsidpico)
-set(PROJECT_VERSION "0.2.1-BETA.20241109")  # Must be the same as in config.h
-set(MAGIC_SMOKE "20241109")  # DATEOFRELEASE
+set(PROJECT_MANUFACTURER "LouD")
+set(PROJECT_PRODUCT "USBSID-Pico")
+set(MAGIC_SMOKE "20241117")  # DATEOFRELEASE
+set(PROJECT_VERSION "0.2.1-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
 
 ### Optimization and debugging
 SET(DEBUG_SYMBOLS 0)
@@ -37,19 +39,32 @@ SET(OPTIMIZATIONS 3)
 
 ### Enable debug logging
 # NOTICE: ENABLING THESE DEBUGGING DEFINITIONS WILL HAVE SIGNIFICANT IMPACT AND WILL DELAY PLAYING!
-set(USBSID_DEBUGGING 1)   # Enable UART ~ mandatory enable for all other logging types
-set(MEMORY_LOGGING 0)     # Enable memory map of SID 1 voices printing
-set(DEFAULT_DEBUGGING 1)  # Enable debugging in usbsid.c
-set(USBIO_DEBUGGING 0)    # Enable debugging in usbsid.c
-set(CONFIG_DEBUGGING 1)   # Enable debugging in config.c
-set(GPIOBUS_DEBUGGING 0)  # Enable debugging in gpio.c
-set(MIDI_DEBUGGING 0)     # Enable debugging in midi.c
-set(MIDIVOICE_DEBUGGING 0)     # Enable debugging in midi.c
+if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
+  set(USBSID_DEBUGGING 1)   # Enable UART ~ mandatory enable for all other logging types
+  set(MEMORY_LOGGING 0)     # Enable memory map of SID 1 voices printing
+  set(DEFAULT_DEBUGGING 1)  # Enable debugging in usbsid.c
+  set(USBIO_DEBUGGING 0)    # Enable debugging in usbsid.c
+  set(CONFIG_DEBUGGING 1)   # Enable debugging in config.c
+  set(GPIOBUS_DEBUGGING 0)  # Enable debugging in gpio.c
+  set(MIDI_DEBUGGING 0)     # Enable debugging in midi.c
+endif()
 
 
 #### You no touchy after this line
 
 ### Target board
+message("ENV Pico board: $ENV{PICO_BOARD}")
+message("ENV Pico platform: $ENV{PICO_PLATFORM}")
+if(NOT DEFINED $ENV{PICO_BOARD})
+  message("PICO_BOARD not defined, defaulting to 'pico'")
+  set(PICO_BOARD pico)
+  # set(PICO_BOARD pico2)
+endif()
+if(NOT DEFINED $ENV{PICO_PLATFORM})
+  message("PICO_PLATFORM not defined, defaulting to 'rp2040'")
+  set(PICO_PLATFORM rp2040)
+  # set(PICO_PLATFORM rp2350)
+endif()
 # set(PICO_PLATFORM rp2350-arm-s)
 # set(PICO_BOARD pico2)
 
@@ -65,6 +80,12 @@ if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/src/config.h)
       if(${VERSION} MATCHES ${PROJECT_VERSION})
         set(REDUCTION_SUCCESS True)
         message("VALIDATED config version ${VERSION} matches project version \"${PROJECT_VERSION}\"")
+        set(USBSID_PRODUCT ${PROJECT_PRODUCT})
+        set(USBSID_MANUFACTURER "${PROJECT_MANUFACTURER} (v${PROJECT_VERSION})")
+        add_compile_definitions(USBSID_PRODUCT="${USBSID_PRODUCT}")
+        add_compile_definitions(USBSID_MANUFACTURER="${USBSID_MANUFACTURER}")
+        message("Set USB manufacturer: ${USBSID_MANUFACTURER}")
+        message("Set USB product: ${USBSID_PRODUCT}")
         break()
       else()
       message("ERROR config version ${VERSION} does not match project version \"${PROJECT_VERSION}\"")
@@ -84,7 +105,9 @@ set(CMAKE_CXX_STANDARD 17)
 ### Compilers to use for C and C++
 # set(CMAKE_C_COMPILER   arm-none-eabi-gcc)
 # set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
-set(PICO_COMPILER pico_arm_gcc)
+if(${PICO_PLATFORM} MATCHES rp2040)
+  set(PICO_COMPILER pico_arm_gcc)  # required for mem_ops on rp2040
+endif()
 
 ### Target environment path
 set(CMAKE_FIND_ROOT_PATH $ENV{PICO_ENV_PATH})
@@ -165,6 +188,7 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/gpio.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/sid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/mcu.c
   ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c
 )
@@ -206,9 +230,9 @@ set(TARGET_INCLUDE_DIRS PRIVATE
 )
 
 ### Pico sdk path
-include($ENV{PICO_SDK_PATH}/pico_sdk_init.cmake)
+# include($ENV{PICO_SDK_PATH}/pico_sdk_init.cmake)
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
-include($ENV{PICO_EXTRAS_PATH}/external/pico_extras_import.cmake)
+# include($ENV{PICO_EXTRAS_PATH}/external/pico_extras_import.cmake)
 
 ### Project type
 project(${PROJECT_NAME} C CXX ASM)
@@ -269,6 +293,16 @@ foreach(FILENAME PICOTYPE IN ZIP_LISTS FILENAMES PICOTYPES)
   # source files to compile
   target_sources(${BUILD} PUBLIC ${SOURCEFILES})
   target_compile_options(${BUILD} ${COMPILE_OPTS})
+  target_link_options(${BUILD} PRIVATE -Xlinker --print-memory-usage)
+  if(${PICO_SDK_VERSION_MAJOR} LESS 2)
+    pico_set_linker_script(${BUILD} ${PICO_SDK_PATH}/src/memmap_custom.ld)
+  else()
+    if(${PICO_PLATFORM} MATCHES rp2350)
+      pico_set_linker_script(${BUILD} ${PICO_SDK_PATH}/src/rp2_common/pico_crt0/rp2350/memmap_default.ld)
+    else()
+      pico_set_linker_script(${BUILD} ${PICO_SDK_PATH}/src/rp2_common/pico_crt0/rp2040/memmap_default.ld)
+    endif()
+  endif()
   # tell the linker what libraries to link
   target_link_libraries(${BUILD} ${TARGET_LL})
   # target sid types
