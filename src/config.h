@@ -51,10 +51,12 @@
 /* Config constants */
 #define FLASH_TARGET_OFFSET (PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE)
 #define CONFIG_SIZE (FLASH_SECTOR_SIZE / 4)  /* 1024 Bytes */
-#define PROJECT_VERSION "0.2.1-BETA.20241109"
 /* Compile time variable settings */
 #ifndef MAGIC_SMOKE
 #define MAGIC_SMOKE 19700101  /* DATEOFRELEASE */
+#endif
+#ifndef PROJECT_VERSION
+#define PROJECT_VERSION "0.2.2-BETA.20241117"  /* Must be the same as in CMakeLists.txt */
 #endif
 #ifdef USE_RGB
 #define RGB_ENABLED true
@@ -72,13 +74,13 @@ typedef struct Config {
   {
     bool    enabled : 1;       /* enable / disable this socket */
     bool    dualsid : 1;       /* enable / disable dual SID support for this socket */
-    uint8_t sidtype;           /* 0 = empty, 1 = 6581, 2 = 8085, 3 = SKPico or other clone */
+    uint8_t sidtype;           /* 0 = empty, 1 = SKPico or other clone, 2 = MOS6581, 3 = MOS8085 */
   } socketOne;                 /* 1 */
   struct {
     bool    enabled : 1;       /* enable / disable this socket */
     bool    dualsid : 1;       /* enable / disable dual SID support for this socket */
     bool    act_as_one : 1;    /* act as socket 1 */
-    uint8_t sidtype;           /* 0 = empty, 1 = 6581, 2 = 8085, 3 = SKPico or other clone */
+    uint8_t sidtype;           /* 0 = empty, 1 = SKPico or other clone, 2 = MOS6581, 3 = MOS8085 */
   } socketTwo;                 /* 2 */
   struct {
     bool enabled : 1;
@@ -125,10 +127,18 @@ enum
   TRIPLE_SID       = 0x43,
 
   SET_CLOCK        = 0x50,
+  DETECT_SIDS      = 0x51,
+  TEST_ALLSIDS     = 0x52,
+  TEST_SID1        = 0x53,
+  TEST_SID2        = 0x54,
+  TEST_SID3        = 0x55,
+  TEST_SID4        = 0x56,
 
   LOAD_MIDI_STATE  = 0x60,
   SAVE_MIDI_STATE  = 0x61,
   RESET_MIDI_STATE = 0x63,
+
+  USBSID_VERSION   = 0x80,
 
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
 };
