@@ -72,13 +72,13 @@ typedef struct Config {
   {
     bool    enabled : 1;       /* enable / disable this socket */
     bool    dualsid : 1;       /* enable / disable dual SID support for this socket */
-    uint8_t sidtype;           /* 0 = empty, 1 = 6581, 2 = 8085, 3 = SKPico or other clone */
+    uint8_t sidtype;           /* 0 = empty, 1 = SKPico or other clone, 2 = MOS6581, 3 = MOS8085 */
   } socketOne;                 /* 1 */
   struct {
     bool    enabled : 1;       /* enable / disable this socket */
     bool    dualsid : 1;       /* enable / disable dual SID support for this socket */
     bool    act_as_one : 1;    /* act as socket 1 */
-    uint8_t sidtype;           /* 0 = empty, 1 = 6581, 2 = 8085, 3 = SKPico or other clone */
+    uint8_t sidtype;           /* 0 = empty, 1 = SKPico or other clone, 2 = MOS6581, 3 = MOS8085 */
   } socketTwo;                 /* 2 */
   struct {
     bool enabled : 1;
