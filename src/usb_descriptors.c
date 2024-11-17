@@ -194,12 +194,19 @@ uint8_t const * tud_descriptor_configuration_cb(uint8_t index)
   return desc_fs_configuration;
 }
 
+#ifndef USBSID_MANUFACTURER
+#define USBSID_MANUFACTURER "ERROR MISSING MANUFACTURER!"
+#endif
+#ifndef USBSID_PRODUCT
+#define USBSID_PRODUCT "ERROR MISSING PRODUCT!"
+#endif
+
 /* String Descriptors */
-char const *string_desc_arr[] =
+const char *string_desc_arr[] =
 {
     (const char[]){0x09, 0x04},  // 0: is supported language is English (0x0409)
-    "USBSID",                    // 1: Manufacturer
-    "USBSID-Pico",               // 2: Product
+    USBSID_MANUFACTURER,                       // 1: Manufacturer
+    USBSID_PRODUCT,                        // 2: Product
     "USES-MCU-ID",               // 3: Serial, uses chip ID
     "USBSID-Pico Data",          // 4: CDC Interface
     "USBSID-Pico Midi",          // 5: Midi Interface

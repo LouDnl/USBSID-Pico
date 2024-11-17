@@ -27,6 +27,7 @@
 #include "config.h"
 #include "gpio.h"
 #include "logging.h"
+#include "sid.h"
 
 
 /* Init external vars */
@@ -269,4 +270,14 @@ void reset_sid(void)
   disable_sid();
   clear_bus();
   enable_sid();
+}
+
+void clear_sid_registers(void)
+{
+  for (int sid = 0; sid < numsids; sid++) {
+    for (int reg = 0; reg < count_of(sid_registers); reg++) {
+      bus_operation((0x10 | WRITE), sid_registers[reg], 0x0);
+    }
+  }
+  clear_bus();
 }

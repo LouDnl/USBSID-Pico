@@ -566,6 +566,7 @@ void process_midi(uint8_t *buffer, int size)
       switch (bank) { /* QUESTION: Should this be/stay bank independent!? */
         case 0:  /* Bank 0 ~ Polyfonic stacking */
         case 1:  /* Bank 1 ~ Single voices */
+        case 9:  /* Bank 9 ~ Cynthcart */
           switch (buffer[1]) { /* MSB or LSB for Control/Mode Change */
             /* Bank ~ Patch select */
             case CC_BMSB:  /* Bank Select MSB */
@@ -814,7 +815,7 @@ void process_midi(uint8_t *buffer, int size)
               break;
           }
           break;
-        case 9:  /* Bank 9 ~ Cynthcart */
+        // case 9:  /* Bank 9 ~ Cynthcart */
         default:
           break;
       }
