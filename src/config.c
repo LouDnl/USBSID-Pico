@@ -27,6 +27,7 @@
 
 #include "globals.h"
 #include "config.h"
+#include "usbsid.h"
 #include "midi.h"
 #include "sid.h"
 #include "logging.h"
@@ -35,10 +36,16 @@
 /* USBSID externals */
 extern void init_sidclock(void);
 extern void deinit_sidclock(void);
-extern void cdc_write(size_t n);
-extern void webserial_write(size_t n);
+extern void cdc_write(uint8_t * itf, uint32_t n);
+extern void webserial_write(uint8_t * itf, uint32_t n);
 extern char dtype;
+extern uint8_t *cdc_itf;
+extern uint8_t *wusb_itf;
 extern uint8_t *write_buffer_p;
+
+/* SID externals */
+extern uint8_t detect_sid_version(uint8_t start_addr);
+extern void sid_test(int sidno, char test, char wf);
 
 /* GPIO externals */
 extern void restart_bus(void);
@@ -55,7 +62,8 @@ void apply_config(void);
 static uint8_t config_array[FLASH_PAGE_SIZE]; /* 256 MIN ~ FLASH_PAGE_SIZE & 4096 MAX ~ FLASH_SECTOR_SIZE  */
 int sock_one, sock_two, sids_one, sids_two, numsids, act_as_one;
 uint8_t one, two, three, four;
-const char* project_version = PROJECT_VERSION; /* Needed? */
+const char* project_version = PROJECT_VERSION;
+static uint8_t p_version_array[MAX_BUFFER_SIZE];
 
 // static const Config usbsid_default_config = {
 #define USBSID_DEFAULT_CONFIG_INIT { \
@@ -66,13 +74,13 @@ const char* project_version = PROJECT_VERSION; /* Needed? */
   .socketOne = { \
     .enabled = true, \
     .dualsid = false, \
-    .sidtype = 0x0,  /* unused */ \
+    .sidtype = 0x0,  /* empty */ \
   }, \
   .socketTwo = { \
     .enabled = true, \
     .dualsid = false, \
     .act_as_one = false, \
-    .sidtype = 0x0,  /* unused */ \
+    .sidtype = 0x0,  /* empty */ \
   }, \
   .LED = { \
     .enabled = true, \
@@ -103,18 +111,53 @@ static const Config usbsid_default_config = USBSID_DEFAULT_CONFIG_INIT;
 void print_cfg(const uint8_t *buf, size_t len) {
   CFG("[PRINT CFG START]\n");
   for (size_t i = 0; i < len; ++i) {
+    if (i == 0)
+      CFG("[R%d] ", i);
     CFG("%02x", buf[i]);
-    if (i % 16 == 15)
+    if (i == (len - 1)) {
       CFG("\n");
-    else
+    } else if (i % 16 == 15) {
+      CFG("\n[R%d] ", i);
+    } else {
       CFG(" ");
+    }
   }
   CFG("[PRINT CFG END]\n");
 }
 
+void detect_sid_types(void)
+{
+  const char *sidtypes[4] = {"NONE", "CLONE", "MOS8580", "MOS6581"};
+  int sid1 = 0, sid2 = 0;
+  if (usbsid_config.socketOne.enabled) {
+    sid1 = detect_sid_version(0x00);
+    usbsid_config.socketOne.sidtype = sid1;
+  } else {
+    usbsid_config.socketOne.sidtype = 0;
+  }
+  if (usbsid_config.socketTwo.enabled) {
+    if (usbsid_config.socketOne.dualsid) {
+      sid2 = detect_sid_version(0x40);
+      usbsid_config.socketTwo.sidtype = sid2;
+    } else {
+      sid2 = detect_sid_version(0x20);
+      usbsid_config.socketTwo.sidtype = sid2;
+    }
+  } else {
+    usbsid_config.socketTwo.sidtype = 0;
+  }
+
+  CFG("[SOCKET ONE] %s\n", sidtypes[usbsid_config.socketOne.sidtype]);
+  CFG("[SOCKET TWO] %s\n", sidtypes[usbsid_config.socketTwo.sidtype]);
+  CFG("[READ SID1] [%02x %s]\n", sid1, sidtypes[sid1]);
+  CFG("[READ SID2] [%02x %s]\n", sid2, sidtypes[sid2]);
+}
+
 void read_config(Config* config)
 {
-  config_array[0] = 0x7F; /* Verification byte */
+
+  config_array[0] = READ_CONFIG; /* Initiator byte */
+  config_array[1] = 0x7F; /* Verification byte */
   config_array[6] = (int)config->external_clock;
   config_array[7] = (config->clock_rate >> 16) & BYTE;
   config_array[8] = (config->clock_rate >> 8) & BYTE;
@@ -136,6 +179,14 @@ void read_config(Config* config)
   config_array[52] = (int)config->WebUSB.enabled;
   config_array[53] = (int)config->Asid.enabled;
   config_array[54] = (int)config->Midi.enabled;
+  config_array[63] = 0xFF; // Terminator byte
+}
+
+void read_firmware_version()
+{
+  p_version_array[0] = USBSID_VERSION;  /* Initiator byte */
+  p_version_array[1] = strlen(project_version);  /* Length of version string */
+  __builtin_memcpy(p_version_array+2, project_version, strlen(project_version));
 }
 
 void default_config(Config* config)
@@ -193,21 +244,27 @@ void handle_config_request(uint8_t * buffer)
     case READ_CONFIG:
       CFG("[READ_CONFIG]\n");
       /* TODO: loads current config and sends it to the requester ~ when config is finished */
-      printf("[XIP_BASE]%u [FLASH_PAGE_SIZE]%u [FLASH_SECTOR_SIZE]%u [FLASH_TARGET_OFFSET]%u\r\n", XIP_BASE, FLASH_PAGE_SIZE, FLASH_SECTOR_SIZE, FLASH_TARGET_OFFSET);
-      printf("[>]\r\n");
-      // Not working yet
+      /* ISSUE: Although 4 writes are performed, only the first 2 are received */
+      CFG("[XIP_BASE]%u [FLASH_PAGE_SIZE]%u [FLASH_SECTOR_SIZE]%u [FLASH_TARGET_OFFSET]%u\r\n", XIP_BASE, FLASH_PAGE_SIZE, FLASH_SECTOR_SIZE, FLASH_TARGET_OFFSET);
+      CFG("[>]\r\n");
       read_config(&usbsid_config);
       print_cfg(config_array, count_of(config_array));
-      printf("[<]\r\n");
-      int writes = count_of(config_array) / 64;
-      for (int i = 0; i <= writes; i++) {
+      CFG("[<]\r\n");
+      int writes = count_of(config_array) / 64;  /* BUG: It should send 4 packets of 64 bytes, but sends only 2 and a zero packet */
+      CFG("[>] SEND %d WRITES OF 64 BYTES TO %c [<]\n", writes, dtype);
+      memset(write_buffer_p, 0, 64);
+      for (int i = 0; i < writes; i++) {
         __builtin_memcpy(write_buffer_p, config_array + (i * 64), 64);
+        CFG("[>] SEND WRITE %d OF %d [<]\n", i, writes);
+        CFG("[>]");
+        for (int i = 0; i < 64; i++) CFG(" %x", write_buffer_p[i]);
+        CFG(" [<]\n");
         switch (dtype) {
           case 'C':
-            cdc_write(64);
+            cdc_write(cdc_itf, 64);
             break;
           case 'W':
-            webserial_write(64);
+            webserial_write(wusb_itf, 64);
             break;
         }
       }
@@ -295,6 +352,8 @@ void handle_config_request(uint8_t * buffer)
       usbsid_config.socketTwo.enabled = false;
       usbsid_config.socketOne.dualsid = false;
       usbsid_config.socketTwo.dualsid = false;
+      usbsid_config.socketOne.sidtype = 0;
+      usbsid_config.socketTwo.sidtype = 0;
       usbsid_config.socketTwo.act_as_one = true;
       save_config(&usbsid_config);
       load_config(&usbsid_config);
@@ -306,6 +365,8 @@ void handle_config_request(uint8_t * buffer)
       usbsid_config.socketTwo.enabled = true;
       usbsid_config.socketOne.dualsid = false;
       usbsid_config.socketTwo.dualsid = false;
+      usbsid_config.socketOne.sidtype = 1;
+      usbsid_config.socketTwo.sidtype = 1;
       usbsid_config.socketTwo.act_as_one = false;
       save_config(&usbsid_config);
       load_config(&usbsid_config);
@@ -317,8 +378,8 @@ void handle_config_request(uint8_t * buffer)
       usbsid_config.socketTwo.enabled = true;
       usbsid_config.socketOne.dualsid = true;
       usbsid_config.socketTwo.dualsid = true;
-      usbsid_config.socketOne.sidtype = 3;
-      usbsid_config.socketTwo.sidtype = 3;
+      usbsid_config.socketOne.sidtype = 1;
+      usbsid_config.socketTwo.sidtype = 1;
       usbsid_config.socketTwo.act_as_one = false;
       save_config(&usbsid_config);
       load_config(&usbsid_config);
@@ -330,8 +391,8 @@ void handle_config_request(uint8_t * buffer)
       usbsid_config.socketTwo.enabled = true;
       usbsid_config.socketOne.dualsid = true;
       usbsid_config.socketTwo.dualsid = false;
-      usbsid_config.socketOne.sidtype = 3;
-      usbsid_config.socketTwo.sidtype = 2;
+      usbsid_config.socketOne.sidtype = 1;
+      usbsid_config.socketTwo.sidtype = 1;
       usbsid_config.socketTwo.act_as_one = false;
       save_config(&usbsid_config);
       mcu_reset();
@@ -341,6 +402,7 @@ void handle_config_request(uint8_t * buffer)
       for (int i = 0; i < 4; i++) {
         CFG("[SID %d]", (i + 1));
         for (int j = 0; j < 32; j++) {
+          /* ISSUE: this only loads 1 channel state and should actually save all channel states */
           midimachine.channel_states[curr_midi_channel][i][j] = usbsid_config.Midi.sid_states[i][j];
           midimachine.channelkey_states[curr_midi_channel][i][i] = 0;  /* Make sure extras is always initialized @ zero */
           CFG(" %02x", midimachine.channel_states[curr_midi_channel][i][j]);
@@ -354,6 +416,7 @@ void handle_config_request(uint8_t * buffer)
       for (int i = 0; i < 4; i++) {
         CFG("[SID %d]", (i + 1));
         for (int j = 0; j < 32; j++) {
+          /* ISSUE: this only loads 1 channel state and should actually save all channel states */
           usbsid_config.Midi.sid_states[i][j] = midimachine.channel_states[curr_midi_channel][i][j];
           CFG(" %02x", usbsid_config.Midi.sid_states[i][j]);
         }
@@ -366,6 +429,7 @@ void handle_config_request(uint8_t * buffer)
       for (int i = 0; i < 4; i++) {
         CFG("[SID %d]", (i + 1));
         for (int j = 0; j < 32; j++) {
+          // BUG: this only resets 1 channel state
           usbsid_config.Midi.sid_states[i][j] = midimachine.channel_states[curr_midi_channel][i][j] = 0;
           CFG(" %02x", usbsid_config.Midi.sid_states[i][j]);
           midi_bus_operation((0x20 * i) | j, midimachine.channel_states[curr_midi_channel][i][j]);
@@ -378,12 +442,66 @@ void handle_config_request(uint8_t * buffer)
     case SET_CLOCK: /* Change SID clock frequency */
       CFG("[SET_CLOCK]\n");
       if (!usbsid_config.external_clock) {
-        CFG("[CLOCK FROM]%d [CLOCK TO]%d\n", usbsid_config.clock_rate, clockrates[(int)buffer[1]]);
-        usbsid_config.clock_rate = clockrates[(int)buffer[1]];
-        deinit_sidclock();
-        init_sidclock();
-        /* restart_bus(); */  /* TODO: Enable after bus_clock change */
+        if (clockrates[(int)buffer[1]] != usbsid_config.clock_rate) {
+          CFG("[CLOCK FROM]%d [CLOCK TO]%d\n", usbsid_config.clock_rate, clockrates[(int)buffer[1]]);
+          usbsid_config.clock_rate = clockrates[(int)buffer[1]];
+          deinit_sidclock();
+          init_sidclock();
+          /* restart_bus(); */  /* TODO: Enable after bus_clock change */
+        } else {
+          CFG("[CLOCK FROM]%d AND [CLOCK TO]%d ARE THE SAME, SKIPPING SET_CLOCK\n", usbsid_config.clock_rate, clockrates[(int)buffer[1]]);
+        }
+
       }
+      break;
+    case DETECT_SIDS:
+      CFG("[DETECT_SIDS]\n");
+      detect_sid_types();
+      break;
+    case TEST_ALLSIDS:
+      CFG("[TEST_ALLSIDS]\n");
+      for (int s = 0; s < numsids; s++) {
+        CFG("[START TEST SID %d]\n", s);
+        sid_test(s, '1', 'A');
+      };
+      break;
+    case TEST_SID1:
+    case TEST_SID2:
+    case TEST_SID3:
+    case TEST_SID4:
+      int s = (buffer[0] == TEST_SID1 ? 0
+        : buffer[0] == TEST_SID2 ? 1
+        : buffer[0] == TEST_SID3 ? 2
+        : buffer[0] == TEST_SID4 ? 3
+        : 0);  /* Fallback to SID 0 */
+      int t = (buffer[1] == 1 ? '1'  /* All tests */
+        : buffer[1] == 2 ? '2'  /* All waveforms test */
+        : buffer[1] == 3 ? '3'  /* Filter tests */
+        : buffer[1] == 4 ? '4'  /* Envelope tests */
+        : buffer[1] == 5 ? '5'  /* Modulation tests */
+        : '1');  /* Fallback to all tests */
+      int wf = (buffer[2] == 0 ? 'A'  /* All */
+        : buffer[2] == 1 ? 'T'  /* Triangle */
+        : buffer[2] == 2 ? 'S'  /* Sawtooth */
+        : buffer[2] == 3 ? 'P'  /* Pulse */
+        : buffer[2] == 4 ? 'N'  /* Noise */
+        : 'P');  /* Fallback to pulse waveform */
+      CFG("[TEST_SID%d] TEST: %c WF: %c\n", (s + 1), t, wf);
+      sid_test(s, t, wf);
+      break;
+    case USBSID_VERSION:
+      CFG("[READ_FIRMWARE_VERSION]\n");
+      read_firmware_version();
+      memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
+      __builtin_memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
+        switch (dtype) {
+          case 'C':
+            cdc_write(cdc_itf, MAX_BUFFER_SIZE);
+            break;
+          case 'W':
+            webserial_write(wusb_itf, MAX_BUFFER_SIZE);
+            break;
+        }
       break;
     case TEST_FN: /* TODO: Remove before v1 release */
       printf("[TEST_FN]\n");
