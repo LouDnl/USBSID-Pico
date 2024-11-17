@@ -51,10 +51,12 @@
 /* Config constants */
 #define FLASH_TARGET_OFFSET (PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE)
 #define CONFIG_SIZE (FLASH_SECTOR_SIZE / 4)  /* 1024 Bytes */
-#define PROJECT_VERSION "0.2.1-BETA.20241109"
 /* Compile time variable settings */
 #ifndef MAGIC_SMOKE
 #define MAGIC_SMOKE 19700101  /* DATEOFRELEASE */
+#endif
+#ifndef PROJECT_VERSION
+#define PROJECT_VERSION "0.2.1-BETA.20241117"  /* Must be the same as in CMakeLists.txt */
 #endif
 #ifdef USE_RGB
 #define RGB_ENABLED true
