@@ -56,7 +56,7 @@
 #define MAGIC_SMOKE 19700101  /* DATEOFRELEASE */
 #endif
 #ifndef PROJECT_VERSION
-#define PROJECT_VERSION "0.2.1-BETA.20241117"  /* Must be the same as in CMakeLists.txt */
+#define PROJECT_VERSION "0.2.2-BETA.20241117"  /* Must be the same as in CMakeLists.txt */
 #endif
 #ifdef USE_RGB
 #define RGB_ENABLED true
