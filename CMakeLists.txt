@@ -30,7 +30,7 @@ set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PROJECT_PRODUCT "USBSID-Pico")
 set(MAGIC_SMOKE "20241117")  # DATEOFRELEASE
-set(PROJECT_VERSION "0.2.1-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
+set(PROJECT_VERSION "0.2.2-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
 
 ### Optimization and debugging
 SET(DEBUG_SYMBOLS 0)
