@@ -311,15 +311,19 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
           }
           break;
         case PAUSE:
+          DBG("[PAUSE_SID]\n");
           pause_sid();
           break;
         case RESET_SID:
+          DBG("[RESET_SID]\n");
           reset_sid();
           break;
         case RESET_MCU:
+          DBG("[RESET_MCU]\n");
           mcu_reset();
           break;
         case BOOTLOADER:
+          DBG("[BOOTLOADER]\n");
           mcu_jump_to_bootloader();
           break;
         default:
