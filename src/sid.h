@@ -101,7 +101,7 @@ typedef enum {
  * 5: Attack/Decay
  * 6: Sustain/Release
  */
-static const uint8_t sid_registers[] =
+static const uint8_t sid_registers[29] =
 {
     /* Voice 1 */
     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
