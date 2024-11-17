@@ -125,10 +125,18 @@ enum
   TRIPLE_SID       = 0x43,
 
   SET_CLOCK        = 0x50,
+  DETECT_SIDS      = 0x51,
+  TEST_ALLSIDS     = 0x52,
+  TEST_SID1        = 0x53,
+  TEST_SID2        = 0x54,
+  TEST_SID3        = 0x55,
+  TEST_SID4        = 0x56,
 
   LOAD_MIDI_STATE  = 0x60,
   SAVE_MIDI_STATE  = 0x61,
   RESET_MIDI_STATE = 0x63,
+
+  USBSID_VERSION   = 0x80,
 
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
 };
