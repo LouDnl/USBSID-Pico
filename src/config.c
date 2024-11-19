@@ -186,18 +186,18 @@ void read_firmware_version()
 {
   p_version_array[0] = USBSID_VERSION;  /* Initiator byte */
   p_version_array[1] = strlen(project_version);  /* Length of version string */
-  __builtin_memcpy(p_version_array+2, project_version, strlen(project_version));
+  memcpy(p_version_array+2, project_version, strlen(project_version));
 }
 
 void default_config(Config* config)
 {
-  __builtin_memcpy(config, &usbsid_default_config, sizeof(Config));
+  memcpy(config, &usbsid_default_config, sizeof(Config));
 }
 
 void load_config(Config* config)
 {
   CFG("[COPY CONFIG] [FROM]0x%x [TO]0x%x  [SIZE]%u\n", XIP_BASE + FLASH_TARGET_OFFSET, (uint)&config, sizeof(Config));
-  __builtin_memcpy(config, (void *)(XIP_BASE + FLASH_TARGET_OFFSET), sizeof(Config));
+  memcpy(config, (void *)(XIP_BASE + FLASH_TARGET_OFFSET), sizeof(Config));
   stdio_flush();
   if (config->magic != MAGIC_SMOKE) {
       default_config(config);
@@ -217,7 +217,7 @@ void save_config(const Config* config)
 {
   uint8_t config_data[CONFIG_SIZE] = {0};
   static_assert(sizeof(Config) < CONFIG_SIZE, "[CONFIG SAVE ERROR] Config struct doesn't fit inside CONFIG_SIZE");
-  __builtin_memcpy(config_data, config, sizeof(Config));
+  memcpy(config_data, config, sizeof(Config));
   int err = flash_safe_execute(save_config_lowlevel, config_data, 100);
   if (err) {
     CFG("[SAVE ERROR] %d\n", err);
@@ -254,7 +254,7 @@ void handle_config_request(uint8_t * buffer)
       CFG("[>] SEND %d WRITES OF 64 BYTES TO %c [<]\n", writes, dtype);
       memset(write_buffer_p, 0, 64);
       for (int i = 0; i < writes; i++) {
-        __builtin_memcpy(write_buffer_p, config_array + (i * 64), 64);
+        memcpy(write_buffer_p, config_array + (i * 64), 64);
         CFG("[>] SEND WRITE %d OF %d [<]\n", i, writes);
         CFG("[>]");
         for (int i = 0; i < 64; i++) CFG(" %x", write_buffer_p[i]);
@@ -493,7 +493,7 @@ void handle_config_request(uint8_t * buffer)
       CFG("[READ_FIRMWARE_VERSION]\n");
       read_firmware_version();
       memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
-      __builtin_memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
+      memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
         switch (dtype) {
           case 'C':
             cdc_write(cdc_itf, MAX_BUFFER_SIZE);

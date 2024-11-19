@@ -240,7 +240,7 @@ uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 
   if ( index == 0)
   {
-    __builtin_memcpy(&_desc_str[1], string_desc_arr[0], 2);
+    memcpy(&_desc_str[1], string_desc_arr[0], 2);
     chr_count = 1;
   } else if ( index == 3 ) { // special-case for USB Serial number
     /* BOARD ID */
