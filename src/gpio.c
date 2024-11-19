@@ -62,13 +62,13 @@ void init_gpio()
   gpio_set_dir(RW, GPIO_OUT);
 }
 
-void init_vue(void)
+void init_vu(void)
 {
   /* PWM led */
   gpio_init( BUILTIN_LED );
   gpio_set_dir(BUILTIN_LED, GPIO_OUT);
   gpio_set_function(BUILTIN_LED, GPIO_FUNC_PWM);
-  /* Init Vue */
+  /* Init Vu */
   int led_pin_slice = pwm_gpio_to_slice_num( BUILTIN_LED );
 	pwm_config configLED = pwm_get_default_config();
 	pwm_config_set_clkdiv( &configLED, 1 );
