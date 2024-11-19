@@ -226,6 +226,7 @@ void sid_test(int sidno, char test, char wf)
       modulation_tests(addr, voices, 2);
       modulation_tests(addr, voices, 3);
       clear_sid_registers();
+      break;
     case '2':  /* ALL WAVEFORMS */
       test_all_waveforms(addr, voices);
       break;
