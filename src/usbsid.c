@@ -596,7 +596,7 @@ void tud_midi_rx_cb(uint8_t itf)
       process_stream(midimachine.usbstreambuffer, available);
     }
     /* Clear usb buffer after use */
-    __builtin_memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer));
+    memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer));
   }
 }
 
@@ -659,7 +659,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
           if (request->wIndex == 7) {
             /* Get Microsoft OS 2.0 compatible descriptor */
             uint16_t total_len;
-            __builtin_memcpy(&total_len, desc_ms_os_20+8, 2);
+            memcpy(&total_len, desc_ms_os_20+8, 2);
             return tud_control_xfer(rhport, request, (void*)(uintptr_t) desc_ms_os_20, total_len);
           } else {
             return false;
@@ -700,7 +700,7 @@ void core1_main(void)
   /* Init RGB LED */
   init_rgb();
   /* Clear the dirt */
-  __builtin_memset(sid_memory, 0, sizeof sid_memory);
+  memset(sid_memory, 0, sizeof sid_memory);
   /* Start the VU */
   init_vu();
   /* Release semaphore when core 1 is started */
