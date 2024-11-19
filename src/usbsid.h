@@ -136,7 +136,7 @@ enum
   MAX_CHECKS = 200,  /* 200 checks times 100ms == 20 seconds */
   BREATHE_INTV = 1,
   BREATHE_STEP = 100,
-  VUE_MAX = 65534,
+  VU_MAX = 65534,
   HZ_MAX = 40
 };
 
