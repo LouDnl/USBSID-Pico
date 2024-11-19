@@ -35,7 +35,8 @@ Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouD
 ##### C64 Music trackers
 When using Vice or RetroDebugger you can freely use applications like [SID-Wizard](https://sourceforge.net/projects/sid-wizard/) for music creation.
 #### Midi
-USBSID-Pico acts as Midi device and supports basic Midi in ~ note that Midi is still in development and in Beta phase.
+USBSID-Pico acts as Midi device and supports basic Midi in ~ note that Midi is still in development and in Beta phase.  
+This means that no support is available here at this time, please visit the Discord for more information.
 
 # Questions and Support
 Any questions about or support with USBSID-Pico can be asked 
@@ -48,16 +49,18 @@ Firmware is in beta stage and still in development.
 While in development any mentioned features, options, etc. are subject to change.  
 ### Test and config your board
 I have set up a small test player using Hermit's JsSID implementation (borrowed from Deepsid).  
-You can test (and config) your board with WebUSB and ASID here: [USBSID](https://usbsid.loudai.nl/).  
+You can test (and config) your board with WebUSB and ASID here: [USBSID](https://usbsid.loudai.nl/index.html?player=webusb).  
 If needed you can change your SID count configuration after selecting WebUSB.
+#### Debug functions
+For testing purposes only you can use the debug functions available on the [USBSID Debug](https://usbsid.loudai.nl/index.html?player=webusb&debug=usbsidpico) site.
 ### Supported platforms
 _In development_  
 Linux: Vice, RetroDebugger, SidBerry, JSidplay2, USB Midi, ASID (in webbrowser) SID Play  
 Windows: Vice  
 Windows/Android: USB Midi, ASID (in webbrowser) SID Play
 
-# Firmware (current version 0.2.1-BETA)
-See the [firmware changelog](#changelog) for more information on what's changed and previous releases.
+# Firmware
+See the [firmware changelog](CHANGELOG.md) for more information on what's changed and previous releases.
 ### Firmware versions
 Use `usbsidpico.uf2` for regular green rp2040 Pico boards.  
 Use `usbsidpico-rgb.uf2` for black clone rp2040 Pico boards with RGB LED onboard.  
@@ -93,7 +96,7 @@ The firmware is still in development so features might change, be added or remov
   - Socket one address range $00 ~ $3F (default $00 ~ $1F)
   - Socket two address range $20 ~ $7F (default $20 ~ $3F)
   - Configurable (platform independent (Linux/Windows) tool still in development)
-- Onboard LED acts as VU meter calculated by the voices of SID1
+- Onboard LED acts as VU meter calculated by the voices of SID1 (Pico & Pico2 only)
 - Onboard RGB LED acts as second VU meter calculated by the voices of SID1 (default)
   - Requires Black Pico clone board with RGB LED onboard!
   - SID voices to use for calculation can be changed in config
