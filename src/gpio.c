@@ -64,23 +64,30 @@ void init_gpio()
 
 void init_vu(void)
 {
+  #if defined(PICO_DEFAULT_LED_PIN)  /* Cannot use VU on PicoW :( */
   /* PWM led */
-  gpio_init( BUILTIN_LED );
+  gpio_init(BUILTIN_LED);
   gpio_set_dir(BUILTIN_LED, GPIO_OUT);
   gpio_set_function(BUILTIN_LED, GPIO_FUNC_PWM);
   /* Init Vu */
-  int led_pin_slice = pwm_gpio_to_slice_num( BUILTIN_LED );
+  int led_pin_slice = pwm_gpio_to_slice_num(BUILTIN_LED);
 	pwm_config configLED = pwm_get_default_config();
-	pwm_config_set_clkdiv( &configLED, 1 );
-	pwm_config_set_wrap( &configLED, 65535 );  /* LED max */
-	pwm_init( led_pin_slice, &configLED, true );
-	gpio_set_drive_strength( BUILTIN_LED, GPIO_DRIVE_STRENGTH_2MA );
-	pwm_set_gpio_level( BUILTIN_LED, 0 );  /* turn off led */
+	pwm_config_set_clkdiv(&configLED, 1);
+	pwm_config_set_wrap(&configLED, 65535);  /* LED max */
+	pwm_init(led_pin_slice, &configLED, true);
+	gpio_set_drive_strength(BUILTIN_LED, GPIO_DRIVE_STRENGTH_2MA);
+	pwm_set_gpio_level(BUILTIN_LED, 0);  /* turn off led */
 
   #if defined(USE_RGB)
   { /* Init RGB */
-    gpio_set_drive_strength( WS2812_PIN, GPIO_DRIVE_STRENGTH_2MA );
+    gpio_set_drive_strength(WS2812_PIN, GPIO_DRIVE_STRENGTH_2MA);
   }
+  #endif
+  #elif defined(CYW43_WL_GPIO_LED_PIN)
+  /* For Pico W devices we need to initialise the driver etc */
+  cyw43_arch_init();
+  /* Ask the wifi "driver" to set the GPIO on or off */
+  cyw43_arch_gpio_put(BUILTIN_LED, usbsid_config.LED.enabled);
   #endif
 }
 

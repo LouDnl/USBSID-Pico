@@ -45,9 +45,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-/* Pico libs */
-#include "pico/mem_ops.h"
-
 
 /* SID Register order for ASID */
 static const uint8_t asid_sid_registers[] =

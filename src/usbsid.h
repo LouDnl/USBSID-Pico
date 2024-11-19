@@ -47,7 +47,6 @@
 #include "pico/types.h"     /* absolute_time_t */
 #include "pico/multicore.h" /* Multicore */
 #include "pico/sem.h"       /* Semaphores */
-#include "pico/mem_ops.h"   /* Optimized memory handling functions string.h replacement */
 
 /* Hardware api's */
 #include "hardware/clocks.h"

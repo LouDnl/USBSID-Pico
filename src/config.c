@@ -65,7 +65,6 @@ uint8_t one, two, three, four;
 const char* project_version = PROJECT_VERSION;
 static uint8_t p_version_array[MAX_BUFFER_SIZE];
 
-// static const Config usbsid_default_config = {
 #define USBSID_DEFAULT_CONFIG_INIT { \
   .magic = MAGIC_SMOKE, \
   .default_config = 1, \
@@ -84,12 +83,12 @@ static uint8_t p_version_array[MAX_BUFFER_SIZE];
   }, \
   .LED = { \
     .enabled = true, \
-    .idle_breathe = true \
+    .idle_breathe = LED_PWM \
   }, \
   .RGBLED = { \
     .enabled = RGB_ENABLED, \
-    .idle_breathe = true, \
-    .brightness = 0x7F,  /* Half of max brightness */ \
+    .idle_breathe = RGB_ENABLED, \
+    .brightness = (RGB_ENABLED ? 0x7F : 0),  /* Half of max brightness or disabled if no RGB LED */ \
     .sid_to_use = 1, \
   }, \
   .Cdc = { \
@@ -291,8 +290,13 @@ void handle_config_request(uint8_t * buffer)
                 usbsid_config.LED.enabled = (buffer[3] == 1) ? true : false;
               break;
             case 1: /* idle_breathe */
-              if (buffer[3] <= 1)  /* 1 or 0 */
-                usbsid_config.LED.idle_breathe = (buffer[3] == 1) ? true : false;
+              if (buffer[3] <= 1) { /* 1 or 0 */
+                if (LED_PWM) {
+                  usbsid_config.LED.idle_breathe = (buffer[3] == 1) ? true : false;
+                } else {
+                  usbsid_config.LED.idle_breathe = false;  /* Always false, no PWM LED on PicoW :( */
+                };
+              };
               break;
             default:
               break;
@@ -301,19 +305,34 @@ void handle_config_request(uint8_t * buffer)
         case 4: /* RGBLED */
           switch (buffer[2]) {
             case 0: /* enabled */
-              if (buffer[3] <= 1)  /* 1 or 0 */
-                usbsid_config.RGBLED.enabled = (buffer[3] == 1) ? true : false;
+              if (buffer[3] <= 1) { /* 1 or 0 */
+                if (RGB_ENABLED) {
+                  usbsid_config.RGBLED.enabled = (buffer[3] == 1) ? true : false;
+                } else {
+                  usbsid_config.RGBLED.enabled = false;  /* Always false if no RGB LED */
+                };
+              };
               break;
             case 1: /* idle_breathe */
-              if (buffer[3] <= 1)  /* 1 or 0 */
-                usbsid_config.RGBLED.idle_breathe = (buffer[3] == 1) ? true : false;
+              if (buffer[3] <= 1) { /* 1 or 0 */
+                if (RGB_ENABLED) {
+                  usbsid_config.RGBLED.idle_breathe = (buffer[3] == 1) ? true : false;
+                } else {
+                  usbsid_config.RGBLED.idle_breathe = false;  /* Always false if no RGB LED */
+                };
+              };
               break;
             case 2: /* brightness */
-              usbsid_config.RGBLED.brightness = buffer[3];
+              if (RGB_ENABLED) {
+                usbsid_config.RGBLED.brightness = buffer[3];
+              } else {
+                usbsid_config.RGBLED.brightness = 0;  /* No brightness needed if no RGB LED */
+              };
               break;
             case 3: /* sid_to_use */
-              if (buffer[3] <= 3)
+              if (buffer[3] <= 3) {
                 usbsid_config.RGBLED.sid_to_use = buffer[3];
+              };
               break;
             default:
               break;

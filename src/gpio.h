@@ -38,7 +38,12 @@
 /* Pico libs */
 #include "pico/stdlib.h"
 #include "pico/types.h"
-#include "pico/mem_ops.h"
+
+/* Pico W devices use a GPIO on the WIFI chip for the LED,
+ * so when building for Pico W, CYW43_WL_GPIO_LED_PIN will be defined */
+#ifdef CYW43_WL_GPIO_LED_PIN
+#include "pico/cyw43_arch.h"
+#endif
 
 /* Hardware api's */
 #include "hardware/gpio.h"
@@ -82,7 +87,12 @@
 #define PHI 22  /* Pico 1Mhz PWM out ~ External Clock In */
 
 /* LED */
+#if defined(PICO_DEFAULT_LED_PIN)
 #define BUILTIN_LED PICO_DEFAULT_LED_PIN  /* 25 */
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+#define BUILTIN_LED CYW43_WL_GPIO_LED_PIN  /* Warning, No PWM available on LED! */
+#endif
+
 #if defined(USE_RGB)
 #define WS2812_PIN 23
 #endif
