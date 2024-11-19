@@ -356,6 +356,7 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
 /* It goes up and it goes down */
 void led_vumeter_task(void)
 {
+  #if LED_PWM
   if (to_ms_since_boot(get_absolute_time()) - start_ms < breathe_interval_ms) {
     return;  /* not enough time */
   }
@@ -452,11 +453,13 @@ void led_vumeter_task(void)
       sid_memory[0x0E], sid_memory[0x0F], sid_memory[0x10], sid_memory[0x11], sid_memory[0x12], sid_memory[0x13], sid_memory[0x14]);
 
   }
+  #endif
 }
 
 /* Mouth breather! */
 void led_breathe_task(void)
 {
+  #if LED_PWM
   if (usbdata == 0 && dtype == ntype) {
     if (to_ms_since_boot(get_absolute_time()) - start_ms < breathe_interval_ms) {
       return;  /* not enough time */
@@ -495,6 +498,7 @@ void led_breathe_task(void)
     }
     #endif
   }
+  #endif
 }
 
 
