@@ -47,6 +47,36 @@ Any questions about or support with USBSID-Pico can be asked
 Visit the [Project Page](https://github.com/users/LouDnl/projects/1) for an up-to-date list of things being worked on.
 Firmware is in beta stage and still in development.  
 While in development any mentioned features, options, etc. are subject to change.  
+### Code status
+|          | Master             | Dev                    |
+| -------  | :-----             | :-----                 |
+| Build    | [![release][1]][A] | [![build][2]][B]       |
+| Commit   | [![commit][3]][C]  | [![commit][4]][D]      |
+|          | **Other**          |
+| Latest   | [![tag][5]][E]     | [![release][6]][F]     |
+| Open     | [![issues][7]][G]  | [![discussions][8]][H] |
+| Info     | [![license][9]][I] | [![language][10]][J]   |
+
+[1]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/release.yml/badge.svg?branch=master
+[2]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/build.yml/badge.svg?branch=dev
+[3]: https://shields.io/github/last-commit/LouDnl/USBSID-Pico/master
+[4]: https://shields.io/github/last-commit/LouDnl/USBSID-Pico/dev
+[5]: https://shields.io/github/v/tag/LouDnl/USBSID-Pico?sort=semver
+[6]: https://shields.io/github/v/release/LouDnl/USBSID-Pico
+[7]: https://shields.io/github/issues/LouDnl/USBSID-Pico
+[8]: https://shields.io/github/discussions/LouDnl/USBSID-Pico
+[9]: https://shields.io/github/license/LouDnl/USBSID-Pico
+[10]: https://shields.io/github/languages/top/LouDnl/USBSID-Pico
+[A]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/release.yml
+[B]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/build.yml
+[C]: https://github.com/LouDnl/USBSID-Pico/commits/master/
+[D]: https://github.com/LouDnl/USBSID-Pico/commits/dev/
+[E]: https://github.com/LouDnl/USBSID-Pico/tags
+[F]: https://github.com/LouDnl/USBSID-Pico/releases
+[G]: https://github.com/LouDnl/USBSID-Pico/issues
+[H]: https://github.com/LouDnl/USBSID-Pico/discussions
+[I]: https://github.com/LouDnl/USBSID-Pico/blob/master/LICENSE
+[J]: https://github.com/LouDnl/USBSID-Pico
 ### Test and config your board
 I have set up a small test player using Hermit's JsSID implementation (borrowed from Deepsid).  
 You can test (and config) your board with WebUSB and ASID here: [USBSID](https://usbsid.loudai.nl/index.html?player=webusb).  
