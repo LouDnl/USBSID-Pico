@@ -1,4 +1,4 @@
-name: USBSID-Pico
+name: USBSID-Pico Build
 
 env:
   BUILD_THREADS: 4
