@@ -4,6 +4,12 @@
 * ...
 * Beam me up Scotty!
 * Continue work on Midi handling
+* Fix issue in SID tests not stopping
+  * Add Support for Pico2 (rp2350) green board
+* Add Support for PicoW (rp2040) green board
+  - NOTE: Due to the LED being used by the WiFi chip there is no VU support
+* Rename Vue to Vu 🤦‍♀️
+* Remove `__builtin_` function calls
 #### Version: 0.2.2-BETA
 * Add direct SID functions
   - Detect SID type
