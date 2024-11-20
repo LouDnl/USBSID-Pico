@@ -1,7 +1,7 @@
 ![USBSID-Pico](images/pcbv1.0.jpg)<br>
 ![USBSID-Pico](images/usbsid.png)![LouD](images/loud.png)
 # USBSID-Pico
-USBSID-Pico is a RPi Pico (RP2040) based board for interfacing one or two MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer, phone, ASID supporting player or USB midi controller.  
+USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2 (RP2350) based board for interfacing one or two MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer, phone, ASID supporting player or USB midi controller.  
 
 * [Features](#features)
 * [Questions & Support](#questions-and-support)
@@ -62,9 +62,11 @@ Windows/Android: USB Midi, ASID (in webbrowser) SID Play
 # Firmware
 See the [firmware changelog](CHANGELOG.md) for more information on what's changed and previous releases.
 ### Firmware versions
-Use `usbsidpico.uf2` for regular green rp2040 Pico boards.  
-Use `usbsidpico-rgb.uf2` for black clone rp2040 Pico boards with RGB LED onboard.  
-**WARNING!** Do _NOT_ use the RGB firmware for the regular green rp2040 Pico boards.
+Use `usbsidpico_pico.uf2` for Pico1 regular green rp2040 Pico boards.  
+Use `usbsidpico-rgb_pico.uf2` for Pico1 black clone rp2040 Pico boards with RGB LED onboard.  
+Use `usbsidpico_pico_w.uf2` for PicoW regular green rp2040 Pico boards.  
+Use `usbsidpico_pico2.uf2` for Pico2 regular green rp2040 Pico boards.  
+**WARNING!** Do _NOT_ use the RGB firmware for any of the (non black) rp2040 or rp2350 Pico boards that do not contain an RGB LED.
 ### How to flash
 A Raspberry Pi Pico board is incredibly easy to flash, as it comes with a built in bootloader for flashing new firmwares in the `uf2` format. 
 In order to flash a new firmware to your USBSID-Pico you will need to put the Pico into bootloader mode. This can be done in 2 ways:
