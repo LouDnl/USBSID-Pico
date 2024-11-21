@@ -65,7 +65,6 @@ uint8_t one, two, three, four;
 const char* project_version = PROJECT_VERSION;
 static uint8_t p_version_array[MAX_BUFFER_SIZE];
 
-// static const Config usbsid_default_config = {
 #define USBSID_DEFAULT_CONFIG_INIT { \
   .magic = MAGIC_SMOKE, \
   .default_config = 1, \
@@ -84,12 +83,12 @@ static uint8_t p_version_array[MAX_BUFFER_SIZE];
   }, \
   .LED = { \
     .enabled = true, \
-    .idle_breathe = true \
+    .idle_breathe = LED_PWM \
   }, \
   .RGBLED = { \
     .enabled = RGB_ENABLED, \
-    .idle_breathe = true, \
-    .brightness = 0x7F,  /* Half of max brightness */ \
+    .idle_breathe = RGB_ENABLED, \
+    .brightness = (RGB_ENABLED ? 0x7F : 0),  /* Half of max brightness or disabled if no RGB LED */ \
     .sid_to_use = 1, \
   }, \
   .Cdc = { \
@@ -186,18 +185,18 @@ void read_firmware_version()
 {
   p_version_array[0] = USBSID_VERSION;  /* Initiator byte */
   p_version_array[1] = strlen(project_version);  /* Length of version string */
-  __builtin_memcpy(p_version_array+2, project_version, strlen(project_version));
+  memcpy(p_version_array+2, project_version, strlen(project_version));
 }
 
 void default_config(Config* config)
 {
-  __builtin_memcpy(config, &usbsid_default_config, sizeof(Config));
+  memcpy(config, &usbsid_default_config, sizeof(Config));
 }
 
 void load_config(Config* config)
 {
   CFG("[COPY CONFIG] [FROM]0x%x [TO]0x%x  [SIZE]%u\n", XIP_BASE + FLASH_TARGET_OFFSET, (uint)&config, sizeof(Config));
-  __builtin_memcpy(config, (void *)(XIP_BASE + FLASH_TARGET_OFFSET), sizeof(Config));
+  memcpy(config, (void *)(XIP_BASE + FLASH_TARGET_OFFSET), sizeof(Config));
   stdio_flush();
   if (config->magic != MAGIC_SMOKE) {
       default_config(config);
@@ -217,7 +216,7 @@ void save_config(const Config* config)
 {
   uint8_t config_data[CONFIG_SIZE] = {0};
   static_assert(sizeof(Config) < CONFIG_SIZE, "[CONFIG SAVE ERROR] Config struct doesn't fit inside CONFIG_SIZE");
-  __builtin_memcpy(config_data, config, sizeof(Config));
+  memcpy(config_data, config, sizeof(Config));
   int err = flash_safe_execute(save_config_lowlevel, config_data, 100);
   if (err) {
     CFG("[SAVE ERROR] %d\n", err);
@@ -254,7 +253,7 @@ void handle_config_request(uint8_t * buffer)
       CFG("[>] SEND %d WRITES OF 64 BYTES TO %c [<]\n", writes, dtype);
       memset(write_buffer_p, 0, 64);
       for (int i = 0; i < writes; i++) {
-        __builtin_memcpy(write_buffer_p, config_array + (i * 64), 64);
+        memcpy(write_buffer_p, config_array + (i * 64), 64);
         CFG("[>] SEND WRITE %d OF %d [<]\n", i, writes);
         CFG("[>]");
         for (int i = 0; i < 64; i++) CFG(" %x", write_buffer_p[i]);
@@ -291,8 +290,13 @@ void handle_config_request(uint8_t * buffer)
                 usbsid_config.LED.enabled = (buffer[3] == 1) ? true : false;
               break;
             case 1: /* idle_breathe */
-              if (buffer[3] <= 1)  /* 1 or 0 */
-                usbsid_config.LED.idle_breathe = (buffer[3] == 1) ? true : false;
+              if (buffer[3] <= 1) { /* 1 or 0 */
+                if (LED_PWM) {
+                  usbsid_config.LED.idle_breathe = (buffer[3] == 1) ? true : false;
+                } else {
+                  usbsid_config.LED.idle_breathe = false;  /* Always false, no PWM LED on PicoW :( */
+                };
+              };
               break;
             default:
               break;
@@ -301,19 +305,34 @@ void handle_config_request(uint8_t * buffer)
         case 4: /* RGBLED */
           switch (buffer[2]) {
             case 0: /* enabled */
-              if (buffer[3] <= 1)  /* 1 or 0 */
-                usbsid_config.RGBLED.enabled = (buffer[3] == 1) ? true : false;
+              if (buffer[3] <= 1) { /* 1 or 0 */
+                if (RGB_ENABLED) {
+                  usbsid_config.RGBLED.enabled = (buffer[3] == 1) ? true : false;
+                } else {
+                  usbsid_config.RGBLED.enabled = false;  /* Always false if no RGB LED */
+                };
+              };
               break;
             case 1: /* idle_breathe */
-              if (buffer[3] <= 1)  /* 1 or 0 */
-                usbsid_config.RGBLED.idle_breathe = (buffer[3] == 1) ? true : false;
+              if (buffer[3] <= 1) { /* 1 or 0 */
+                if (RGB_ENABLED) {
+                  usbsid_config.RGBLED.idle_breathe = (buffer[3] == 1) ? true : false;
+                } else {
+                  usbsid_config.RGBLED.idle_breathe = false;  /* Always false if no RGB LED */
+                };
+              };
               break;
             case 2: /* brightness */
-              usbsid_config.RGBLED.brightness = buffer[3];
+              if (RGB_ENABLED) {
+                usbsid_config.RGBLED.brightness = buffer[3];
+              } else {
+                usbsid_config.RGBLED.brightness = 0;  /* No brightness needed if no RGB LED */
+              };
               break;
             case 3: /* sid_to_use */
-              if (buffer[3] <= 3)
+              if (buffer[3] <= 3) {
                 usbsid_config.RGBLED.sid_to_use = buffer[3];
+              };
               break;
             default:
               break;
@@ -493,7 +512,7 @@ void handle_config_request(uint8_t * buffer)
       CFG("[READ_FIRMWARE_VERSION]\n");
       read_firmware_version();
       memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
-      __builtin_memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
+      memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
         switch (dtype) {
           case 'C':
             cdc_write(cdc_itf, MAX_BUFFER_SIZE);

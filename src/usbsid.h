@@ -47,7 +47,6 @@
 #include "pico/types.h"     /* absolute_time_t */
 #include "pico/multicore.h" /* Multicore */
 #include "pico/sem.h"       /* Semaphores */
-#include "pico/mem_ops.h"   /* Optimized memory handling functions string.h replacement */
 
 /* Hardware api's */
 #include "hardware/clocks.h"
@@ -136,7 +135,7 @@ enum
   MAX_CHECKS = 200,  /* 200 checks times 100ms == 20 seconds */
   BREATHE_INTV = 1,
   BREATHE_STEP = 100,
-  VUE_MAX = 65534,
+  VU_MAX = 65534,
   HZ_MAX = 40
 };
 

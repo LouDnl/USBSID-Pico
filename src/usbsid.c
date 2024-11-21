@@ -42,7 +42,7 @@ int usb_connected = 0, usbdata = 0, pwm_value = 0, updown = 1;
 uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
 uint sm_clock, offset_clock;
 uint8_t *cdc_itf, *wusb_itf;
-uint16_t vue;
+uint16_t vu;
 uint32_t breathe_interval_ms = BREATHE_INTV;
 uint32_t start_ms = 0;
 char ntype = '0', dtype = '0', cdc = 'C', asid = 'A', midi = 'M', wusb = 'W';
@@ -66,7 +66,7 @@ extern void verify_clockrate(void);
 /* GPIO externals */
 extern PIO bus_pio;
 extern void init_gpio(void);
-extern void init_vue(void);
+extern void init_vu(void);
 extern void setup_piobus(void);
 extern void setup_dmachannels(void);
 extern void pause_sid(void);
@@ -267,7 +267,7 @@ void cdc_write(uint8_t * itf, uint32_t n)
 { /* No need to check if write available with current driver code */
   tud_cdc_n_write(*itf, write_buffer, n);  /* write n bytes of data to client */
   tud_cdc_n_write_flush(*itf);
-  vue = vue == 0 ? 100 : vue;  /* NOTICE: Testfix for core1 setting dtype to 0 */
+  vu = vu == 0 ? 100 : vu;  /* NOTICE: Testfix for core1 setting dtype to 0 */
   IODBG("[O] [%c] DAT[0x%02x] \r\n", dtype, write_buffer[0]);
 }
 
@@ -276,7 +276,7 @@ void webserial_write(uint8_t * itf, uint32_t n)
 { /* No need to check if write available with current driver code */
   tud_vendor_write(write_buffer, n);
   tud_vendor_flush();
-  vue = vue == 0 ? 100 : vue;  /* NOTICE: Testfix for core1 setting dtype to 0 */
+  vu = vu == 0 ? 100 : vu;  /* NOTICE: Testfix for core1 setting dtype to 0 */
   IODBG("[O] [%c] DAT[0x%02x] \r\n", dtype, write_buffer[0]);
 }
 
@@ -354,8 +354,9 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
 /* LED SORCERERS */
 
 /* It goes up and it goes down */
-void led_vuemeter_task(void)
+void led_vumeter_task(void)
 {
+  #if LED_PWM
   if (to_ms_since_boot(get_absolute_time()) - start_ms < breathe_interval_ms) {
     return;  /* not enough time */
   }
@@ -435,35 +436,37 @@ void led_vuemeter_task(void)
 
       /* Color LED debugging ~ uncomment for testing */
       // DBG("[%c][PWM]$%04x [R]%02x [G]%02x [B]%02x [O1]$%02x $%02d [O2]$%02x $%02d [O3]$%02x $%02d [O4]$%02x $%02d [O5]$%02x $%02d [O6]$%02x $%02d\r\n",
-      //  dtype, vue, r_, g_, b_, osc1, o1, osc2, o2, osc3, o3, osc4, o4, osc5, o5, osc6, o6);
+      //  dtype, vu, r_, g_, b_, osc1, o1, osc2, o2, osc3, o3, osc4, o4, osc5, o5, osc6, o6);
     }
     #endif
 
-    vue = abs((osc1 + osc2 + osc3) / 3.0f);
-    vue = map(vue, 0, HZ_MAX, 0, VUE_MAX);
+    vu = abs((osc1 + osc2 + osc3) / 3.0f);
+    vu = map(vu, 0, HZ_MAX, 0, VU_MAX);
     if (usbsid_config.LED.enabled) {
-      pwm_set_gpio_level(BUILTIN_LED, vue);
+      pwm_set_gpio_level(BUILTIN_LED, vu);
     }
 
     MDBG("[%c:%d] [VOL]$%02x [PWM]$%04x | [V1] $%02X%02X %02X%02X %02X %02X %02X | [V2] $%02X%02X %02X%02X %02X %02X %02X | [V3] $%02X%02X %02X%02X %02X %02X %02X \n",
-      dtype, usbdata, sid_memory[0x18], vue,
+      dtype, usbdata, sid_memory[0x18], vu,
       sid_memory[0x00], sid_memory[0x01], sid_memory[0x02], sid_memory[0x03], sid_memory[0x04], sid_memory[0x05], sid_memory[0x06],
       sid_memory[0x07], sid_memory[0x08], sid_memory[0x09], sid_memory[0x0A], sid_memory[0x0B], sid_memory[0x0C], sid_memory[0x0D],
       sid_memory[0x0E], sid_memory[0x0F], sid_memory[0x10], sid_memory[0x11], sid_memory[0x12], sid_memory[0x13], sid_memory[0x14]);
 
   }
+  #endif
 }
 
 /* Mouth breather! */
 void led_breathe_task(void)
 {
+  #if LED_PWM
   if (usbdata == 0 && dtype == ntype) {
     if (to_ms_since_boot(get_absolute_time()) - start_ms < breathe_interval_ms) {
       return;  /* not enough time */
     }
     start_ms = to_ms_since_boot(get_absolute_time());
 
-    if (pwm_value >= VUE_MAX) {
+    if (pwm_value >= VU_MAX) {
       updown = 0;
     }
     if (pwm_value <= 0) {
@@ -473,7 +476,7 @@ void led_breathe_task(void)
       #endif
     }
 
-    if (updown == 1 && pwm_value <= VUE_MAX)
+    if (updown == 1 && pwm_value <= VU_MAX)
       pwm_value += BREATHE_STEP;
 
     if (updown == 0 && pwm_value >= 0)
@@ -483,7 +486,7 @@ void led_breathe_task(void)
     }
     #if defined(USE_RGB)
     if (usbsid_config.RGBLED.enabled && usbsid_config.RGBLED.idle_breathe) {
-      int rgb_ = map(pwm_value, 0, VUE_MAX, 0, 43);
+      int rgb_ = map(pwm_value, 0, VU_MAX, 0, 43);
       r_ = color_LUT[rgb_][_rgb][0];
       g_ = color_LUT[rgb_][_rgb][1];
       b_ = color_LUT[rgb_][_rgb][2];
@@ -495,6 +498,7 @@ void led_breathe_task(void)
     }
     #endif
   }
+  #endif
 }
 
 
@@ -534,7 +538,7 @@ void tud_cdc_rx_cb(uint8_t itf)
 { /* No need to check available bytes for reading */
   cdc_itf = &itf;
   usbdata = 1, dtype = cdc;
-  vue = vue == 0 ? 100 : vue;  /* NOTICE: Testfix for core1 setting dtype to 0 */
+  vu = vu == 0 ? 100 : vu;  /* NOTICE: Testfix for core1 setting dtype to 0 */
   cdcread = tud_cdc_n_read(*cdc_itf, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
   tud_cdc_n_read_flush(*cdc_itf);
   handle_buffer_task(cdc_itf, &cdcread);
@@ -596,7 +600,7 @@ void tud_midi_rx_cb(uint8_t itf)
       process_stream(midimachine.usbstreambuffer, available);
     }
     /* Clear usb buffer after use */
-    __builtin_memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer));
+    memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer));
   }
 }
 
@@ -659,7 +663,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
           if (request->wIndex == 7) {
             /* Get Microsoft OS 2.0 compatible descriptor */
             uint16_t total_len;
-            __builtin_memcpy(&total_len, desc_ms_os_20+8, 2);
+            memcpy(&total_len, desc_ms_os_20+8, 2);
             return tud_control_xfer(rhport, request, (void*)(uintptr_t) desc_ms_os_20, total_len);
           } else {
             return false;
@@ -700,22 +704,22 @@ void core1_main(void)
   /* Init RGB LED */
   init_rgb();
   /* Clear the dirt */
-  __builtin_memset(sid_memory, 0, sizeof sid_memory);
-  /* Start the VUE */
-  init_vue();
+  memset(sid_memory, 0, sizeof sid_memory);
+  /* Start the VU */
+  init_vu();
   /* Release semaphore when core 1 is started */
   sem_release(&core1_init);
 
   int n_checks = 0, m_now = 0;
   m_now = to_ms_since_boot(get_absolute_time());
   while (1) {
-    usbdata == 1 ? led_vuemeter_task() : led_breathe_task();
+    usbdata == 1 ? led_vumeter_task() : led_breathe_task();
     if (to_ms_since_boot(get_absolute_time()) - m_now < CHECK_INTV) { /* 20 seconds */
       /* NOTICE: Testfix for core1 setting dtype to 0 */
       /* do nothing */
     } else {
       m_now = to_ms_since_boot(get_absolute_time());
-      if (vue == 0 && usbdata == 1) {
+      if (vu == 0 && usbdata == 1) {
         n_checks++;
         if (n_checks >= MAX_CHECKS)
         {

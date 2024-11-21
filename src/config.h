@@ -38,7 +38,6 @@
 #include <string.h>
 
 /* Pico libs */
-#include "pico/mem_ops.h"
 #include "pico/flash.h"
 #include "pico/stdlib.h"
 
@@ -56,7 +55,13 @@
 #define MAGIC_SMOKE 19700101  /* DATEOFRELEASE */
 #endif
 #ifndef PROJECT_VERSION
-#define PROJECT_VERSION "0.2.2-BETA.20241117"  /* Must be the same as in CMakeLists.txt */
+#define PROJECT_VERSION "0.2.2-BETA.20241120"  /* Must be the same as in CMakeLists.txt */
+#endif
+
+#ifdef PICO_DEFAULT_LED_PIN
+#define LED_PWM true
+#else
+#define LED_PWM false
 #endif
 #ifdef USE_RGB
 #define RGB_ENABLED true

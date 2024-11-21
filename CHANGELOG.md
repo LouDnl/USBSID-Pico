@@ -1,7 +1,33 @@
 # Changelog
 
-#### Version: 0.2.2-BETA (Unreleased)
+#### Version: 0.3.0-BETA (Unreleased)
+* ...
+* Beam me up Scotty!
 * Continue work on Midi handling
+* Fix issue in SID tests not stopping
+  * Add Support for Pico2 (rp2350) green board
+* Add Support for PicoW (rp2040) green board
+  - NOTE: Due to the LED being used by the WiFi chip there is no VU support
+* Rename Vue to Vu 🤦‍♀️
+* Remove `__builtin_` function calls
+#### Version: 0.2.2-BETA
+* Add direct SID functions
+  - Detect SID type
+  - Test SID voices
+* Add config commands for SID testing functions
+* Add function to clear SID registers without SID reboot
+* Add some debug logging
+* Update config handling
+  - Add direct SID functions
+  - Add version retrieval support
+  - Check if set clockspeed is correct or se default
+  - Fix write functions
+  - Fix some values on SID count change
+* Update USB descriptors
+  - Add version in manufacturer string
+* Enable CC's for bank 9 (temporary workaround)
+* Refactor some whitespace
+* Start work on support for PicoW and Pico2 boards
 #### Version: 0.2.1-BETA
 * Start on update for Midi handling
   * Details will follow at a later time when finished

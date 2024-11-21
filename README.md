@@ -1,7 +1,7 @@
 ![USBSID-Pico](images/pcbv1.0.jpg)<br>
 ![USBSID-Pico](images/usbsid.png)![LouD](images/loud.png)
 # USBSID-Pico
-USBSID-Pico is a RPi Pico (RP2040) based board for interfacing one or two MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer, phone, ASID supporting player or USB midi controller.  
+USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2 (RP2350) based board for interfacing one or two MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer, phone, ASID supporting player or USB midi controller.  
 
 * [Features](#features)
 * [Questions & Support](#questions-and-support)
@@ -35,7 +35,8 @@ Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouD
 ##### C64 Music trackers
 When using Vice or RetroDebugger you can freely use applications like [SID-Wizard](https://sourceforge.net/projects/sid-wizard/) for music creation.
 #### Midi
-USBSID-Pico acts as Midi device and supports basic Midi in ~ note that Midi is still in development and in Beta phase.
+USBSID-Pico acts as Midi device and supports basic Midi in ~ note that Midi is still in development and in Beta phase.  
+This means that no support is available here at this time, please visit the Discord for more information.
 
 # Questions and Support
 Any questions about or support with USBSID-Pico can be asked 
@@ -46,22 +47,56 @@ Any questions about or support with USBSID-Pico can be asked
 Visit the [Project Page](https://github.com/users/LouDnl/projects/1) for an up-to-date list of things being worked on.
 Firmware is in beta stage and still in development.  
 While in development any mentioned features, options, etc. are subject to change.  
+### Code status
+|          | Master             | Dev                    |
+| -------  | :-----             | :-----                 |
+| Build    | [![release][1]][A] | [![build][2]][B]       |
+| Commit   | [![commit][3]][C]  | [![commit][4]][D]      |
+|          | **Other**          |
+| Latest   | [![tag][5]][E]     | [![release][6]][F]     |
+| Open     | [![issues][7]][G]  | [![discussions][8]][H] |
+| Info     | [![license][9]][I] | [![language][10]][J]   |
+
+[1]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/release.yml/badge.svg?branch=master
+[2]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/build.yml/badge.svg?branch=dev
+[3]: https://shields.io/github/last-commit/LouDnl/USBSID-Pico/master
+[4]: https://shields.io/github/last-commit/LouDnl/USBSID-Pico/dev
+[5]: https://shields.io/github/v/tag/LouDnl/USBSID-Pico?sort=semver
+[6]: https://shields.io/github/v/release/LouDnl/USBSID-Pico
+[7]: https://shields.io/github/issues/LouDnl/USBSID-Pico
+[8]: https://shields.io/github/discussions/LouDnl/USBSID-Pico
+[9]: https://shields.io/github/license/LouDnl/USBSID-Pico
+[10]: https://shields.io/github/languages/top/LouDnl/USBSID-Pico
+[A]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/release.yml
+[B]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/build.yml
+[C]: https://github.com/LouDnl/USBSID-Pico/commits/master/
+[D]: https://github.com/LouDnl/USBSID-Pico/commits/dev/
+[E]: https://github.com/LouDnl/USBSID-Pico/tags
+[F]: https://github.com/LouDnl/USBSID-Pico/releases
+[G]: https://github.com/LouDnl/USBSID-Pico/issues
+[H]: https://github.com/LouDnl/USBSID-Pico/discussions
+[I]: https://github.com/LouDnl/USBSID-Pico/blob/master/LICENSE
+[J]: https://github.com/LouDnl/USBSID-Pico
 ### Test and config your board
 I have set up a small test player using Hermit's JsSID implementation (borrowed from Deepsid).  
-You can test (and config) your board with WebUSB and ASID here: [USBSID](https://usbsid.loudai.nl/).  
+You can test (and config) your board with WebUSB and ASID here: [USBSID](https://usbsid.loudai.nl/index.html?player=webusb).  
 If needed you can change your SID count configuration after selecting WebUSB.
+#### Debug functions
+For testing purposes only you can use the debug functions available on the [USBSID Debug](https://usbsid.loudai.nl/index.html?player=webusb&debug=usbsidpico) site.
 ### Supported platforms
 _In development_  
 Linux: Vice, RetroDebugger, SidBerry, JSidplay2, USB Midi, ASID (in webbrowser) SID Play  
 Windows: Vice  
 Windows/Android: USB Midi, ASID (in webbrowser) SID Play
 
-# Firmware (current version 0.2.1-BETA)
-See the [firmware changelog](#changelog) for more information on what's changed and previous releases.
+# Firmware
+See the [firmware changelog](CHANGELOG.md) for more information on what's changed and previous releases.
 ### Firmware versions
-Use `usbsidpico.uf2` for regular green rp2040 Pico boards.  
-Use `usbsidpico-rgb.uf2` for black clone rp2040 Pico boards with RGB LED onboard.  
-**WARNING!** Do _NOT_ use the RGB firmware for the regular green rp2040 Pico boards.
+Use `usbsidpico_pico.uf2` for Pico1 regular green rp2040 Pico boards.  
+Use `usbsidpico-rgb_pico.uf2` for Pico1 black clone rp2040 Pico boards with RGB LED onboard.  
+Use `usbsidpico_pico_w.uf2` for PicoW regular green rp2040 Pico boards.  
+Use `usbsidpico_pico2.uf2` for Pico2 regular green rp2040 Pico boards.  
+**WARNING!** Do _NOT_ use the RGB firmware for any of the (non black) rp2040 or rp2350 Pico boards that do not contain an RGB LED.
 ### How to flash
 A Raspberry Pi Pico board is incredibly easy to flash, as it comes with a built in bootloader for flashing new firmwares in the `uf2` format. 
 In order to flash a new firmware to your USBSID-Pico you will need to put the Pico into bootloader mode. This can be done in 2 ways:
@@ -93,7 +128,7 @@ The firmware is still in development so features might change, be added or remov
   - Socket one address range $00 ~ $3F (default $00 ~ $1F)
   - Socket two address range $20 ~ $7F (default $20 ~ $3F)
   - Configurable (platform independent (Linux/Windows) tool still in development)
-- Onboard LED acts as VU meter calculated by the voices of SID1
+- Onboard LED acts as VU meter calculated by the voices of SID1 (Pico & Pico2 only)
 - Onboard RGB LED acts as second VU meter calculated by the voices of SID1 (default)
   - Requires Black Pico clone board with RGB LED onboard!
   - SID voices to use for calculation can be changed in config
