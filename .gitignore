@@ -12,6 +12,7 @@
 !*.png
 !*.pdf
 !*.html
+!*.yml
 
 # specific files
 !.gitignore
@@ -20,6 +21,8 @@
 !CMakeLists.txt
 
 # folders
+!.github
+!.github/**
 !src
 !src/pio
 !images

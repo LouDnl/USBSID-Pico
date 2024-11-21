@@ -22,22 +22,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 ####
 
-### Cmake minimum
+### Cmake minimum version
 cmake_minimum_required(VERSION 3.17)
 
-### Project
+### Project magic sprinkles
 set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
-set(PROJECT_PRODUCT "USBSID-Pico")
-set(MAGIC_SMOKE "20241117")  # DATEOFRELEASE
+set(PRODUCT_STRING "USBSID-Pico")
+set(MAGIC_SMOKE "20241120")
 set(PROJECT_VERSION "0.2.2-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
 
-### Optimization and debugging
-SET(DEBUG_SYMBOLS 0)
-SET(DEBUGGING 0)
-SET(OPTIMIZATIONS 3)
-
-### Enable debug logging
+### Want a cookie?
 # NOTICE: ENABLING THESE DEBUGGING DEFINITIONS WILL HAVE SIGNIFICANT IMPACT AND WILL DELAY PLAYING!
 if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(USBSID_DEBUGGING 1)   # Enable UART ~ mandatory enable for all other logging types
@@ -50,23 +45,39 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
 endif()
 
 
-#### You no touchy after this line
+#######################################
+#### You no touchy after this line ####
+#######################################
 
-### Target board
-message("ENV Pico board: $ENV{PICO_BOARD}")
-message("ENV Pico platform: $ENV{PICO_PLATFORM}")
-if(NOT DEFINED $ENV{PICO_BOARD})
+### Optimization and debugging
+SET(DEBUG_SYMBOLS 0)
+SET(DEBUGGING 0)
+SET(OPTIMIZATIONS 3)
+
+### Target board pico, pico_w, pico2
+if(DEFINED PICO_BOARD)
+  message("PICO_BOARD is defined as ${PICO_BOARD}")
+else()
   message("PICO_BOARD not defined, defaulting to 'pico'")
   set(PICO_BOARD pico)
-  # set(PICO_BOARD pico2)
 endif()
-if(NOT DEFINED $ENV{PICO_PLATFORM})
+
+### Target platform rp2040, rp2350 (rp2350-arm-s)
+if(DEFINED PICO_PLATFORM)
+  message("PICO_PLATFORM is defined as ${PICO_PLATFORM}")
+else()
   message("PICO_PLATFORM not defined, defaulting to 'rp2040'")
   set(PICO_PLATFORM rp2040)
-  # set(PICO_PLATFORM rp2350)
 endif()
-# set(PICO_PLATFORM rp2350-arm-s)
-# set(PICO_BOARD pico2)
+
+### Target product
+if(${PICO_BOARD} STREQUAL "pico")
+  set(PROJECT_PRODUCT ${PRODUCT_STRING})
+elseif(${PICO_BOARD} STREQUAL "pico_w")
+  set(PROJECT_PRODUCT "${PRODUCT_STRING}_W")
+elseif(${PICO_BOARD} STREQUAL "pico2")
+  set(PROJECT_PRODUCT "${PRODUCT_STRING}2")
+endif()
 
 ### Version validation
 if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/src/config.h)
@@ -102,9 +113,7 @@ endif()
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
-### Compilers to use for C and C++
-# set(CMAKE_C_COMPILER   arm-none-eabi-gcc)
-# set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
+### Compilers to use
 if(${PICO_PLATFORM} MATCHES rp2040)
   set(PICO_COMPILER pico_arm_gcc)  # required for mem_ops on rp2040
 endif()
@@ -145,15 +154,20 @@ elseif(OPTIMIZATIONS EQUAL 3)
   set(C_OPT -O3)
 endif()
 
-### Compiler options
-# set(COMPILE_OPTS PRIVATE -Wno-maybe-uninitialized -save-temps -fverbose-asm -Ofast -fomit-frame-pointer -fmodulo-sched -fmodulo-sched-allow-regmoves -fgcse-sm -fgcse-las -finline-small-functions -fdelete-null-pointer-checks -fexpensive-optimizations)  # test
+### Compiler flags and options
+# set(COMPILE_OPTS PRIVATE
+  # -Wno-maybe-uninitialized
+  # -save-temps -fverbose-asm -Ofast -fomit-frame-pointer -fmodulo-sched
+  # -fmodulo-sched-allow-regmoves -fgcse-sm -fgcse-las -finline-small-functions
+  # -fdelete-null-pointer-checks -fexpensive-optimizations
+# )
 set(COMPILE_OPTS PRIVATE
   ${D_OPT}
   -Wall
   -Wunused
   -Werror
-  -Wno-format
-  -Wno-unused-function
+  -Wno-format          # int != int32_t as far as the compiler is concerned because gcc has int32_t as long int
+  -Wno-unused-function # extra check to verify no unused lingering code is present
   -Wno-maybe-uninitialized
   -save-temps
   ${C_OPT}
@@ -171,15 +185,23 @@ set(COMPILE_OPTS PRIVATE
   -Wl,--wrap=vprintf
   -Wl,--wrap=puts
 )
-
 message("Compile time flags: ${COMPILE_OPTS}")
 
 ### Executable names
 list(APPEND FILENAMES
-  ${PROJECT_NAME}
-  ${PROJECT_NAME}-rgb
+  ${PROJECT_NAME}_${PICO_BOARD}
 )
-list(APPEND PICOTYPES "LED" "RGB")
+list(APPEND PICOTYPES
+  "LED"
+)
+if(${PICO_BOARD} STREQUAL "pico")
+list(APPEND FILENAMES
+  ${PROJECT_NAME}-rgb_${PICO_BOARD}
+)
+list(APPEND PICOTYPES
+    "RGB"
+)
+endif()
 
 ### Source files to compile
 set(SOURCEFILES
@@ -230,9 +252,7 @@ set(TARGET_INCLUDE_DIRS PRIVATE
 )
 
 ### Pico sdk path
-# include($ENV{PICO_SDK_PATH}/pico_sdk_init.cmake)
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
-# include($ENV{PICO_EXTRAS_PATH}/external/pico_extras_import.cmake)
 
 ### Project type
 project(${PROJECT_NAME} C CXX ASM)
@@ -305,9 +325,12 @@ foreach(FILENAME PICOTYPE IN ZIP_LISTS FILENAMES PICOTYPES)
   endif()
   # tell the linker what libraries to link
   target_link_libraries(${BUILD} ${TARGET_LL})
+  if (PICO_CYW43_SUPPORTED)
+    target_link_libraries(${BUILD} pico_cyw43_arch_none)
+  endif()
   # target sid types
   target_include_directories(${BUILD} ${TARGET_INCLUDE_DIRS})
-  pico_set_program_name(${BUILD} "USBSIDPico")
+  pico_set_program_name(${BUILD} "USBSID-Pico")
   pico_set_program_version(${BUILD} $PROJECT_VERSION)
   # create map/bin/hex/uf2 file in addition to ELF.
   pico_add_extra_outputs(${BUILD})

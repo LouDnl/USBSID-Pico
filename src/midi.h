@@ -47,7 +47,7 @@
 #include <math.h>
 
 /* Pico libs */
-#include "pico/mem_ops.h"
+#include "pico/stdlib.h"
 
 
 typedef enum {
