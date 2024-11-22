@@ -3,6 +3,7 @@
 - [[Home]]
 
 ## Midi
+- [[Basics]]
 - [[Strudel]]
 - [[TidalCycles]]
 - [[VMPK]]

@@ -70,13 +70,16 @@ else()
   set(PICO_PLATFORM rp2040)
 endif()
 
-### Target product
+### Target product & output filename
 if(${PICO_BOARD} STREQUAL "pico")
   set(PROJECT_PRODUCT ${PRODUCT_STRING})
+  set(PROJECT_FILENAME ${PROJECT_NAME})
 elseif(${PICO_BOARD} STREQUAL "pico_w")
   set(PROJECT_PRODUCT "${PRODUCT_STRING}_W")
+  set(PROJECT_FILENAME "${PROJECT_NAME}_w")
 elseif(${PICO_BOARD} STREQUAL "pico2")
   set(PROJECT_PRODUCT "${PRODUCT_STRING}2")
+  set(PROJECT_FILENAME "${PROJECT_NAME}2")
 endif()
 
 ### Version validation
@@ -189,14 +192,14 @@ message("Compile time flags: ${COMPILE_OPTS}")
 
 ### Executable names
 list(APPEND FILENAMES
-  ${PROJECT_NAME}_${PICO_BOARD}
+  ${PROJECT_FILENAME}
 )
 list(APPEND PICOTYPES
   "LED"
 )
 if(${PICO_BOARD} STREQUAL "pico")
 list(APPEND FILENAMES
-  ${PROJECT_NAME}-rgb_${PICO_BOARD}
+  ${PROJECT_FILENAME}-rgb
 )
 list(APPEND PICOTYPES
     "RGB"
