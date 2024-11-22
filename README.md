@@ -92,10 +92,10 @@ Windows/Android: USB Midi, ASID (in webbrowser) SID Play
 # Firmware
 See the [firmware changelog](CHANGELOG.md) for more information on what's changed and previous releases.
 ### Firmware versions
-Use `usbsidpico_pico.uf2` for Pico1 regular green rp2040 Pico boards.  
-Use `usbsidpico-rgb_pico.uf2` for Pico1 black clone rp2040 Pico boards with RGB LED onboard.  
-Use `usbsidpico_pico_w.uf2` for PicoW regular green rp2040 Pico boards.  
-Use `usbsidpico_pico2.uf2` for Pico2 regular green rp2040 Pico boards.  
+Use `usbsidpico.uf2` for Pico1 regular green rp2040 Pico boards.  
+Use `usbsidpico-rgb.uf2` for Pico1 black clone rp2040 Pico boards with RGB LED onboard.  
+Use `usbsidpico_w.uf2` for PicoW regular green rp2040 Pico boards.  
+Use `usbsidpico2.uf2` for Pico2 regular green rp2040 Pico boards.  
 **WARNING!** Do _NOT_ use the RGB firmware for any of the (non black) rp2040 or rp2350 Pico boards that do not contain an RGB LED.
 ### How to flash
 A Raspberry Pi Pico board is incredibly easy to flash, as it comes with a built in bootloader for flashing new firmwares in the `uf2` format. 
@@ -142,8 +142,14 @@ You can build the firmware using the Pico SDK 2.0.0 and TinyUSB from it's Github
 
 # Hardware
 ### Where to buy
-Assembled boards while available (and minus Pico) can be purchased from me - send me a message on any of my socials.  
-At a minimum of 5 assembled boards it is also possible to purchase at [PCBWay here](https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html).  
+#### Licensed resellers
+[Run Stop Re-Store](https://www.runstoprestore.nl) at [Retro8BITshop](https://www.retro8bitshop.com) is the first reseller to sell licensed USBSID-Pico boards.  
+Click [this link](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/) to go to their product page
+#### PCBWay
+At a minimum of 5 bare or assembled boards it is also possible to purchase at [PCBWay here](https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html).  
+#### Me (while I still have boards)
+While still available you can purchase assembled boards minus Pico can be purchased from me - send me a message on any of my socials.  
+
 I am currently negotiating the possibility for the boards to be purchasable at an online store here in NL. 
 ### Schematic and BOM
 If you want and are up to it you can create your own development board by using the provided [schematic](resources/v1.0-schematic.pdf) and [interactive BOM](https://loudnl.github.io/).
