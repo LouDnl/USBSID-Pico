@@ -35,13 +35,14 @@ set(PROJECT_VERSION "0.2.2-BETA.${MAGIC_SMOKE}")  # Must be the same as in confi
 ### Want a cookie?
 # NOTICE: ENABLING THESE DEBUGGING DEFINITIONS WILL HAVE SIGNIFICANT IMPACT AND WILL DELAY PLAYING!
 if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
-  set(USBSID_DEBUGGING 1)   # Enable UART ~ mandatory enable for all other logging types
-  set(MEMORY_LOGGING 0)     # Enable memory map of SID 1 voices printing
-  set(DEFAULT_DEBUGGING 1)  # Enable debugging in usbsid.c
-  set(USBIO_DEBUGGING 0)    # Enable debugging in usbsid.c
-  set(CONFIG_DEBUGGING 1)   # Enable debugging in config.c
-  set(GPIOBUS_DEBUGGING 0)  # Enable debugging in gpio.c
-  set(MIDI_DEBUGGING 0)     # Enable debugging in midi.c
+  set(USBSID_DEBUGGING 1)     # Enable UART ~ mandatory enable for all other logging types
+  set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
+  set(DEFAULT_DEBUGGING 1)    # Enable debugging in usbsid.c
+  set(USBIO_DEBUGGING 0)      # Enable debugging in usbsid.c
+  set(CONFIG_DEBUGGING 1)     # Enable debugging in config.c
+  set(GPIOBUS_DEBUGGING 0)    # Enable debugging in gpio.c
+  set(MIDI_DEBUGGING 0)       # Enable debugging in midi.c
+  set(MIDIVOICE_DEBUGGING 0)  # Enable debugging in midi.c
 endif()
 
 
@@ -198,12 +199,12 @@ list(APPEND PICOTYPES
   "LED"
 )
 if(${PICO_BOARD} STREQUAL "pico")
-list(APPEND FILENAMES
-  ${PROJECT_FILENAME}-rgb
-)
-list(APPEND PICOTYPES
+  list(APPEND FILENAMES
+    ${PROJECT_FILENAME}-rgb
+  )
+  list(APPEND PICOTYPES
     "RGB"
-)
+  )
 endif()
 
 ### Source files to compile
