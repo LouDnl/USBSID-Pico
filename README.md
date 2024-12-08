@@ -94,8 +94,8 @@ See the [firmware changelog](CHANGELOG.md) for more information on what's change
 ### Firmware versions
 Use `usbsidpico.uf2` for Pico1 regular green rp2040 Pico boards.  
 Use `usbsidpico-rgb.uf2` for Pico1 black clone rp2040 Pico boards with RGB LED onboard.  
-Use `usbsidpico_w.uf2` for PicoW regular green rp2040 Pico boards.  
-Use `usbsidpico2.uf2` for Pico2 regular green rp2040 Pico boards.  
+Use `usbsidpico_w.uf2` for PicoW regular green rp2040 PicoW boards.  
+Use `usbsidpico2.uf2` for Pico2 regular green rp2350 Pico2 boards.  
 **WARNING!** Do _NOT_ use the RGB firmware for any of the (non black) rp2040 or rp2350 Pico boards that do not contain an RGB LED.
 ### How to flash
 A Raspberry Pi Pico board is incredibly easy to flash, as it comes with a built in bootloader for flashing new firmwares in the `uf2` format. 
