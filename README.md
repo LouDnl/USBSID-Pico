@@ -148,9 +148,8 @@ Click [this link](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/) to
 #### PCBWay
 At a minimum of 5 bare or assembled boards it is also possible to purchase at [PCBWay here](https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html).  
 #### Me (while I still have boards)
-While still available you can purchase assembled boards minus Pico can be purchased from me - send me a message on any of my socials.  
+While still available you can purchase assembled boards minus Pico from me - send me a message on any of my socials.  
 
-I am currently negotiating the possibility for the boards to be purchasable at an online store here in NL. 
 ### Schematic and BOM
 If you want and are up to it you can create your own development board by using the provided [schematic](resources/v1.0-schematic.pdf) and [interactive BOM](https://loudnl.github.io/).
 ### PCB Features ~ v1.0
