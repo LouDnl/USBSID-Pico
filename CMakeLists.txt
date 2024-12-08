@@ -29,8 +29,8 @@ cmake_minimum_required(VERSION 3.17)
 set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
-set(MAGIC_SMOKE "20241120")
-set(PROJECT_VERSION "0.2.2-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
+set(MAGIC_SMOKE "20241208")
+set(PROJECT_VERSION "0.2.3-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
 
 ### Want a cookie?
 # NOTICE: ENABLING THESE DEBUGGING DEFINITIONS WILL HAVE SIGNIFICANT IMPACT AND WILL DELAY PLAYING!
@@ -67,8 +67,15 @@ endif()
 if(DEFINED PICO_PLATFORM)
   message("PICO_PLATFORM is defined as ${PICO_PLATFORM}")
 else()
-  message("PICO_PLATFORM not defined, defaulting to 'rp2040'")
-  set(PICO_PLATFORM rp2040)
+  if(DEFINED PICO_BOARD)
+    if(PICO_BOARD STREQUAL "pico2")
+      set(PICO_PLATFORM rp2350)
+      message("PICO_PLATFORM not defined, board is ${PICO_BOARD} setting PICO_PLATFORM to ${PICO_PLATFORM}")
+    endif()
+  else()
+    message("PICO_PLATFORM not defined, defaulting to 'rp2040'")
+    set(PICO_PLATFORM rp2040)
+  endif()
 endif()
 
 ### Target product & output filename
