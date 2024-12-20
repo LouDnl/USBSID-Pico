@@ -35,6 +35,8 @@
 /* Default includes */
 #include <stdint.h>
 
+/* Helper macro for constraining a value within a range */
+#define constrain(amt,low,high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
 
 /* USBSID command byte */
 enum
@@ -43,9 +45,11 @@ enum
   READ,           /* 1 */
   PAUSE,          /* 2 */
   RESET_SID,      /* 3 */
-  RESET_MCU,      /* 4 */
-  CLEAR_BUS,      /* 5 */
-  BOOTLOADER,     /* 6 */
+  DISABLE_SID,    /* 4 */
+  ENABLE_SID,     /* 5 */
+  CLEAR_BUS,      /* 6 */
+  RESET_MCU,      /* 7 */
+  BOOTLOADER,     /* 8 */
 };
 
 /* USB data type */
