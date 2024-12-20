@@ -38,10 +38,20 @@ extern int sock_one, sock_two, sids_one, sids_two, numsids, act_as_one;
 
 /* Init vars */
 PIO bus_pio = pio0;
-uint sm_control, sm_data, offset_control, offset_data;
-int dma_tx_control, dma_tx_data, dma_rx_data;
-uint16_t control_word;
-uint32_t data_word, read_data, dir_mask;
+static uint sm_control, offset_control;
+static uint sm_data, offset_data;
+static uint sm_clock, offset_clock;
+static int dma_tx_control, dma_tx_data, dma_rx_data;
+static uint16_t control_word;
+static uint32_t data_word, read_data, dir_mask;
+
+/* Read GPIO macro
+ *
+ * The following 2 lines (var naming changed) are copied from SKPico code by frenetic
+ * see: https://github.com/frntc/SIDKick-pico
+ */
+register uint32_t b asm( "r10" );
+volatile const uint32_t *BUSState = &sio_hw->gpio_in;
 
 
 void init_gpio()
@@ -93,25 +103,29 @@ void init_vu(void)
 
 void setup_piobus(void)
 {
-  /* float freq = (float)clock_get_hz(clk_sys) / (usbsid_config.clock_rate * 8) / 2; */  /* Clock frequency is 8 times the SID clock */
+  float freq = (float)clock_get_hz(clk_sys) / (usbsid_config.clock_rate * 32) / 2;  /* Clock frequency is 32 times the SID clock */
+  CFG("[BUS CLK INIT] START\n");
+  CFG("[PI CLK]@%dMHz [DIV]@%.2f [BUS CLK]@%.2f [CFG SID CLK]%d\n", ((int)clock_get_hz(clk_sys) / 1000 / 1000), freq, ((float)clock_get_hz(clk_sys) / freq / 2), (int)usbsid_config.clock_rate);
 
   { /* control bus */
     offset_control = pio_add_program(bus_pio, &bus_control_program);
-    sm_control = pio_claim_unused_sm(bus_pio, true);
+    sm_control = 1;  /* PIO0 SM1 */
+    pio_sm_claim(bus_pio, sm_control);
     for (uint i = RW; i < CS2 + 1; ++i)
       pio_gpio_init(bus_pio, i);
     pio_sm_config c_control = bus_control_program_get_default_config(offset_control);
     sm_config_set_out_pins(&c_control, RW, 3);
     sm_config_set_in_pins(&c_control, D0);
     sm_config_set_jmp_pin(&c_control, RW);
-    /* sm_config_set_clkdiv(&c_control, freq); */
+    sm_config_set_clkdiv(&c_control, freq);
     pio_sm_init(bus_pio, sm_control, offset_control, &c_control);
     pio_sm_set_enabled(bus_pio, sm_control, true);
   }
 
   { /* databus */
     offset_data = pio_add_program(bus_pio, &data_bus_program);
-    sm_data = pio_claim_unused_sm(bus_pio, true);
+    sm_data = 2;  /* PIO0 SM2 */
+    pio_sm_claim(bus_pio, sm_data);
     for (uint i = D0; i < A5 + 1; ++i) {
       pio_gpio_init(bus_pio, i);
     }
@@ -119,20 +133,21 @@ void setup_piobus(void)
     pio_sm_set_pindirs_with_mask(bus_pio, sm_data, PIO_PINDIRMASK, PIO_PINDIRMASK);  /* WORKING */
     sm_config_set_out_pins(&c_data, D0, A5 + 1);
     sm_config_set_fifo_join(&c_data, PIO_FIFO_JOIN_TX);
-    /* sm_config_set_clkdiv(&c_data, freq); */
+    sm_config_set_clkdiv(&c_data, freq);
     pio_sm_init(bus_pio, sm_data, offset_data, &c_data);
     pio_sm_set_enabled(bus_pio, sm_data, true);
   }
+
+  CFG("[BUS CLK INIT] FINISHED\n");
 }
 
 void setup_dmachannels(void)
-{
+{ /* NOTE: Fo not manually assign DMA channels, this causes a Panic on the  PicoW */
+  CFG("[DMA CHANNELS INIT] START\n");
   { /* dma controlbus */
     dma_tx_control = dma_claim_unused_channel(true);
     dma_channel_config tx_config_control = dma_channel_get_default_config(dma_tx_control);
     channel_config_set_transfer_data_size(&tx_config_control, DMA_SIZE_16);
-    channel_config_set_read_increment(&tx_config_control, true);
-    channel_config_set_write_increment(&tx_config_control, false);
     channel_config_set_dreq(&tx_config_control, pio_get_dreq(bus_pio, sm_control, true));
     dma_channel_configure(dma_tx_control, &tx_config_control, &bus_pio->txf[sm_control], NULL, 1, false);
   }
@@ -156,10 +171,25 @@ void setup_dmachannels(void)
     channel_config_set_dreq(&rx_config, pio_get_dreq(bus_pio, sm_control, false));
     dma_channel_configure(dma_rx_data, &rx_config, NULL, &bus_pio->rxf[sm_control], 1, false);
   }
+
+  CFG("[DMA CHANNELS INIT] FINISHED\n");
 }
+
+void sync_pios(void)
+{ /* Sync PIO's */
+  #if PICO_PIO_VERSION == 0
+  CFG("[RESTART PIOS] Pico & Pico_w\n");
+  pio_sm_restart(bus_pio, 0b111);
+  #elif PICO_PIO_VERSION > 0  // NOTE: rp2350 only
+  CFG("[SYNC PIOS] Pico2\n");
+  pio_clkdiv_restart_sm_multi_mask(bus_pio, 0 /* 0b111 */, 0b111, 0);
+  #endif
+}
+
 
 void restart_bus(void)
 {
+  CFG("[RESTART BUS START]\n");
   /* disable databus rx dma */
   dma_channel_unclaim(dma_rx_data);
   /* disable databus tx dma */
@@ -178,6 +208,47 @@ void restart_bus(void)
   setup_piobus();
   /* start dma */
   setup_dmachannels();
+  /* sync pios */
+  sync_pios();
+  CFG("[RESTART BUS END]\n");
+}
+
+/* Detect clock signal */
+int detect_clocksignal(void)
+{
+  CFG("[DETECT CLOCK] START\n");
+  int c = 0, r = 0;
+  gpio_init(PHI);
+  gpio_set_pulls(PHI, false, true);
+  for (int i = 0; i < 20; i++) {
+    b = *BUSState; /* read complete bus */
+    // DBG("[BUS]0x%"PRIu32", 0b"PRINTF_BINARY_PATTERN_INT32"", b, PRINTF_BYTE_TO_BINARY_INT32(b));
+    r |= c = (b & bPIN(PHI)) >> PHI;
+    // DBG(" [PHI2]%d [R]%d\r\n", c, r);
+  }
+  CFG("[RESULT] %d: %s\n", r, (r == 0 ? "INTERNAL CLOCK" : "EXTERNAL CLOCK"));
+  CFG("[DETECT CLOCK] END\n");
+  return r;  /* 1 if clock detected */
+}
+
+/* Init nMHz square wave output */
+void init_sidclock(void)
+{
+  float freq = (float)clock_get_hz(clk_sys) / usbsid_config.clock_rate / 2;
+  CFG("[SID CLK INIT] START\n");
+  CFG("[PI CLK]@%dMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n", (int)clock_get_hz(clk_sys) / 1000 / 1000, freq, ((float)clock_get_hz(clk_sys) / freq / 2), (int)usbsid_config.clock_rate);
+  offset_clock = pio_add_program(bus_pio, &clock_program);
+  sm_clock = 0;  /* PIO0 SM0 */
+  pio_sm_claim(bus_pio, sm_clock);
+  clock_program_init(bus_pio, sm_clock, offset_clock, PHI, freq);
+  CFG("[SID CLK INIT] FINISHED\n");
+}
+
+/* De-init nMHz square wave output */
+void deinit_sidclock(void)
+{
+  CFG("[DE-INIT CLOCK]\n");
+  clock_program_deinit(bus_pio, sm_clock, offset_clock, clock_program);
 }
 
 uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data)
@@ -274,9 +345,13 @@ void pause_sid(void)
 
 void reset_sid(void)
 {
-  disable_sid();
+  /* disable_sid();
   clear_bus();
-  enable_sid();
+  enable_sid(); */
+  gpio_put(CS1, 1);
+  gpio_put(CS2, 1);
+  gpio_put(RES, 0);
+  gpio_put(RES, 1);
 }
 
 void clear_sid_registers(void)
