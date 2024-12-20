@@ -44,9 +44,10 @@
 
 /* Pico libs */
 #include "pico/stdlib.h"
-#include "pico/types.h"     /* absolute_time_t */
-#include "pico/multicore.h" /* Multicore */
-#include "pico/sem.h"       /* Semaphores */
+#include "pico/types.h"       /* absolute_time_t */
+#include "pico/multicore.h"   /* Multicore */
+#include "pico/sem.h"         /* Semaphores */
+#include "pico/util/queue.h"  /* Inter core queue */
 
 /* Hardware api's */
 #include "hardware/clocks.h"
@@ -72,8 +73,7 @@
 #include "tusb.h"            /* Tiny USB stack */
 #include "tusb_config.h"     /* Tiny USB configuration */
 
-/* PIO */
-#include "clock.pio.h"       /* Square wave generator */
+/* RGBLED */
 #if defined(USE_RGB)
 #include "ws2812.pio.h"      /* RGB led handler */
 #endif
