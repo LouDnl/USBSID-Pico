@@ -39,6 +39,7 @@
 /* GPIO externals */
 extern uint8_t bus_operation(uint8_t command, uint8_t address, uint8_t data);
 extern void pause_sid(void);
+extern void reset_sid(void);
 
 /* Well, it does what it does */
 void handle_asid_message(uint8_t sid, uint8_t* buffer, int size)
@@ -66,26 +67,27 @@ void handle_asid_message(uint8_t sid, uint8_t* buffer, int size)
 void decode_asid_message(uint8_t* buffer, int size)
 {
   switch(buffer[2]) {
-    case 0x4C:
-      /* Play start */
+    case 0x4C:  /* Play start */
       midimachine.bus = CLAIMED;
       break;
-    case 0x4D:
-      /* Play stop */
+    case 0x4D:  /* Play stop */
+      reset_sid();
       pause_sid();
       midimachine.bus = FREE;
       break;
-    case 0x4F:
-      /* Display characters */
+    case 0x4F:  /* Display characters */
       break;
-    case 0x4E:
+    case 0x4E:  /* SID 1 */
       handle_asid_message(0, buffer, size);
       break;
-    case 0x50:
+    case 0x50:  /* SID 2 */
       handle_asid_message(32, buffer, size);
       break;
-    case 0x51:
+    case 0x51:  /* SID 3 */
       handle_asid_message(64, buffer, size);
+      break;
+    case 0x52:  /* SID 4 */
+      handle_asid_message(96, buffer, size);
       break;
     case 0x60:
       midimachine.fmopl = 1;  /* Not implemented yet */
