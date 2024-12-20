@@ -22,6 +22,24 @@
 ; along with this program. If not, see <http://www.gnu.org/licenses/>.
 ;
 
+; BUS clock = 32 * SID clock
+; Example:
+; 32MHz BUS clock @ 1MHz SID clock
+; 32MHZ is 0.03125µs per cycle
+; 32MHZ is 31.25ns per cycle
+; 1MHz is 1µs per cycle
+; 1MHz is 1000ns per cycle
+; A 1MHz/1µs SID cycle _should_ contain 32 BUS cycles
+; This _should_ mean that 1 command or NOP == 31.25ns
+;
+; Except?
+; nop 26 waits 15 cycles to and including out pins
+; nop 25 waits 15 cycles to and including out pins
+; nop 24 waits 14 cycles to and including out pins
+; nop 14 waits 9 cycles to and including out pins
+; so 10 nops is 5 cycles? WTF!?
+;
+
 .define PUBLIC PHI 22
 
 ; Bus control program
@@ -29,20 +47,15 @@
 .wrap_target
     pull block              ; Pull data from FIFO
     wait 1 gpio PHI         ; Wait for clock to go high
-    wait 0 gpio PHI         ; Wait for clock to go low
-    nop [31]                ; Wait for ~103ns
+    wait 0 gpio PHI    [26] ; Wait for clock to go low
     out pins, 3             ; Set control pins (19-21)
-    wait 1 gpio PHI         ; Wait for clock to go high
-    nop [31]                ; Wait for ~103ns
+    wait 1 gpio PHI    [24] ; Wait for clock to go high
     jmp pin read            ; Jump to read if IN pin is high
-    nop [9]                 ; Wait for ~30ns
     jmp done                ; Jump to done
 read:
-    nop [31]
     in pins, 8              ; Read data bus into isr
     push block              ; Push isr to fifo
 done:
-    nop [9]                 ; Wait for ~30ns
     wait 0 gpio PHI         ; Wait for clock to go low
     out pins, 3             ; Set control to next 3 bits from fifo
 .wrap
@@ -50,14 +63,11 @@ done:
 ; Data and address bus program
 .program data_bus
 .wrap_target
-    pull block       ; Pull data from FIFO
-    wait 1 gpio PHI  ; Wait for clock to go high
-    wait 0 gpio PHI  ; Wait for clock to go low
-    nop [31]         ; Wait for ~103ns
-    out pins, 16     ; Set data bus pins
-    out pindirs 16   ; Set pin directions
-    wait 1 gpio PHI  ; Wait for clock to go high
-    nop [31]         ; Wait for ~103ns
-    nop [31]         ; Wait for ~103ns
-    nop [9]          ; Wait for ~30ns
+    pull block            ; Pull data from FIFO
+    wait 1 gpio PHI       ; Wait for clock to go high
+    wait 0 gpio PHI [26]  ; Wait for clock to go low and throw in some nops
+    out pins, 16          ; Set data bus pins
+    out pindirs 16        ; Set pin directions
+    wait 1 gpio PHI       ; Wait for clock to go high
+    wait 0 gpio PHI       ; Wait for clock to go low
 .wrap
