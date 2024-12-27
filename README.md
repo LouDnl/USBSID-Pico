@@ -12,6 +12,7 @@ USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2 (RP2350) based board for interf
 * [Hardware](#hardware)
   * [Where to buy](#where-to-buy)
   * [Schematic and BOM](#schematic-and-bom)
+  * [Cases](#cases)
 * [Important PCB information](#important-pcb-information)
 * [PCB in action](#usbsid-pico-in-action)
 * [Software examples](#software)
@@ -176,6 +177,10 @@ If you want and are up to it you can create your own development board by using 
   <img src="images/v0.2-top.png" width="30%">
 * v0.1 testboard<br>
   <img src="images/v0.1-top.png" width="30%">  
+
+## Cases
+All USBSID-Pico community created cases are available in the [cases](cases/) folder, direct links below.
+* [Cartridge case](cases/spotUP/USBSID-Pico_Case.zip) by @spotUP
 
 ## Important PCB information
 [<img src="images/v1.0-explained.png" width="30%">](images/v1.0-explained.png)<br/>
