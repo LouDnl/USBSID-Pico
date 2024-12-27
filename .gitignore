@@ -13,6 +13,7 @@
 !*.pdf
 !*.html
 !*.yml
+!*.zip
 
 # specific files
 !.gitignore
@@ -32,6 +33,8 @@
 !examples/sidberry
 !examples/vice
 !examples/hardsid-sidblaster
+!cases
+!cases/**
 
 # folder contents
 !examples/hardsid-sidblaster/**
