@@ -40,9 +40,13 @@ uint8_t waveforms[4] = { 16, 32, 64, 128 };
 uint8_t detect_sid_version(uint8_t start_addr)  /* Not working on real SIDS!? */
 {
   bus_operation(0x10, (start_addr + 0x12), 0xFF);  /* Set testbit in voice 3 control register to disable oscillator */
+  sleep_ms(1);
   bus_operation(0x10, (start_addr + 0x0E), 0xFF);  /* Set frequency in voice 3 to $ffff */
+  sleep_ms(1);
   bus_operation(0x10, (start_addr + 0x0F), 0xFF);  /* Set frequency in voice 3 to $ffff */
+  sleep_ms(1);
   bus_operation(0x10, (start_addr + 0x12), 0x20);  /* Set Sawtooth wave and gatebit OFF to start oscillator again */
+  sleep_ms(1);
   uint8_t sidtype = bus_operation(0x11, (start_addr + 0x1B), 0x00);  /* Accu now has different value depending on sid model (6581=3/8580=2) */
   return sidtype;  /* that is: Carry flag is set for 6581, and clear for 8580. */
 }

@@ -29,7 +29,7 @@ cmake_minimum_required(VERSION 3.17)
 set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
-set(MAGIC_SMOKE "20241208")
+set(MAGIC_SMOKE "20241220")
 set(PROJECT_VERSION "0.2.3-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
 
 ### Want a cookie?
@@ -224,6 +224,7 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/sid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/mcu.c
   ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/util.c
 )
 
 ### Libraries to link
@@ -245,6 +246,7 @@ set(TARGET_LL
   pico_stdlib
   pico_unique_id
   pico_usb_reset_interface
+  pico_async_context_threadsafe_background
   tinyusb_device
   tinyusb_board
 )

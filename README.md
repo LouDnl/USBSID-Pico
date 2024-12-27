@@ -12,6 +12,7 @@ USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2 (RP2350) based board for interf
 * [Hardware](#hardware)
   * [Where to buy](#where-to-buy)
   * [Schematic and BOM](#schematic-and-bom)
+  * [Cases](#cases)
 * [Important PCB information](#important-pcb-information)
 * [PCB in action](#usbsid-pico-in-action)
 * [Software examples](#software)
@@ -94,8 +95,8 @@ See the [firmware changelog](CHANGELOG.md) for more information on what's change
 ### Firmware versions
 Use `usbsidpico.uf2` for Pico1 regular green rp2040 Pico boards.  
 Use `usbsidpico-rgb.uf2` for Pico1 black clone rp2040 Pico boards with RGB LED onboard.  
-Use `usbsidpico_w.uf2` for PicoW regular green rp2040 Pico boards.  
-Use `usbsidpico2.uf2` for Pico2 regular green rp2040 Pico boards.  
+Use `usbsidpico_w.uf2` for PicoW regular green rp2040 PicoW boards.  
+Use `usbsidpico2.uf2` for Pico2 regular green rp2350 Pico2 boards.  
 **WARNING!** Do _NOT_ use the RGB firmware for any of the (non black) rp2040 or rp2350 Pico boards that do not contain an RGB LED.
 ### How to flash
 A Raspberry Pi Pico board is incredibly easy to flash, as it comes with a built in bootloader for flashing new firmwares in the `uf2` format. 
@@ -176,6 +177,10 @@ If you want and are up to it you can create your own development board by using 
   <img src="images/v0.2-top.png" width="30%">
 * v0.1 testboard<br>
   <img src="images/v0.1-top.png" width="30%">  
+
+## Cases
+All USBSID-Pico community created cases are available in the [cases](cases/) folder, direct links below.
+* [Cartridge case](cases/spotUP/USBSID-Pico_Case.zip) by @spotUP
 
 ## Important PCB information
 [<img src="images/v1.0-explained.png" width="30%">](images/v1.0-explained.png)<br/>

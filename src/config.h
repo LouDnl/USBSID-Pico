@@ -55,7 +55,7 @@
 #define MAGIC_SMOKE 19700101  /* DATEOFRELEASE */
 #endif
 #ifndef PROJECT_VERSION
-#define PROJECT_VERSION "0.2.3-BETA.20241208"  /* Must be the same as in CMakeLists.txt */
+#define PROJECT_VERSION "0.2.3-BETA.20241220"  /* Must be the same as in CMakeLists.txt */
 #endif
 
 #ifdef PICO_DEFAULT_LED_PIN
@@ -78,14 +78,20 @@ typedef struct Config {
   struct
   {
     bool    enabled : 1;       /* enable / disable this socket */
-    bool    dualsid : 1;       /* enable / disable dual SID support for this socket */
-    uint8_t sidtype;           /* 0 = empty, 1 = SKPico or other clone, 2 = MOS6581, 3 = MOS8085 */
+    bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
+    uint8_t chiptype;          /* 0 = real, 1 = clone */
+    uint8_t clonetype;         /* 0 = disabled, 1 = SKPico, 2 = ARMSID, 3 = FPGASID, 4 = other */
+    uint8_t sid1type;          /* 0 = unknown, 1 = n/a, 2 = MOS8085, 3 = MOS6581 */
+    uint8_t sid2type;          /* 0 = unknown, 1 = FMopl, 2 = MOS8085, 3 = MOS6581 */
   } socketOne;                 /* 1 */
   struct {
     bool    enabled : 1;       /* enable / disable this socket */
-    bool    dualsid : 1;       /* enable / disable dual SID support for this socket */
+    bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
     bool    act_as_one : 1;    /* act as socket 1 */
-    uint8_t sidtype;           /* 0 = empty, 1 = SKPico or other clone, 2 = MOS6581, 3 = MOS8085 */
+    uint8_t chiptype;          /* 0 = real, 1 = clone */
+    uint8_t clonetype;         /* 0 = disabled, 1 = SKPico, 2 = ARMSID, 3 = FPGASID, 4 = other */
+    uint8_t sid1type;          /* 0 = unknown, 1 = n/a, 2 = MOS8085, 3 = MOS6581 */
+    uint8_t sid2type;          /* 0 = unknown, 1 = FMopl, 2 = MOS8085, 3 = MOS6581 */
   } socketTwo;                 /* 2 */
   struct {
     bool enabled : 1;

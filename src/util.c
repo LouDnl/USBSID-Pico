@@ -3,7 +3,7 @@
  * MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer,
  * phone or ASID supporting player
  *
- * globals.h
+ * util.c
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
@@ -23,50 +23,16 @@
  *
  */
 
-#ifndef _USBSIDGLOBALS_H_
-#define _USBSIDGLOBALS_H_
-#pragma once
+/* Pico libs */
+#include <stdlib.h>
+#include "pico/stdlib.h"
 
-#ifdef __cplusplus
-  extern "C" {
-#endif
-
-
-/* Default includes */
-#include <stdint.h>
-
-/* Helper macro for constraining a value within a range */
-#define constrain(amt,low,high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
-
-/* USBSID command byte */
-enum
+int randval(int min, int max)
 {
-  WRITE = 0,      /* 0 */
-  READ,           /* 1 */
-  PAUSE,          /* 2 */
-  RESET_SID,      /* 3 */
-  DISABLE_SID,    /* 4 */
-  ENABLE_SID,     /* 5 */
-  CLEAR_BUS,      /* 6 */
-  RESET_MCU,      /* 7 */
-  BOOTLOADER,     /* 8 */
-};
+  return min + rand() / (RAND_MAX / (max - min + 1) + 1);
+}
 
-/* USB data type */
-extern char dtype, ntype, cdc, asid, midi, wusb;
-
-/* WebUSB globals */
-#define URL  "/github.com/LouDnl/USBSID-Pico"
-enum
+long map(long x, long in_min, long in_max, long out_min, long out_max)
 {
-  VENDOR_REQUEST_WEBUSB = 1,
-  VENDOR_REQUEST_MICROSOFT = 2
-};
-extern uint8_t const desc_ms_os_20[];
-
-
-#ifdef __cplusplus
-  }
-#endif
-
-#endif /* _USBSIDGLOBALS_H_ */
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}

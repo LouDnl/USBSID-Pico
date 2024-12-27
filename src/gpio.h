@@ -54,7 +54,7 @@
 
 /* PIO */
 #include "bus_control.pio.h" /* Busje komt zo! */
-
+#include "clock.pio.h"       /* Square wave generator */
 
 /* Uart */
 #define BAUD_RATE 115200

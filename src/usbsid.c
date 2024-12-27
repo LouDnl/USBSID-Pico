@@ -31,22 +31,26 @@
 #include "sid.h"
 #include "logging.h"
 
+/* util.c */
+extern long map(long x, long in_min, long in_max, long out_min, long out_max);
+extern int randval(int min, int max);
 
 /* Init external vars */
 static semaphore_t core1_init;
 
 /* Init vars */
+uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] = {0}; /* 4x max */
 uint8_t __not_in_flash("usbsid_buffer") read_buffer[MAX_BUFFER_SIZE];
 uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE];
 int usb_connected = 0, usbdata = 0, pwm_value = 0, updown = 1;
 uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
-uint sm_clock, offset_clock;
-uint8_t *cdc_itf, *wusb_itf;
-uint16_t vu;
+uint8_t *cdc_itf = 0, *wusb_itf = 0;
+uint16_t vu = 0;
 uint32_t breathe_interval_ms = BREATHE_INTV;
 uint32_t start_ms = 0;
 char ntype = '0', dtype = '0', cdc = 'C', asid = 'A', midi = 'M', wusb = 'W';
 bool web_serial_connected = false;
+double /* cpu_mhz = 0, cpu_us = 0, */ clk_rate = 0, sidfrq = 0, frqpow = 0;
 
 /* Init var pointers for external use */
 uint8_t (*write_buffer_p)[MAX_BUFFER_SIZE] = &write_buffer;
@@ -64,14 +68,18 @@ extern void detect_default_config(void);
 extern void verify_clockrate(void);
 
 /* GPIO externals */
-extern PIO bus_pio;
 extern void init_gpio(void);
 extern void init_vu(void);
 extern void setup_piobus(void);
 extern void setup_dmachannels(void);
+extern void sync_pios(void);
+extern void init_sidclock(void);
+extern int detect_clocksignal(void);
 extern void pause_sid(void);
-extern void disable_sid(void);
 extern void reset_sid(void);
+extern void enable_sid(void);
+extern void disable_sid(void);
+extern void clear_bus(void);
 extern uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data);
 
 /* MCU externals */
@@ -139,14 +147,6 @@ const __not_in_flash("usbsid_data") unsigned char color_LUT[43][6][3] =
 };
 #endif
 
-/* Read GPIO macro
- *
- * The following 2 lines (var naming changed) are copied from SKPico code by frenetic
- * see: https://github.com/frntc/SIDKick-pico
- */
-register uint32_t b asm( "r10" );
-volatile const uint32_t *BUSState = &sio_hw->gpio_in;
-
 /* WebUSB Description URL */
 static const tusb_desc_webusb_url_t desc_url =
 {
@@ -171,32 +171,6 @@ void reset_reason(void)
   if(*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_PSM_RESTART_BITS)
     DBG("[RESET] Caused by debug port\n");
 #endif
-}
-
-/* Detect clock signal */
-int detect_clock(void)
-{
-  int c = 0, r = 0;
-  gpio_init(PHI);
-  gpio_set_pulls(PHI, false, true);
-  for (int i = 0; i < 20; i++) {
-    b = *BUSState; /* read complete bus */
-    DBG("[BUS]0x%"PRIu32", 0b"PRINTF_BINARY_PATTERN_INT32"", b, PRINTF_BYTE_TO_BINARY_INT32(b));
-    r |= c = (b & bPIN(PHI)) >> PHI;
-    DBG(" [PHI2]%d [R]%d\r\n", c, r);
-  }
-  DBG("[RESULT]%d\r\n", r);
-  return r;  /* 1 if clock detected */
-}
-
-int randval(int min, int max)
-{
-  return min + rand() / (RAND_MAX / (max - min + 1) + 1);
-}
-
-long map(long x, long in_min, long in_max, long out_min, long out_max)
-{
-  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
 #if defined(USE_RGB)
@@ -230,22 +204,6 @@ void init_logging(void)
   #endif
 }
 
-/* Init nMHz square wave output */
-void init_sidclock(void)
-{
-  float freq = (float)clock_get_hz(clk_sys) / usbsid_config.clock_rate / 2;
-  offset_clock = pio_add_program(bus_pio, &clock_program);
-  sm_clock = pio_claim_unused_sm(bus_pio, true);
-  clock_program_init(bus_pio, sm_clock, offset_clock, PHI, freq);
-  DBG("[CLK INIT] [PI CLK]@%dMHz [DIV]@%.2f [SID CLK]@%.2f [CFG]%d\n", (int)clock_get_hz(clk_sys) / 1000 / 1000, freq, ((float)clock_get_hz(clk_sys) / freq / 2), (int)usbsid_config.clock_rate);
-}
-
-/* De-init nMHz square wave output */
-void deinit_sidclock(void)
-{
-  clock_program_deinit(bus_pio, sm_clock, offset_clock, clock_program);
-}
-
 /* Init the RGB LED pio */
 void init_rgb(void)
 {
@@ -253,7 +211,8 @@ void init_rgb(void)
   _rgb = randval(0, 5);
   r_ = g_ = b_ = 0;
   offset_ws2812 = pio_add_program(pio_rgb, &ws2812_program);
-  ws2812_sm = pio_claim_unused_sm(pio_rgb, true);
+  ws2812_sm = 0;  /* PIO1 SM0 */
+  pio_sm_claim(pio_rgb, ws2812_sm);
   ws2812_program_init(pio_rgb, ws2812_sm, offset_ws2812, 23, 800000, IS_RGBW);
   put_pixel(urgb_u32(0,0,0));
   #endif
@@ -291,6 +250,7 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
       read_buffer[1] = read_buffer[2];
       read_buffer[2] = read_buffer[3];
     case BYTES_EXPECTED:
+      usbdata = 1;
       IODBG("[%c][I]$%02x $%02x $%02x[RE]\r\n", dtype, read_buffer[0], read_buffer[1], read_buffer[2]);
       switch (read_buffer[0]) {
         case WRITE:
@@ -318,6 +278,18 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
           DBG("[RESET_SID]\n");
           reset_sid();
           break;
+        case DISABLE_SID:
+          DBG("[DISABLE_SID]\n");
+          disable_sid();
+          break;
+        case ENABLE_SID:
+          DBG("[ENABLE_SID]\n");
+          enable_sid();
+          break;
+        case CLEAR_BUS:
+          DBG("[CLEAR_BUS]\n");
+          clear_bus();
+          break;
         case RESET_MCU:
           DBG("[RESET_MCU]\n");
           mcu_reset();
@@ -336,10 +308,16 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
       CFG("\r\n");
       handle_config_request(read_buffer);
       break;
-    case MAX_BUFFER_SIZE: /* No implementation yet */
-      IODBG("[%c][MAX %d]", dtype, *n);
-      for (int i = 0; i < *n; i ++) IODBG("$%02x ", read_buffer[i]);
-      IODBG("\r\n");
+    case MAX_BUFFER_SIZE: /* Cycled write buffer */
+      // ISSUE: Not perfect yet!
+      usbdata = 1;
+      for (int i = 0; i < *n; i += 4) {
+        uint16_t cycles = (read_buffer[i + 2] | read_buffer[i + 3]);
+        uint64_t sleep_time = ((double)cycles * frqpow);
+        /* uint32_t delay_cycles = (sleep_time / cpu_us) - 3; */
+        sleep_us(sleep_time - 2);
+        bus_operation(0x10, read_buffer[i], read_buffer[i + 1]);
+      }
       break;
     default:
       /* Nope not gonna handle that shit, just log it */
@@ -446,11 +424,12 @@ void led_vumeter_task(void)
       pwm_set_gpio_level(BUILTIN_LED, vu);
     }
 
-    MDBG("[%c:%d] [VOL]$%02x [PWM]$%04x | [V1] $%02X%02X %02X%02X %02X %02X %02X | [V2] $%02X%02X %02X%02X %02X %02X %02X | [V3] $%02X%02X %02X%02X %02X %02X %02X \n",
-      dtype, usbdata, sid_memory[0x18], vu,
-      sid_memory[0x00], sid_memory[0x01], sid_memory[0x02], sid_memory[0x03], sid_memory[0x04], sid_memory[0x05], sid_memory[0x06],
-      sid_memory[0x07], sid_memory[0x08], sid_memory[0x09], sid_memory[0x0A], sid_memory[0x0B], sid_memory[0x0C], sid_memory[0x0D],
-      sid_memory[0x0E], sid_memory[0x0F], sid_memory[0x10], sid_memory[0x11], sid_memory[0x12], sid_memory[0x13], sid_memory[0x14]);
+    MDBG("[%c:%d][PWM]$%04x[V1]$%02X%02X$%02X%02X$%02X$%02X$%02X[V2]$%02X%02X$%02X%02X$%02X$%02X$%02X[V3]$%02X%02X$%02X%02X$%02X$%02X$%02X[FC]$%02x%02x$%02x[VOL]$%02x\n",
+      dtype, usbdata, vu,
+      sid_memory[0x01], sid_memory[0x00], sid_memory[0x03], sid_memory[0x02], sid_memory[0x04], sid_memory[0x05], sid_memory[0x06],
+      sid_memory[0x08], sid_memory[0x07], sid_memory[0x0A], sid_memory[0x09], sid_memory[0x0B], sid_memory[0x0C], sid_memory[0x0D],
+      sid_memory[0x0F], sid_memory[0x0E], sid_memory[0x11], sid_memory[0x10], sid_memory[0x12], sid_memory[0x13], sid_memory[0x14],
+      sid_memory[0x16], sid_memory[0x15], sid_memory[0x17], sid_memory[0x18]);
 
   }
   #endif
@@ -614,9 +593,9 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
   (void)buffer;
   (void)bufsize;
 
-  usbdata = 1, dtype = wusb;
   if (web_serial_connected) { /* vendor class has no connect check, thus use this */
     wusb_itf = &itf;
+    usbdata = 1, dtype = wusb;
     webread = tud_vendor_n_read(*wusb_itf, &read_buffer, MAX_BUFFER_SIZE);
     tud_vendor_n_read_flush(*wusb_itf);
     handle_buffer_task(wusb_itf, &webread);
@@ -692,7 +671,7 @@ void core1_main(void)
   /* Apply saved config to used vars */
   apply_config();
   /* Detect optional external crystal */
-  if (detect_clock() == 0) {
+  if (detect_clocksignal() == 0) {
     usbsid_config.external_clock = false;
     gpio_deinit(PHI); /* Disable PHI as gpio */
     init_sidclock();
@@ -707,6 +686,14 @@ void core1_main(void)
   memset(sid_memory, 0, sizeof sid_memory);
   /* Start the VU */
   init_vu();
+
+  /* Init cycled write buffer vars */
+  /* double cpu_mhz = (clock_get_hz(clk_sys) / 1000 / 1000); */
+  /* double cpu_us = (1 / cpu_mhz); */
+  clk_rate = usbsid_config.clock_rate;
+  sidfrq = (clk_rate / 1000 / 1000);
+  frqpow = (1 / sidfrq);
+
   /* Release semaphore when core 1 is started */
   sem_release(&core1_init);
 
@@ -734,8 +721,13 @@ int main()
 {
   (void)desc_url;  /* NOTE: Remove if going to use it */
 
+  #if PICO_RP2040
   /* System clock @ 125MHz */
   set_sys_clock_pll(1500000000, 6, 2);
+  #elif PICO_RP2350
+  /* System clock @ 150MHz */
+  set_sys_clock_pll(1800000000, 6, 2);
+  #endif
   /* Init board */
   board_init();
   /* Init USB */
@@ -760,6 +752,8 @@ int main()
   init_gpio();
   /* Init PIO */
   setup_piobus();
+  /* Sync PIOS */
+  sync_pios();
   /* Init DMA */
   setup_dmachannels();
   /* Init midi */
