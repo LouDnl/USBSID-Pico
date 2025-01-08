@@ -44,7 +44,8 @@ extern char dtype;
 extern uint8_t *cdc_itf;
 extern uint8_t *wusb_itf;
 extern uint8_t *write_buffer_p;
-extern double clk_rate, sidfrq, frqpow;
+extern double cpu_mhz, cpu_us;
+extern double sid_hz, sid_mhz, sid_us;
 extern uint8_t sid_memory[];
 
 /* SID externals */
@@ -182,6 +183,12 @@ void detect_sid_types(void)
       usbsid_config.socketTwo.sid1type = sid3;
       usbsid_config.socketTwo.sid2type = 1;
     }
+    if (!usbsid_config.socketOne.dualsid && !usbsid_config.socketTwo.dualsid) {
+      usbsid_config.socketOne.sid1type = sid1;
+      usbsid_config.socketOne.sid2type = 1;
+      usbsid_config.socketTwo.sid1type = sid2;
+      usbsid_config.socketTwo.sid2type = 1;
+    }
   } else if (usbsid_config.socketOne.enabled && !usbsid_config.socketTwo.enabled) {
     usbsid_config.socketTwo.sid1type = 1;
     usbsid_config.socketTwo.sid2type = 1;
@@ -212,7 +219,6 @@ void detect_sid_types(void)
 
 void read_config(Config* config)
 {
-
   config_array[0] = READ_CONFIG; /* Initiator byte */
   config_array[1] = 0x7F; /* Verification byte */
   config_array[6] = (int)config->external_clock;
@@ -349,9 +355,24 @@ void handle_config_request(uint8_t * buffer)
                 };
                 break;
               case 2: /* chiptype */
+                if (buffer[3] <= 1) {
+                  usbsid_config.socketOne.chiptype = buffer[3];
+                }
+                break;
               case 3: /* clonetype */
+                if (buffer[3] <= 5) {
+                  usbsid_config.socketOne.clonetype = buffer[3];
+                }
+                break;
               case 4: /* sid1type */
+                if (buffer[3] <= 3) {
+                  usbsid_config.socketOne.sid1type = buffer[3];
+                }
+                break;
               case 5: /* sid2type */
+                if (buffer[3] <= 3) {
+                  usbsid_config.socketOne.sid2type = buffer[3];
+                }
                 break;
             };
           break;
@@ -367,15 +388,30 @@ void handle_config_request(uint8_t * buffer)
                 usbsid_config.socketTwo.dualsid = (buffer[3] == 1) ? true : false;
               };
               break;
-            case 2: /* act_as_one */
+            case 2: /* chiptype */
+              if (buffer[3] <= 1) {
+                usbsid_config.socketTwo.chiptype = buffer[3];
+              }
+              break;
+            case 3: /* clonetype */
+              if (buffer[3] <= 5) {
+                usbsid_config.socketTwo.clonetype = buffer[3];
+              }
+              break;
+            case 4: /* sid1type */
+              if (buffer[3] <= 3) {
+                usbsid_config.socketTwo.sid1type = buffer[3];
+              }
+              break;
+            case 5: /* sid2type */
+              if (buffer[3] <= 3) {
+                usbsid_config.socketTwo.sid2type = buffer[3];
+              }
+              break;
+            case 6: /* act_as_one */
               if (buffer[3] <= 1) { /* 1 or 0 */
                 usbsid_config.socketTwo.act_as_one = (buffer[3] == 1) ? true : false;
               };
-              break;
-            case 3: /* chiptype */
-            case 4: /* clonetype */
-            case 5: /* sid1type */
-            case 6: /* sid2type */
               break;
           };
           break;
@@ -554,9 +590,11 @@ void handle_config_request(uint8_t * buffer)
           CFG("[CLOCK FROM]%d [CLOCK TO]%d\n", usbsid_config.clock_rate, clockrates[(int)buffer[1]]);
           usbsid_config.clock_rate = clockrates[(int)buffer[1]];
           /* Cycled write buffer vars */
-          clk_rate = usbsid_config.clock_rate;
-          sidfrq = (clk_rate / 1000 / 1000);
-          frqpow = (1 / sidfrq);
+          sid_hz = usbsid_config.clock_rate;
+          sid_mhz = (sid_hz / 1000 / 1000);
+          sid_us = (1 / sid_mhz);
+          CFG("[CFG PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
+          CFG("[CFG C64]  %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
           /* Start clock set */
           deinit_sidclock();
           init_sidclock();
@@ -570,6 +608,17 @@ void handle_config_request(uint8_t * buffer)
     case DETECT_SIDS:
       CFG("[DETECT_SIDS]\n");
       detect_sid_types();
+      memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
+      read_config(&usbsid_config);  /* Read the config into the config buffer */
+      memcpy(write_buffer_p, config_array, 64);  /* Copy the first 64 bytes from the buffer into the write buffer */
+      switch (dtype) {
+        case 'C':
+          cdc_write(cdc_itf, 64);
+          break;
+        case 'W':
+          webserial_write(wusb_itf, 64);
+          break;
+      }
       break;
     case TEST_ALLSIDS:
       CFG("[TEST_ALLSIDS]\n");
@@ -636,8 +685,49 @@ void handle_config_request(uint8_t * buffer)
     }
 }
 
+void apply_default_socket_settings(void)
+{
+  /* Pre applying default socket settings if needed */
+  if (usbsid_config.socketOne.enabled == true) {
+    if (usbsid_config.socketOne.dualsid == true) {
+      if (usbsid_config.socketOne.chiptype != 1)
+        usbsid_config.socketOne.chiptype = 1;  /* chiptype cannot be real with dualsid */
+      if (usbsid_config.socketOne.clonetype == 0)
+        usbsid_config.socketOne.clonetype = 1;  /* clonetype cannot be disabled with dualsid */
+    } else {
+      if (usbsid_config.socketOne.chiptype == 1) {
+        if (usbsid_config.socketOne.clonetype == 0) {
+          usbsid_config.socketOne.clonetype = 1;  /* clonetype cannot be disabled when chiptype is clone */
+        }
+      } else {
+        usbsid_config.socketOne.clonetype = 0;  /* clonetype cannot be anything else when chiptype is real */
+      }
+    }
+  }
+  /* Pre applying default socket settings if needed */
+  if (usbsid_config.socketTwo.enabled == true) {
+    if (usbsid_config.socketTwo.dualsid == true) {
+      if (usbsid_config.socketTwo.chiptype != 1)
+        usbsid_config.socketTwo.chiptype = 1;  /* chiptype cannot be real with dualsid */
+      if (usbsid_config.socketTwo.clonetype == 0) {
+        usbsid_config.socketTwo.clonetype = 1;  /* clonetype cannot be disabled with dualsid */
+      }
+    } else {
+      if (usbsid_config.socketTwo.chiptype == 1) {
+        if (usbsid_config.socketTwo.clonetype == 0) {
+          usbsid_config.socketTwo.clonetype = 1;  /* clonetype cannot be disabled when chiptype is clone */
+        }
+      } else {
+        usbsid_config.socketTwo.clonetype = 0;  /* clonetype cannot be anything else when chiptype is real */
+      }
+    }
+  }
+}
+
 void apply_config(void)
 {
+  apply_default_socket_settings();
+
   /* Debug logging */
   CFG("[PICO] PICO_PIO_VERSION = %d\n", PICO_PIO_VERSION);  // pio.h PICO_PIO_VERSION
   #if defined(PICO_DEFAULT_LED_PIN)
