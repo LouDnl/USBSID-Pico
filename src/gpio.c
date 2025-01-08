@@ -35,15 +35,19 @@ extern Config usbsid_config;
 extern uint8_t sid_memory[];
 extern uint8_t one, two, three, four;
 extern int sock_one, sock_two, sids_one, sids_two, numsids, act_as_one;
+extern double cpu_us, sid_hz, sid_mhz, sid_us;
 
 /* Init vars */
 PIO bus_pio = pio0;
 static uint sm_control, offset_control;
 static uint sm_data, offset_data;
 static uint sm_clock, offset_clock;
-static int dma_tx_control, dma_tx_data, dma_rx_data;
-static uint16_t control_word;
+static uint sm_delay, offset_delay;
+static int dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay;
+static uint16_t control_word, delay_word;
 static uint32_t data_word, read_data, dir_mask;
+static float sidclock_frequency, busclock_frequency;
+static int pico_hz = 0;
 
 /* Read GPIO macro
  *
@@ -103,13 +107,18 @@ void init_vu(void)
 
 void setup_piobus(void)
 {
-  float freq = (float)clock_get_hz(clk_sys) / (usbsid_config.clock_rate * 32) / 2;  /* Clock frequency is 32 times the SID clock */
+  pico_hz = clock_get_hz(clk_sys);
+  busclock_frequency = (float)pico_hz / (usbsid_config.clock_rate * 32) / 2;  /* Clock frequency is 8 times the SID clock */
   CFG("[BUS CLK INIT] START\n");
-  CFG("[PI CLK]@%dMHz [DIV]@%.2f [BUS CLK]@%.2f [CFG SID CLK]%d\n", ((int)clock_get_hz(clk_sys) / 1000 / 1000), freq, ((float)clock_get_hz(clk_sys) / freq / 2), (int)usbsid_config.clock_rate);
+  CFG("[PI CLK]@%dMHz [DIV]@%.2f [BUS CLK]@%.2f [CFG SID CLK]%d\n",
+     (pico_hz / 1000 / 1000),
+     busclock_frequency,
+     ((float)pico_hz / busclock_frequency / 2),
+     (int)usbsid_config.clock_rate);
 
   { /* control bus */
     offset_control = pio_add_program(bus_pio, &bus_control_program);
-    sm_control = 1;  /* PIO0 SM1 */
+    sm_control = 1;  /* PIO1 SM1 */
     pio_sm_claim(bus_pio, sm_control);
     for (uint i = RW; i < CS2 + 1; ++i)
       pio_gpio_init(bus_pio, i);
@@ -117,14 +126,14 @@ void setup_piobus(void)
     sm_config_set_out_pins(&c_control, RW, 3);
     sm_config_set_in_pins(&c_control, D0);
     sm_config_set_jmp_pin(&c_control, RW);
-    sm_config_set_clkdiv(&c_control, freq);
+    sm_config_set_clkdiv(&c_control, busclock_frequency);
     pio_sm_init(bus_pio, sm_control, offset_control, &c_control);
     pio_sm_set_enabled(bus_pio, sm_control, true);
   }
 
   { /* databus */
     offset_data = pio_add_program(bus_pio, &data_bus_program);
-    sm_data = 2;  /* PIO0 SM2 */
+    sm_data = 2;  /* PIO1 SM2 */
     pio_sm_claim(bus_pio, sm_data);
     for (uint i = D0; i < A5 + 1; ++i) {
       pio_gpio_init(bus_pio, i);
@@ -133,27 +142,48 @@ void setup_piobus(void)
     pio_sm_set_pindirs_with_mask(bus_pio, sm_data, PIO_PINDIRMASK, PIO_PINDIRMASK);  /* WORKING */
     sm_config_set_out_pins(&c_data, D0, A5 + 1);
     sm_config_set_fifo_join(&c_data, PIO_FIFO_JOIN_TX);
-    sm_config_set_clkdiv(&c_data, freq);
+    sm_config_set_clkdiv(&c_data, busclock_frequency);
     pio_sm_init(bus_pio, sm_data, offset_data, &c_data);
     pio_sm_set_enabled(bus_pio, sm_data, true);
+  }
+
+  { /* delay counter */
+    sm_delay = 3;  /* PIO1 SM3 */
+    pio_sm_claim(bus_pio, sm_delay);
+    offset_delay = pio_add_program(bus_pio, &delay_timer_program);
+    pio_sm_config c_delay = delay_timer_program_get_default_config(offset_delay);
+    sm_config_set_sideset_pins(&c_delay, NIL0);
+    sm_config_set_sideset(&c_delay, 1, false, false);
+    sm_config_set_fifo_join(&c_delay, PIO_FIFO_JOIN_TX);
+    pio_gpio_init(bus_pio, NIL0);
+    gpio_set_function(NIL0, pio_get_funcsel(bus_pio));
+    pio_sm_set_consecutive_pindirs(bus_pio, sm_delay, NIL0, 1, true);
+    pio_sm_init(bus_pio, sm_delay, offset_delay, &c_delay);
+    pio_sm_set_enabled(bus_pio, sm_delay, true);
   }
 
   CFG("[BUS CLK INIT] FINISHED\n");
 }
 
 void setup_dmachannels(void)
-{ /* NOTE: Fo not manually assign DMA channels, this causes a Panic on the  PicoW */
+{ /* NOTE: Do not manually assign DMA channels, this causes a Panic on the  PicoW */
   CFG("[DMA CHANNELS INIT] START\n");
+  dma_claim_mask(0b1111);
+
   { /* dma controlbus */
-    dma_tx_control = dma_claim_unused_channel(true);
+    // dma_tx_control = dma_claim_unused_channel(true);
+    dma_tx_control = 0;
     dma_channel_config tx_config_control = dma_channel_get_default_config(dma_tx_control);
     channel_config_set_transfer_data_size(&tx_config_control, DMA_SIZE_16);
+    channel_config_set_read_increment(&tx_config_control, true);
+    channel_config_set_write_increment(&tx_config_control, false);
     channel_config_set_dreq(&tx_config_control, pio_get_dreq(bus_pio, sm_control, true));
     dma_channel_configure(dma_tx_control, &tx_config_control, &bus_pio->txf[sm_control], NULL, 1, false);
   }
 
   { /* dma tx databus */
-    dma_tx_data = dma_claim_unused_channel(true);
+    // dma_tx_data = dma_claim_unused_channel(true);
+    dma_tx_data = 1;
     dma_channel_config tx_config_data = dma_channel_get_default_config(dma_tx_data);
     channel_config_set_transfer_data_size(&tx_config_data, DMA_SIZE_32);
     channel_config_set_read_increment(&tx_config_data, true);
@@ -163,7 +193,8 @@ void setup_dmachannels(void)
   }
 
   { /* dma rx databus */
-    dma_rx_data = dma_claim_unused_channel(true);
+    // dma_rx_data = dma_claim_unused_channel(true);
+    dma_rx_data = 2;
     dma_channel_config rx_config = dma_channel_get_default_config(dma_rx_data);
     channel_config_set_transfer_data_size(&rx_config, DMA_SIZE_32);
     channel_config_set_read_increment(&rx_config, false);
@@ -172,6 +203,16 @@ void setup_dmachannels(void)
     dma_channel_configure(dma_rx_data, &rx_config, NULL, &bus_pio->rxf[sm_control], 1, false);
   }
 
+  { /* dma delaytimerbus */
+    // dma_tx_delay = dma_claim_unused_channel(true);
+    dma_tx_delay = 3;
+    dma_channel_config tx_config_delay = dma_channel_get_default_config(dma_tx_delay);
+    channel_config_set_transfer_data_size(&tx_config_delay, DMA_SIZE_16 /* DMA_SIZE_32 */);
+    channel_config_set_dreq(&tx_config_delay, pio_get_dreq(bus_pio, sm_delay, true));
+    dma_channel_configure(dma_tx_delay, &tx_config_delay, &bus_pio->txf[sm_delay], NULL, 1, false);
+  }
+  CFG("[DMA CHANNELS CLAIMED] C:%d TX:%d RX:%d D:%d\n", dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay);
+
   CFG("[DMA CHANNELS INIT] FINISHED\n");
 }
 
@@ -179,23 +220,28 @@ void sync_pios(void)
 { /* Sync PIO's */
   #if PICO_PIO_VERSION == 0
   CFG("[RESTART PIOS] Pico & Pico_w\n");
-  pio_sm_restart(bus_pio, 0b111);
+  pio_sm_restart(bus_pio, 0b1111);
   #elif PICO_PIO_VERSION > 0  // NOTE: rp2350 only
   CFG("[SYNC PIOS] Pico2\n");
-  pio_clkdiv_restart_sm_multi_mask(bus_pio, 0 /* 0b111 */, 0b111, 0);
+  pio_clkdiv_restart_sm_multi_mask(bus_pio, 0 /* 0b111 */, 0b1111, 0);
   #endif
 }
-
 
 void restart_bus(void)
 {
   CFG("[RESTART BUS START]\n");
+  /* disable delay timer dma */
+  dma_channel_unclaim(dma_tx_delay);
   /* disable databus rx dma */
   dma_channel_unclaim(dma_rx_data);
   /* disable databus tx dma */
   dma_channel_unclaim(dma_tx_data);
   /* disable control bus dma */
   dma_channel_unclaim(dma_tx_control);
+  /* disable delay */
+  pio_sm_set_enabled(bus_pio, sm_delay, false);
+  pio_remove_program(bus_pio, &delay_timer_program, offset_delay);
+  pio_sm_unclaim(bus_pio, sm_delay);
   /* disable databus */
   pio_sm_set_enabled(bus_pio, sm_data, false);
   pio_remove_program(bus_pio, &data_bus_program, offset_data);
@@ -234,13 +280,18 @@ int detect_clocksignal(void)
 /* Init nMHz square wave output */
 void init_sidclock(void)
 {
-  float freq = (float)clock_get_hz(clk_sys) / usbsid_config.clock_rate / 2;
+  // float freq = (float)clock_get_hz(clk_sys) / usbsid_config.clock_rate / 2;
+  sidclock_frequency = (float)clock_get_hz(clk_sys) / usbsid_config.clock_rate / 2;
   CFG("[SID CLK INIT] START\n");
-  CFG("[PI CLK]@%dMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n", (int)clock_get_hz(clk_sys) / 1000 / 1000, freq, ((float)clock_get_hz(clk_sys) / freq / 2), (int)usbsid_config.clock_rate);
+  CFG("[PI CLK]@%.2fMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n",
+    (float)clock_get_hz(clk_sys) / 1000 / 1000,
+    sidclock_frequency,
+    ((float)clock_get_hz(clk_sys) / sidclock_frequency / 2),
+    (int)usbsid_config.clock_rate);
   offset_clock = pio_add_program(bus_pio, &clock_program);
-  sm_clock = 0;  /* PIO0 SM0 */
+  sm_clock = 0;  /* PIO1 SM0 */
   pio_sm_claim(bus_pio, sm_clock);
-  clock_program_init(bus_pio, sm_clock, offset_clock, PHI, freq);
+  clock_program_init(bus_pio, sm_clock, offset_clock, PHI, sidclock_frequency);
   CFG("[SID CLK INIT] FINISHED\n");
 }
 
@@ -257,6 +308,8 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
     return 0; // Sync bit not set, ignore operation
   }
   bool is_read = (command & 0x0F) == 0x01;
+  pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, 4));  /* Preset the statemachine IRQ to not wait for a 1 */
+  pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, 5));  /* Preset the statemachine IRQ to not wait for a 1 */
   switch (command & 0x0F) {
     case PAUSE:
       control_word = 0b110110;
@@ -271,7 +324,8 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
       sid_memory[address] = data;
     case READ:
     default:
-      control_word = 0b110000;
+      // control_word = 0b110000;
+      control_word = 0b111000;
       data_word = (address & 0x3F) << 8 | data;
       dir_mask = 0x0;
       dir_mask |= (is_read ? 0b1111111100000000 : 0b1111111111111111);
@@ -292,7 +346,9 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
           break;
       }
       dma_channel_set_read_addr(dma_tx_data, &data_word, true); /* Data & Address DMA transfer */
+      pio_sm_exec(bus_pio, sm_data, pio_encode_wait_pin(true, 22));
       dma_channel_set_read_addr(dma_tx_control, &control_word, true); /* Control lines RW, CS1 & CS2 DMA transfer */
+      pio_sm_exec(bus_pio, sm_control, pio_encode_wait_pin(true, 22));
       break;
   }
 
@@ -313,6 +369,43 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
     default:
       return 0;
   }
+}
+
+void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, uint16_t cycles)
+{
+  delay_word = cycles;
+  // dma_channel_set_read_addr(dma_tx_delay, &delay_word, true); /* Delay cycles DMA transfer */
+  if (cycles >= 2) {  // ISSUE: This is randomly chosen!
+    dma_channel_set_read_addr(dma_tx_delay, &delay_word, true); /* Delay cycles DMA transfer */
+  } else {
+    pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, 4));  /* Preset the statemachine IRQ to not wait for a 1 */
+    pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, 5));  /* Preset the statemachine IRQ to not wait for a 1 */
+  }
+  if (address == 0xFF && data == 0xFF) return;
+  sid_memory[address] = data;
+  control_word = 0b111000;  /* Always WRITE never READ */
+  // control_word = 0b110000;  /* Always WRITE never READ */
+  data_word = (address & 0x3F) << 8 | data;
+  dir_mask = 0b1111111111111111;  /* Always OUT never IN */
+  data_word = (dir_mask << 16) | data_word;
+  switch (address) {
+    case 0x00 ... 0x1F:
+      control_word |= one;
+      break;
+    case 0x20 ... 0x3F:
+      control_word |= two;
+      break;
+    case 0x40 ... 0x5F:
+      control_word |= three;
+      break;
+    case 0x60 ... 0x7F:
+      control_word |= four;
+      break;
+  }
+  dma_channel_set_read_addr(dma_tx_control, &control_word, true); /* Control lines RW, CS1 & CS2 DMA transfer */
+  dma_channel_set_read_addr(dma_tx_data, &data_word, true); /* Data & Address DMA transfer */
+  dma_channel_wait_for_finish_blocking(dma_tx_control);
+  return;
 }
 
 void enable_sid(void)

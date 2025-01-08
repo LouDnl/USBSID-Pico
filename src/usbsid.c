@@ -50,7 +50,7 @@ uint32_t breathe_interval_ms = BREATHE_INTV;
 uint32_t start_ms = 0;
 char ntype = '0', dtype = '0', cdc = 'C', asid = 'A', midi = 'M', wusb = 'W';
 bool web_serial_connected = false;
-double /* cpu_mhz = 0, cpu_us = 0, */ clk_rate = 0, sidfrq = 0, frqpow = 0;
+double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
 
 /* Init var pointers for external use */
 uint8_t (*write_buffer_p)[MAX_BUFFER_SIZE] = &write_buffer;
@@ -81,6 +81,7 @@ extern void enable_sid(void);
 extern void disable_sid(void);
 extern void clear_bus(void);
 extern uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data);
+extern void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 
 /* MCU externals */
 extern void mcu_reset(void);
@@ -244,7 +245,7 @@ void webserial_write(uint8_t * itf, uint32_t n)
 
 /* Process received usb data */
 void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
-{
+{  /* BUG: PICO_W IS BROKEN ATM! */
   switch (*n) {
     case BACKWARD_BYTES:  /* For backward compatability */
       read_buffer[1] = read_buffer[2];
@@ -310,13 +311,10 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
       break;
     case MAX_BUFFER_SIZE: /* Cycled write buffer */
       // ISSUE: Not perfect yet!
+      // TODO: NEED TO ACCOUNT FOR CLOCK DRIFT!
       usbdata = 1;
       for (int i = 0; i < *n; i += 4) {
-        uint16_t cycles = (read_buffer[i + 2] | read_buffer[i + 3]);
-        uint64_t sleep_time = ((double)cycles * frqpow);
-        /* uint32_t delay_cycles = (sleep_time / cpu_us) - 3; */
-        sleep_us(sleep_time - 2);
-        bus_operation(0x10, read_buffer[i], read_buffer[i + 1]);
+        cycled_bus_operation(read_buffer[i], read_buffer[i + 1], (read_buffer[i + 2] << 8 | read_buffer[i + 3]));
       }
       break;
     default:
@@ -688,11 +686,13 @@ void core1_main(void)
   init_vu();
 
   /* Init cycled write buffer vars */
-  /* double cpu_mhz = (clock_get_hz(clk_sys) / 1000 / 1000); */
-  /* double cpu_us = (1 / cpu_mhz); */
-  clk_rate = usbsid_config.clock_rate;
-  sidfrq = (clk_rate / 1000 / 1000);
-  frqpow = (1 / sidfrq);
+  cpu_mhz = (clock_get_hz(clk_sys) / 1000 / 1000);
+  cpu_us = (1 / cpu_mhz);
+  sid_hz = usbsid_config.clock_rate;
+  sid_mhz = (sid_hz / 1000 / 1000);
+  sid_us = (1 / sid_mhz);
+  printf("[BOOT PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
+  printf("[BOOT C64]  %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
 
   /* Release semaphore when core 1 is started */
   sem_release(&core1_init);
@@ -726,7 +726,7 @@ int main()
   set_sys_clock_pll(1500000000, 6, 2);
   #elif PICO_RP2350
   /* System clock @ 150MHz */
-  set_sys_clock_pll(1800000000, 6, 2);
+  set_sys_clock_pll(1500000000, 5, 2);
   #endif
   /* Init board */
   board_init();
