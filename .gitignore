@@ -29,9 +29,14 @@
 !images
 !resources
 !examples
+!examples/config-tools
+!examples/config-tools/inih
 !examples/retrodebugger
 !examples/sidberry
 !examples/vice
+!examples/libsidplayfp
+!examples/sidplayfp
+!examples/USBSID-Pico-driver
 !examples/hardsid-sidblaster
 !cases
 !cases/**
