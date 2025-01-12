@@ -7,7 +7,7 @@
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
- * Copyright (c) 2024 LouD
+ * Copyright (c) 2024-2025 LouD
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,203 +37,42 @@
 #include <libusb.h>
 
 #include "inih/ini.h"
+#include "cfg_usbsid.h"
+#include "cfg_skpico.h"
 
 /* Compile with:
  * gcc -g3 -L/usr/local/lib inih/ini.c cfg_usbsid.c -o cfg_usbsid $(pkg-config --libs --cflags libusb-1.0)
  */
 
+/* ---------------------- */
+
+/* init local libusb variables */
 static int debug = 0;
-
-#define VENDOR_ID      0xCAFE
-#define PRODUCT_ID     0x4011
-#define ACM_CTRL_DTR   0x01
-#define ACM_CTRL_RTS   0x02
-
 static struct libusb_device_handle *devh = NULL;
+static libusb_context *ctx = NULL;
 static unsigned char encoding[] = { 0x00, 0x10, 0x0E, 0x00, 0x00, 0x00, 0x08 };
 static int ep_out_addr = 0x02;
 static int ep_in_addr  = 0x82;
-
 static int len, rc, actual_length, transferred;
 static int usid_dev = -1;
 
-uint8_t read_data[1];
-uint8_t read_data_max[64];
-uint8_t read_data_uber[128];
-uint8_t read_buffer[3]  = { 0x1, 0x0, 0x0 };
-uint8_t write_buffer[3]  = { 0x0, 0x0, 0x0 };
-uint8_t command_buffer[3]  = { 0x0, 0x0, 0x0 };
-uint8_t config_buffer[5]  = { 0x0, 0x0, 0x0, 0x0, 0x0 };
+/* -----USBSID-Pico------ */
 
-/* ---------------------- */
-
-enum
-{
-  WRITE = 0,      /* 0 */
-  READ,           /* 1 */
-  PAUSE,          /* 2 */
-  RESET_SID,      /* 3 */
-  DISABLE_SID,    /* 4 */
-  ENABLE_SID,     /* 5 */
-  CLEAR_BUS,      /* 6 */
-  RESET_MCU,      /* 7 */
-  BOOTLOADER,     /* 8 */
-};
-enum
-{
-  RESET_USBSID     = 0x20,
-
-  READ_CONFIG      = 0x30,
-  APPLY_CONFIG     = 0x31,
-  STORE_CONFIG     = 0x32,
-  SAVE_CONFIG      = 0x33,
-  SAVE_NORESET     = 0x34,
-  RESET_CONFIG     = 0x35,
-
-  SINGLE_SID       = 0x40,
-  DUAL_SID         = 0x41,
-  QUAD_SID         = 0x42,
-  TRIPLE_SID       = 0x43,
-
-  SET_CLOCK        = 0x50,
-  DETECT_SIDS      = 0x51,
-  TEST_ALLSIDS     = 0x52,
-  TEST_SID1        = 0x53,
-  TEST_SID2        = 0x54,
-  TEST_SID3        = 0x55,
-  TEST_SID4        = 0x56,
-
-  LOAD_MIDI_STATE  = 0x60,
-  SAVE_MIDI_STATE  = 0x61,
-  RESET_MIDI_STATE = 0x63,
-
-  USBSID_VERSION   = 0x80,
-
-  TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
-};
-typedef enum {
-    CLOCK_DEFAULT  = 1000000,  /* @125MHz clock ~ 125000000 / 62,5f = 2000000 / 2 = 1000000 == 1.00MHz @ 125MHz and 1.06MHz @ 133MHz */
-    CLOCK_PAL      = 985248,   /* @125MHz clock ~ 125000000 / 63,435804995f = 1970496,000009025 / 2 = 985248,000004513 */
-    CLOCK_NTSC     = 1022727,  /* @125MHz clock ~ 125000000 / 61,111127407f = 2045454,000013782 / 2 = 1022727,000006891 */
-    CLOCK_DREAN    = 1023440   /* @125MHz clock ~ 125000000 / 61,068553115f = 2046879,999999489 / 2 = 1023439,999999745 */
-} clock_rates;
-enum config_clockrates
-{
-    DEFAULT = CLOCK_DEFAULT,  /* 0 */
-    PAL     = CLOCK_PAL,      /* 1 */
-    NTSC    = CLOCK_NTSC,     /* 2 */
-    DREAN   = CLOCK_DREAN,    /* 3 */
-};
+/* init local usbsid-pico variables */
 static const enum config_clockrates clockrates[] = { DEFAULT, PAL, NTSC, DREAN };
-
 static char version[64] = {0};
 static char project_version[64] = {0};
 static uint8_t config[256] = {0};
-
-const char * enabled[] = {"Disabled", "Enabled"};
-const char * intext[] = { "Internal", "External" };
-const char * onoff[] = {"Off", "On"};
-const char * truefalse[] = {"False", "True"};
-const char * socket[] = { "Single SID", "Dual SID" };
-const char * chiptypes[] = {"Real", "Clone"};
-const char * sidtypes[] = {"Unknown", "N/A", "MOS8580", "MOS6581", "FMopl"};
-const char * clonetypes[] = { "Disabled", "Other", "SKPico", "ARMSID", "FPGASID", "RedipSID" };
-
-/* USBSID-Pico config struct */
-typedef struct Config {
-  bool external_clock : 1;     /* enable / disable external oscillator */
-  uint32_t clock_rate;         /* clock speed identifier */
-  struct
-  {
-    bool    enabled : 1;       /* enable / disable this socket */
-    bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
-    uint8_t chiptype;          /* 0 = real, 1 = clone */
-    uint8_t clonetype;         /* 0 = disabled, 1 = SKPico, 2 = ARMSID, 3 = FPGASID, 4 = other */
-    uint8_t sid1type;          /* 0 = unknown, 1 = n/a, 2 = MOS8085, 3 = MOS6581 */
-    uint8_t sid2type;          /* 0 = unknown, 1 = FMopl, 2 = MOS8085, 3 = MOS6581 */
-  } socketOne;                 /* 1 */
-  struct {
-    bool    enabled : 1;       /* enable / disable this socket */
-    bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
-    bool    act_as_one : 1;    /* act as socket 1 */
-    uint8_t chiptype;          /* 0 = real, 1 = clone */
-    uint8_t clonetype;         /* 0 = disabled, 1 = SKPico, 2 = ARMSID, 3 = FPGASID, 4 = other */
-    uint8_t sid1type;          /* 0 = unknown, 1 = n/a, 2 = MOS8085, 3 = MOS6581 */
-    uint8_t sid2type;          /* 0 = unknown, 1 = FMopl, 2 = MOS8085, 3 = MOS6581 */
-  } socketTwo;                 /* 2 */
-  struct {
-    bool enabled : 1;
-    bool idle_breathe : 1;
-  } LED;                       /* 3 */
-  struct {
-    bool    enabled : 1;
-    bool    idle_breathe : 1;
-    uint8_t brightness;
-    int     sid_to_use;         /* 0 = sid 1&2, 1...4 = sid 1 ... sid 4 */
-  } RGBLED;                     /* 4 */
-  struct {
-    bool enabled : 1;
-  } Cdc;                        /* 5 */
-  struct {
-    bool enabled : 1;
-  } WebUSB;                     /* 6 */
-  struct {
-    bool enabled : 1;
-  } Asid;                       /* 7 */
-  struct {
-    bool enabled : 1;
-    uint8_t sid_states[4][32];  /* Stores states of each SID ~ 4 sids max */
-  } Midi;                       /* 8 */
-} Config;
-
-#define USBSID_DEFAULT_CONFIG_INIT { \
-  .external_clock = false, \
-  .clock_rate = 1000000, \
-  .socketOne = { \
-    .enabled = true, \
-    .dualsid = false, \
-    .chiptype = 0x0,  /* real */ \
-    .clonetype = 0x0, /* disabled */ \
-    .sid1type = 0x0,  /* unknown */ \
-    .sid2type = 0x0,  /* unknown */ \
-  }, \
-  .socketTwo = { \
-    .enabled = true, \
-    .dualsid = false, \
-    .act_as_one = false, \
-    .chiptype = 0x0,  /* real */ \
-    .clonetype = 0x0, /* disabled */ \
-    .sid1type = 0x0,  /* unknown */ \
-    .sid2type = 0x0,  /* unknown */ \
-  }, \
-  .LED = { \
-    .enabled = true, \
-    .idle_breathe = true, \
-  }, \
-  .RGBLED = { \
-    .enabled = true, \
-    .idle_breathe = true, \
-    .brightness = 0x7F,  /* Half of max brightness or disabled if no RGB LED */ \
-    .sid_to_use = 1, \
-  }, \
-  .Cdc = { \
-    .enabled = true \
-  }, \
-  .WebUSB = { \
-    .enabled = true \
-  }, \
-  .Asid = { \
-    .enabled = true \
-  }, \
-  .Midi = { \
-    .enabled = true \
-  }, \
-} \
-
 static Config usbsid_config = USBSID_DEFAULT_CONFIG_INIT;
 
+/* -----SIDKICK-pico----- */
 
-/* ---------------------- */
+/* init local skpico variables */
+static uint8_t skpico_config[64] = {0};
+static uint8_t base_address = 0x0;
+static int sid_socket = 1;
+
+/* -----USBSID-Pico------ */
 
 int clockspeed_n(int value)
 {
@@ -417,7 +256,22 @@ void write_config_ini(Config * config, char * filename)
   };
 }
 
-/* ---------------------- */
+/* -----USBSID-Pico------ */
+
+void usbsid_close(void)
+{
+  printf("Closing USBSID-Pico\n");
+  for (int if_num = 0; if_num < 2; if_num++) {
+    if (libusb_kernel_driver_active(devh, if_num)) {
+        libusb_detach_kernel_driver(devh, if_num);
+    }
+    libusb_release_interface(devh, if_num);
+  }
+  if (devh != NULL)
+    libusb_close(devh);
+  libusb_exit(ctx);
+  devh = NULL;
+}
 
 int usbsid_init(void)
 {
@@ -425,14 +279,16 @@ int usbsid_init(void)
         libusb_close(devh);
     }
 
-    rc = libusb_init(NULL);
+    rc = libusb_init(&ctx);
     if (rc != 0) {
         fprintf(stderr, "Error initializing libusb: %s: %s\n",
         libusb_error_name(rc), libusb_strerror(rc));
         goto out;
     }
 
-    devh = libusb_open_device_with_vid_pid(NULL, VENDOR_ID, PRODUCT_ID);
+    libusb_set_option(&ctx, LIBUSB_OPTION_LOG_LEVEL, 3);
+    
+    devh = libusb_open_device_with_vid_pid(ctx, VENDOR_ID, PRODUCT_ID);
     if (!devh) {
         fprintf(stderr, "Error finding USB device\n");
         rc = -1;
@@ -452,20 +308,20 @@ int usbsid_init(void)
     }
 
     rc = libusb_control_transfer(devh, 0x21, 0x22, ACM_CTRL_DTR | ACM_CTRL_RTS, 0, NULL, 0, 0);
-    if (rc != 0 && rc != 7) {
+    if (rc < 0) {
         fprintf(stderr, "?Error configuring line state during control transfer: %d, %s: %s\n",
             rc, libusb_error_name(rc), libusb_strerror(rc));
         goto out;
     }
 
     rc = libusb_control_transfer(devh, 0x21, 0x20, 0, 0, encoding, sizeof(encoding), 0);
-    if (rc != 0 && rc != 7) {
+    if (rc < 0 || rc != 7) {
         fprintf(stderr, "Error configuring line encoding during control transfer: %d, %s: %s\n",
             rc, libusb_error_name(rc), libusb_strerror(rc));
         goto out;
     }
 
-    usid_dev = (rc == 0 || rc == 7) ? 0 : -1;
+    usid_dev = (rc > 0 && rc == 7) ? 0 : -1;
 
     if (usid_dev < 0)
     {
@@ -477,26 +333,11 @@ int usbsid_init(void)
 
 	return usid_dev;
 out:
-    if (devh != NULL)
-        libusb_close(devh);
-    libusb_exit(NULL);
-    return rc;
-
+  usbsid_close();
+  return rc;
 }
 
-void usbsid_close(void)
-{
-  for (int if_num = 0; if_num < 2; if_num++) {
-    libusb_release_interface(devh, if_num);
-    if (libusb_kernel_driver_active(devh, if_num)) {
-        libusb_detach_kernel_driver(devh, if_num);
-    }
-  }
-  libusb_close(devh);
-  libusb_exit(NULL);
-}
-
-/* ---------------------- */
+/* -----USBSID-Pico------ */
 
 void write_chars(unsigned char * data, int size)
 {
@@ -504,14 +345,14 @@ void write_chars(unsigned char * data, int size)
   if (libusb_bulk_transfer(devh, ep_out_addr, data, size, &actual_length, 0) < 0) {
     fprintf(stderr, "Error while sending char\n");
   }
-  /* printf("[W]$%02X:%02X\n", data[1], data[2]); */
+  //printf("[W]$%02X:%02X\n", data[1], data[2]);
 }
 
 int read_chars(unsigned char * data, int size)
 {
   int actual_length;
   int rc = libusb_bulk_transfer(devh, ep_in_addr, data, size, &actual_length, 0);
-  /* printf("[R]$%02X:%02X\n", read_buffer[1], data[0]); */
+  //printf("[R]$%02X:%02X\n", read_buffer[1], data[0]);
   if (rc == LIBUSB_ERROR_TIMEOUT) {
     printf("timeout (%d)\n", actual_length);
     return -1;
@@ -522,7 +363,7 @@ int read_chars(unsigned char * data, int size)
   return actual_length;
 }
 
-/* ---------------------- */
+/* -----USBSID-Pico------ */
 
 void write_command(uint8_t command)
 {
@@ -801,8 +642,369 @@ void read_config(void)
   return;
 }
 
+void apply_default_socket_settings(void)
+{
+  /* Pre applying default socket settings if needed */
+  if (usbsid_config.socketOne.enabled == true) {
+    if (usbsid_config.socketOne.dualsid == true) {
+      if (usbsid_config.socketOne.chiptype != 1)
+        usbsid_config.socketOne.chiptype = 1;  /* chiptype cannot be real with dualsid */
+      if (usbsid_config.socketOne.clonetype == 0)
+        usbsid_config.socketOne.clonetype = 1;  /* clonetype cannot be disabled with dualsid */
+    } else {
+      if (usbsid_config.socketOne.chiptype == 1) {
+        if (usbsid_config.socketOne.clonetype == 0) {
+          usbsid_config.socketOne.clonetype = 1;  /* clonetype cannot be disabled when chiptype is clone */
+        }
+      } else {
+        usbsid_config.socketOne.clonetype = 0;  /* clonetype cannot be anything else when chiptype is real */
+      }
+    }
+  }
+  /* Pre applying default socket settings if needed */
+  if (usbsid_config.socketTwo.enabled == true) {
+    if (usbsid_config.socketTwo.dualsid == true) {
+      if (usbsid_config.socketTwo.chiptype != 1)
+        usbsid_config.socketTwo.chiptype = 1;  /* chiptype cannot be real with dualsid */
+      if (usbsid_config.socketTwo.clonetype == 0) {
+        usbsid_config.socketTwo.clonetype = 1;  /* clonetype cannot be disabled with dualsid */
+      }
+    } else {
+      if (usbsid_config.socketTwo.chiptype == 1) {
+        if (usbsid_config.socketTwo.clonetype == 0) {
+          usbsid_config.socketTwo.clonetype = 1;  /* clonetype cannot be disabled when chiptype is clone */
+        }
+      } else {
+        usbsid_config.socketTwo.clonetype = 0;  /* clonetype cannot be anything else when chiptype is real */
+      }
+    }
+  }
+}
 
-/* ---------------------- */
+void print_socket_config(void)
+{
+  int sock_one, sock_two, sids_one, sids_two, numsids, act_as_one, one, two, three, four;
+  apply_default_socket_settings();
+
+  act_as_one = usbsid_config.socketTwo.act_as_one;
+
+  sock_one = usbsid_config.socketOne.enabled;
+  sock_two = usbsid_config.socketTwo.enabled;
+
+  sids_one = (sock_one == true) ? (usbsid_config.socketOne.dualsid == true) ? 2 : 1 : 0;
+  sids_two = (sock_two == true) ? (usbsid_config.socketTwo.dualsid == true) ? 2 : 1 : 0;
+  numsids = (sids_one + sids_two);
+
+  printf("[CONFIG] Calculating socket settings\n");
+  /* one == 0x00, two == 0x20, three == 0x40, four == 0x60 */
+  if (act_as_one) {                    /* act-as-one enabled overrules all settings */
+    printf("[CONFIG] ACT AS ONE\n");
+    one = two = 0;                     /* CS1 low, CS2 low */
+    three = four = 0;                  /* CS1 low, CS2 low */
+  } else {
+    if (sock_one && !sock_two) {       /* SocketOne enabled, SocketTwo disabled */
+      printf("[CONFIG] sock_one enabled, sock_two disabled\n");
+      one = 0b100;                     /* CS1 low, CS2 high */
+      two = (sids_one == 2) ? 0b100    /* CS1 low, CS2 high */
+        : 0b110;                       /* CS1 high, CS2 high */
+      three = four = 0b110;            /* CS1 high, CS2 high */
+    }
+    if (!sock_one && sock_two) {       /* SocketOne disabled, SocketTwo enabled */
+      printf("[CONFIG] sock_one disabled, sock_two enabled\n");
+      one = 0b010;                     /* CS1 high, CS2 low */
+      two = (sids_two == 2) ? 0b010    /* CS1 high, CS2 low */
+        : 0b110;                       /* CS1 high, CS2 high */
+      three = four = 0b110;            /* CS1 high, CS2 high */
+    }
+    if (sock_one && sock_two) {        /* SocketOne enabled, SocketTwo enabled */
+      printf("[CONFIG] sock_one enabled, sock_two enabled\n");
+      one = 0b100;                     /* CS1 low, CS2 high */
+      two = (sids_one == 2) ? 0b100    /* CS1 low, CS2 high */
+        : (sids_one == 1) ? 0b010      /* CS1 high, CS2 low */
+        : 0b110;                       /* CS1 high, CS2 high */
+      three = 0b010;                   /* CS1 high, CS2 low */
+      four = (sids_two == 2) ? 0b010   /* CS1 high, CS2 low */
+        : 0b110;                       /* CS1 high, CS2 high */
+    }
+  }
+
+  printf("[SOCK_ONE EN]%s\n[SOCK_TWO EN]%s\n[ACT_AS_ONE]%s\n[NO SIDS]\n[SOCK_ONE#]%d\n[SOCK_TWO#]%d\n[TOTAL#]%d\n[BUS]\n[ONE]%02x\n[TWO]%02x\n[THREE]%02x\n[FOUR]%02x\n",
+    (sock_one ? truefalse[1] : truefalse[0]),
+    (sock_two ? truefalse[1] : truefalse[0]),
+    (act_as_one ? truefalse[1] : truefalse[0]),
+    sids_one, sids_two, numsids,
+    one, two, three, four);
+}
+
+/* -----SIDKICK-pico----- */
+
+void skpico_config_mode(void)
+{
+  uint8_t skpicobuff[3] = {0};
+  memcpy(skpicobuff, &init_configmode, 3);
+  skpicobuff[1] = (skpicobuff[1] + base_address); 
+  write_chars(skpicobuff, 3);  /* Start or extend config mode */
+}
+
+void skpico_end_config_mode(void)
+{
+  uint8_t skpicobuff[3] = {0};
+  memcpy(skpicobuff, &config_exit, 3);
+  skpicobuff[1] = (skpicobuff[1] + base_address); 
+  write_chars(skpicobuff, 3);  /* Exit config mode */
+}
+
+void skpico_update_config(void)
+{
+  uint8_t skpicobuff[3] = {0};
+  memcpy(skpicobuff, &config_update, 3);
+  skpicobuff[1] = (skpicobuff[1] + base_address); 
+  write_chars(skpicobuff, 3);  /* Update config, doesn't save */
+}
+
+void skpico_save_config(void)
+{
+  uint8_t skpicobuff[3] = {0};
+  memcpy(skpicobuff, &config_writeupdate, 3);
+  skpicobuff[1] = (skpicobuff[1] + base_address); 
+  write_chars(skpicobuff, 3);  /* Update & save config */
+}
+
+void skpico_read_config(void)
+{
+  skpico_config_mode();
+
+  for (int i = 0; i < 64 ; i++) {
+    //uint8_t skpicobuff[3] = {0};
+    //memcpy(skpicobuff, &read_buffer, 3);
+    //skpicobuff[1] = (0x1d + base_address); 
+    read_buffer[1] = (0x1d + base_address); 
+    int len;
+    write_chars(read_buffer, 3);
+    len = read_chars(read_data, sizeof(read_data));
+    skpico_config[i] = read_data[0];
+    /* if(i == 64) printf("\n"); */
+  }
+
+  skpico_config_mode();
+
+  printf("[PRINT CFG SETTINGS START]\n");
+  for (size_t i = 0; i < 64; ++i) {
+    if (i >= 4 && i <= 7) continue;
+    if (i >= 13 && i <= 56) continue;
+    if (i == 62 || i == 63) continue;
+    if (i == 0 || i == 8) {
+        printf("[%02ld] %s: %02X ~ %s\n", i, config_names[i], skpico_config[i], sid_types[skpico_config[i]]);
+        continue;
+    }
+    if (i == 10) {
+        printf("[%02ld] %s: %02X ~ %s\n", i, config_names[i], skpico_config[i], sid2_address[skpico_config[i]]);
+        continue;
+    }
+    if (i == 59) {
+        printf("[%02ld] %s: %02X ~ %s\n", i, config_names[i], skpico_config[i], clock_speed[skpico_config[i]]);
+        continue;
+    }
+    printf("[%02ld] %s: %02X\n", i, config_names[i], skpico_config[i]);
+  }
+  printf("[PRINT CFG SETTINGS END]\n");
+
+  //return;
+}
+
+void skpico_write_config(void)
+{
+  uint8_t skpicobuff[3] = {0};
+  memcpy(skpicobuff, &start_config_write, 3);
+  skpicobuff[1] = (skpicobuff[1] + base_address); 
+  write_chars(skpicobuff, 3);
+
+  for (int i = 0; i < 64 ; i++) {
+    uint8_t skpicobuff[3] = {0};
+    memcpy(skpicobuff, &config_write, 3);
+    skpicobuff[1] = (skpicobuff[1] + base_address);
+    skpicobuff[2] = skpico_config[i];  /* config value */
+    write_chars(skpicobuff, 3);
+  }
+}
+
+/* -----SIDKICK-pico----- */
+
+void print_help_skpico(void)
+{
+  printf("--------------------------------------------------------------------------------------------------------------------\n");
+  printf("USBSID-Pico SIDKICK-pico configtool\n");
+  printf("This tool should work with any SKPico PCB and firmware version, but comes without any guarantees\n");
+  printf("Use at your own risk!\n");
+  printf("\n");
+  printf("IMPORTANT! For socket 2 to work the USBSID-Pico needs to be in 2x, 3x or 4x SID mode\n");
+  printf("\n");
+  printf("Usage:\n");
+  printf("$ cfg_usbsid -skpico [options]\n");
+  printf("--[OPTIONS]---------------------------------------------------------------------------------------------------------\n");
+  printf("  -h,       --help              : Show this help message\n");
+  printf("  -sock     --socket            : Set the USBSID-Pico socket to use, defaults to socket 1\n");
+  printf("  -r,       --read              : Read and print SIDKICK-pico configuration\n");
+  printf("  -w,       --write             : Write single config item to SIDKICK-pico (will read the current config first)\n");
+  printf("--[MANUAL CONFIGURATION]--------------------------------------------------------------------------------------------\n");
+  printf("  All the following options require '-w'\n");
+  printf("  -s1       --sidone            : Change SID type to:\n");
+  printf("                                  0: %s 1: %s 2: %s 3: %s 4: %s\n",
+         sid_types[0], sid_types[1], sid_types[2], sid_types[3], sid_types[4]);
+  printf("  -s1vol    --sidone-volume     : Change volume from 0 to 15\n");
+  printf("  -s1db     --sidone-digiboost  : Change digiboost from 0 to 15\n");
+  printf("  -s2       --sidtwo            : Change SID type to:\n");
+  printf("                                  0: %s 1: %s 2: %s 3: %s 4: %s\n",
+         sid_types[0], sid_types[1], sid_types[2], sid_types[3], sid_types[4]);
+  printf("  -s2vol    --sidtwo-volume     : Change volume from 0 to 15\n");
+  printf("  -s2db     --sidtwo-digiboost  : Change digiboost from 0 to 15\n");
+  printf("  -io       --iopina5a8         : Change IO pin setting (A5 for USBSID-Pico) to:\n");
+  printf("                                  0: %s 1: %s 2: %s 3: %s 4: %s 5: %s\n",
+         sid2_address[0], sid2_address[1], sid2_address[2], sid2_address[3], sid2_address[4], sid2_address[5]);
+  printf("  -clock    --clockspeed        : Change clockspeed to:\n");
+  printf("                                  0: %s 1: %s 2: %s\n",
+         clock_speed[0], clock_speed[1], clock_speed[2]);
+  printf("--[NOT CONFIGURABLE]------------------------------------------------------------------------------------------------\n");
+  printf("  SID panning ~ defaults to 7, approx the middle\n");
+  printf("  SID balance ~ defaults to 7, approx the middle\n");
+  printf("  digidetect ~ defaults to 1, on\n");
+  printf("--------------------------------------------------------------------------------------------------------------------\n");
+}
+
+void config_skpico(int argc, char **argv)
+{
+  if (argc <= 2) {
+    printf("Please supply atleast 1 option\n");
+    print_help_skpico();
+    goto exit;
+  }
+  if (!strcmp(argv[2], "-h") || !strcmp(argv[2], "--help") || !strcmp(argv[2], "-")) {
+    print_help_skpico();
+    goto exit;
+  }
+  for (int param_count = 2; param_count < argc; param_count++) {
+    if (!strcmp(argv[param_count], "-sock") || !strcmp(argv[param_count], "--socket")) {
+      param_count++;
+      sid_socket = atoi(argv[param_count]);
+      int socket_base = (sid_socket == 1) ? 0 : (sid_socket == 2) ? 1 : 0;
+      base_address = (socket_base * 0x40);
+    }
+  }
+
+  printf("Using USBSID-Pico socket %d with base address 0x%02X\n", sid_socket, base_address);
+
+  for (int param_count = 2; param_count < argc; param_count++) {
+    if (!strcmp(argv[param_count], "-r") || !strcmp(argv[param_count], "--read")) {
+      param_count++;
+      printf("Read config\n");
+      skpico_read_config();
+      skpico_end_config_mode();
+      return;
+      //goto exit;
+      //break;
+    }
+    if (!strcmp(argv[param_count], "-w") || !strcmp(argv[param_count], "--write")) {
+      param_count++;
+      printf("Write config ~ read current config first\n");
+      skpico_read_config();
+      for (int param_count = 1; param_count < argc; param_count++) {
+        if (!strcmp(argv[param_count], "-s1") || !strcmp(argv[param_count], "--sidone")) {
+          param_count++;
+          int sid = atoi(argv[param_count]);
+          if (sid < 4) {
+            printf("SID one from: %s to: %s\n", sid_types[skpico_config[0]], sid_types[sid]);
+            skpico_config[0] = sid;
+          }
+        }
+        if (!strcmp(argv[param_count], "-s2") || !strcmp(argv[param_count], "--sidtwo")) {
+          param_count++;
+          int sid = atoi(argv[param_count]);
+          if (sid < 5) {
+            printf("SID two from: %s to: %s\n", sid_types[skpico_config[8]], sid_types[sid]);
+            skpico_config[8] = sid;
+          }
+        }
+        if (!strcmp(argv[param_count], "-s1vol") || !strcmp(argv[param_count], "--sidone-volume")) {
+          param_count++;
+          int vol = atoi(argv[param_count]);
+          if (vol >= 0 && vol <= 14) {
+            printf("SID one volume from: %d to: %d\n", skpico_config[3], vol);
+            skpico_config[3] = vol;
+          }
+        }
+        if (!strcmp(argv[param_count], "-s2vol") || !strcmp(argv[param_count], "--sidtwo-volume")) {
+          param_count++;
+          int vol = atoi(argv[param_count]);
+          if (vol >= 0 && vol <= 14) {
+            printf("SID two volume from: %d to: %d\n", skpico_config[11], vol);
+            skpico_config[11] = vol;
+          }
+        }
+        if (!strcmp(argv[param_count], "-s1db") || !strcmp(argv[param_count], "--sidone-digiboost")) {
+          param_count++;
+          int db = atoi(argv[param_count]);
+          if (db >= 0 && db <= 14) {
+            printf("SID one digiboost from: %d to: %d\n", skpico_config[1], db);
+            skpico_config[1] = db;
+          }
+        }
+        if (!strcmp(argv[param_count], "-s2db") || !strcmp(argv[param_count], "--sidtwo-digiboost")) {
+          param_count++;
+          int db = atoi(argv[param_count]);
+          if (db >= 0 && db <= 14) {
+            printf("SID two digiboost from: %d to: %d\n", skpico_config[9], db);
+            skpico_config[9] = db;
+          }
+        }
+        if (!strcmp(argv[param_count], "-io") || !strcmp(argv[param_count], "--iopina5a8")) {
+          param_count++;
+          int io = atoi(argv[param_count]);
+          if (io < 6) {
+            printf("SKPico SID 2 IO pin from: %s to: %s\n", sid2_address[skpico_config[10]], sid2_address[io]);
+            skpico_config[10] = io;
+          }
+        }
+        if (!strcmp(argv[param_count], "-clock") || !strcmp(argv[param_count], "--clockspeed")) {
+          param_count++;
+          int clk = atoi(argv[param_count]);
+          if (clk < 3) {
+            printf("SKPico clockspeed from: %s to: %s\n", clock_speed[skpico_config[59]], clock_speed[clk]);
+            skpico_config[59] = clk;
+          }
+        }
+      }
+      // Default & and fallback
+      if (skpico_config[2] != 1) skpico_config[2] =   1;  // register read
+      skpico_config[12] =  7;  // panning
+      skpico_config[58] =  7;  // balance
+      skpico_config[61] =  1;  // digidetect on
+      if (skpico_config[59] > 2) skpico_config[59] = 0;  // reset clockspeed to PAL if incorrect
+
+      printf("Start writing config\n");
+      skpico_config_mode();
+      skpico_write_config();
+
+      printf("Start saving config\n");
+      sleep(0.5);
+      skpico_save_config();
+
+      printf("Reset SIDS and wait for boot\n");
+      sleep(0.5);
+      write_command(RESET_SID);
+      sleep(1);
+      printf("Start reading config\n");
+      skpico_read_config();
+
+      sleep(0.5);
+      goto exit;
+      break;
+    }
+  }
+exit:
+  return;
+}
+
+/* -----USBSID-Pico------ */
 
 void print_help(void)
 {
@@ -815,6 +1017,15 @@ void print_help(void)
   printf("--[OPTIONS]---------------------------------------------------------------------------------------------------------\n");
   printf("  -h,       --help              : Show this help message\n");
   printf("  -debug    --debug             : Enable debug prints\n");
+  printf("  -reset,   --reset-sids        : Reset SID's\n");
+  printf("  -reboot,  --reboot-usp        : Reboot USBSID-Pico\n");
+  printf("  -boot,    --bootloader        : Reboot USBSID-Pico to the bootloader for firmware upload\n");
+  printf("  -skpico   --sidkickpico       : Enter SIDKICK-pico config mode\n");
+  printf("--[PRESETS]---------------------------------------------------------------------------------------------------------\n");
+  printf("  -defaults,--config-defaults   : Reset USBSID-Pico config to defaults\n");
+  printf("  -single,  --single-sid        : Socket 1 enabled @ single SID, Socket 2 disabled\n");
+  printf("  -dual,    --dual-sid          : Socket 1 enabled @ single SID, Socket 2 enabled @ single SID\n");
+  printf("  -quad,    --quad-sid          : Socket 1 enabled @ dual SID, Socket 2 enabled @ dual SID\n");
   printf("--[BASICS]----------------------------------------------------------------------------------------------------------\n");
   printf("  -v,       --version           : Read and print USBSID-Pico firmware version\n");
   printf("  -r,       --read-config       : Read and print USBSID-Pico config settings\n");
@@ -822,9 +1033,6 @@ void print_help(void)
   printf("  -w,       --write-config      : Write single config item to USBSID-Pico (will read the full config first!)\n");
   printf("  -s,       --save-config       : Send the save config command to USBSID-Pico\n");
   printf("  -sr,      --save-reboot       : Send the save config command to USBSID-Pico and reboot it\n");
-  printf("  -reset,   --reset-sids        : Reset SID's\n");
-  printf("  -reboot,  --reboot-usp        : Reboot USBSID-Pico\n");
-  printf("  -boot,    --bootloader        : Reboot USBSID-Pico to the bootloader for firmware upload\n");
   printf("--[INI FILE CONFIGURATION]------------------------------------------------------------------------------------------\n");
   printf("  -default, --default-ini       : Generate an ini file with default USBSID-Pico config named `USBSID-Pico-cfg.ini`\n");
   printf("  -export F,--export-config F   : Read config from USBSID-Pico and export it to provided ini file or default in\n");
@@ -863,36 +1071,8 @@ void print_help(void)
   printf("--------------------------------------------------------------------------------------------------------------------\n");
 }
 
-int main(int argc, char **argv)
+void config_usbsidpico(int argc, char **argv)
 {
-  memset(version, 0, 64);
-  memset(project_version, 0, 64);
-  memset(config, 0, 256);
-  memset(read_data, 0, 1);
-  memset(read_data_max, 0, 64);
-  memset(read_data_uber, 0, 128);
-  if (argc <= 1) {
-    printf("Please supply atleast 1 option\n");
-    print_help();
-    goto exit;
-  }
-  if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help") || !strcmp(argv[1], "-")) {
-    print_help();
-    goto exit;
-  }
-  fprintf(stdout, "Detecting Linux usbsid boards\n");
-
-  if (usid_dev != 0) {
-    rc = usbsid_init();
-    if (rc != 0) {
-        return -1;
-    }
-    /* zero length read to clear any lingering data */
-    unsigned char buffer[1];
-    libusb_bulk_transfer(devh, ep_out_addr, buffer, 0, &transferred, 1);
-    printf("Connected to USBSID-Pico\n");
-  }
-
   for (int param_count = 1; param_count < argc; param_count++) {
     if (!strcmp(argv[param_count], "-h") || !strcmp(argv[param_count], "--help")) {
       print_help();
@@ -910,11 +1090,34 @@ int main(int argc, char **argv)
       continue;
     }
 
+    if (!strcmp(argv[param_count], "-defaults") || !strcmp(argv[param_count], "--config-defaults")) {
+      printf("Reset USBSID-Pico config to defaults\n");
+      write_config_command(RESET_CONFIG, 0, 0 ,0 ,0);
+      goto exit;;
+    }
+    if (!strcmp(argv[param_count], "-single") || !strcmp(argv[param_count], "--single-sid")) {
+      printf("Set USBSID-Pico config to single SID\n");
+      write_config_command(SINGLE_SID, 0, 0 ,0 ,0);
+      goto exit;;
+    }
+    if (!strcmp(argv[param_count], "-dual") || !strcmp(argv[param_count], "--dual-sid")) {
+      printf("Set USBSID-Pico config to dual SID\n");
+      write_config_command(DUAL_SID, 0, 0 ,0 ,0);
+      goto exit;;
+    }
+    if (!strcmp(argv[param_count], "-quad") || !strcmp(argv[param_count], "--quad-sid")) {
+      printf("Set USBSID-Pico config to quad SID\n");
+      write_config_command(QUAD_SID, 0, 0 ,0 ,0);
+      goto exit;;
+    }
+
     if (!strcmp(argv[param_count], "-r") || !strcmp(argv[param_count], "--read-config")) {
       printf("Reading config\n");
       read_config();
       printf("Printing config\n");
       print_config();
+      param_count++;
+      if (argc == 3 && !strcmp(argv[param_count], "-d")) print_socket_config();
       break;
     }
 
@@ -1257,7 +1460,57 @@ int main(int argc, char **argv)
     }
   }
 exit:
-  if (usid_dev != -1) {
+}
+
+/* ---------------------- */
+
+int main(int argc, char **argv)
+{
+  memset(version, 0, 64);
+  memset(project_version, 0, 64);
+  memset(config, 0, 256);
+  memset(read_data, 0, 1);
+  memset(read_data_max, 0, 64);
+  memset(read_data_uber, 0, 128);
+  /* USBSID-Pico */
+  if (argc <= 1) {
+    printf("Please supply atleast 1 option\n");
+    print_help();
+    goto exit;
+  }
+  if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help") || !strcmp(argv[1], "-") || !strcmp(argv[1], "--")) {
+    print_help();
+    goto exit;
+  }
+  /* SIDKICK-pico */
+  if (!strcmp(argv[1], "-skpico") && (argc <= 2 || !strcmp(argv[2], "-h") || !strcmp(argv[2], "--help") || !strcmp(argv[2], "-") || !strcmp(argv[2], "--"))) {
+    print_help_skpico();
+    goto exit;
+  }
+  fprintf(stdout, "Detecting Linux usbsid boards\n");
+
+  if (usid_dev != 0) {
+    rc = usbsid_init();
+    if (rc != 0) {
+        return -1;
+    }
+    /* zero length read to clear any lingering data */
+    unsigned char buffer[1];
+    libusb_bulk_transfer(devh, ep_out_addr, buffer, 0, &transferred, 1);
+    printf("Connected to USBSID-Pico\n");
+  }
+
+  if (!strcmp(argv[1], "-skpico") || !strcmp(argv[1], "--sidkickpico")) {
+
+    config_skpico(argc, argv);
+    goto exit;
+  } else {
+    config_usbsidpico(argc, argv);
+    goto exit;
+  }
+
+exit:
+  if (usid_dev != -1 || usid_dev == 0) {
     usbsid_close();
   }
   return 0;
