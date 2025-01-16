@@ -171,8 +171,7 @@ void setup_dmachannels(void)
   dma_claim_mask(0b1111);
 
   { /* dma controlbus */
-    // dma_tx_control = dma_claim_unused_channel(true);
-    dma_tx_control = 0;
+    dma_tx_control = dma_claim_unused_channel(true);
     dma_channel_config tx_config_control = dma_channel_get_default_config(dma_tx_control);
     channel_config_set_transfer_data_size(&tx_config_control, DMA_SIZE_16);
     channel_config_set_read_increment(&tx_config_control, true);
@@ -182,8 +181,7 @@ void setup_dmachannels(void)
   }
 
   { /* dma tx databus */
-    // dma_tx_data = dma_claim_unused_channel(true);
-    dma_tx_data = 1;
+    dma_tx_data = dma_claim_unused_channel(true);
     dma_channel_config tx_config_data = dma_channel_get_default_config(dma_tx_data);
     channel_config_set_transfer_data_size(&tx_config_data, DMA_SIZE_32);
     channel_config_set_read_increment(&tx_config_data, true);
@@ -193,8 +191,7 @@ void setup_dmachannels(void)
   }
 
   { /* dma rx databus */
-    // dma_rx_data = dma_claim_unused_channel(true);
-    dma_rx_data = 2;
+    dma_rx_data = dma_claim_unused_channel(true);
     dma_channel_config rx_config = dma_channel_get_default_config(dma_rx_data);
     channel_config_set_transfer_data_size(&rx_config, DMA_SIZE_32);
     channel_config_set_read_increment(&rx_config, false);
@@ -204,8 +201,7 @@ void setup_dmachannels(void)
   }
 
   { /* dma delaytimerbus */
-    // dma_tx_delay = dma_claim_unused_channel(true);
-    dma_tx_delay = 3;
+    dma_tx_delay = dma_claim_unused_channel(true);
     dma_channel_config tx_config_delay = dma_channel_get_default_config(dma_tx_delay);
     channel_config_set_transfer_data_size(&tx_config_delay, DMA_SIZE_16 /* DMA_SIZE_32 */);
     channel_config_set_dreq(&tx_config_delay, pio_get_dreq(bus_pio, sm_delay, true));
