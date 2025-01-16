@@ -41,15 +41,17 @@
 /* USBSID command byte */
 enum
 {
-  WRITE = 0,      /* 0 */
-  READ,           /* 1 */
-  PAUSE,          /* 2 */
-  RESET_SID,      /* 3 */
-  DISABLE_SID,    /* 4 */
-  ENABLE_SID,     /* 5 */
-  CLEAR_BUS,      /* 6 */
-  RESET_MCU,      /* 7 */
-  BOOTLOADER,     /* 8 */
+  WRITE = 0,      /*  0 */
+  READ,           /*  1 */
+  PAUSE,          /*  2 */
+  RESET_SID,      /*  3 */
+  DISABLE_SID,    /*  4 */
+  ENABLE_SID,     /*  5 */
+  CLEAR_BUS,      /*  6 */
+  RESET_MCU,      /*  7 */
+  BOOTLOADER,     /*  8 */
+  MUTE,           /*  9 */
+  UNMUTE,         /* 10 */
 };
 
 /* USB data type */
