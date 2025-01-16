@@ -58,7 +58,6 @@ static uint8_t volume_state[4] = {0};
 register uint32_t b asm( "r10" );
 volatile const uint32_t *BUSState = &sio_hw->gpio_in;
 
-
 void init_gpio()
 {
   /* GPIO defaults for PIO bus */
@@ -110,6 +109,7 @@ void setup_piobus(void)
 {
   pico_hz = clock_get_hz(clk_sys);
   busclock_frequency = (float)pico_hz / (usbsid_config.clock_rate * 32) / 2;  /* Clock frequency is 8 times the SID clock */
+
   CFG("[BUS CLK INIT] START\n");
   CFG("[PI CLK]@%dMHz [DIV]@%.2f [BUS CLK]@%.2f [CFG SID CLK]%d\n",
      (pico_hz / 1000 / 1000),
@@ -272,13 +272,12 @@ int detect_clocksignal(void)
 /* Init nMHz square wave output */
 void init_sidclock(void)
 {
-  // float freq = (float)clock_get_hz(clk_sys) / usbsid_config.clock_rate / 2;
   sidclock_frequency = (float)clock_get_hz(clk_sys) / usbsid_config.clock_rate / 2;
   CFG("[SID CLK INIT] START\n");
   CFG("[PI CLK]@%.2fMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n",
-    (float)clock_get_hz(clk_sys) / 1000 / 1000,
+    pico_hz / 1000 / 1000,
     sidclock_frequency,
-    ((float)clock_get_hz(clk_sys) / sidclock_frequency / 2),
+    (pico_hz / sidclock_frequency / 2),
     (int)usbsid_config.clock_rate);
   offset_clock = pio_add_program(bus_pio, &clock_program);
   sm_clock = 0;  /* PIO1 SM0 */
@@ -316,7 +315,6 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
       sid_memory[address] = data;
     case READ:
     default:
-      // control_word = 0b110000;
       control_word = 0b111000;
       data_word = (address & 0x3F) << 8 | data;
       dir_mask = 0x0;
@@ -366,17 +364,15 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
 void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, uint16_t cycles)
 {
   delay_word = cycles;
-  // dma_channel_set_read_addr(dma_tx_delay, &delay_word, true); /* Delay cycles DMA transfer */
-  if (cycles >= 2) {  // ISSUE: This is randomly chosen!
-    dma_channel_set_read_addr(dma_tx_delay, &delay_word, true); /* Delay cycles DMA transfer */
+  if (cycles >= 1) {  /* Minimum of 1 cycle as delay, otherwise unneeded overhead */
+    dma_channel_set_read_addr(dma_tx_delay, &delay_word, true);  /* Delay cycles DMA transfer */
+    if (address == 0xFF && data == 0xFF) return;
   } else {
     pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, 4));  /* Preset the statemachine IRQ to not wait for a 1 */
     pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, 5));  /* Preset the statemachine IRQ to not wait for a 1 */
   }
-  if (address == 0xFF && data == 0xFF) return;
   sid_memory[address] = data;
-  control_word = 0b111000;  /* Always WRITE never READ */
-  // control_word = 0b110000;  /* Always WRITE never READ */
+  control_word = 0b111000;
   data_word = (address & 0x3F) << 8 | data;
   dir_mask = 0b1111111111111111;  /* Always OUT never IN */
   data_word = (dir_mask << 16) | data_word;
