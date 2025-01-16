@@ -48,6 +48,7 @@ static uint16_t control_word, delay_word;
 static uint32_t data_word, read_data, dir_mask;
 static float sidclock_frequency, busclock_frequency;
 static int pico_hz = 0;
+static uint8_t volume_state[4] = {0};
 
 /* Read GPIO macro
  *
@@ -404,19 +405,31 @@ void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, ui
   return;
 }
 
+void unmute_sid(void)
+{
+  for (int i = 0; i < numsids; i++) {
+    if ((volume_state[i] & 0xF) == 0) volume_state[i] = (volume_state[i] & 0xF0) | 0x0E;
+    bus_operation((0x10 | WRITE), ((0x20 * i) + 0x18), volume_state[i]);  /* Volume back */
+  }
+}
+
+void mute_sid(void)
+{
+  for (int i = 0; i < numsids; i++) {
+    volume_state[i] = sid_memory[((0x20 * i) + 0x18)];
+    bus_operation((0x10 | WRITE), ((0x20 * i) + 0x18), (volume_state[i] & 0xF0));  /* Volume to 0 */
+  }
+}
+
 void enable_sid(void)
 {
   gpio_put(RES, 1);
-  for (int i = 0; i < numsids; i++) {
-    bus_operation((0x10 | WRITE), ((0x20 * i) + 0x18), 0x0F);  /* Volume to 0 */
-  }
+  unmute_sid();
 }
 
 void disable_sid(void)
 {
-  for (int i = 0; i < numsids; i++) {
-    bus_operation((0x10 | WRITE), ((0x20 * i) + 0x18), 0x0);  /* Volume to 0 */
-  }
+  mute_sid();
   gpio_put(CS1, 1);
   gpio_put(CS2, 1);
   gpio_put(RES, 0);
@@ -434,12 +447,10 @@ void pause_sid(void)
 
 void reset_sid(void)
 {
-  /* disable_sid();
-  clear_bus();
-  enable_sid(); */
   gpio_put(CS1, 1);
   gpio_put(CS2, 1);
   gpio_put(RES, 0);
+  clear_bus();
   gpio_put(RES, 1);
 }
 
