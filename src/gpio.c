@@ -153,12 +153,7 @@ void setup_piobus(void)
     pio_sm_claim(bus_pio, sm_delay);
     offset_delay = pio_add_program(bus_pio, &delay_timer_program);
     pio_sm_config c_delay = delay_timer_program_get_default_config(offset_delay);
-    sm_config_set_sideset_pins(&c_delay, NIL0);
-    sm_config_set_sideset(&c_delay, 1, false, false);
     sm_config_set_fifo_join(&c_delay, PIO_FIFO_JOIN_TX);
-    pio_gpio_init(bus_pio, NIL0);
-    gpio_set_function(NIL0, pio_get_funcsel(bus_pio));
-    pio_sm_set_consecutive_pindirs(bus_pio, sm_delay, NIL0, 1, true);
     pio_sm_init(bus_pio, sm_delay, offset_delay, &c_delay);
     pio_sm_set_enabled(bus_pio, sm_delay, true);
   }
