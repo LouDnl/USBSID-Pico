@@ -76,6 +76,8 @@ extern void sync_pios(void);
 extern void init_sidclock(void);
 extern int detect_clocksignal(void);
 extern void pause_sid(void);
+extern void mute_sid(void);
+extern void unmute_sid(void);
 extern void reset_sid(void);
 extern void enable_sid(void);
 extern void disable_sid(void);
@@ -275,6 +277,14 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
           DBG("[PAUSE_SID]\n");
           pause_sid();
           break;
+        case MUTE:
+          DBG("[MUTE_SID]\n");
+          mute_sid();
+          break;
+        case UNMUTE:
+          DBG("[UNMUTE_SID]\n");
+          unmute_sid();
+          break;
         case RESET_SID:
           DBG("[RESET_SID]\n");
           reset_sid();
@@ -310,8 +320,6 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
       handle_config_request(read_buffer);
       break;
     case MAX_BUFFER_SIZE: /* Cycled write buffer */
-      // ISSUE: Not perfect yet!
-      // TODO: NEED TO ACCOUNT FOR CLOCK DRIFT!
       usbdata = 1;
       for (int i = 0; i < *n; i += 4) {
         cycled_bus_operation(read_buffer[i], read_buffer[i + 1], (read_buffer[i + 2] << 8 | read_buffer[i + 3]));
