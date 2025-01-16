@@ -821,6 +821,7 @@ void apply_config(void)
       CFG("[CONFIG] sock_one enabled, sock_two enabled\n");
       one = 0b100;                     /* CS1 low, CS2 high */
       two = (sids_one == 2) ? 0b100    /* CS1 low, CS2 high */
+        : (sids_one == 1) ? 0b010      /* CS1 high, CS2 low */
         : 0b110;                       /* CS1 high, CS2 high */
       three = 0b010;                   /* CS1 high, CS2 low */
       four = (sids_two == 2) ? 0b010   /* CS1 high, CS2 low */
