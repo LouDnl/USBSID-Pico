@@ -164,7 +164,6 @@ void setup_piobus(void)
 void setup_dmachannels(void)
 { /* NOTE: Do not manually assign DMA channels, this causes a Panic on the  PicoW */
   CFG("[DMA CHANNELS INIT] START\n");
-  dma_claim_mask(0b1111);
 
   { /* dma controlbus */
     dma_tx_control = dma_claim_unused_channel(true);
