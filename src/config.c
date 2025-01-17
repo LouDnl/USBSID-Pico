@@ -620,13 +620,14 @@ void handle_config_request(uint8_t * buffer)
           break;
       }
       break;
-    case TEST_ALLSIDS:
+    case TEST_ALLSIDS:  /* ISSUE: This must be run on Core 1 so we can actually stop it! */
       CFG("[TEST_ALLSIDS]\n");
       for (int s = 0; s < numsids; s++) {
         CFG("[START TEST SID %d]\n", s);
         sid_test(s, '1', 'A');
       };
       break;
+    /* ISSUE: This must be run on Core 1 so we can actually stop it! */
     case TEST_SID1:
     case TEST_SID2:
     case TEST_SID3:
