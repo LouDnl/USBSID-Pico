@@ -48,6 +48,8 @@ static uint16_t control_word, delay_word;
 static uint32_t data_word, read_data, dir_mask;
 static float sidclock_frequency, busclock_frequency;
 static int pico_hz = 0;
+
+static int paused_state = 0;
 static uint8_t volume_state[4] = {0};
 
 /* Read GPIO macro
@@ -413,12 +415,14 @@ void mute_sid(void)
 
 void enable_sid(void)
 {
+  paused_state = 0;
   gpio_put(RES, 1);
   unmute_sid();
 }
 
 void disable_sid(void)
 {
+  paused_state = 1;
   mute_sid();
   gpio_put(CS1, 1);
   gpio_put(CS2, 1);
@@ -432,15 +436,25 @@ void clear_bus(void)
 
 void pause_sid(void)
 {
+  if (paused_state == 0) mute_sid();
+  if (paused_state == 1) unmute_sid();
   bus_operation((0x10 | PAUSE), 0x0, 0x0);
+  paused_state = !paused_state;
 }
 
 void reset_sid(void)
 {
+  paused_state = 0;
   gpio_put(CS1, 1);
   gpio_put(CS2, 1);
   gpio_put(RES, 0);
-  clear_bus();
+  gpio_put(RES, 1);
+}
+
+void reset_sid_registers(void)
+{
+  gpio_put(RES, 0);
+  sleep_us(10);
   gpio_put(RES, 1);
 }
 
