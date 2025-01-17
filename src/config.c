@@ -602,7 +602,6 @@ void handle_config_request(uint8_t * buffer)
         } else {
           CFG("[CLOCK FROM]%d AND [CLOCK TO]%d ARE THE SAME, SKIPPING SET_CLOCK\n", usbsid_config.clock_rate, clockrates[(int)buffer[1]]);
         }
-
       }
       break;
     case DETECT_SIDS:
