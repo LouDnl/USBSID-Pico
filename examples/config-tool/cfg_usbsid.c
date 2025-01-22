@@ -286,8 +286,8 @@ int usbsid_init(void)
         goto out;
     }
 
-    libusb_set_option(&ctx, LIBUSB_OPTION_LOG_LEVEL, 3);
-    
+    libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, 3);
+
     devh = libusb_open_device_with_vid_pid(ctx, VENDOR_ID, PRODUCT_ID);
     if (!devh) {
         fprintf(stderr, "Error finding USB device\n");
@@ -367,18 +367,18 @@ int read_chars(unsigned char * data, int size)
 
 void write_command(uint8_t command)
 {
-  command_buffer[0] = command;
+  command_buffer[0] |= (command << 6);
   write_chars(command_buffer, 3);
 }
 
 void write_config_command(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t e)
 {
-  config_buffer[0] = a;
-  config_buffer[1] = b;
-  config_buffer[2] = c;
-  config_buffer[3] = d;
-  config_buffer[4] = e;
-  write_chars(config_buffer, 5);
+  config_buffer[1] = a;
+  config_buffer[2] = b;
+  config_buffer[3] = c;
+  config_buffer[4] = d;
+  config_buffer[5] = e;
+  write_chars(config_buffer, 6);
   return;
 }
 
@@ -446,8 +446,8 @@ void print_cfg_buffer(const uint8_t *buf, size_t len)
 
 void read_version(int print_version)
 {
-  memset(config_buffer, 0, (sizeof(config_buffer)/sizeof(config_buffer[0])));
-  config_buffer[0] = 0x80;
+  memset(config_buffer+1, 0, (sizeof(config_buffer)/sizeof(config_buffer[0]))-1);
+  config_buffer[1] = 0x80;
   write_chars(config_buffer, (sizeof(config_buffer)/sizeof(config_buffer[0])));
 
   int len;
@@ -612,7 +612,7 @@ void print_config(void)
 
 void sid_autodetect(void)
 {
-  config_buffer[0] = 0x51;
+  config_buffer[1] = 0x51;
   write_chars(config_buffer, sizeof(config_buffer));
 
   int len;
@@ -628,7 +628,7 @@ void sid_autodetect(void)
 
 void read_config(void)
 {
-  config_buffer[0] = 0x30;
+  config_buffer[1] = 0x30;
   write_chars(config_buffer, sizeof(config_buffer));
 
   int len;
@@ -742,7 +742,7 @@ void skpico_config_mode(void)
 {
   uint8_t skpicobuff[3] = {0};
   memcpy(skpicobuff, &init_configmode, 3);
-  skpicobuff[1] = (skpicobuff[1] + base_address); 
+  skpicobuff[1] = (skpicobuff[1] + base_address);
   write_chars(skpicobuff, 3);  /* Start or extend config mode */
 }
 
@@ -750,7 +750,7 @@ void skpico_end_config_mode(void)
 {
   uint8_t skpicobuff[3] = {0};
   memcpy(skpicobuff, &config_exit, 3);
-  skpicobuff[1] = (skpicobuff[1] + base_address); 
+  skpicobuff[1] = (skpicobuff[1] + base_address);
   write_chars(skpicobuff, 3);  /* Exit config mode */
 }
 
@@ -758,7 +758,7 @@ void skpico_update_config(void)
 {
   uint8_t skpicobuff[3] = {0};
   memcpy(skpicobuff, &config_update, 3);
-  skpicobuff[1] = (skpicobuff[1] + base_address); 
+  skpicobuff[1] = (skpicobuff[1] + base_address);
   write_chars(skpicobuff, 3);  /* Update config, doesn't save */
 }
 
@@ -766,7 +766,7 @@ void skpico_save_config(void)
 {
   uint8_t skpicobuff[3] = {0};
   memcpy(skpicobuff, &config_writeupdate, 3);
-  skpicobuff[1] = (skpicobuff[1] + base_address); 
+  skpicobuff[1] = (skpicobuff[1] + base_address);
   write_chars(skpicobuff, 3);  /* Update & save config */
 }
 
@@ -777,8 +777,8 @@ void skpico_read_config(void)
   for (int i = 0; i < 64 ; i++) {
     //uint8_t skpicobuff[3] = {0};
     //memcpy(skpicobuff, &read_buffer, 3);
-    //skpicobuff[1] = (0x1d + base_address); 
-    read_buffer[1] = (0x1d + base_address); 
+    //skpicobuff[1] = (0x1d + base_address);
+    read_buffer[1] = (0x1d + base_address);
     int len;
     write_chars(read_buffer, 3);
     len = read_chars(read_data, sizeof(read_data));
@@ -816,7 +816,7 @@ void skpico_write_config(void)
 {
   uint8_t skpicobuff[3] = {0};
   memcpy(skpicobuff, &start_config_write, 3);
-  skpicobuff[1] = (skpicobuff[1] + base_address); 
+  skpicobuff[1] = (skpicobuff[1] + base_address);
   write_chars(skpicobuff, 3);
 
   for (int i = 0; i < 64 ; i++) {
@@ -1116,8 +1116,9 @@ void config_usbsidpico(int argc, char **argv)
       read_config();
       printf("Printing config\n");
       print_config();
-      param_count++;
-      if (argc == 3 && !strcmp(argv[param_count], "-d")) print_socket_config();
+      for (int pc = 1; pc < argc; pc++ ) {
+        if (!strcmp(argv[pc], "-d")) print_socket_config();
+      }
       break;
     }
 

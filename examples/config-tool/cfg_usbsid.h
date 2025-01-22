@@ -29,26 +29,32 @@
 #define ACM_CTRL_DTR   0x01
 #define ACM_CTRL_RTS   0x02
 
-uint8_t read_data[1];
-uint8_t read_data_max[64];
-uint8_t read_data_uber[128];
-uint8_t read_buffer[3]  = { 0x1, 0x0, 0x0 };
-uint8_t write_buffer[3]  = { 0x0, 0x0, 0x0 };
-uint8_t command_buffer[3]  = { 0x0, 0x0, 0x0 };
-uint8_t config_buffer[5]  = { 0x0, 0x0, 0x0, 0x0, 0x0 };
-
 /* usbsid-pico variables */
 enum
 {
-  WRITE = 0,      /* 0 */
-  READ,           /* 1 */
-  PAUSE,          /* 2 */
-  RESET_SID,      /* 3 */
-  DISABLE_SID,    /* 4 */
-  ENABLE_SID,     /* 5 */
-  CLEAR_BUS,      /* 6 */
-  RESET_MCU,      /* 7 */
-  BOOTLOADER,     /* 8 */
+  PACKET_TYPE  = 0xC0,  /* 0b11000000 ~ 192  */
+  BYTE_MASK    = 0x3F,  /*   0b111111 ~  63  */
+  COMMAND_MASK = 0x1F,  /*    0b11111 ~  31  */
+
+  /* BYTE 0 */
+  /* Top 2 bits */
+  WRITE        =   0,   /*        0b0 ~ 0x00 */
+  READ         =   1,   /*        0b1 ~ 0x40 */
+  CYCLED_WRITE =   2,   /*       0b10 ~ 0x80 */
+  COMMAND      =   3,   /*       0b11 ~ 0xC0 */
+  /* Lower 6 bits for byte count */
+  /* Lower 6 bits for Commands */
+  PAUSE        =  10,   /*     0b1010 ~ 0x0A */
+  UNPAUSE      =  11,   /*     0b1011 ~ 0x0B */
+  MUTE         =  12,   /*     0b1100 ~ 0x0C */
+  UNMUTE       =  13,   /*     0b1101 ~ 0x0D */
+  RESET_SID    =  14,   /*     0b1110 ~ 0x0E */
+  DISABLE_SID  =  15,   /*     0b1111 ~ 0x0F */
+  ENABLE_SID   =  16,   /*    0b10000 ~ 0x10 */
+  CLEAR_BUS    =  17,   /*    0b10001 ~ 0x11 */
+  CONFIG       =  18,   /*    0b10010 ~ 0x12 */
+  RESET_MCU    =  19,   /*    0b10011 ~ 0x13 */
+  BOOTLOADER   =  20,   /*    0b10100 ~ 0x14 */
 };
 enum
 {
@@ -95,6 +101,14 @@ enum config_clockrates
     NTSC    = CLOCK_NTSC,     /* 2 */
     DREAN   = CLOCK_DREAN,    /* 3 */
 };
+
+uint8_t read_data[1];
+uint8_t read_data_max[64];
+uint8_t read_data_uber[128];
+uint8_t read_buffer[3]    = { (READ << 6), 0x0, 0x0 };
+uint8_t write_buffer[3]   = { (WRITE << 6), 0x0, 0x0 };
+uint8_t command_buffer[3] = { (COMMAND << 6), 0x0, 0x0 };
+uint8_t config_buffer[6]  = { ((COMMAND << 6) | 18), 0x0, 0x0, 0x0, 0x0, 0x0 };
 
 const char * enabled[] = {"Disabled", "Enabled"};
 const char * intext[] = { "Internal", "External" };
@@ -194,5 +208,4 @@ typedef struct Config {
   .Midi = { \
     .enabled = true \
   }, \
-} \
-
+}
