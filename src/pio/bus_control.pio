@@ -46,43 +46,40 @@
 
 ; Delay counter program
 .program delay_timer
-.side_set 1 opt
 .wrap_target
-    pull block       side 1 ; Pull data from FIFO
-    out x 16         side 1 ; Move data into scratch register x
+    pull block              ; Pull data from FIFO
+    out x 16                ; Move data into scratch register x
 delay:
-    wait 1 gpio PHI  side 1 ; Wait for clock to go high
-    wait 0 gpio PHI  side 0 ; Wait for clock to go low
+    wait 1 gpio PHI         ; Wait for clock to go high
+    wait 0 gpio PHI         ; Wait for clock to go low
     jmp x-- delay           ; Decrease x and restart count
-    irq set BUSIRQ   side 0 ; Set IRQ and continue
-    irq wait DATAIRQ side 0 ; Set IRQ and wait for its release
+    irq set BUSIRQ          ; Set IRQ and continue
+    irq wait DATAIRQ        ; Set IRQ and wait for its release
 .wrap
 
 ; Bus control program
 .program bus_control
 .wrap_target
-    pull block             ; Pull data from FIFO
-    wait 1 irq BUSIRQ      ; Wait for IRQ signal
-    ; wait 1 gpio PHI        ; Wait for clock to go high ; ISSUE: For async this is shit, for sync this is great
-    wait 0 gpio PHI   [26] ; Wait for clock to go low
-    out pins, 3            ; Set control pins (19-21)
-    wait 1 gpio PHI   [24] ; Wait for clock to go high
-    jmp pin read           ; Jump to read if IN pin is high
-    jmp done               ; Jump to done if write and wait
+    pull block              ; Pull data from FIFO
+    wait 1 irq BUSIRQ       ; Wait for IRQ signal
+    wait 0 gpio PHI   [26]  ; Wait for clock to go low
+    out pins, 3             ; Set control pins (19-21)
+    wait 1 gpio PHI   [24]  ; Wait for clock to go high
+    jmp pin read            ; Jump to read if IN pin is high
+    jmp done                ; Jump to done if write and wait
 read:
-    in pins, 8             ; Read data bus into isr
-    push block             ; Push isr to fifo
+    in pins, 8              ; Read data bus into isr
+    push block              ; Push isr to fifo
 done:
-    out pins, 3            ; Set control to next 3 bits from fifo
-    wait 0 gpio PHI        ; Wait for clock to go low
+    out pins, 3             ; Set control to next 3 bits from fifo
+    wait 0 gpio PHI         ; Wait for clock to go low
 .wrap
 
 ; Data and address bus program
 .program data_bus
 .wrap_target
     pull block              ; Pull data from FIFO
-    wait 1 irq DATAIRQ      ; Wait for data irq signal
-    ; wait 1 gpio PHI         ; Wait for clock to go high ; ISSUE: For async this is shit, for sync this is great
+    wait 1 irq DATAIRQ      ; Wait for data irq signal ~ should trigger exactly 1 cycle after datairq
     wait 0 gpio PHI    [26] ; Wait for clock to go low
     out pins, 16            ; Set data bus pins
     out pindirs 16          ; Set pin directions

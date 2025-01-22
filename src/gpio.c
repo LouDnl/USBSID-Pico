@@ -303,11 +303,11 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
   pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, 4));  /* Preset the statemachine IRQ to not wait for a 1 */
   pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, 5));  /* Preset the statemachine IRQ to not wait for a 1 */
   switch (command & 0x0F) {
-    case PAUSE:
+    case G_PAUSE:
       control_word = 0b110110;
       dma_channel_set_read_addr(dma_tx_control, &control_word, true); /* Control lines RW, CS1 & CS2 DMA transfer */
       break;
-    case CLEAR_BUS:
+    case G_CLEAR_BUS:
       dir_mask = 0b1111111111111111;
       data_word = (dir_mask << 16) | 0x0;
       dma_channel_set_read_addr(dma_tx_data, &data_word, true); /* Data & Address DMA transfer */
@@ -350,12 +350,12 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
       dma_channel_wait_for_finish_blocking(dma_rx_data);
       GPIODBG("[R]$%08x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\r\n", read_data, PRINTF_BYTE_TO_BINARY_INT32(read_data), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word));
       return (read_data >> 24) & 0xFF;
-    case PAUSE:
+    case G_PAUSE:
     case WRITE:
       dma_channel_wait_for_finish_blocking(dma_tx_control);
       GPIODBG("[W]$%08x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\r\n", data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word));
       return 0;
-    case CLEAR_BUS:
+    case G_CLEAR_BUS:
       /* don't wait, just fall through */
     default:
       return 0;
@@ -399,18 +399,24 @@ void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, ui
 
 void unmute_sid(void)
 {
+  DBG("[UNMUTE] ");
   for (int i = 0; i < numsids; i++) {
     if ((volume_state[i] & 0xF) == 0) volume_state[i] = (volume_state[i] & 0xF0) | 0x0E;
     bus_operation((0x10 | WRITE), ((0x20 * i) + 0x18), volume_state[i]);  /* Volume back */
+    DBG("[%d] 0x%02X ", i, volume_state[i]);
   }
+  DBG("\n");
 }
 
 void mute_sid(void)
 {
+  DBG("[MUTE] ");
   for (int i = 0; i < numsids; i++) {
     volume_state[i] = sid_memory[((0x20 * i) + 0x18)];
     bus_operation((0x10 | WRITE), ((0x20 * i) + 0x18), (volume_state[i] & 0xF0));  /* Volume to 0 */
+    DBG("[%d] 0x%02X ", i, volume_state[i]);
   }
+  DBG("\n");
 }
 
 void enable_sid(void)
@@ -431,15 +437,22 @@ void disable_sid(void)
 
 void clear_bus(void)
 {
-  bus_operation((0x10 | CLEAR_BUS), 0x0, 0x0);
+  bus_operation((0x10 | G_CLEAR_BUS), 0x0, 0x0);
 }
 
 void pause_sid(void)
 {
+  bus_operation((0x10 | G_PAUSE), 0x0, 0x0);
+}
+
+void pause_sid_withmute(void)
+{
+  DBG("[PAUSE STATE PRE] %d\n", paused_state);
   if (paused_state == 0) mute_sid();
   if (paused_state == 1) unmute_sid();
-  bus_operation((0x10 | PAUSE), 0x0, 0x0);
+  bus_operation((0x10 | G_PAUSE), 0x0, 0x0);
   paused_state = !paused_state;
+  DBG("[PAUSE STATE POST] %d\n", paused_state);
 }
 
 void reset_sid(void)
@@ -453,6 +466,9 @@ void reset_sid(void)
 
 void reset_sid_registers(void)
 {
+  paused_state = 0;
+  gpio_put(CS1, 1);
+  gpio_put(CS2, 1);
   gpio_put(RES, 0);
   sleep_us(10);
   gpio_put(RES, 1);

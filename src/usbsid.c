@@ -40,8 +40,10 @@ static semaphore_t core1_init;
 
 /* Init vars */
 uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] = {0}; /* 4x max */
+uint8_t __not_in_flash("usbsid_buffer") sid_buffer[MAX_BUFFER_SIZE];
 uint8_t __not_in_flash("usbsid_buffer") read_buffer[MAX_BUFFER_SIZE];
 uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE];
+uint8_t __not_in_flash("usbsid_buffer") config_buffer[5];
 int usb_connected = 0, usbdata = 0, pwm_value = 0, updown = 1;
 uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
 uint8_t *cdc_itf = 0, *wusb_itf = 0;
@@ -76,9 +78,11 @@ extern void sync_pios(void);
 extern void init_sidclock(void);
 extern int detect_clocksignal(void);
 extern void pause_sid(void);
+extern void pause_sid_withmute(void);
 extern void mute_sid(void);
 extern void unmute_sid(void);
 extern void reset_sid(void);
+extern void reset_sid_registers(void);
 extern void enable_sid(void);
 extern void disable_sid(void);
 extern void clear_bus(void);
@@ -247,91 +251,96 @@ void webserial_write(uint8_t * itf, uint32_t n)
 
 /* Process received usb data */
 void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
-{  /* BUG: PICO_W IS BROKEN ATM! */
-  switch (*n) {
-    case BACKWARD_BYTES:  /* For backward compatability */
-      read_buffer[1] = read_buffer[2];
-      read_buffer[2] = read_buffer[3];
-    case BYTES_EXPECTED:
+{
+  usbdata = 1;
+  uint8_t command = ((sid_buffer[0] & PACKET_TYPE) >> 6);
+  uint8_t subcommand = (sid_buffer[0] & COMMAND_MASK);
+  uint8_t n_bytes = (sid_buffer[0] & BYTE_MASK);
+
+  if (command == CYCLED_WRITE) {
+    n_bytes = (n_bytes == 0) ? 4 : n_bytes; /* if byte count is zero, this is a single write packet */
+    for (int i = 1; i <= n_bytes; i += 4) {
       usbdata = 1;
-      IODBG("[%c][I]$%02x $%02x $%02x[RE]\r\n", dtype, read_buffer[0], read_buffer[1], read_buffer[2]);
-      switch (read_buffer[0]) {
-        case WRITE:
-          bus_operation(0x10, read_buffer[1], read_buffer[2]);  /* write the address and value to the SID */
-          break;
-        case READ:
-          write_buffer[0] = bus_operation((0x10 | READ), read_buffer[1], read_buffer[2]);  /* write the address to the SID and read the data back */
-          switch (dtype) {  /* write the result to the USB client */
-            case 'C':
-              cdc_write(itf, BYTES_TO_SEND);
-              break;
-            case 'W':
-              webserial_write(itf, BYTES_TO_SEND);
-              break;
-            default:
-              IODBG("[WRITE ERROR]%c\r\n", dtype);
-              break;
-          }
-          break;
-        case PAUSE:
-          DBG("[PAUSE_SID]\n");
-          pause_sid();
-          break;
-        case MUTE:
-          DBG("[MUTE_SID]\n");
-          mute_sid();
-          break;
-        case UNMUTE:
-          DBG("[UNMUTE_SID]\n");
-          unmute_sid();
-          break;
-        case RESET_SID:
-          DBG("[RESET_SID]\n");
-          reset_sid();
-          break;
-        case DISABLE_SID:
-          DBG("[DISABLE_SID]\n");
-          disable_sid();
-          break;
-        case ENABLE_SID:
-          DBG("[ENABLE_SID]\n");
-          enable_sid();
-          break;
-        case CLEAR_BUS:
-          DBG("[CLEAR_BUS]\n");
-          clear_bus();
-          break;
-        case RESET_MCU:
-          DBG("[RESET_MCU]\n");
-          mcu_reset();
-          break;
-        case BOOTLOADER:
-          DBG("[BOOTLOADER]\n");
-          mcu_jump_to_bootloader();
-          break;
-        default:
-          break;
+      if (sid_buffer[i] == 0xFF && sid_buffer[i + 1] == 0xF0 && sid_buffer[i + 2] == 0xFF && sid_buffer[i + 3] == 0xFF) {
+        /* EXPERIMENTAL ~ NOT WORKING YET */
+        reset_sid();
+        return;
+      };
+      cycled_bus_operation(sid_buffer[i], sid_buffer[i + 1], (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]));
+    };
+    return;
+  };
+  if (command == WRITE) {
+    n_bytes = (n_bytes == 0) ? 2 : n_bytes; /* if byte count is zero, this is a single write packet */
+    for (int i = 1; i <= n_bytes; i += 2) {
+      bus_operation(0x10, sid_buffer[i], sid_buffer[i + 1]);  /* write the address and value to the SID */
+    };
+    return;
+  };
+  if (command == READ) {  /* READING CAN ONLY HANDLE ONE AT A TIME, PERIOD. */
+    write_buffer[0] = bus_operation((0x10 | READ), sid_buffer[1], sid_buffer[2]);  /* write the address to the SID and read the data back */
+    switch (dtype) {  /* write the result to the USB client */
+      case 'C':
+        cdc_write(itf, BYTES_TO_SEND);
+        break;
+      case 'W':
+        webserial_write(itf, BYTES_TO_SEND);
+        break;
+      default:
+        IODBG("[WRITE ERROR]%c\r\n", dtype);
+        break;
+    };
+    return;
+  };
+  if (command == COMMAND) {
+    switch (subcommand) {
+      case PAUSE:
+        DBG("[PAUSE_SID]\n");
+        pause_sid();
+        break;
+      case MUTE:
+        DBG("[MUTE_SID]\n");
+        mute_sid();
+        break;
+      case UNMUTE:
+        DBG("[UNMUTE_SID]\n");
+        unmute_sid();
+        break;
+      case RESET_SID:
+        DBG("[RESET_SID]\n");
+        if (sid_buffer[1] == 0) reset_sid();
+        if (sid_buffer[1] == 1) reset_sid_registers();
+        break;
+      case DISABLE_SID:
+        DBG("[DISABLE_SID]\n");
+        disable_sid();
+        break;
+      case ENABLE_SID:
+        DBG("[ENABLE_SID]\n");
+        enable_sid();
+        break;
+      case CLEAR_BUS:
+        DBG("[CLEAR_BUS]\n");
+        clear_bus();
+        break;
+      case CONFIG:
+        DBG("[CONFIG]\n");
+        memcpy(config_buffer, (sid_buffer + 1), 5);
+        handle_config_request(config_buffer);
+        memset(config_buffer, 0, count_of(config_buffer));
+        break;
+      case RESET_MCU:
+        DBG("[RESET_MCU]\n");
+        mcu_reset();
+        break;
+      case BOOTLOADER:
+        DBG("[BOOTLOADER]\n");
+        mcu_jump_to_bootloader();
+        break;
+      default:
+        break;
       }
-      break;
-    case CONFIG_BYTES:
-      CFG("[%c][CFG %d] ", dtype, *n);
-      for (int i = 0; i < *n; i ++) CFG("$%02x ", read_buffer[i]);
-      CFG("\r\n");
-      handle_config_request(read_buffer);
-      break;
-    case MAX_BUFFER_SIZE: /* Cycled write buffer */
-      usbdata = 1;
-      for (int i = 0; i < *n; i += 4) {
-        cycled_bus_operation(read_buffer[i], read_buffer[i + 1], (read_buffer[i + 2] << 8 | read_buffer[i + 3]));
-      }
-      break;
-    default:
-      /* Nope not gonna handle that shit, just log it */
-      DBG("[%c][DEFAULT %d]", dtype, *n);
-      for (int i = 0; i < *n; i ++) DBG("$%02x ", read_buffer[i]);
-      DBG("\r\n");
-      break;
-  }
+  };
 }
 
 
@@ -526,7 +535,10 @@ void tud_cdc_rx_cb(uint8_t itf)
   vu = vu == 0 ? 100 : vu;  /* NOTICE: Testfix for core1 setting dtype to 0 */
   cdcread = tud_cdc_n_read(*cdc_itf, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
   tud_cdc_n_read_flush(*cdc_itf);
+  memcpy(sid_buffer, read_buffer, cdcread);
   handle_buffer_task(cdc_itf, &cdcread);
+  memset(read_buffer, 0, count_of(read_buffer));
+  memset(sid_buffer, 0, count_of(sid_buffer));
 }
 
 void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char)
@@ -604,7 +616,10 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
     usbdata = 1, dtype = wusb;
     webread = tud_vendor_n_read(*wusb_itf, &read_buffer, MAX_BUFFER_SIZE);
     tud_vendor_n_read_flush(*wusb_itf);
+    memcpy(sid_buffer, read_buffer, webread);
     handle_buffer_task(wusb_itf, &webread);
+    memset(read_buffer, 0, count_of(read_buffer));
+    memset(sid_buffer, 0, count_of(sid_buffer));
   }
 }
 
