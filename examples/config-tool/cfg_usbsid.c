@@ -367,7 +367,7 @@ int read_chars(unsigned char * data, int size)
 
 void write_command(uint8_t command)
 {
-  command_buffer[0] |= (command << 6);
+  command_buffer[0] |= command;
   write_chars(command_buffer, 3);
 }
 
