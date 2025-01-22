@@ -92,6 +92,7 @@ jobs:
           git checkout master
           git pull
           python3 tools/get_deps.py rp2040
+          python3 tools/get_deps.py rp2350
 
       - name: 💽 Cache Pico-Extras
         id: cache-pico-extras
