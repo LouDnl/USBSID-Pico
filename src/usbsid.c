@@ -59,7 +59,6 @@ uint8_t (*write_buffer_p)[MAX_BUFFER_SIZE] = &write_buffer;
 
 /* Config externals */
 Config usbsid_config;
-uint8_t sid_memory[(0x20 * 4)]; /* 4x max */
 extern int sock_one, sock_two, sids_one, sids_two, numsids, act_as_one;
 extern void default_config(Config * config);
 extern void load_config(Config * config);
@@ -234,7 +233,7 @@ void cdc_write(uint8_t * itf, uint32_t n)
   tud_cdc_n_write(*itf, write_buffer, n);  /* write n bytes of data to client */
   tud_cdc_n_write_flush(*itf);
   vu = vu == 0 ? 100 : vu;  /* NOTICE: Testfix for core1 setting dtype to 0 */
-  IODBG("[O] [%c] DAT[0x%02x] \r\n", dtype, write_buffer[0]);
+  IODBG("[O] [%c] %02X:%02X\n", dtype, sid_buffer[1], write_buffer[0]);
 }
 
 /* Write from device to host */
@@ -258,23 +257,36 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
   uint8_t n_bytes = (sid_buffer[0] & BYTE_MASK);
 
   if (command == CYCLED_WRITE) {
-    n_bytes = (n_bytes == 0) ? 4 : n_bytes; /* if byte count is zero, this is a single write packet */
-    for (int i = 1; i <= n_bytes; i += 4) {
-      usbdata = 1;
-      if (sid_buffer[i] == 0xFF && sid_buffer[i + 1] == 0xF0 && sid_buffer[i + 2] == 0xFF && sid_buffer[i + 3] == 0xFF) {
-        /* EXPERIMENTAL ~ NOT WORKING YET */
-        reset_sid();
-        return;
+    // n_bytes = (n_bytes == 0) ? 4 : n_bytes; /* if byte count is zero, this is a single write packet */
+    if (n_bytes == 0) {
+      cycled_bus_operation(sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
+    } else {
+      for (int i = 1; i <= n_bytes; i += 4) {
+        usbdata = 1;
+        if (sid_buffer[i] == 0xFF && sid_buffer[i + 1] == 0xF0 && sid_buffer[i + 2] == 0xFF && sid_buffer[i + 3] == 0xFF) {
+          /* EXPERIMENTAL ~ NOT WORKING YET */
+          /* reset_sid(); */
+          /* return; */
+          continue;
+        };
+        cycled_bus_operation(sid_buffer[i], sid_buffer[i + 1], (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]));
       };
-      cycled_bus_operation(sid_buffer[i], sid_buffer[i + 1], (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]));
-    };
+    }
     return;
   };
   if (command == WRITE) {
-    n_bytes = (n_bytes == 0) ? 2 : n_bytes; /* if byte count is zero, this is a single write packet */
-    for (int i = 1; i <= n_bytes; i += 2) {
-      bus_operation(0x10, sid_buffer[i], sid_buffer[i + 1]);  /* write the address and value to the SID */
-    };
+    // n_bytes = (n_bytes == 0) ? 2 : n_bytes; /* if byte count is zero, this is a single write packet */
+    if (n_bytes == 0) {
+      bus_operation(0x10, sid_buffer[1], sid_buffer[2]);  /* write the address and value to the SID */
+      IODBG("[I] [%c] $%02X:%02X\n", dtype, sid_buffer[1], sid_buffer[2]);
+    } else {
+      IODBG("[I] [%c]", dtype);
+      for (int i = 1; i <= n_bytes; i += 2) {
+        IODBG(" $%02X:%02X", sid_buffer[i], sid_buffer[i + 1]);
+        bus_operation(0x10, sid_buffer[i], sid_buffer[i + 1]);  /* write the address and value to the SID */
+      };
+      IODBG("\n");
+    }
     return;
   };
   if (command == READ) {  /* READING CAN ONLY HANDLE ONE AT A TIME, PERIOD. */
@@ -635,7 +647,10 @@ void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
 /* Handle incoming vendor and webusb data */
 bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const * request)
 {
-  DBG("[%s] rhport:%x, stage:%x, bRequest:0x%x, wValue:%d, bittype:%x\r\n", __func__, stage, rhport, request->bRequest, request->wValue, request->bmRequestType_bit.type);
+  DBG("[%s] stage:%x, rhport:%x, bRequest:0x%x, wValue:%d, wIndex:%x, wLength:%x, bmRequestType:%x, type:%x, recipient:%x, direction:%x\r\n",
+    __func__, stage, rhport,
+    request->bRequest, request->wValue, request->wIndex, request->wLength, request->bmRequestType,
+    request->bmRequestType_bit.type, request->bmRequestType_bit.recipient, request->bmRequestType_bit.direction);
   /* Do nothing with IDLE (0), DATA (2) & ACK (3) stages */
   if (stage != CONTROL_STAGE_SETUP) return true;  /* Stage 1 */
 
@@ -643,6 +658,28 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
     case TUSB_REQ_TYPE_STANDARD:  /* 0 */
       break;
     case TUSB_REQ_TYPE_CLASS:  /* 1 */
+      if (request->bRequest == WEBUSB_COMMAND) {
+        DBG("request->bRequest == WEBUSB_COMMAND\n");
+        if (request->wValue == WEBUSB_RESET) {
+          DBG("request->wValue == WEBUSB_RESET\n");
+          reset_sid_registers();
+          unmute_sid();
+        }
+        if (request->wValue == RESET_SID) {
+          DBG("request->wValue == RESET_SID\n");
+          reset_sid();
+        }
+        if (request->wValue == PAUSE) {
+          DBG("request->wValue == PAUSE\n");
+          pause_sid();
+          mute_sid();
+        }
+        if (request->wValue == WEBUSB_CONTINUE) {
+          DBG("request->wValue == WEBUSB_CONTINUE\n");
+          pause_sid();
+          unmute_sid();
+        }
+      }
       if (request->bRequest == 0x22) {
         /* Webserial simulates the CDC_REQUEST_SET_CONTROL_LINE_STATE (0x22) to connect and disconnect */
         web_serial_connected = (request->wValue != 0);
