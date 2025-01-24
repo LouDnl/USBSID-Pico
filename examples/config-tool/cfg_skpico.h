@@ -24,14 +24,31 @@
  */
 
 const uint8_t init_configmode[3] = { 0x0, 0x1F, 0xFF };       /* Inits and extends config mode */
-const uint8_t config_unknown[3] = { 0x0, 0x1D, 0xFA };        /* Unknown configuration option */
-const uint8_t config_exit[3] = { 0x0, 0x1D, 0xFB };           /* Exit config mode */
-const uint8_t config_update[3] = { 0x0, 0x1D, 0xFE };         /* Update configuration */
-const uint8_t config_writeupdate[3] = { 0x0, 0x1D, 0xFF };    /* Update and write configuration */
+const uint8_t config_extend[3] = { 0x0, 0x1D, 0xFA };         /* Clear address lines and extend config mode */
+const uint8_t config_exit[3] = { 0x0, 0x1D, 0xFB };           /* Exit config mode without reset */
+const uint8_t config_update[3] = { 0x0, 0x1D, 0xFE };         /* Update configuration and exit */
+const uint8_t config_writeupdate[3] = { 0x0, 0x1D, 0xFF };    /* Update and write configuration and exit */
 const uint8_t config_write[3] = { 0x0, 0x1D, 0x0 };           /* Write complete config to memory */
 const uint8_t start_config_write[3] = { 0x0, 0x1E, 0x0 };     /* Write single value to config */
 const uint8_t set_dac_mode_mono8[3] = { 0x0, 0x1F, 0xFC };    /* Set DAC mode to mono */
 const uint8_t set_dac_mode_stereo8[3] = { 0x0, 0x1F, 0xFB };  /* Set DAC mode to stereo */
+
+const uint8_t skpico_default_config[64] = {                   /* Default SKPico config */
+  0x1, 0xC, 0x1, 0xE, /* SID 1 */
+  0,0,0,0, /* -- */
+  0x3, 0xC, 0x0, 0xE, /* SID 2 */
+  0x5,
+  0,0,0,0,0,0,
+  0,0,0,0,0,0,
+  0,0,0,0,0,0,
+  0,0,0,0,0,0,
+  0,0,0,0,0,0,
+  0,0,0,0,0,0,
+  0,0,0,0,0,0,
+  0,0,
+  0x0, 0x7, 0x0, 0xF, 0x0,
+  0,0,
+};
 
 unsigned char * config_names[/* 64 */] = {
   "CFG_SID1_TYPE",       //  0   //  1  // 0 ... 3  // 6581, 8580, 8580+digiboost, none
