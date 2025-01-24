@@ -47,7 +47,6 @@ static int dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay;
 static uint16_t control_word, delay_word;
 static uint32_t data_word, read_data, dir_mask;
 static float sidclock_frequency, busclock_frequency;
-static int pico_hz = 0;
 
 static int paused_state = 0;
 static uint8_t volume_state[4] = {0};
@@ -109,7 +108,7 @@ void init_vu(void)
 
 void setup_piobus(void)
 {
-  pico_hz = clock_get_hz(clk_sys);
+  uint32_t pico_hz = clock_get_hz(clk_sys);
   busclock_frequency = (float)pico_hz / (usbsid_config.clock_rate * 32) / 2;  /* Clock frequency is 8 times the SID clock */
 
   CFG("[BUS CLK INIT] START\n");
@@ -273,12 +272,14 @@ int detect_clocksignal(void)
 /* Init nMHz square wave output */
 void init_sidclock(void)
 {
-  sidclock_frequency = (float)clock_get_hz(clk_sys) / usbsid_config.clock_rate / 2;
+  uint32_t pico_hz = clock_get_hz(clk_sys);
+  sidclock_frequency = (float)pico_hz / usbsid_config.clock_rate / 2;
+
   CFG("[SID CLK INIT] START\n");
-  CFG("[PI CLK]@%.2fMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n",
-    pico_hz / 1000 / 1000,
+  CFG("[PI CLK]@%dMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n",
+    (pico_hz / 1000 / 1000),
     sidclock_frequency,
-    (pico_hz / sidclock_frequency / 2),
+    ((float)pico_hz / sidclock_frequency / 2),
     (int)usbsid_config.clock_rate);
   offset_clock = pio_add_program(bus_pio, &clock_program);
   sm_clock = 0;  /* PIO1 SM0 */
@@ -299,71 +300,74 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
   if ((command & 0xF0) != 0x10) {
     return 0; // Sync bit not set, ignore operation
   }
-  bool is_read = (command & 0x0F) == 0x01;
+  int sid_command = (command & 0x0F);
+  bool is_read = sid_command == 0x01;
   pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, 4));  /* Preset the statemachine IRQ to not wait for a 1 */
   pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, 5));  /* Preset the statemachine IRQ to not wait for a 1 */
-  switch (command & 0x0F) {
+
+  control_word = 0b110000;
+  data_word = (address & 0x3F) << 8 | data;
+  dir_mask = 0x0;
+  dir_mask |= (is_read ? 0b1111111100000000 : 0b1111111111111111);
+  data_word = (dir_mask << 16) | data_word;
+  control_word |= (is_read ? 1 : 0);
+  switch (address) {
+    case 0x00 ... 0x1F:
+      control_word |= one;
+      break;
+    case 0x20 ... 0x3F:
+      control_word |= two;
+      break;
+    case 0x40 ... 0x5F:
+      control_word |= three;
+      break;
+    case 0x60 ... 0x7F:
+      control_word |= four;
+      break;
+  }
+
+  switch (sid_command) {
     case G_PAUSE:
       control_word = 0b110110;
       dma_channel_set_read_addr(dma_tx_control, &control_word, true); /* Control lines RW, CS1 & CS2 DMA transfer */
       break;
-    case G_CLEAR_BUS:
-      dir_mask = 0b1111111111111111;
-      data_word = (dir_mask << 16) | 0x0;
-      dma_channel_set_read_addr(dma_tx_data, &data_word, true); /* Data & Address DMA transfer */
-      break;
     case WRITE:
       sid_memory[address] = data;
-    case READ:
-    default:
-      control_word = 0b111000;
-      data_word = (address & 0x3F) << 8 | data;
-      dir_mask = 0x0;
-      dir_mask |= (is_read ? 0b1111111100000000 : 0b1111111111111111);
-      data_word = (dir_mask << 16) | data_word;
-      control_word |= (is_read ? 1 : 0);
-      switch (address) {
-        case 0x00 ... 0x1F:
-          control_word |= one;
-          break;
-        case 0x20 ... 0x3F:
-          control_word |= two;
-          break;
-        case 0x40 ... 0x5F:
-          control_word |= three;
-          break;
-        case 0x60 ... 0x7F:
-          control_word |= four;
-          break;
-      }
-      dma_channel_set_read_addr(dma_tx_data, &data_word, true); /* Data & Address DMA transfer */
       pio_sm_exec(bus_pio, sm_data, pio_encode_wait_pin(true, 22));
-      dma_channel_set_read_addr(dma_tx_control, &control_word, true); /* Control lines RW, CS1 & CS2 DMA transfer */
       pio_sm_exec(bus_pio, sm_control, pio_encode_wait_pin(true, 22));
+      dma_channel_set_read_addr(dma_tx_data, &data_word, true); /* Data & Address DMA transfer */
+      dma_channel_set_read_addr(dma_tx_control, &control_word, true); /* Control lines RW, CS1 & CS2 DMA transfer */
       break;
-  }
-
-  switch (command & 0x0F) {
     case READ:
+      pio_sm_exec(bus_pio, sm_data, pio_encode_wait_pin(true, 22));
+      pio_sm_exec(bus_pio, sm_control, pio_encode_wait_pin(true, 22));
+      /* These are in a different order then WRITE on purpose so we actually get the read result */
+      dma_channel_set_read_addr(dma_tx_control, &control_word, true); /* Control lines RW, CS1 & CS2 DMA transfer */
+      dma_channel_set_read_addr(dma_tx_data, &data_word, true); /* Data & Address DMA transfer */
       read_data = 0x0;
       dma_channel_set_write_addr(dma_rx_data, &read_data, true);
       dma_channel_wait_for_finish_blocking(dma_rx_data);
       GPIODBG("[R]$%08x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\r\n", read_data, PRINTF_BYTE_TO_BINARY_INT32(read_data), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word));
+      sid_memory[address] = (read_data >> 24) & 0xFF;
       return (read_data >> 24) & 0xFF;
-    case G_PAUSE:
-    case WRITE:
-      dma_channel_wait_for_finish_blocking(dma_tx_control);
-      GPIODBG("[W]$%08x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\r\n", data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word));
-      return 0;
     case G_CLEAR_BUS:
-      /* don't wait, just fall through */
+      dir_mask = 0b1111111111111111;
+      data_word = (dir_mask << 16) | 0x0;
+      dma_channel_set_read_addr(dma_tx_data, &data_word, true); /* Data & Address DMA transfer */
+      return 0;
     default:
       return 0;
   }
+
+  /* WRITE & G_PAUSE */
+  dma_channel_wait_for_finish_blocking(dma_tx_control);
+  GPIODBG("[W]$%08x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\r\n", data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word));
+  return 0;
 }
 
 void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, uint16_t cycles)
 {
+  GPIODBG("[CB] $%02X:%02X %u\n", address, data, cycles);
   delay_word = cycles;
   if (cycles >= 1) {  /* Minimum of 1 cycle as delay, otherwise unneeded overhead */
     dma_channel_set_read_addr(dma_tx_delay, &delay_word, true);  /* Delay cycles DMA transfer */
@@ -391,8 +395,9 @@ void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, ui
       control_word |= four;
       break;
   }
-  dma_channel_set_read_addr(dma_tx_control, &control_word, true); /* Control lines RW, CS1 & CS2 DMA transfer */
+
   dma_channel_set_read_addr(dma_tx_data, &data_word, true); /* Data & Address DMA transfer */
+  dma_channel_set_read_addr(dma_tx_control, &control_word, true); /* Control lines RW, CS1 & CS2 DMA transfer */
   dma_channel_wait_for_finish_blocking(dma_tx_control);
   return;
 }
@@ -460,6 +465,7 @@ void reset_sid(void)
   paused_state = 0;
   gpio_put(CS1, 1);
   gpio_put(CS2, 1);
+  sleep_us(10);  /* 10x 02 cycles as per datasheet */
   gpio_put(RES, 0);
   gpio_put(RES, 1);
 }
@@ -470,7 +476,7 @@ void reset_sid_registers(void)
   gpio_put(CS1, 1);
   gpio_put(CS2, 1);
   gpio_put(RES, 0);
-  sleep_us(10);
+  sleep_us(10);  /* 10x 02 cycles as per datasheet */
   gpio_put(RES, 1);
 }
 
