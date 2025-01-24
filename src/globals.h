@@ -45,14 +45,13 @@ enum
   BYTE_MASK    = 0x3F,  /*   0b111111 ~  63  */
   COMMAND_MASK = 0x1F,  /*    0b11111 ~  31  */
 
-  /* BYTE 0 */
-  /* Top 2 bits */
+  /* BYTE 0 - top 2 bits */
   WRITE        =   0,   /*        0b0 ~ 0x00 */
   READ         =   1,   /*        0b1 ~ 0x40 */
   CYCLED_WRITE =   2,   /*       0b10 ~ 0x80 */
   COMMAND      =   3,   /*       0b11 ~ 0xC0 */
-  /* Lower 6 bits for byte count */
-  /* Lower 6 bits for Commands */
+  /* BYTE 0 - lower 6 bits for byte count */
+  /* BYTE 0 - lower 5 bits for Commands */
   PAUSE        =  10,   /*     0b1010 ~ 0x0A */
   UNPAUSE      =  11,   /*     0b1011 ~ 0x0B */
   MUTE         =  12,   /*     0b1100 ~ 0x0C */
@@ -65,9 +64,14 @@ enum
   RESET_MCU    =  19,   /*    0b10011 ~ 0x13 */
   BOOTLOADER   =  20,   /*    0b10100 ~ 0x14 */
 
-  /* GPIO COMMANDS */
+  /* INTERNAL BUS COMMANDS */
   G_PAUSE      = 2,
   G_CLEAR_BUS  = 3,
+
+  /* WEBSUSB ADDITIONAL COMMANDS */
+  WEBUSB_COMMAND  = 0xFF,
+  WEBUSB_RESET    = 0x15,
+  WEBUSB_CONTINUE = 0x16,
 };
 
 /* USB data type */
