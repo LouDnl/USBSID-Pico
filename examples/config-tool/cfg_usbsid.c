@@ -329,6 +329,9 @@ int usbsid_init(void)
         goto out;
     }
 
+    /* zero length read to clear any lingering data */
+    unsigned char buffer[1];
+    libusb_bulk_transfer(devh, ep_out_addr, buffer, 0, &transferred, 1);
     /* fprintf(stdout, "usbsid_init: detected [rc]%d [usid_dev]%d\n", rc, usid_dev); */
 
 	return usid_dev;
@@ -368,6 +371,7 @@ int read_chars(unsigned char * data, int size)
 void write_command(uint8_t command)
 {
   command_buffer[0] |= command;
+  if (command == RESET_SID) command_buffer[1] = 0x1;
   write_chars(command_buffer, 3);
 }
 
@@ -738,43 +742,66 @@ void print_socket_config(void)
 
 /* -----SIDKICK-pico----- */
 
-void skpico_config_mode(void)
+void skpico_config_mode(int debug)
 {
   uint8_t skpicobuff[3] = {0};
   memcpy(skpicobuff, &init_configmode, 3);
   skpicobuff[1] = (skpicobuff[1] + base_address);
   write_chars(skpicobuff, 3);  /* Start or extend config mode */
+  if (debug == 1) {
+    printf("[%s][W]%02X $%02X:%02X\n", __func__, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
+  }
 }
 
-void skpico_end_config_mode(void)
+void skpico_extend_config_mode(int debug)
+{
+  uint8_t skpicobuff[3] = {0};
+  memcpy(skpicobuff, &config_extend, 3);
+  skpicobuff[1] = (skpicobuff[1] + base_address);
+  write_chars(skpicobuff, 3);  /* Exit config mode */
+  if (debug == 1) {
+    printf("[%s][W]%02X $%02X:%02X\n", __func__, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
+  }
+}
+
+void skpico_end_config_mode(int debug)
 {
   uint8_t skpicobuff[3] = {0};
   memcpy(skpicobuff, &config_exit, 3);
   skpicobuff[1] = (skpicobuff[1] + base_address);
   write_chars(skpicobuff, 3);  /* Exit config mode */
+  if (debug == 1) {
+    printf("[%s][W]%02X $%02X:%02X\n", __func__, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
+  }
 }
 
-void skpico_update_config(void)
+void skpico_update_config(int debug)
 {
   uint8_t skpicobuff[3] = {0};
   memcpy(skpicobuff, &config_update, 3);
   skpicobuff[1] = (skpicobuff[1] + base_address);
   write_chars(skpicobuff, 3);  /* Update config, doesn't save */
+  if (debug == 1) {
+    printf("[%s][W]%02X $%02X:%02X\n", __func__, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
+  }
 }
 
-void skpico_save_config(void)
+void skpico_save_config(int debug)
 {
   uint8_t skpicobuff[3] = {0};
   memcpy(skpicobuff, &config_writeupdate, 3);
   skpicobuff[1] = (skpicobuff[1] + base_address);
   write_chars(skpicobuff, 3);  /* Update & save config */
+  if (debug == 1) {
+    printf("[%s][W]%02X $%02X:%02X\n", __func__, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
+  }
 }
 
-void skpico_read_config(void)
+void skpico_read_config(int debug)
 {
-  skpico_config_mode();
+  skpico_config_mode(debug);
 
-  for (int i = 0; i < 64 ; i++) {
+  for (int i = 0; i <= 63; ++i) {
     //uint8_t skpicobuff[3] = {0};
     //memcpy(skpicobuff, &read_buffer, 3);
     //skpicobuff[1] = (0x1d + base_address);
@@ -783,13 +810,15 @@ void skpico_read_config(void)
     write_chars(read_buffer, 3);
     len = read_chars(read_data, sizeof(read_data));
     skpico_config[i] = read_data[0];
-    /* if(i == 64) printf("\n"); */
+    if (debug == 1) {
+      printf("[%s][WR%d]%02X $%02X:%02X\n", __func__, i, read_buffer[0], read_buffer[1], read_data[0]);
+    }
   }
 
-  skpico_config_mode();
+  skpico_extend_config_mode(debug);
 
   printf("[PRINT CFG SETTINGS START]\n");
-  for (size_t i = 0; i < 64; ++i) {
+  for (size_t i = 0; i < 64; i++) {
     if (i >= 4 && i <= 7) continue;
     if (i >= 13 && i <= 56) continue;
     if (i == 62 || i == 63) continue;
@@ -812,12 +841,15 @@ void skpico_read_config(void)
   //return;
 }
 
-void skpico_write_config(void)
+void skpico_write_config(int debug)
 {
   uint8_t skpicobuff[3] = {0};
   memcpy(skpicobuff, &start_config_write, 3);
   skpicobuff[1] = (skpicobuff[1] + base_address);
   write_chars(skpicobuff, 3);
+  if (debug == 1) {
+    printf("[%s][W]%02X $%02X:%02X\n", __func__, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
+  }
 
   for (int i = 0; i < 64 ; i++) {
     uint8_t skpicobuff[3] = {0};
@@ -825,6 +857,9 @@ void skpico_write_config(void)
     skpicobuff[1] = (skpicobuff[1] + base_address);
     skpicobuff[2] = skpico_config[i];  /* config value */
     write_chars(skpicobuff, 3);
+    if (debug == 1) {
+      printf("[%s][W%d]%02X $%02X:%02X\n", __func__, i, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
+    }
   }
 }
 
@@ -843,6 +878,8 @@ void print_help_skpico(void)
   printf("$ cfg_usbsid -skpico [options]\n");
   printf("--[OPTIONS]---------------------------------------------------------------------------------------------------------\n");
   printf("  -h,       --help              : Show this help message\n");
+  printf("  -d,       --debug             : Prints all read write debug information\n");
+  printf("  --default-config              : Resets the SKPico to default configuration\n");
   printf("  -sock     --socket            : Set the USBSID-Pico socket to use, defaults to socket 1\n");
   printf("  -r,       --read              : Read and print SIDKICK-pico configuration\n");
   printf("  -w,       --write             : Write single config item to SIDKICK-pico (will read the current config first)\n");
@@ -864,10 +901,10 @@ void print_help_skpico(void)
   printf("  -clock    --clockspeed        : Change clockspeed to:\n");
   printf("                                  0: %s 1: %s 2: %s\n",
          clock_speed[0], clock_speed[1], clock_speed[2]);
+  printf("  -dd       --digidetect        : Change digidetect to on or off\n");
   printf("--[NOT CONFIGURABLE]------------------------------------------------------------------------------------------------\n");
   printf("  SID panning ~ defaults to 7, approx the middle\n");
   printf("  SID balance ~ defaults to 7, approx the middle\n");
-  printf("  digidetect ~ defaults to 1, on\n");
   printf("--------------------------------------------------------------------------------------------------------------------\n");
 }
 
@@ -882,12 +919,34 @@ void config_skpico(int argc, char **argv)
     print_help_skpico();
     goto exit;
   }
+  int debug = 0;
   for (int param_count = 2; param_count < argc; param_count++) {
     if (!strcmp(argv[param_count], "-sock") || !strcmp(argv[param_count], "--socket")) {
       param_count++;
       sid_socket = atoi(argv[param_count]);
       int socket_base = (sid_socket == 1) ? 0 : (sid_socket == 2) ? 1 : 0;
       base_address = (socket_base * 0x40);
+    }
+    if (!strcmp(argv[param_count], "-d") || !strcmp(argv[param_count], "--debug")) {
+      debug = 1;
+    }
+    if (!strcmp(argv[param_count], "--default-config")) {
+      memcpy(skpico_config, skpico_default_config, 64);
+      printf("Start writing default config\n");
+      skpico_config_mode(debug);
+      skpico_write_config(debug);
+
+      printf("Start saving default config\n");
+      sleep(0.5);
+      skpico_save_config(debug);
+
+      printf("Extend config mode\n");
+      skpico_extend_config_mode(debug);
+
+      sleep(1);
+      printf("Start reading config\n");
+      skpico_read_config(debug);
+      skpico_end_config_mode(debug);
     }
   }
 
@@ -897,16 +956,14 @@ void config_skpico(int argc, char **argv)
     if (!strcmp(argv[param_count], "-r") || !strcmp(argv[param_count], "--read")) {
       param_count++;
       printf("Read config\n");
-      skpico_read_config();
-      skpico_end_config_mode();
+      skpico_read_config(debug);
+      skpico_end_config_mode(debug);
       return;
-      //goto exit;
-      //break;
     }
     if (!strcmp(argv[param_count], "-w") || !strcmp(argv[param_count], "--write")) {
       param_count++;
       printf("Write config ~ read current config first\n");
-      skpico_read_config();
+      skpico_read_config(debug);
       for (int param_count = 1; param_count < argc; param_count++) {
         if (!strcmp(argv[param_count], "-s1") || !strcmp(argv[param_count], "--sidone")) {
           param_count++;
@@ -972,6 +1029,14 @@ void config_skpico(int argc, char **argv)
             skpico_config[59] = clk;
           }
         }
+        if (!strcmp(argv[param_count], "-dd") || !strcmp(argv[param_count], "--digidetect")) {
+          param_count++;
+          int digidetect = atoi(argv[param_count]);
+          if (digidetect <= 1 ) {
+            printf("Digidetect from: %s to: %s\n", enabled[skpico_config[61]], enabled[digidetect]);
+            skpico_config[61] = digidetect;
+          }
+        }
       }
       // Default & and fallback
       if (skpico_config[2] != 1) skpico_config[2] =   1;  // register read
@@ -981,23 +1046,39 @@ void config_skpico(int argc, char **argv)
       if (skpico_config[59] > 2) skpico_config[59] = 0;  // reset clockspeed to PAL if incorrect
 
       printf("Start writing config\n");
-      skpico_config_mode();
-      skpico_write_config();
+      skpico_extend_config_mode(debug);
+      skpico_write_config(debug);
 
       printf("Start saving config\n");
       sleep(0.5);
-      skpico_save_config();
+      skpico_save_config(debug);
 
-      printf("Reset SIDS and wait for boot\n");
-      sleep(0.5);
-      write_command(RESET_SID);
+      printf("Extend config mode\n");
+      skpico_extend_config_mode(debug);
+
       sleep(1);
       printf("Start reading config\n");
-      skpico_read_config();
+      skpico_read_config(debug);
+      skpico_end_config_mode(debug);
 
       sleep(0.5);
       goto exit;
       break;
+    }
+    /* NOTICE: Undocumented as of yet due to wonky results */
+    if (!strcmp(argv[param_count], "-dac") || !strcmp(argv[param_count], "--dacmode")) {
+      param_count++;
+      uint8_t skpicobuff[3] = {0};
+      if (!strcmp(argv[param_count], "mono")) {
+        printf("Set SIDKICK-pico DAC mode to mono\n");
+        memcpy(skpicobuff, &set_dac_mode_mono8, 3);
+        write_chars(skpicobuff, 3);
+      }
+      if (!strcmp(argv[param_count], "stereo")) {
+        printf("Set SIDKICK-pico DAC mode to stereo\n");
+        memcpy(skpicobuff, &set_dac_mode_stereo8, 3);
+        write_chars(skpicobuff, 3);
+      }
     }
   }
 exit:
