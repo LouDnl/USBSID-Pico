@@ -29,7 +29,7 @@ cmake_minimum_required(VERSION 3.17)
 set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
-set(MAGIC_SMOKE "20250108")
+set(MAGIC_SMOKE "20250125")
 set(PROJECT_VERSION "0.2.4-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
 
 ### Want a cookie?
@@ -51,6 +51,9 @@ endif()
 #######################################
 
 ### Optimization and debugging
+# remember that enabling debugging and disabling optimizations
+# will weird out tune playing and reading from and writing to
+# SKPico will stop functioning
 SET(DEBUG_SYMBOLS 0)
 SET(DEBUGGING 0)
 SET(OPTIMIZATIONS 3)
