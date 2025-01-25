@@ -461,22 +461,13 @@ void pause_sid_withmute(void)
 }
 
 void reset_sid(void)
-{
+{ /* ISSUE: With sleep_us things get reset but new tunes miss notes on SKPico, not tested on real SIDs yet. Without sleep_us registers are not reset! */
   paused_state = 0;
   gpio_put(CS1, 1);
   gpio_put(CS2, 1);
-  sleep_us(10);  /* 10x 02 cycles as per datasheet */
+  sleep_us(10);  /* NOTE: Incorrect placing */
   gpio_put(RES, 0);
-  gpio_put(RES, 1);
-}
-
-void reset_sid_registers(void)
-{
-  paused_state = 0;
-  gpio_put(CS1, 1);
-  gpio_put(CS2, 1);
-  gpio_put(RES, 0);
-  sleep_us(10);  /* 10x 02 cycles as per datasheet */
+  // sleep_us(10);  /* 10x 02 cycles as per datasheet */
   gpio_put(RES, 1);
 }
 
@@ -488,4 +479,15 @@ void clear_sid_registers(void)
     }
   }
   clear_bus();
+}
+
+void reset_sid_registers(void)
+{
+  paused_state = 0;
+  clear_sid_registers();
+  gpio_put(CS1, 1);
+  gpio_put(CS2, 1);
+  gpio_put(RES, 0);
+  sleep_us(10);  /* 10x 02 cycles as per datasheet */
+  gpio_put(RES, 1);
 }
