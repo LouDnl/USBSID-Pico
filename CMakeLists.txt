@@ -29,7 +29,7 @@ cmake_minimum_required(VERSION 3.17)
 set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
-set(MAGIC_SMOKE "20250125")
+set(MAGIC_SMOKE "20250129")
 set(PROJECT_VERSION "0.2.4-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
 
 ### Want a cookie?
