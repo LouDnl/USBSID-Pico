@@ -125,17 +125,21 @@ enum
 {
   RESET_USBSID     = 0x20,
 
-  READ_CONFIG      = 0x30,
-  APPLY_CONFIG     = 0x31,
-  STORE_CONFIG     = 0x32,
-  SAVE_CONFIG      = 0x33,
-  SAVE_NORESET     = 0x34,
-  RESET_CONFIG     = 0x35,
+  READ_CONFIG      = 0x30,  /* Read full config as bytes */
+  APPLY_CONFIG     = 0x31,  /* Apply config from memory */
+  SET_CONFIG       = 0x32,  /* Set single config item */
+  SAVE_CONFIG      = 0x33,  /* Save and load config and then reboot */
+  SAVE_NORESET     = 0x34,  /* Save, load and apply config */
+  RESET_CONFIG     = 0x35,  /* Reset to default settings */
+  WRITE_CONFIG     = 0x36,  /* Write full config as bytes */
+  READ_SOCKETCFG   = 0x37,  /* Read socket config as bytes */
 
   SINGLE_SID       = 0x40,
   DUAL_SID         = 0x41,
   QUAD_SID         = 0x42,
   TRIPLE_SID       = 0x43,
+  TRIPLE_SID_TWO   = 0x44,
+  MIRRORED_SID     = 0x45,
 
   SET_CLOCK        = 0x50,
   DETECT_SIDS      = 0x51,
