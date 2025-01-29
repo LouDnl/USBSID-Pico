@@ -23,6 +23,11 @@
  *
  */
 
+/* Macros */
+#ifndef count_of
+#define count_of(a) (sizeof(a)/sizeof((a)[0]))
+#endif
+
 /* libusb variables */
 #define VENDOR_ID      0xCAFE
 #define PRODUCT_ID     0x4011
@@ -60,17 +65,21 @@ enum
 {
   RESET_USBSID     = 0x20,
 
-  READ_CONFIG      = 0x30,
-  APPLY_CONFIG     = 0x31,
-  STORE_CONFIG     = 0x32,
+  READ_CONFIG      = 0x30,  /* Read full config as bytes */
+  APPLY_CONFIG     = 0x31,  /* Load and apply config */
+  SET_CONFIG       = 0x32,  /* Set single config item */
   SAVE_CONFIG      = 0x33,
   SAVE_NORESET     = 0x34,
   RESET_CONFIG     = 0x35,
+  WRITE_CONFIG     = 0x36,  /* Write full config as bytes */
+  READ_SOCKETCFG   = 0x37,  /* Read socket config as bytes */
 
   SINGLE_SID       = 0x40,
   DUAL_SID         = 0x41,
   QUAD_SID         = 0x42,
   TRIPLE_SID       = 0x43,
+  TRIPLE_SID_TWO   = 0x44,
+  MIRRORED_SID     = 0x45,
 
   SET_CLOCK        = 0x50,
   DETECT_SIDS      = 0x51,
@@ -110,6 +119,7 @@ uint8_t write_buffer[3]   = { (WRITE << 6), 0x0, 0x0 };
 uint8_t command_buffer[3] = { (COMMAND << 6), 0x0, 0x0 };
 uint8_t config_buffer[6]  = { ((COMMAND << 6) | 18), 0x0, 0x0, 0x0, 0x0, 0x0 };
 
+const char * error_type = "ERROR";
 const char * enabled[] = {"Disabled", "Enabled"};
 const char * intext[] = { "Internal", "External" };
 const char * onoff[] = {"Off", "On"};
