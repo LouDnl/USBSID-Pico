@@ -84,7 +84,7 @@ extern void reset_sid(void);
 extern void reset_sid_registers(void);
 extern void enable_sid(void);
 extern void disable_sid(void);
-extern void clear_bus(void);
+extern void clear_bus_all(void);
 extern uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data);
 extern void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 
@@ -283,7 +283,8 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
       IODBG("[I] [%c]", dtype);
       for (int i = 1; i <= n_bytes; i += 2) {
         IODBG(" $%02X:%02X", sid_buffer[i], sid_buffer[i + 1]);
-        bus_operation(0x10, sid_buffer[i], sid_buffer[i + 1]);  /* write the address and value to the SID */
+        /* write the address and value to the SID with minimal 10 cycles in between ~ Thanks for the cycle amount erique! */
+        cycled_bus_operation(sid_buffer[i], sid_buffer[i + 1], 10);
       };
       IODBG("\n");
     }
@@ -319,9 +320,14 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
         unmute_sid();
         break;
       case RESET_SID:
-        DBG("[RESET_SID]\n");
-        if (sid_buffer[1] == 0) reset_sid();
-        if (sid_buffer[1] == 1) reset_sid_registers();
+        if (sid_buffer[1] == 0) {
+          DBG("[RESET_SID]\n");
+          reset_sid();
+        }
+        if (sid_buffer[1] == 1) {
+          DBG("[RESET_SID_REGISTERS]\n");
+          reset_sid_registers();
+        }
         break;
       case DISABLE_SID:
         DBG("[DISABLE_SID]\n");
@@ -333,7 +339,7 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
         break;
       case CLEAR_BUS:
         DBG("[CLEAR_BUS]\n");
-        clear_bus();
+        clear_bus_all();
         break;
       case CONFIG:
         DBG("[CONFIG]\n");
