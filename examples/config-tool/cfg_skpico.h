@@ -86,3 +86,7 @@ unsigned char * sid2_address[] = {
 unsigned char * clock_speed[] = {
   "985248", "1022727", "1023440"
 };
+const size_t s_config_names = count_of(config_names);
+const size_t s_sid_types = count_of(sid_types);
+const size_t s_sid2_address = count_of(sid2_address);
+const size_t s_clock_speed = count_of(clock_speed);
