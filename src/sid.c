@@ -32,7 +32,7 @@
 
 /* GPIO externals */
 extern uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data);
-extern void clear_sid_registers(void);
+extern void clear_sid_registers(int sidno);
 
 /* Declare variables */
 uint8_t waveforms[4] = { 16, 32, 64, 128 };
@@ -215,7 +215,7 @@ void modulation_tests(uint8_t addr, uint8_t voices[3], int wf)
 
 void sid_test(int sidno, char test, char wf)
 {
-  clear_sid_registers();
+  clear_sid_registers(sidno);
   uint8_t addr = (sidno * 0x20);
   uint8_t voices[3] = { (sid_registers[0] + addr), (sid_registers[7] + addr), (sid_registers[14] + addr) };
   test_operation((sid_registers[MODVOL] + addr), 0x0F);  /* Volume to full */
@@ -223,22 +223,22 @@ void sid_test(int sidno, char test, char wf)
   switch (test) {
     case '1':  /* RUN ALL TESTS */
       test_all_waveforms(addr, voices);
-      clear_sid_registers();
+      clear_sid_registers(sidno);
       filter_tests(addr, voices, 0);
       filter_tests(addr, voices, 1);
       filter_tests(addr, voices, 2);
       filter_tests(addr, voices, 3);
-      clear_sid_registers();
+      clear_sid_registers(sidno);
       envelope_tests(addr, voices, 0);
       envelope_tests(addr, voices, 1);
       envelope_tests(addr, voices, 2);
       envelope_tests(addr, voices, 3);
-      clear_sid_registers();
+      clear_sid_registers(sidno);
       modulation_tests(addr, voices, 0);
       modulation_tests(addr, voices, 1);
       modulation_tests(addr, voices, 2);
       modulation_tests(addr, voices, 3);
-      clear_sid_registers();
+      clear_sid_registers(sidno);
       break;
     case '2':  /* ALL WAVEFORMS */
       test_all_waveforms(addr, voices);
