@@ -33,8 +33,9 @@
 /* Init external vars */
 extern Config usbsid_config;
 extern uint8_t sid_memory[];
-extern uint8_t one, two, three, four;
 extern int sock_one, sock_two, sids_one, sids_two, numsids, act_as_one;
+extern uint8_t one, two, three, four;
+extern uint8_t one_mask, two_mask, three_mask, four_mask;
 extern double cpu_us, sid_hz, sid_mhz, sid_us;
 
 /* Init vars */
@@ -295,6 +296,33 @@ void deinit_sidclock(void)
   clock_program_deinit(bus_pio, sm_clock, offset_clock, clock_program);
 }
 
+static int __not_in_flash_func(set_bus_bits)(uint8_t address, uint8_t data)
+{
+  switch (address) {
+    case 0x00 ... 0x1F:
+      if (one == 0b110 || one == 0b111) return 0;
+      data_word = (address & one_mask) << 8 | data;
+      control_word |= one;
+      break;
+    case 0x20 ... 0x3F:
+      if (two == 0b110 || two == 0b111) return 0;
+      data_word = (address & two_mask) << 8 | data;
+      control_word |= two;
+      break;
+    case 0x40 ... 0x5F:
+      if (three == 0b110 || three == 0b111) return 0;
+      data_word = (address & three_mask) << 8 | data;
+      control_word |= three;
+      break;
+    case 0x60 ... 0x7F:
+      if (four == 0b110 || four == 0b111) return 0;
+      data_word = (address & four_mask) << 8 | data;
+      control_word |= four;
+      break;
+  }
+  return 1;
+}
+
 uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data)
 {
   if ((command & 0xF0) != 0x10) {
@@ -306,25 +334,13 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
   pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, 5));  /* Preset the statemachine IRQ to not wait for a 1 */
 
   control_word = 0b110000;
-  data_word = (address & 0x3F) << 8 | data;
   dir_mask = 0x0;
   dir_mask |= (is_read ? 0b1111111100000000 : 0b1111111111111111);
-  data_word = (dir_mask << 16) | data_word;
   control_word |= (is_read ? 1 : 0);
-  switch (address) {
-    case 0x00 ... 0x1F:
-      control_word |= one;
-      break;
-    case 0x20 ... 0x3F:
-      control_word |= two;
-      break;
-    case 0x40 ... 0x5F:
-      control_word |= three;
-      break;
-    case 0x60 ... 0x7F:
-      control_word |= four;
-      break;
+  if (set_bus_bits(address, data) != 1) {
+    return 0;
   }
+  data_word = (dir_mask << 16) | data_word;
 
   switch (sid_command) {
     case G_PAUSE:
@@ -347,12 +363,16 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
       read_data = 0x0;
       dma_channel_set_write_addr(dma_rx_data, &read_data, true);
       dma_channel_wait_for_finish_blocking(dma_rx_data);
-      GPIODBG("[R]$%08x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\r\n", read_data, PRINTF_BYTE_TO_BINARY_INT32(read_data), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word));
+      GPIODBG("[W]$%08x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\n[R]$%08x 0b"PRINTF_BINARY_PATTERN_INT32"\n",
+        data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word),
+        control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word),
+        read_data, PRINTF_BYTE_TO_BINARY_INT32(read_data));
       sid_memory[address] = (read_data >> 24) & 0xFF;
       return (read_data >> 24) & 0xFF;
     case G_CLEAR_BUS:
       dir_mask = 0b1111111111111111;
       data_word = (dir_mask << 16) | 0x0;
+      dma_channel_set_read_addr(dma_tx_control, &control_word, true); /* Control lines RW, CS1 & CS2 DMA transfer */
       dma_channel_set_read_addr(dma_tx_data, &data_word, true); /* Data & Address DMA transfer */
       return 0;
     default:
@@ -378,23 +398,11 @@ void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, ui
   }
   sid_memory[address] = data;
   control_word = 0b111000;
-  data_word = (address & 0x3F) << 8 | data;
   dir_mask = 0b1111111111111111;  /* Always OUT never IN */
-  data_word = (dir_mask << 16) | data_word;
-  switch (address) {
-    case 0x00 ... 0x1F:
-      control_word |= one;
-      break;
-    case 0x20 ... 0x3F:
-      control_word |= two;
-      break;
-    case 0x40 ... 0x5F:
-      control_word |= three;
-      break;
-    case 0x60 ... 0x7F:
-      control_word |= four;
-      break;
+  if (set_bus_bits(address, data) != 1) {
+    return;
   }
+  data_word = (dir_mask << 16) | data_word;
 
   dma_channel_set_read_addr(dma_tx_data, &data_word, true); /* Data & Address DMA transfer */
   dma_channel_set_read_addr(dma_tx_control, &control_word, true); /* Control lines RW, CS1 & CS2 DMA transfer */
@@ -440,9 +448,16 @@ void disable_sid(void)
   gpio_put(RES, 0);
 }
 
-void clear_bus(void)
+void clear_bus(int sidno)
 {
-  bus_operation((0x10 | G_CLEAR_BUS), 0x0, 0x0);
+  bus_operation((0x10 | G_CLEAR_BUS), (sidno * 0x20), 0x0);
+}
+
+void clear_bus_all(void)
+{
+  for (int sid = 0; sid < numsids; sid++) {
+    clear_bus(sid);
+  }
 }
 
 void pause_sid(void)
@@ -463,31 +478,27 @@ void pause_sid_withmute(void)
 void reset_sid(void)
 { /* ISSUE: With sleep_us things get reset but new tunes miss notes on SKPico, not tested on real SIDs yet. Without sleep_us registers are not reset! */
   paused_state = 0;
-  gpio_put(CS1, 1);
-  gpio_put(CS2, 1);
-  sleep_us(10);  /* NOTE: Incorrect placing */
   gpio_put(RES, 0);
-  // sleep_us(10);  /* 10x 02 cycles as per datasheet */
+  if (usbsid_config.socketOne.chiptype == 0 ||
+      usbsid_config.socketTwo.chiptype == 0) {
+      sleep_us(10);  /* 10x 02 cycles as per datasheet for REAL SIDs only */
+    }
   gpio_put(RES, 1);
 }
 
-void clear_sid_registers(void)
+void clear_sid_registers(int sidno)
 {
-  for (int sid = 0; sid < numsids; sid++) {
-    for (int reg = 0; reg < count_of(sid_registers); reg++) {
-      bus_operation((0x10 | WRITE), sid_registers[reg], 0x0);
-    }
+  for (int reg = 0; reg < count_of(sid_registers); reg++) {
+    bus_operation((0x10 | WRITE), ((sidno * 0x20) | sid_registers[reg]), 0x0);
   }
-  clear_bus();
 }
 
 void reset_sid_registers(void)
 {
   paused_state = 0;
-  clear_sid_registers();
+  for (int sid = 0; sid < numsids; sid++) {
+    clear_sid_registers(sid);
+  }
   gpio_put(CS1, 1);
   gpio_put(CS2, 1);
-  gpio_put(RES, 0);
-  sleep_us(10);  /* 10x 02 cycles as per datasheet */
-  gpio_put(RES, 1);
 }
