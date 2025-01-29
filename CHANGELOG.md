@@ -5,6 +5,35 @@
 * Beam me up Scotty!
 * Continue work on Midi handling
 
+#### Version: 0.2.4-BETA
+* USB buffer handling overhaul
+  - Add support for incoming packets of variable sizes
+  - Add more command types
+  - Add commands for WebUSB
+* GPIO init overhaul
+  - Fix DMA panic on Pico_w
+  - Add syncing of PIO's
+  - Add stream buffer support
+  - Add check for Clone type sid to reset_set
+    SKPico does not handle resets very well
+  - Move SID clock functions to GPIO
+* PIO bus overhaul
+  - Add support for clock cycle writes
+* Add 4x SID support to ASID handler
+* Rework config handling
+  - Add optional command for retrieving socket config only
+  - Split apply_config into separate functions
+  - Update/Fix SID type detection
+    - Add delays between detection commands
+    - Add retry to try 3 times if detection fails
+* General code rework
+  - Move util functions into separate util file
+* Update examples
+  - Add cli config-tool
+  - Add USBSID-Pico-driver repo
+  - Add SidplayFp repo
+  - Add libSidplayFp repo
+
 #### Version: 0.2.3-BETA
 * Add workflow for auto version release build
 * Fix issue in SID tests not stopping

@@ -30,10 +30,13 @@ USBSID-Pico supports various ways of playing SID files.
 Out-of-the box playing is supported by using [Deepsid by Chordian](https://deepsid.chordian.net)  
 by selecting `WebUSB (Hermit)` as player in the pulldown menu or  
 by selecting `ASID (MIDI)` as player in the pulldown menu.  
+Out-of-the box playing is also supported by using [C64jukebox by Kenchis](https://haendel.ddns.net:8443/static/c64jukebox.vue), note that this is still in BETA.  
 [SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux with up to 4 SIDs supported.  
 Unofficial support is added to a fork of [Vice](https://github.com/LouDnl/Vice-USBSID), up to 3 SIDs are supported in vsid and up to 4 in xs64.  
+Unofficial support is added to a fork of [sidplayfp]() which requires a fork of [libsidplayfp]().  
 Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouDnl/RetroDebugger), up to 4 SIDs are supported.
 ##### C64 Music trackers
+You should be able to use the ASID fork of [sidfactory2](https://github.com/Chordian/sidfactory2/tree/asid-support) without issues.  
 When using Vice or RetroDebugger you can freely use applications like [SID-Wizard](https://sourceforge.net/projects/sid-wizard/) for music creation.
 #### Midi
 USBSID-Pico acts as Midi device and supports basic Midi in ~ note that Midi is still in development and in Beta phase.  
@@ -79,11 +82,14 @@ While in development any mentioned features, options, etc. are subject to change
 [I]: https://github.com/LouDnl/USBSID-Pico/blob/master/LICENSE
 [J]: https://github.com/LouDnl/USBSID-Pico
 ### Test and config your board
-I have set up a small test player using Hermit's JsSID implementation (borrowed from Deepsid).  
-You can test (and config) your board with WebUSB and ASID here: [USBSID](https://usbsid.loudai.nl/index.html?player=webusb).  
-If needed you can change your SID count configuration after selecting WebUSB.
+You can configurate your board by using the commandline [config-tool](examples/config-tool) [binary](examples/config-tool/cfg_usbsid) (Linux only atm) provided in examples  
+
+**The webconfig tool is not in sync with the latest firmware yet!**  
+I also have set up a small test player using Hermit's JsSID implementation (borrowed from Deepsid).  
+~~You can test (and config) your board with WebUSB and ASID~~ here: [USBSID](https://usbsid.loudai.nl/index.html?player=webusb).  
+~~If needed you can change your SID count configuration after selecting WebUSB.~~  
 #### Debug functions
-For testing purposes only you can use the debug functions available on the [USBSID Debug](https://usbsid.loudai.nl/index.html?player=webusb&debug=usbsidpico) site.
+~~For testing purposes only you can use the debug functions available on the [USBSID Debug](https://usbsid.loudai.nl/index.html?player=webusb&debug=usbsidpico) site.~~
 ### Supported platforms
 _In development_  
 Linux: Vice, RetroDebugger, SidBerry, JSidplay2, USB Midi, ASID (in webbrowser) SID Play  
@@ -135,8 +141,8 @@ The firmware is still in development so features might change, be added or remov
   - SID voices to use for calculation can be changed in config
 - Uses the [TinyUSB](https://github.com/hathach/tinyusb) stack
 ### ISSUES that need addressing (Any help is welcome)
-* Digiplay does not work like it should. This is a driver issue (client side).
-  At one point I had this working with Async LIBUSB but forgot to backup it, DOH!  
+* Digiplay is better in Vice then SidplayFp at the moment.  
+  While not yet at 100%, most tunes will play!  
   See the [discussion](https://github.com/LouDnl/USBSID-Pico/discussions/1) about this.
 ### Building
 You can build the firmware using the Pico SDK 2.0.0 and TinyUSB from it's Github repo, not the one included in the SDK!
@@ -246,15 +252,22 @@ While in development any videos and/or audio links are subject to be changed or 
 Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-29KQ), [other socials](https://github.com/LouDnl) or the [SHOWCASE](SHOWCASE.md) page to see more examples.
 ### Software
 _Available examples with USBSID-Pico support:_<br>
-[**HardSID USB / SidBlaster USB**](examples/hardsid-sidblaster) driver example<br>
+[**USBSID-Pico driver**](https://github.com/LouDnl/USBSID-Pico-driver) repo is available @ https://github.com/LouDnl/USBSID-Pico-driver<br>
+[**HardSID USB / SidBlaster USB**](examples/hardsid-sidblaster) emulation driver example<br>
 [**Vice**](https://github.com/LouDnl/Vice-USBSID) fork is available @ https://github.com/LouDnl/Vice-USBSID<br>
+[**sidplayfp**](https://github.com/LouDnl/sidplayfp-usbsid) for [**libsidplayfp**](https://github.com/LouDnl/libsidplayfp-usbsid) forks are available @ https://github.com/LouDnl/sidplayfp-usbsid and https://github.com/LouDnl/libsidplayfp-usbsid<br>
 [**SidBerry**](https://github.com/LouDnl/SidBerry) fork is available @ https://github.com/LouDnl/SidBerry<br>
 [**RetroDebugger**](https://github.com/LouDnl/RetroDebugger) fork is available @ https://github.com/LouDnl/RetroDebugger<br>
+[**playsid.library**](https://github.com/erique/playsid.library) Amiga implementation is available @ https://github.com/erique/playsid.library<br>
 ### Precompiled Vice binaries
-Pre compiled Vice binaries are available in my fork @ https://github.com/LouDnl/Vice-USBSID/tree/main/builds
+**Pre compiled binaries are out of date at the moment sorry!**  
+~~Pre compiled Vice binaries are available in my fork @ https://github.com/LouDnl/Vice-USBSID/tree/main/builds~~
 
 # Acknowledgements
-Special thanks goes out to [Tobozo](https://github.com/tobozo/) for making the USBSID-Pico logo and for his (mental🤣) support since starting this project.
+Special thanks goes out to [Tobozo](https://github.com/tobozo/) for making the USBSID-Pico logo and for his (mental🤣) support since starting this project.  
+Thanks to [erique](https://github.com/erique) and [koobo](https://github.com/koobo) for creating and implementing Amiga support!  
+Thanks to [Chordian](https://github.com/Chordian) for implementing my crappy webusb solution into deepsid.  
+Thanks to [Ken](https://sourceforge.net/u/kenchis/profile/) for adding webusb support to jsidplay2's c64jukebox.
 
 Some portions of this code and board are heavily inspired on projects by other great people.
 Some of those projects are - in no particular order:
