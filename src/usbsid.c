@@ -683,8 +683,10 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
         DBG("request->bRequest == WEBUSB_COMMAND\n");
         if (request->wValue == WEBUSB_RESET) {
           DBG("request->wValue == WEBUSB_RESET\n");
-          reset_sid_registers();
-          unmute_sid();
+          // BUG: NO WURKY CURKY
+          /* reset_sid_registers(); */ // BUG: Temporary disabled
+          reset_sid();  // NOTICE: Temporary until fixed!
+          /* unmute_sid(); */
         }
         if (request->wValue == RESET_SID) {
           DBG("request->wValue == RESET_SID\n");
