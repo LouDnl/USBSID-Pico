@@ -1237,10 +1237,14 @@ void print_help(void)
   printf("  -reboot,  --reboot-usp        : Reboot USBSID-Pico\n");
   printf("  -boot,    --bootloader        : Reboot USBSID-Pico to the bootloader for firmware upload\n");
   printf("  -skpico   --sidkickpico       : Enter SIDKICK-pico config mode\n");
-  printf("--[PRESETS]---------------------------------------------------------------------------------------------------------\n");
+  printf("--[DEFAULTS]---------------------------------------------------------------------------------------------------------\n");
   printf("  -defaults,--config-defaults   : Reset USBSID-Pico config to defaults\n");
+  printf("--[PRESETS]---------------------------------------------------------------------------------------------------------\n");
+  printf("  (add '-q' before any of the preset commands for a quick change and apply the config without saving and rebooting)\n");
   printf("  -single,  --single-sid        : Socket 1 enabled @ single SID, Socket 2 disabled\n");
   printf("  -dual,    --dual-sid          : Socket 1 enabled @ single SID, Socket 2 enabled @ single SID\n");
+  printf("  -duals1,  --dual-sid-socket1  : Socket 1 enabled @ dual SID, Socket 2 disabled\n");
+  printf("  -duals2,  --dual-sid-socket2  : Socket 1 disabled, Socket 2 enabled @ dual SID\n");
   printf("  -triple1, --triple-sid1       : Socket 1 enabled @ dual SID, Socket 2 enabled @ single SID\n");
   printf("  -triple2, --triple-sid2       : Socket 1 enabled @ single SID, Socket 2 enabled @ dual SID\n");
   printf("  -quad,    --quad-sid          : Socket 1 enabled @ dual SID, Socket 2 enabled @ dual SID\n");
@@ -1254,6 +1258,7 @@ void print_help(void)
   printf("  -a,       --apply-config      : Apply the current config settings (from USBSID-Pico memory) that you changed with '-w'\n");
   printf("  -s,       --save-config       : Send the save config command to USBSID-Pico\n");
   printf("  -sr,      --save-reboot       : Send the save config command to USBSID-Pico and reboot it\n");
+  printf("  -rl,      --reload-config     : Reload the config stored in flash, does not return anything\n");
   printf("--[INI FILE CONFIGURATION]------------------------------------------------------------------------------------------\n");
   printf("  -default, --default-ini       : Generate an ini file with default USBSID-Pico config named `USBSID-Pico-cfg.ini`\n");
   printf("  -export F,--export-config F   : Read config from USBSID-Pico and export it to provided ini file or default in\n");
@@ -1296,6 +1301,7 @@ void print_help(void)
 
 void config_usbsidpico(int argc, char **argv)
 {
+  int quickchange = 0;
   for (int param_count = 1; param_count < argc; param_count++) {
     if (!strcmp(argv[param_count], "-h") || !strcmp(argv[param_count], "--help")) {
       print_help();
@@ -1318,34 +1324,47 @@ void config_usbsidpico(int argc, char **argv)
       write_config_command(RESET_CONFIG, 0, 0 ,0 ,0);
       goto exit;
     }
+    if (!strcmp(argv[param_count], "-q")) {
+      quickchange = 1;
+    };
     if (!strcmp(argv[param_count], "-single") || !strcmp(argv[param_count], "--single-sid")) {
       printf("Set USBSID-Pico config to single SID\n");
-      write_config_command(SINGLE_SID, 0, 0 ,0 ,0);
+      write_config_command(SINGLE_SID, quickchange, 0, 0, 0);
       goto exit;
     }
     if (!strcmp(argv[param_count], "-dual") || !strcmp(argv[param_count], "--dual-sid")) {
       printf("Set USBSID-Pico config to dual SID\n");
-      write_config_command(DUAL_SID, 0, 0 ,0 ,0);
+      write_config_command(DUAL_SID, quickchange, 0 ,0 ,0);
+      goto exit;
+    }
+    if (!strcmp(argv[param_count], "-duals1") || !strcmp(argv[param_count], "--dual-sid-socket1")) {
+      printf("Set USBSID-Pico config to dual SID in socket one\n");
+      write_config_command(DUAL_SOCKET1, quickchange, 0 ,0 ,0);
+      goto exit;
+    }
+    if (!strcmp(argv[param_count], "-duals2") || !strcmp(argv[param_count], "--dual-sid-socket2")) {
+      printf("Set USBSID-Pico config to dual SID in socket two\n");
+      write_config_command(DUAL_SOCKET2, quickchange, 0 ,0 ,0);
       goto exit;
     }
     if (!strcmp(argv[param_count], "-triple1") || !strcmp(argv[param_count], "--triple-sid1")) {
-      printf("Set USBSID-Pico config to triple SID socket 1\n");
-      write_config_command(TRIPLE_SID, 0, 0 ,0 ,0);
+      printf("Set USBSID-Pico config to triple SID socket one\n");
+      write_config_command(TRIPLE_SID, quickchange, 0 ,0 ,0);
       goto exit;
     }
     if (!strcmp(argv[param_count], "-triple2") || !strcmp(argv[param_count], "--triple-sid2")) {
-      printf("Set USBSID-Pico config to triple SID socket 2\n");
-      write_config_command(TRIPLE_SID_TWO, 0, 0 ,0 ,0);
+      printf("Set USBSID-Pico config to triple SID socket two\n");
+      write_config_command(TRIPLE_SID_TWO, quickchange, 0 ,0 ,0);
       goto exit;
     }
     if (!strcmp(argv[param_count], "-quad") || !strcmp(argv[param_count], "--quad-sid")) {
       printf("Set USBSID-Pico config to quad SID\n");
-      write_config_command(QUAD_SID, 0, 0 ,0 ,0);
+      write_config_command(QUAD_SID, quickchange, 0 ,0 ,0);
       goto exit;
     }
     if (!strcmp(argv[param_count], "-mirrored") || !strcmp(argv[param_count], "--mirrored-sid")) {
       printf("Set USBSID-Pico config to single -> dual mirrored SID\n");
-      write_config_command(MIRRORED_SID, 0, 0 ,0 ,0);
+      write_config_command(MIRRORED_SID, quickchange, 0 ,0 ,0);
       goto exit;
     }
 
@@ -1658,7 +1677,6 @@ void config_usbsidpico(int argc, char **argv)
       print_config();
       goto exit;
     }
-
     if (!strcmp(argv[param_count], "-export") || !strcmp(argv[param_count], "--export-config")) {
       param_count++;
       char * filename = argv[param_count];
@@ -1680,19 +1698,16 @@ void config_usbsidpico(int argc, char **argv)
       write_config_ini(&usbsid_config, filename);
       goto exit;
     }
-
     if (!strcmp(argv[param_count], "-default") || !strcmp(argv[param_count], "--default-ini")) {
       printf("Generating default config\n");
       write_config_ini(&usbsid_config, "USBSID-Pico-cfg.ini");
       goto exit;
     }
-
     if (!strcmp(argv[param_count], "-a") || !strcmp(argv[param_count], "--apply-config")) {
       printf("Sending apply config command\n");
-      save_config(0);
+      apply_config();
       continue;
     }
-
     if (!strcmp(argv[param_count], "-s") || !strcmp(argv[param_count], "--save-config")) {
       printf("Sending save config command\n");
       save_config(0);
@@ -1701,6 +1716,11 @@ void config_usbsidpico(int argc, char **argv)
     if (!strcmp(argv[param_count], "-sr") || !strcmp(argv[param_count], "--save-reboot")) {
       printf("Sending save config and reboot command\n");
       save_config(1);
+      continue;
+    }
+    if (!strcmp(argv[param_count], "-rl") || !strcmp(argv[param_count], "--reload-config")) {
+      printf("Sending reload config from flash command\n");
+      write_config_command(RELOAD_CONFIG,0x0,0x0,0x0,0x0);
       continue;
     }
     if (!strcmp(argv[param_count], "-reset") || !strcmp(argv[param_count], "--reset-sids")) {
