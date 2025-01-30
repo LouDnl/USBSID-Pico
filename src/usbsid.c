@@ -177,12 +177,14 @@ void reset_reason(void)
   if(*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_PSM_RESTART_BITS)
     DBG("[RESET] Caused by debug port\n");
 #endif
+  return;
 }
 
 #if defined(USE_RGB)
 void put_pixel(uint32_t pixel_grb) {
   // pio_sm_put_blocking(pio_rgb, ws2812_sm, pixel_grb << 8u);
   pio_sm_put(pio_rgb, ws2812_sm, pixel_grb << 8u);
+  return;
 }
 
 uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b) {
@@ -208,6 +210,7 @@ void init_logging(void)
   stdio_flush();
   DBG("\r\n[%s]\r\n", __func__);
   #endif
+  return;
 }
 
 /* Init the RGB LED pio */
@@ -222,6 +225,7 @@ void init_rgb(void)
   ws2812_program_init(pio_rgb, ws2812_sm, offset_ws2812, 23, 800000, IS_RGBW);
   put_pixel(urgb_u32(0,0,0));
   #endif
+  return;
 }
 
 
@@ -234,6 +238,7 @@ void cdc_write(uint8_t * itf, uint32_t n)
   tud_cdc_n_write_flush(*itf);
   vu = vu == 0 ? 100 : vu;  /* NOTICE: Testfix for core1 setting dtype to 0 */
   IODBG("[O] [%c] %02X:%02X\n", dtype, sid_buffer[1], write_buffer[0]);
+  return;
 }
 
 /* Write from device to host */
@@ -243,6 +248,7 @@ void webserial_write(uint8_t * itf, uint32_t n)
   tud_vendor_flush();
   vu = vu == 0 ? 100 : vu;  /* NOTICE: Testfix for core1 setting dtype to 0 */
   IODBG("[O] [%c] DAT[0x%02x] \r\n", dtype, write_buffer[0]);
+  return;
 }
 
 
@@ -358,7 +364,9 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
       default:
         break;
       }
+    return;
   };
+  return;
 }
 
 
@@ -465,6 +473,7 @@ void led_vumeter_task(void)
       sid_memory[0x16], sid_memory[0x15], sid_memory[0x17], sid_memory[0x18]);
 
   }
+  return;
   #endif
 }
 
@@ -510,6 +519,7 @@ void led_breathe_task(void)
     }
     #endif
   }
+  return;
   #endif
 }
 
@@ -557,6 +567,7 @@ void tud_cdc_rx_cb(uint8_t itf)
   handle_buffer_task(cdc_itf, &cdcread);
   memset(read_buffer, 0, count_of(read_buffer));
   memset(sid_buffer, 0, count_of(sid_buffer));
+  return;
 }
 
 void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char)
@@ -616,7 +627,9 @@ void tud_midi_rx_cb(uint8_t itf)
     }
     /* Clear usb buffer after use */
     memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer));
+    return;
   }
+  return;
 }
 
 
@@ -638,7 +651,9 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
     handle_buffer_task(wusb_itf, &webread);
     memset(read_buffer, 0, count_of(read_buffer));
     memset(sid_buffer, 0, count_of(sid_buffer));
+    return;
   }
+  return;
 }
 
 void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
