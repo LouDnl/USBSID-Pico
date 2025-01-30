@@ -38,12 +38,12 @@ extern int randval(int min, int max);
 /* Init external vars */
 static semaphore_t core1_init;
 
-/* Init vars */
-uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] = {0}; /* 4x max */
-uint8_t __not_in_flash("usbsid_buffer") sid_buffer[MAX_BUFFER_SIZE];
-uint8_t __not_in_flash("usbsid_buffer") read_buffer[MAX_BUFFER_SIZE];
-uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE];
+/* Init vars ~ Do not change order to keep memory alignment! */
 uint8_t __not_in_flash("usbsid_buffer") config_buffer[5];
+uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));
+uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE] __attribute__((aligned(2 * MAX_BUFFER_SIZE)));
+uint8_t __not_in_flash("usbsid_buffer") sid_buffer[MAX_BUFFER_SIZE] __attribute__((aligned(2 * MAX_BUFFER_SIZE)));
+uint8_t __not_in_flash("usbsid_buffer") read_buffer[MAX_BUFFER_SIZE] __attribute__((aligned(2 * MAX_BUFFER_SIZE)));
 int usb_connected = 0, usbdata = 0, pwm_value = 0, updown = 1;
 uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
 uint8_t *cdc_itf = 0, *wusb_itf = 0;
