@@ -351,6 +351,25 @@ void write_back_data(size_t buffersize)
   return;
 }
 
+void set_socket_config(uint8_t cmd, bool s1en, bool s1dual, uint8_t s1chip, bool s2en, bool s2dual, uint8_t s2chip, bool as_one)
+{
+  usbsid_config.socketOne.enabled = s1en;
+  usbsid_config.socketOne.dualsid = s1dual;
+  usbsid_config.socketOne.chiptype = s1chip;  /* Chiptype must be clone for dualsid to work! */
+  usbsid_config.socketTwo.enabled = s2en;
+  usbsid_config.socketTwo.dualsid = s2dual;
+  usbsid_config.socketTwo.chiptype = s2chip;  /* Chiptype must be clone for dualsid to work! */
+  usbsid_config.socketTwo.act_as_one = as_one;
+  if (cmd == 0) {
+    save_config(&usbsid_config);
+    load_config(&usbsid_config);
+    apply_config();
+  } else if (cmd == 1) {
+    apply_socket_change();
+  }
+  return;
+}
+
 void handle_config_request(uint8_t * buffer)
 { /* Incoming Config data buffer
    *
@@ -389,12 +408,12 @@ void handle_config_request(uint8_t * buffer)
       memcpy(write_buffer_p, socket_config_array, count_of(socket_config_array));
       write_back_data(64);
       break;
-    case APPLY_CONFIG:  /* applies the config from memory */
+    case APPLY_CONFIG:
       CFG("[APPLY_CONFIG]\n");
       apply_config();
       break;
-    case LOAD_CONFIG:  /* applies the config from memory */
-      CFG("[LOAD_CONFIG]\n");
+    case RELOAD_CONFIG:
+      CFG("[RELOAD_CONFIG]\n");
       load_config(&usbsid_config);
       apply_config();
       for (int i = 0; i < count_of(clockrates); i++) {
@@ -571,127 +590,35 @@ void handle_config_request(uint8_t * buffer)
       break;
     case SINGLE_SID:
       CFG("[SINGLE_SID]\n");
-      usbsid_config.socketOne.enabled = true;
-      usbsid_config.socketTwo.enabled = false;
-      usbsid_config.socketOne.dualsid = false;
-      usbsid_config.socketTwo.dualsid = false;
-      usbsid_config.socketTwo.act_as_one = false;
-      if (buffer[1] == 0) {
-        save_config(&usbsid_config);
-        load_config(&usbsid_config);
-        apply_config();
-      } else if (buffer[1] == 1) {
-        apply_socket_change();
-      }
+      set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, false, false, usbsid_config.socketTwo.chiptype, false);
       break;
     case MIRRORED_SID:
       CFG("[MIRRORED_SID]\n");
-      usbsid_config.socketOne.enabled = true;
-      usbsid_config.socketOne.dualsid = false;
-      usbsid_config.socketTwo.enabled = true;
-      usbsid_config.socketTwo.dualsid = false;
-      usbsid_config.socketTwo.act_as_one = true;
-      if (buffer[1] == 0) {
-        save_config(&usbsid_config);
-        load_config(&usbsid_config);
-        apply_config();
-      } else if (buffer[1] == 1) {
-        apply_socket_change();
-      }
+      set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, true, false, usbsid_config.socketTwo.chiptype, true);
       break;
     case DUAL_SID:
       CFG("[DUAL_SID]\n");
-      usbsid_config.socketOne.enabled = true;
-      usbsid_config.socketOne.dualsid = false;
-      usbsid_config.socketTwo.enabled = true;
-      usbsid_config.socketTwo.dualsid = false;
-      usbsid_config.socketTwo.act_as_one = false;
-      if (buffer[1] == 0) {
-        save_config(&usbsid_config);
-        load_config(&usbsid_config);
-        apply_config();
-      } else if (buffer[1] == 1) {
-        apply_socket_change();
-      }
+      set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, true, false, usbsid_config.socketTwo.chiptype, false);
       break;
     case DUAL_SOCKET1:
       CFG("[DUAL_SOCKET1]\n");
-      usbsid_config.socketOne.enabled = true;
-      usbsid_config.socketOne.dualsid = true;
-      usbsid_config.socketTwo.enabled = false;
-      usbsid_config.socketTwo.dualsid = false;
-      usbsid_config.socketTwo.act_as_one = false;
-      if (buffer[1] == 0) {
-        save_config(&usbsid_config);
-        load_config(&usbsid_config);
-        apply_config();
-      } else if (buffer[1] == 1) {
-        apply_socket_change();
-      }
+      set_socket_config(buffer[1], true, true, usbsid_config.socketOne.chiptype, false, false, usbsid_config.socketTwo.chiptype, false);
       break;
     case DUAL_SOCKET2:
       CFG("[DUAL_SOCKET2]\n");
-      usbsid_config.socketOne.enabled = true;
-      usbsid_config.socketOne.dualsid = true;
-      usbsid_config.socketTwo.enabled = false;
-      usbsid_config.socketTwo.dualsid = false;
-      usbsid_config.socketTwo.act_as_one = false;
-      if (buffer[1] == 0) {
-        save_config(&usbsid_config);
-        load_config(&usbsid_config);
-        apply_config();
-      } else if (buffer[1] == 1) {
-        apply_socket_change();
-      }
+      set_socket_config(buffer[1], false, false, usbsid_config.socketOne.chiptype, true, true, usbsid_config.socketTwo.chiptype, false);
       break;
     case QUAD_SID:
       CFG("[QUAD_SID]\n");
-      usbsid_config.socketOne.enabled = true;
-      usbsid_config.socketOne.dualsid = true;
-      usbsid_config.socketOne.chiptype = 1;  /* Chiptype must be clone for dualsid to work! */
-      usbsid_config.socketTwo.enabled = true;
-      usbsid_config.socketTwo.dualsid = true;
-      usbsid_config.socketTwo.chiptype = 1;  /* Chiptype must be clone for dualsid to work! */
-      usbsid_config.socketTwo.act_as_one = false;
-      if (buffer[1] == 0) {
-        save_config(&usbsid_config);
-        load_config(&usbsid_config);
-        apply_config();
-      } else if (buffer[1] == 1) {
-        apply_socket_change();
-      }
+      set_socket_config(buffer[1], true, true, 1, true, true, 1, false);
       break;
     case TRIPLE_SID:
       CFG("[TRIPLE_SID SOCKET 1]\n");
-      usbsid_config.socketOne.enabled = true;
-      usbsid_config.socketOne.dualsid = true;
-      usbsid_config.socketOne.chiptype = 1;  /* Chiptype must be clone for dualsid to work! */
-      usbsid_config.socketTwo.enabled = true;
-      usbsid_config.socketTwo.dualsid = false;
-      usbsid_config.socketTwo.act_as_one = false;
-      if (buffer[1] == 0) {
-        save_config(&usbsid_config);
-        load_config(&usbsid_config);
-        apply_config();
-      } else if (buffer[1] == 1) {
-        apply_socket_change();
-      }
+      set_socket_config(buffer[1], true, true, 1, true, false, usbsid_config.socketTwo.chiptype, false);
       break;
     case TRIPLE_SID_TWO:
       CFG("[TRIPLE_SID SOCKET 2]\n");
-      usbsid_config.socketOne.enabled = true;
-      usbsid_config.socketOne.dualsid = false;
-      usbsid_config.socketTwo.enabled = true;
-      usbsid_config.socketTwo.dualsid = true;
-      usbsid_config.socketTwo.chiptype = 1;  /* Chiptype must be clone for dualsid to work! */
-      usbsid_config.socketTwo.act_as_one = false;
-      if (buffer[1] == 0) {
-        save_config(&usbsid_config);
-        load_config(&usbsid_config);
-        apply_config();
-      } else if (buffer[1] == 1) {
-        apply_socket_change();
-      }
+      set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, true, true, 1, false);
       break;
     case LOAD_MIDI_STATE: /* Load from config into midimachine and apply to SIDs */
       CFG("[LOAD_MIDI_STATE]\n");
