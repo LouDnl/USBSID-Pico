@@ -334,11 +334,13 @@ int usbsid_init(void)
     /* zero length read to clear any lingering data */
     unsigned char buffer[1];
     libusb_bulk_transfer(devh, ep_out_addr, buffer, 0, &transferred, 1);
+    libusb_bulk_transfer(devh, ep_in_addr, buffer, 0, &transferred, 1);
     /* fprintf(stdout, "usbsid_init: detected [rc]%d [usid_dev]%d\n", rc, usid_dev); */
 
 	return usid_dev;
-out:
-  usbsid_close();
+out:;
+  if (devh != NULL)
+    usbsid_close();
   return rc;
 }
 
@@ -1213,7 +1215,7 @@ void config_skpico(int argc, char **argv)
       }
     }
   }
-exit:
+exit:;
   return;
 }
 
@@ -1394,7 +1396,7 @@ void config_usbsidpico(int argc, char **argv)
             goto exit;
           }
           printf("Set SID clockrate from %d to: %d\n", usbsid_config.clock_rate, clockrates[clockrate]);
-          usbsid_config.clock_rate = clockrate;
+          usbsid_config.clock_rate = clockrates[clockrate];
           write_config_command(SET_CONFIG, 0x0, clockspeed_n(usbsid_config.clock_rate), 0x0, 0x0);
           continue;
         }
@@ -1723,8 +1725,8 @@ void config_usbsidpico(int argc, char **argv)
       goto exit;
     }
   }
-exit:
-}
+exit:;
+};
 
 /* ---------------------- */
 
@@ -1773,7 +1775,7 @@ int main(int argc, char **argv)
     goto exit;
   }
 
-exit:
+exit:;
   if (usid_dev != -1 || usid_dev == 0) {
     usbsid_close();
   }
