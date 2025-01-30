@@ -133,6 +133,7 @@ enum
   RESET_CONFIG     = 0x35,  /* Reset to default settings */
   WRITE_CONFIG     = 0x36,  /* Write full config as bytes */
   READ_SOCKETCFG   = 0x37,  /* Read socket config as bytes */
+  LOAD_CONFIG      = 0x38,  /* Load and apply stored config from flash */
 
   SINGLE_SID       = 0x40,
   DUAL_SID         = 0x41,
@@ -140,6 +141,8 @@ enum
   TRIPLE_SID       = 0x43,
   TRIPLE_SID_TWO   = 0x44,
   MIRRORED_SID     = 0x45,
+  DUAL_SOCKET1     = 0x46,
+  DUAL_SOCKET2     = 0x47,
 
   SET_CLOCK        = 0x50,
   DETECT_SIDS      = 0x51,
