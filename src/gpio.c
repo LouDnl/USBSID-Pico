@@ -76,6 +76,7 @@ void init_gpio()
   gpio_set_dir(CS1, GPIO_OUT);
   gpio_set_dir(CS2, GPIO_OUT);
   gpio_set_dir(RW, GPIO_OUT);
+  return;
 }
 
 void init_vu(void)
@@ -105,6 +106,7 @@ void init_vu(void)
   /* Ask the wifi "driver" to set the GPIO on or off */
   cyw43_arch_gpio_put(BUILTIN_LED, usbsid_config.LED.enabled);
   #endif
+  return;
 }
 
 void setup_piobus(void)
@@ -161,6 +163,7 @@ void setup_piobus(void)
   }
 
   CFG("[BUS CLK INIT] FINISHED\n");
+  return;
 }
 
 void setup_dmachannels(void)
@@ -207,6 +210,7 @@ void setup_dmachannels(void)
   CFG("[DMA CHANNELS CLAIMED] C:%d TX:%d RX:%d D:%d\n", dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay);
 
   CFG("[DMA CHANNELS INIT] FINISHED\n");
+  return;
 }
 
 void sync_pios(void)
@@ -218,6 +222,7 @@ void sync_pios(void)
   CFG("[SYNC PIOS] Pico2\n");
   pio_clkdiv_restart_sm_multi_mask(bus_pio, 0 /* 0b111 */, 0b1111, 0);
   #endif
+  return;
 }
 
 void restart_bus(void)
@@ -250,6 +255,7 @@ void restart_bus(void)
   /* sync pios */
   sync_pios();
   CFG("[RESTART BUS END]\n");
+  return;
 }
 
 /* Detect clock signal */
@@ -287,6 +293,7 @@ void init_sidclock(void)
   pio_sm_claim(bus_pio, sm_clock);
   clock_program_init(bus_pio, sm_clock, offset_clock, PHI, sidclock_frequency);
   CFG("[SID CLK INIT] FINISHED\n");
+  return;
 }
 
 /* De-init nMHz square wave output */
@@ -294,6 +301,7 @@ void deinit_sidclock(void)
 {
   CFG("[DE-INIT CLOCK]\n");
   clock_program_deinit(bus_pio, sm_clock, offset_clock, clock_program);
+  return;
 }
 
 static int __not_in_flash_func(set_bus_bits)(uint8_t address, uint8_t data)
@@ -419,6 +427,7 @@ void unmute_sid(void)
     DBG("[%d] 0x%02X ", i, volume_state[i]);
   }
   DBG("\n");
+  return;
 }
 
 void mute_sid(void)
@@ -430,6 +439,7 @@ void mute_sid(void)
     DBG("[%d] 0x%02X ", i, volume_state[i]);
   }
   DBG("\n");
+  return;
 }
 
 void enable_sid(void)
@@ -437,6 +447,7 @@ void enable_sid(void)
   paused_state = 0;
   gpio_put(RES, 1);
   unmute_sid();
+  return;
 }
 
 void disable_sid(void)
@@ -446,11 +457,13 @@ void disable_sid(void)
   gpio_put(CS1, 1);
   gpio_put(CS2, 1);
   gpio_put(RES, 0);
+  return;
 }
 
 void clear_bus(int sidno)
 {
   bus_operation((0x10 | G_CLEAR_BUS), (sidno * 0x20), 0x0);
+  return;
 }
 
 void clear_bus_all(void)
@@ -458,11 +471,13 @@ void clear_bus_all(void)
   for (int sid = 0; sid < numsids; sid++) {
     clear_bus(sid);
   }
+  return;
 }
 
 void pause_sid(void)
 {
   bus_operation((0x10 | G_PAUSE), 0x0, 0x0);
+  return;
 }
 
 void pause_sid_withmute(void)
@@ -473,6 +488,7 @@ void pause_sid_withmute(void)
   bus_operation((0x10 | G_PAUSE), 0x0, 0x0);
   paused_state = !paused_state;
   DBG("[PAUSE STATE POST] %d\n", paused_state);
+  return;
 }
 
 void reset_sid(void)
@@ -484,21 +500,22 @@ void reset_sid(void)
       sleep_us(10);  /* 10x 02 cycles as per datasheet for REAL SIDs only */
     }
   gpio_put(RES, 1);
+  return;
 }
 
 void clear_sid_registers(int sidno)
-{
-  for (int reg = 0; reg < count_of(sid_registers); reg++) {
+{ /* BUG: CAUSES ISSUES IF USED RIGHT BEFORE PLAYING */
+  for (int reg = 0; reg < count_of(sid_registers) - 4; reg++) {
     bus_operation((0x10 | WRITE), ((sidno * 0x20) | sid_registers[reg]), 0x0);
   }
+  return;
 }
 
 void reset_sid_registers(void)
-{
+{ /* BUG: CAUSES ISSUES IF USED RIGHT BEFORE PLAYING */
   paused_state = 0;
   for (int sid = 0; sid < numsids; sid++) {
     clear_sid_registers(sid);
   }
-  gpio_put(CS1, 1);
-  gpio_put(CS2, 1);
+  return;
 }
