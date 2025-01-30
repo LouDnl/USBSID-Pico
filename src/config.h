@@ -133,7 +133,7 @@ enum
   RESET_CONFIG     = 0x35,  /* Reset to default settings */
   WRITE_CONFIG     = 0x36,  /* Write full config as bytes */
   READ_SOCKETCFG   = 0x37,  /* Read socket config as bytes */
-  LOAD_CONFIG      = 0x38,  /* Load and apply stored config from flash */
+  RELOAD_CONFIG    = 0x38,  /* Reload and apply stored config from flash */
 
   SINGLE_SID       = 0x40,
   DUAL_SID         = 0x41,
