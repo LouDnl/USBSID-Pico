@@ -57,7 +57,7 @@ restart:
   }
 end:
   restart = 0;
-  return sidtype;  /* that is: Carry flag is set for 6581, and clear for 8580. */
+  return (sidtype < 4 ? sidtype : 0);  /* that is: Carry flag is set for 6581, and clear for 8580. */
 }
 
 void test_operation(uint8_t reg, uint8_t val)

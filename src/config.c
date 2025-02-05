@@ -79,7 +79,7 @@ uint8_t one_mask = 0, two_mask = 0, three_mask = 0, four_mask = 0;
 const char* project_version = PROJECT_VERSION;
 
 /* Init string vars for logging */
-const char *sidtypes[4] = { "UNKNOWN", "N/A", "MOS8580", "MOS6581" };
+const char *sidtypes[5] = { "UNKNOWN", "N/A", "MOS8580", "MOS6581", "FMOpl" };
 const char *chiptypes[2] = { "Real", "Clone" };
 const char *clonetypes[6] = { "Disabled", "Other", "SKPico", "ARMSID", "FPGASID", "RedipSID" };
 const char *int_ext[2] = { "Internal", "External" };
@@ -456,7 +456,7 @@ void handle_config_request(uint8_t * buffer)
                 }
                 break;
               case 5: /* sid2type */
-                if (buffer[3] <= 3) {
+                if (buffer[3] <= 4) {
                   usbsid_config.socketOne.sid2type = buffer[3];
                 }
                 break;
@@ -490,7 +490,7 @@ void handle_config_request(uint8_t * buffer)
               }
               break;
             case 5: /* sid2type */
-              if (buffer[3] <= 3) {
+              if (buffer[3] <= 4) {
                 usbsid_config.socketTwo.sid2type = buffer[3];
               }
               break;
@@ -728,18 +728,18 @@ void handle_config_request(uint8_t * buffer)
         }
       break;
     case TEST_FN: /* TODO: Remove before v1 release */
-      printf("[TEST_FN]\n");
-      printf("[FLASH_TARGET_OFFSET]0x%x\n", FLASH_TARGET_OFFSET);
-      printf("[PICO_FLASH_SIZE_BYTES]0x%x\n", PICO_FLASH_SIZE_BYTES);
-      printf("[FLASH_SECTOR_SIZE]0x%x\n", FLASH_SECTOR_SIZE);
-      printf("[FLASH_PAGE_SIZE]0x%x\n", FLASH_PAGE_SIZE);
-      printf("[CONFIG_SIZE]0x%x\n", CONFIG_SIZE);
-      printf("A %x %x %d\n", usbsid_config.magic, MAGIC_SMOKE, usbsid_config.magic != MAGIC_SMOKE);
-      printf("A %x %x %d\n", (uint32_t)usbsid_config.magic, (uint32_t)MAGIC_SMOKE, usbsid_config.magic != MAGIC_SMOKE);
-      printf("A %d %d\n", (int)usbsid_config.magic, (int)MAGIC_SMOKE);
-      printf("A %d\n", usbsid_config.magic == MAGIC_SMOKE);
+      CFG("[TEST_FN]\n");
+      CFG("[FLASH_TARGET_OFFSET]0x%x\n", FLASH_TARGET_OFFSET);
+      CFG("[PICO_FLASH_SIZE_BYTES]0x%x\n", PICO_FLASH_SIZE_BYTES);
+      CFG("[FLASH_SECTOR_SIZE]0x%x\n", FLASH_SECTOR_SIZE);
+      CFG("[FLASH_PAGE_SIZE]0x%x\n", FLASH_PAGE_SIZE);
+      CFG("[CONFIG_SIZE]0x%x\n", CONFIG_SIZE);
+      CFG("A %x %x %d\n", usbsid_config.magic, MAGIC_SMOKE, usbsid_config.magic != MAGIC_SMOKE);
+      CFG("A %x %x %d\n", (uint32_t)usbsid_config.magic, (uint32_t)MAGIC_SMOKE, usbsid_config.magic != MAGIC_SMOKE);
+      CFG("A %d %d\n", (int)usbsid_config.magic, (int)MAGIC_SMOKE);
+      CFG("A %d\n", usbsid_config.magic == MAGIC_SMOKE);
 
-      printf("[USBSID_SID_MEMORY]\n");
+      CFG("[USBSID_SID_MEMORY]\n");
       print_cfg(sid_memory, (numsids * 0x20));
       break;
     default:
