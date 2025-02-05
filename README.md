@@ -61,7 +61,7 @@ While in development any mentioned features, options, etc. are subject to change
 | Open     | [![issues][7]][G]  | [![discussions][8]][H] |
 | Info     | [![license][9]][I] | [![language][10]][J]   |
 
-[1]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/release.yml/badge.svg?branch=master
+[1]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/release.yml/badge.svg?branch=maste r
 [2]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/build.yml/badge.svg?branch=dev
 [3]: https://shields.io/github/last-commit/LouDnl/USBSID-Pico/master
 [4]: https://shields.io/github/last-commit/LouDnl/USBSID-Pico/dev
@@ -82,17 +82,17 @@ While in development any mentioned features, options, etc. are subject to change
 [I]: https://github.com/LouDnl/USBSID-Pico/blob/master/LICENSE
 [J]: https://github.com/LouDnl/USBSID-Pico
 ### Test and config your board
-You can configurate your board by using the commandline [config-tool](examples/config-tool) [binary](examples/config-tool/cfg_usbsid) (Linux only atm) provided in examples  
+You can configurate your board by using the commandline [config-tool](examples/config-tool) [binary](examples/config-tool/cfg_usbsid) (Linux only at the moment) provided in examples  
 
-**The webconfig tool is not in sync with the latest firmware yet!**  
-I also have set up a small test player using Hermit's JsSID implementation (borrowed from Deepsid).  
-~~You can test (and config) your board with WebUSB and ASID~~ here: [USBSID](https://usbsid.loudai.nl/index.html?player=webusb).  
-~~If needed you can change your SID count configuration after selecting WebUSB.~~  
+You can test your board with WebUSB and ASID here: [USBSID](https://usbsid.loudai.nl/?player=webusb).  
+If needed you can change your USBSID configuration after selecting WebUSB and clicking on `Open config`.  
+<img src="images/usbsidpico-config-dark.png" width="300px"><img src="images/usbsidpico-config-light.png" width="300px"><br>
+_The player is set up with some borrowed code from Deepsid using Hermit's JsSID implementation._
 #### Debug functions
-~~For testing purposes only you can use the debug functions available on the [USBSID Debug](https://usbsid.loudai.nl/index.html?player=webusb&debug=usbsidpico) site.~~
+For testing purposes only you can use the debug functions available on the [USBSID Debug](https://usbsid.loudai.nl/?player=webusb&debug=usbsidpico) site.
 ### Supported platforms
 _In development_  
-Linux: Vice, RetroDebugger, SidBerry, JSidplay2, USB Midi, ASID (in webbrowser) SID Play  
+Linux: Vice, RetroDebugger, SidBerry, SidplayFp, JSidplay2, USB Midi, ASID (in webbrowser) SID Play  
 Windows: Vice  
 Windows/Android: USB Midi, ASID (in webbrowser) SID Play
 
@@ -260,8 +260,8 @@ _Available examples with USBSID-Pico support:_<br>
 [**RetroDebugger**](https://github.com/LouDnl/RetroDebugger) fork is available @ https://github.com/LouDnl/RetroDebugger<br>
 [**playsid.library**](https://github.com/erique/playsid.library) Amiga implementation is available @ https://github.com/erique/playsid.library<br>
 ### Precompiled Vice binaries
-**Pre compiled binaries are out of date at the moment sorry!**  
-~~Pre compiled Vice binaries are available in my fork @ https://github.com/LouDnl/Vice-USBSID/tree/main/builds~~
+**NOTE: Pre compiled binaries are out of date at the moment sorry!**  
+Pre compiled Vice binaries are available in my fork @ https://github.com/LouDnl/Vice-USBSID/tree/main/builds
 
 # Acknowledgements
 Special thanks goes out to [Tobozo](https://github.com/tobozo/) for making the USBSID-Pico logo and for his (mental🤣) support since starting this project.  
