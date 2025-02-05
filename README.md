@@ -61,7 +61,7 @@ While in development any mentioned features, options, etc. are subject to change
 | Open     | [![issues][7]][G]  | [![discussions][8]][H] |
 | Info     | [![license][9]][I] | [![language][10]][J]   |
 
-[1]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/release.yml/badge.svg?branch=maste r
+[1]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/release.yml/badge.svg?branch=master
 [2]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/build.yml/badge.svg?branch=dev
 [3]: https://shields.io/github/last-commit/LouDnl/USBSID-Pico/master
 [4]: https://shields.io/github/last-commit/LouDnl/USBSID-Pico/dev
