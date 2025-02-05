@@ -173,17 +173,11 @@ elseif(OPTIMIZATIONS EQUAL 3)
 endif()
 
 ### Compiler flags and options
-# set(COMPILE_OPTS PRIVATE
-  # -Wno-maybe-uninitialized
-  # -save-temps -fverbose-asm -Ofast -fomit-frame-pointer -fmodulo-sched
-  # -fmodulo-sched-allow-regmoves -fgcse-sm -fgcse-las -finline-small-functions
-  # -fdelete-null-pointer-checks -fexpensive-optimizations
-# )
 set(COMPILE_OPTS PRIVATE
   ${D_OPT}
   -Wall
-  # -Wunused
-  # -Werror
+  -Wunused
+  -Werror
   -Wno-format          # int != int32_t as far as the compiler is concerned because gcc has int32_t as long int
   -Wno-unused-function # extra check to verify no unused lingering code is present
   -Wno-maybe-uninitialized
@@ -227,8 +221,8 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/config.c
   ${CMAKE_CURRENT_LIST_DIR}/src/gpio.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/midi_patches.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/midi_bankmsb0.c
+  # ${CMAKE_CURRENT_LIST_DIR}/src/midi_patches.c
+  # ${CMAKE_CURRENT_LIST_DIR}/src/midi_bankmsb0.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/mcu.c
