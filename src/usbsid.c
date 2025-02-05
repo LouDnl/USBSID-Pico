@@ -208,7 +208,7 @@ void init_logging(void)
   stdio_uart_init_full(uart0, BAUD_RATE, TX, RX);
   sleep_ms(100);  /* leave time for uart to settle */
   stdio_flush();
-  DBG("\r\n[%s]\r\n", __func__);
+  DBG("\n[%s]\n", __func__);
   #endif
   return;
 }
@@ -247,7 +247,7 @@ void webserial_write(uint8_t * itf, uint32_t n)
   tud_vendor_write(write_buffer, n);
   tud_vendor_flush();
   vu = vu == 0 ? 100 : vu;  /* NOTICE: Testfix for core1 setting dtype to 0 */
-  IODBG("[O] [%c] DAT[0x%02x] \r\n", dtype, write_buffer[0]);
+  IODBG("[O] [%c] DAT[0x%02x] \n", dtype, write_buffer[0]);
   return;
 }
 
@@ -306,7 +306,7 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
         webserial_write(itf, BYTES_TO_SEND);
         break;
       default:
-        IODBG("[WRITE ERROR]%c\r\n", dtype);
+        IODBG("[WRITE ERROR]%c\n", dtype);
         break;
     };
     return;
@@ -454,7 +454,7 @@ void led_vumeter_task(void)
       put_pixel(urgb_u32(rgbb(r_), rgbb(g_), rgbb(b_)));
 
       /* Color LED debugging ~ uncomment for testing */
-      // DBG("[%c][PWM]$%04x [R]%02x [G]%02x [B]%02x [O1]$%02x $%02d [O2]$%02x $%02d [O3]$%02x $%02d [O4]$%02x $%02d [O5]$%02x $%02d [O6]$%02x $%02d\r\n",
+      // DBG("[%c][PWM]$%04x [R]%02x [G]%02x [B]%02x [O1]$%02x $%02d [O2]$%02x $%02d [O3]$%02x $%02d [O4]$%02x $%02d [O5]$%02x $%02d [O6]$%02x $%02d\n",
       //  dtype, vu, r_, g_, b_, osc1, o1, osc2, o2, osc3, o3, osc4, o4, osc5, o5, osc6, o6);
     }
     #endif
@@ -513,7 +513,7 @@ void led_breathe_task(void)
       b_ = color_LUT[rgb_][_rgb][2];
       put_pixel(urgb_u32(rgbb(r_),rgbb(g_),rgbb(b_)));
       /* Color LED debugging ~ uncomment for testing */
-      /* DBG("[%c][PWM]$%04x [R]%02x [G]%02x [B]%02x\r\n", dtype, pwm_value, r_, g_, b_); */
+      /* DBG("[%c][PWM]$%04x [R]%02x [G]%02x [B]%02x\n", dtype, pwm_value, r_, g_, b_); */
     } else {
       put_pixel(urgb_u32(0,0,0));
     }
@@ -528,27 +528,27 @@ void led_breathe_task(void)
 
 void tud_mount_cb(void)
 {
-  DBG("[%s]\r\n", __func__);
+  DBG("[%s]\n", __func__);
   usb_connected = 1;
 }
 
 void tud_umount_cb(void)
 {
   usb_connected = 0, usbdata = 0, dtype = ntype;
-  DBG("[%s]\r\n", __func__);
+  DBG("[%s]\n", __func__);
   disable_sid();  /* NOTICE: Testing if this is causing the random lockups */
 }
 
 void tud_suspend_cb(bool remote_wakeup_en)
 {
   /* (void) remote_wakeup_en; */
-  DBG("[%s] remote_wakeup_en:%d\r\n", __func__, remote_wakeup_en);
+  DBG("[%s] remote_wakeup_en:%d\n", __func__, remote_wakeup_en);
   usb_connected = 0, usbdata = 0, dtype = ntype;
 }
 
 void tud_resume_cb(void)
 {
-  DBG("[%s]\r\n", __func__);
+  DBG("[%s]\n", __func__);
   usb_connected = 1;
 }
 
@@ -574,20 +574,20 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char)
 {
   (void)itf;
   (void)wanted_char;
-  /* DBG("[%s]\r\n", __func__); */  /* Disabled due to possible uart spam */
+  /* DBG("[%s]\n", __func__); */  /* Disabled due to possible uart spam */
 }
 
 void tud_cdc_tx_complete_cb(uint8_t itf)
 {
   (void)itf;
-  /* DBG("[%s]\r\n", __func__); */ /* Disabled due to uart spam */
+  /* DBG("[%s]\n", __func__); */ /* Disabled due to uart spam */
 }
 
 void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
 {
   /* (void) itf; */
   /* (void) rts; */
-  DBG("[%s] itf:%x, dtr:%d, rts:%d\r\n", __func__, itf, dtr, rts);
+  DBG("[%s] itf:%x, dtr:%d, rts:%d\n", __func__, itf, dtr, rts);
 
   if ( dtr ) {
     /* Terminal connected */
@@ -604,14 +604,14 @@ void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* p_line_coding)
 {
   /* (void)itf; */
   /* (void)p_line_coding; */
-  DBG("[%s] itf:%x, bit_rate:%d, stop_bits:%d, parity:%d, data_bits:%d\r\n", __func__, itf, (int)p_line_coding->bit_rate, p_line_coding->stop_bits, p_line_coding->parity, p_line_coding->data_bits);
+  DBG("[%s] itf:%x, bit_rate:%u, stop_bits:%u, parity:%u, data_bits:%u\n", __func__, itf, (int)p_line_coding->bit_rate, p_line_coding->stop_bits, p_line_coding->parity, p_line_coding->data_bits);
 }
 
 void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 {
   /* (void)itf; */
   /* (void)duration_ms; */
-  DBG("[%s] its:%x, duration_ms:%x\r\n", __func__, itf, duration_ms);
+  DBG("[%s] its:%x, duration_ms:%x\n", __func__, itf, duration_ms);
 }
 
 
@@ -619,8 +619,8 @@ void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 
 void tud_midi_rx_cb(uint8_t itf)
 {
-  usbdata = 1, dtype = midi;
   if (tud_midi_n_mounted(itf)) {
+    usbdata = 1;
     while (tud_midi_n_available(itf, 0)) {  /* Loop as long as there is data available */
       uint32_t available = tud_midi_n_stream_read(itf, 0, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
       process_stream(midimachine.usbstreambuffer, available);
@@ -659,7 +659,7 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
 void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
 {
   (void)itf;
-  DBG("[%s] %lu\r\n", __func__, sent_bytes);
+  DBG("[%s] %lu\n", __func__, sent_bytes);
 }
 
 
@@ -668,7 +668,7 @@ void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
 /* Handle incoming vendor and webusb data */
 bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const * request)
 {
-  DBG("[%s] stage:%x, rhport:%x, bRequest:0x%x, wValue:%d, wIndex:%x, wLength:%x, bmRequestType:%x, type:%x, recipient:%x, direction:%x\r\n",
+  DBG("[%s] stage:%x, rhport:%x, bRequest:0x%x, wValue:%d, wIndex:%x, wLength:%x, bmRequestType:%x, type:%x, recipient:%x, direction:%x\n",
     __func__, stage, rhport,
     request->bRequest, request->wValue, request->wIndex, request->wLength, request->bmRequestType,
     request->bmRequestType_bit.type, request->bmRequestType_bit.recipient, request->bmRequestType_bit.direction);

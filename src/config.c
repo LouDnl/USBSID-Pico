@@ -390,7 +390,7 @@ void handle_config_request(uint8_t * buffer)
       CFG("[READ_CONFIG]\n");
       /* TODO: loads current config and sends it to the requester ~ when config is finished */
       /* ISSUE: Although 4 writes are performed, only the first 2 are received */
-      CFG("[XIP_BASE]%u [FLASH_PAGE_SIZE]%u [FLASH_SECTOR_SIZE]%u [FLASH_TARGET_OFFSET]%u\r\n", XIP_BASE, FLASH_PAGE_SIZE, FLASH_SECTOR_SIZE, FLASH_TARGET_OFFSET);
+      CFG("[XIP_BASE]%u [FLASH_PAGE_SIZE]%u [FLASH_SECTOR_SIZE]%u [FLASH_TARGET_OFFSET]%u\n", XIP_BASE, FLASH_PAGE_SIZE, FLASH_SECTOR_SIZE, FLASH_TARGET_OFFSET);
       read_config(&usbsid_config);
       print_cfg(config_array, count_of(config_array));
       int writes = count_of(config_array) / 64;  /* ISSUE: It should send 4 packets of 64 bytes, but sends only 2 and a zero packet */
