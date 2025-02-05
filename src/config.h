@@ -7,7 +7,7 @@
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
- * Copyright (c) 2024 LouD
+ * Copyright (c) 2024-2025 LouD
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -55,7 +55,7 @@
 #define MAGIC_SMOKE 19700101  /* DATEOFRELEASE */
 #endif
 #ifndef PROJECT_VERSION
-#define PROJECT_VERSION "0.2.3-BETA.20241220"  /* Must be the same as in CMakeLists.txt */
+#define PROJECT_VERSION "0.3.0-BETA.20250205"  /* Must be the same as in CMakeLists.txt */
 #endif
 
 #ifdef PICO_DEFAULT_LED_PIN
@@ -125,17 +125,24 @@ enum
 {
   RESET_USBSID     = 0x20,
 
-  READ_CONFIG      = 0x30,
-  APPLY_CONFIG     = 0x31,
-  STORE_CONFIG     = 0x32,
-  SAVE_CONFIG      = 0x33,
-  SAVE_NORESET     = 0x34,
-  RESET_CONFIG     = 0x35,
+  READ_CONFIG      = 0x30,  /* Read full config as bytes */
+  APPLY_CONFIG     = 0x31,  /* Apply config from memory */
+  SET_CONFIG       = 0x32,  /* Set single config item */
+  SAVE_CONFIG      = 0x33,  /* Save and load config and then reboot */
+  SAVE_NORESET     = 0x34,  /* Save, load and apply config */
+  RESET_CONFIG     = 0x35,  /* Reset to default settings */
+  WRITE_CONFIG     = 0x36,  /* Write full config as bytes */
+  READ_SOCKETCFG   = 0x37,  /* Read socket config as bytes */
+  RELOAD_CONFIG    = 0x38,  /* Reload and apply stored config from flash */
 
   SINGLE_SID       = 0x40,
   DUAL_SID         = 0x41,
   QUAD_SID         = 0x42,
   TRIPLE_SID       = 0x43,
+  TRIPLE_SID_TWO   = 0x44,
+  MIRRORED_SID     = 0x45,
+  DUAL_SOCKET1     = 0x46,
+  DUAL_SOCKET2     = 0x47,
 
   SET_CLOCK        = 0x50,
   DETECT_SIDS      = 0x51,

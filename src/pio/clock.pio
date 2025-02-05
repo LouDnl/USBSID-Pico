@@ -7,7 +7,7 @@
 ; This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
 ; File author: LouD
 ;
-; Copyright (c) 2024 LouD
+; Copyright (c) 2024-2025 LouD
 ;
 ; The contents of this file are based upon and heavily inspired by the sourcecode from
 ; Source: https://forums.raspberrypi.com/viewtopic.php?t=355595#p2131828
@@ -48,7 +48,7 @@ set pins, 2  ; Drive pin low,  binary 0 <--- 250 ns ;total 500 ns period
     sm_config_set_set_pins(&c, pin, 1);                         /* Set the state machine configurations on the given pin */
     sm_config_set_clkdiv(&c, clk_div);                          /* Set the state machine clock divider */
     pio_gpio_init(pio, pin);                                    /* Setup the function select for a GPIO pin to use output from the given PIO instance */
-    pio_sm_set_consecutive_pindirs(pio, sm, pin, 2, true);      /* Use a state machine to set the pin direction for one pins for the PIO instance */
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);      /* Use a state machine to set the pin direction for one pins for the PIO instance */
     pio_sm_init(pio, sm, offset, &c);                           /* Resets the state machine to a consistent state, and configures it */
     pio_sm_set_enabled(pio, sm, true);                          /* Enable or disable a PIO state machine */
   }

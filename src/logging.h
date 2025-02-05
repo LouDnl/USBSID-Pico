@@ -26,59 +26,83 @@
 #pragma once
 
 #ifdef __cplusplus
-  extern "C" {
+extern "C" {
 #endif
 
 
 /* Binary printing */
 #include "macros.h"
 
+#ifdef USB_PRINTF
+/* TinyUSB libs */
+#if __has_include("bsp/board_api.h") /* Needed to account for update in tinyUSB */
+#include "bsp/board_api.h"
+#else
+#include "bsp/board.h"               /* Tiny USB Boards Abstraction Layer */
+#endif
+/* Sourced from:
+ * https://github.com/hathach/tinyusb/blob/eca025f7143141fd2bc99a94619c62a6fd666f28/examples/dual/host_info_to_device_cdc/src/main.c
+ */
+#define cdc_printf(...)                \
+do {                                   \
+    char _tempbuf[1024];               \
+    sprintf(_tempbuf, __VA_ARGS__);    \
+    uint32_t count = sprintf(_tempbuf, __VA_ARGS__); \
+    for (int i = 0; i < count; i ++) tud_cdc_n_write_char(1, _tempbuf[i]); \
+    tud_cdc_n_write_flush(1);            \
+    tud_task_ext(0, true);               \
+    } while(0)
+#define _US_DBG(...) cdc_printf(__VA_ARGS__)
+#else
+#define _US_DBG(...) printf(__VA_ARGS__)
+#endif
+
 
 #ifdef MEM_DEBUG
-#define MDBG(...) printf(__VA_ARGS__)
+#define MDBG(...) _US_DBG(__VA_ARGS__)
 #else
 #define MDBG(...) ((void)0)
 #endif
 
 #ifdef USBSID_DEBUG
-#define DBG(...) printf(__VA_ARGS__)
+#define DBG(...) _US_DBG(__VA_ARGS__)
 #else
 #define DBG(...) ((void)0)
 #endif
 
 #ifdef USBIO_DEBUG
-#define IODBG(...) printf(__VA_ARGS__)
+#define IODBG(...) _US_DBG(__VA_ARGS__)
 #else
 #define IODBG(...) ((void)0)
 #endif
 
 #ifdef CONFIG_DEBUG
-#define CFG(...) printf(__VA_ARGS__)
+#define CFG(...) _US_DBG(__VA_ARGS__)
 #else
 #define CFG(...) ((void)0)
 #endif
 
 #ifdef USBSIDGPIO_DEBUG
-#define GPIODBG(...) printf(__VA_ARGS__)
+#define GPIODBG(...) _US_DBG(__VA_ARGS__)
 #else
 #define GPIODBG(...) ((void)0)
 #endif
 
 #ifdef MIDI_DEBUG
-#define MIDBG(...) printf(__VA_ARGS__)
+#define MIDBG(...) _US_DBG(__VA_ARGS__)
 #else
 #define MIDBG(...) ((void)0)
 #endif
 
 #ifdef MIDIVOICE_DEBUG
-#define MVDBG(...) printf(__VA_ARGS__)
+#define MVDBG(...) _US_DBG(__VA_ARGS__)
 #else
 #define MVDBG(...) ((void)0)
 #endif
 
 
 #ifdef __cplusplus
-  }
+}
 #endif
 
 #endif /* _USBSID_LOGGING_H_ */

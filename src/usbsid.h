@@ -7,7 +7,7 @@
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
- * Copyright (c) 2024 LouD
+ * Copyright (c) 2024-2025 LouD
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,45 +78,41 @@
 #include "ws2812.pio.h"      /* RGB led handler */
 #endif
 
-
-/* Maximum incoming and outgoing buffer size
- *
+/* Maximum incoming and outgoing USB (CDC/WebUSB) buffer size
  * NOTE: 64 byte zero padded packets take longer to process
+ *
+ * Incoming Data buffer write example
+ * 3 bytes minimum, 63 bytes maximum
+ * Byte 0  ~ command byte (see globals.h)
+ * Byte 1  ~ address byte
+ * Byte 2  ~ data byte
+ * Byte n+ ~ repetition of byte 1 and 2
+ *
+ * Incoming Data buffer with clock cycles write example
+ * 5 bytes minimum, 61 bytes maximum
+ * Byte 0  ~ command byte (see globals.h)
+ * Byte 1  ~ address low byte
+ * Byte 2  ~ data byte
+ * Byte 3  ~ clock cycles high byte
+ * Byte 4  ~ clock cycles low byte
+ * Byte n+ ~ repetition of byte 1, 2, 3 and 4
+ *
+ * Incoming Command buffer example
+ * 2 bytes, trailing bytes will be ignored
+ * Byte 0 ~ command byte (see globals.h)
+ * Byte 1 ~ optional command argument
+ *
+ * Incoming Config data buffer command example
+ * 5 bytes, trailing bytes will be ignored
+ * Byte 0 ~ command byte (see globals.h)
+ * Byte 1 ~ config command
+ * Byte 2 ~ struct setting e.g. socketOne or clock_rate
+ * Byte 3 ~ setting entry e.g. dualsid
+ * Byte 4 ~ new value
+ * Byte 5 ~ reserved
+ *
  */
 #define MAX_BUFFER_SIZE 64
-
-/* Incoming USB (CDC/WebUSB) data buffer
- *
- * 3 bytes:
- * Byte 0 ~ command byte
- * Byte 1 ~ address byte
- * Byte 2 ~ data byte
- *
- */
-#define BYTES_EXPECTED 3
-
-/* Backwards compatible incoming USB (CDC/WebUSB) data buffer
- *
- * 4 bytes:
- * Byte 0 ~ command byte
- * Byte 1 ~ address high byte
- * Byte 2 ~ address low byte
- * Byte 3 ~ data byte
- *
- */
-#define BACKWARD_BYTES 4
-
-/* Incoming Config data buffer
-  *
-  * 5 bytes:
-  * Byte 0 ~ command
-  * Byte 1 ~ struct setting e.g. socketOne or clock_rate
-  * Byte 2 ~ setting entry e.g. dualsid
-  * Byte 3 ~ new value
-  * Byte 4 ~ reserved
-  *
-  */
-#define CONFIG_BYTES 5
 
 /* Outgoing USB (CDC/WebUSB) data buffer
  *

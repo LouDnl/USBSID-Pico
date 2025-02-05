@@ -7,7 +7,7 @@
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
- * Copyright (c) 2024 LouD
+ * Copyright (c) 2024-2025 LouD
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,13 +32,15 @@
 
 /* GPIO externals */
 extern uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data);
-extern void clear_sid_registers(void);
+extern void clear_sid_registers(int sidno);
 
 /* Declare variables */
 uint8_t waveforms[4] = { 16, 32, 64, 128 };
 
 uint8_t detect_sid_version(uint8_t start_addr)  /* Not working on real SIDS!? */
 {
+  static int restart = 0;
+restart:
   bus_operation(0x10, (start_addr + 0x12), 0xFF);  /* Set testbit in voice 3 control register to disable oscillator */
   sleep_ms(1);
   bus_operation(0x10, (start_addr + 0x0E), 0xFF);  /* Set frequency in voice 3 to $ffff */
@@ -48,7 +50,14 @@ uint8_t detect_sid_version(uint8_t start_addr)  /* Not working on real SIDS!? */
   bus_operation(0x10, (start_addr + 0x12), 0x20);  /* Set Sawtooth wave and gatebit OFF to start oscillator again */
   sleep_ms(1);
   uint8_t sidtype = bus_operation(0x11, (start_addr + 0x1B), 0x00);  /* Accu now has different value depending on sid model (6581=3/8580=2) */
-  return sidtype;  /* that is: Carry flag is set for 6581, and clear for 8580. */
+  if (restart == 3) goto end;
+  if (sidtype != 2 || sidtype != 3) {
+    restart++;
+    goto restart;
+  }
+end:
+  restart = 0;
+  return (sidtype < 4 ? sidtype : 0);  /* that is: Carry flag is set for 6581, and clear for 8580. */
 }
 
 void test_operation(uint8_t reg, uint8_t val)
@@ -206,7 +215,7 @@ void modulation_tests(uint8_t addr, uint8_t voices[3], int wf)
 
 void sid_test(int sidno, char test, char wf)
 {
-  clear_sid_registers();
+  clear_sid_registers(sidno);
   uint8_t addr = (sidno * 0x20);
   uint8_t voices[3] = { (sid_registers[0] + addr), (sid_registers[7] + addr), (sid_registers[14] + addr) };
   test_operation((sid_registers[MODVOL] + addr), 0x0F);  /* Volume to full */
@@ -214,22 +223,22 @@ void sid_test(int sidno, char test, char wf)
   switch (test) {
     case '1':  /* RUN ALL TESTS */
       test_all_waveforms(addr, voices);
-      clear_sid_registers();
+      clear_sid_registers(sidno);
       filter_tests(addr, voices, 0);
       filter_tests(addr, voices, 1);
       filter_tests(addr, voices, 2);
       filter_tests(addr, voices, 3);
-      clear_sid_registers();
+      clear_sid_registers(sidno);
       envelope_tests(addr, voices, 0);
       envelope_tests(addr, voices, 1);
       envelope_tests(addr, voices, 2);
       envelope_tests(addr, voices, 3);
-      clear_sid_registers();
+      clear_sid_registers(sidno);
       modulation_tests(addr, voices, 0);
       modulation_tests(addr, voices, 1);
       modulation_tests(addr, voices, 2);
       modulation_tests(addr, voices, 3);
-      clear_sid_registers();
+      clear_sid_registers(sidno);
       break;
     case '2':  /* ALL WAVEFORMS */
       test_all_waveforms(addr, voices);

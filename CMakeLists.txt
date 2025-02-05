@@ -7,7 +7,7 @@
 # This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
 # File author: LouD
 #
-# Copyright (c) 2024 LouD
+# Copyright (c) 2024-2025 LouD
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -29,13 +29,16 @@ cmake_minimum_required(VERSION 3.17)
 set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
-set(MAGIC_SMOKE "20241220")
-set(PROJECT_VERSION "0.2.3-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
+set(MAGIC_SMOKE "20250205")
+set(PROJECT_VERSION "0.3.0-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
 
 ### Want a cookie?
 # NOTICE: ENABLING THESE DEBUGGING DEFINITIONS WILL HAVE SIGNIFICANT IMPACT AND WILL DELAY PLAYING!
+# NOTICE: UART AND USBCDC ARE MUTUALLY EXCLUSIVE!
 if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
-  set(USBSID_DEBUGGING 1)     # Enable UART ~ mandatory enable for all other logging types
+  set(USBSID_DEBUGGING 1)     # Enable debugging ~ mandatory enable for all other logging types
+  set(UART_DEBUGGING 1)       # Enable debugging over uart pins
+  set(USBCDC_DEBUGGING 0)     # Enable debugging over cdc port 2
   set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
   set(DEFAULT_DEBUGGING 1)    # Enable debugging in usbsid.c
   set(USBIO_DEBUGGING 0)      # Enable debugging in usbsid.c
@@ -51,6 +54,9 @@ endif()
 #######################################
 
 ### Optimization and debugging
+# remember that enabling debugging and disabling optimizations
+# will weird out tune playing and reading from and writing to
+# SKPico will stop functioning
 SET(DEBUG_SYMBOLS 0)
 SET(DEBUGGING 0)
 SET(OPTIMIZATIONS 3)
@@ -118,6 +124,7 @@ if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/src/config.h)
   endwhile()
 else()
   message("ERROR config.h missing")
+  return()
 endif()
 
 ### Cmake compiler standard versions
@@ -166,12 +173,6 @@ elseif(OPTIMIZATIONS EQUAL 3)
 endif()
 
 ### Compiler flags and options
-# set(COMPILE_OPTS PRIVATE
-  # -Wno-maybe-uninitialized
-  # -save-temps -fverbose-asm -Ofast -fomit-frame-pointer -fmodulo-sched
-  # -fmodulo-sched-allow-regmoves -fgcse-sm -fgcse-las -finline-small-functions
-  # -fdelete-null-pointer-checks -fexpensive-optimizations
-# )
 set(COMPILE_OPTS PRIVATE
   ${D_OPT}
   -Wall
@@ -220,6 +221,8 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/config.c
   ${CMAKE_CURRENT_LIST_DIR}/src/gpio.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi.c
+  # ${CMAKE_CURRENT_LIST_DIR}/src/midi_patches.c
+  # ${CMAKE_CURRENT_LIST_DIR}/src/midi_bankmsb0.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/mcu.c
@@ -276,9 +279,20 @@ pico_sdk_init()
 ### Include
 include_directories(".")
 
+### Double check debugging types
+if(UART_DEBUGGING EQUAL 1 AND USBCDC_DEBUGGING EQUAL 1)
+  message("ERROR cannot have both UART_DEBUGGING and USBCDC_DEBUGGING enabled!")
+  return()
+endif()
+
 ### Logging definitions
 if(USBSID_DEBUGGING EQUAL 1)
-  add_compile_definitions(USBSID_UART=1)
+  if(UART_DEBUGGING EQUAL 1)
+    add_compile_definitions(USBSID_UART=1)
+  endif()
+  if(USBCDC_DEBUGGING EQUAL 1)
+    add_compile_definitions(USB_PRINTF=1)
+  endif()
   if(DEFAULT_DEBUGGING EQUAL 1)
     add_compile_definitions(USBSID_DEBUG=1)
   endif()
@@ -304,6 +318,8 @@ endif()
 
 ### It escapes every damn time!
 add_compile_definitions(MAGIC_SMOKE=${MAGIC_SMOKE})
+
+#add_compile_definitions(PICO_QUEUE_MAX_LEVEL=6)
 
 ### Compile targets
 foreach(FILENAME PICOTYPE IN ZIP_LISTS FILENAMES PICOTYPES)

@@ -7,7 +7,7 @@
 ; This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
 ; File author: LouD
 ;
-; Copyright (c) 2024 LouD
+; Copyright (c) 2024-2025 LouD
 ;
 ; This program is free software: you can redistribute it and/or modify
 ; it under the terms of the GNU General Public License as published by
@@ -41,33 +41,48 @@
 ;
 
 .define PUBLIC PHI 22
+.define PUBLIC BUSIRQ 4
+.define PUBLIC DATAIRQ 5
+
+; Delay counter program
+.program delay_timer
+.wrap_target
+    pull block              ; Pull data from FIFO
+    out x 16                ; Move data into scratch register x
+delay:
+    wait 1 gpio PHI         ; Wait for clock to go high
+    wait 0 gpio PHI         ; Wait for clock to go low
+    jmp x-- delay           ; Decrease x and restart count
+    irq set BUSIRQ          ; Set IRQ and continue
+    irq wait DATAIRQ        ; Set IRQ and wait for its release
+.wrap
 
 ; Bus control program
 .program bus_control
 .wrap_target
     pull block              ; Pull data from FIFO
-    wait 1 gpio PHI         ; Wait for clock to go high
-    wait 0 gpio PHI    [26] ; Wait for clock to go low
+    wait 1 irq BUSIRQ       ; Wait for IRQ signal
+    wait 0 gpio PHI   [26]  ; Wait for clock to go low
     out pins, 3             ; Set control pins (19-21)
-    wait 1 gpio PHI    [24] ; Wait for clock to go high
+    wait 1 gpio PHI   [24]  ; Wait for clock to go high
     jmp pin read            ; Jump to read if IN pin is high
-    jmp done                ; Jump to done
+    jmp done                ; Jump to done if write and wait
 read:
     in pins, 8              ; Read data bus into isr
     push block              ; Push isr to fifo
 done:
-    wait 0 gpio PHI         ; Wait for clock to go low
     out pins, 3             ; Set control to next 3 bits from fifo
+    wait 0 gpio PHI         ; Wait for clock to go low
 .wrap
 
 ; Data and address bus program
 .program data_bus
 .wrap_target
-    pull block            ; Pull data from FIFO
-    wait 1 gpio PHI       ; Wait for clock to go high
-    wait 0 gpio PHI [26]  ; Wait for clock to go low and throw in some nops
-    out pins, 16          ; Set data bus pins
-    out pindirs 16        ; Set pin directions
-    wait 1 gpio PHI       ; Wait for clock to go high
-    wait 0 gpio PHI       ; Wait for clock to go low
+    pull block              ; Pull data from FIFO
+    wait 1 irq DATAIRQ      ; Wait for data irq signal ~ should trigger exactly 1 cycle after datairq
+    wait 0 gpio PHI    [26] ; Wait for clock to go low
+    out pins, 16            ; Set data bus pins
+    out pindirs 16          ; Set pin directions
+    wait 1 gpio PHI         ; Wait for clock to go high
+    wait 0 gpio PHI         ; Wait for clock to go low
 .wrap
