@@ -774,8 +774,8 @@ void core1_main(void)
   sid_hz = usbsid_config.clock_rate;
   sid_mhz = (sid_hz / 1000 / 1000);
   sid_us = (1 / sid_mhz);
-  printf("[BOOT PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
-  printf("[BOOT C64]  %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
+  CFG("[BOOT PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
+  CFG("[BOOT C64]  %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
 
   /* Release semaphore when core 1 is started */
   sem_release(&core1_init);

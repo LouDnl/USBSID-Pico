@@ -399,7 +399,10 @@ void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, ui
   delay_word = cycles;
   if (cycles >= 1) {  /* Minimum of 1 cycle as delay, otherwise unneeded overhead */
     dma_channel_set_read_addr(dma_tx_delay, &delay_word, true);  /* Delay cycles DMA transfer */
-    if (address == 0xFF && data == 0xFF) return;
+    if (address == 0xFF && data == 0xFF) {
+      dma_channel_wait_for_finish_blocking(dma_tx_delay);
+      return;
+    }
   } else {
     pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, 4));  /* Preset the statemachine IRQ to not wait for a 1 */
     pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, 5));  /* Preset the statemachine IRQ to not wait for a 1 */
