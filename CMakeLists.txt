@@ -34,8 +34,11 @@ set(PROJECT_VERSION "0.3.0-BETA.${MAGIC_SMOKE}")  # Must be the same as in confi
 
 ### Want a cookie?
 # NOTICE: ENABLING THESE DEBUGGING DEFINITIONS WILL HAVE SIGNIFICANT IMPACT AND WILL DELAY PLAYING!
+# NOTICE: UART AND USBCDC ARE MUTUALLY EXCLUSIVE!
 if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
-  set(USBSID_DEBUGGING 1)     # Enable UART ~ mandatory enable for all other logging types
+  set(USBSID_DEBUGGING 1)     # Enable debugging ~ mandatory enable for all other logging types
+  set(UART_DEBUGGING 1)       # Enable debugging over uart pins
+  set(USBCDC_DEBUGGING 0)     # Enable debugging over cdc port 2
   set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
   set(DEFAULT_DEBUGGING 1)    # Enable debugging in usbsid.c
   set(USBIO_DEBUGGING 0)      # Enable debugging in usbsid.c
@@ -179,8 +182,8 @@ endif()
 set(COMPILE_OPTS PRIVATE
   ${D_OPT}
   -Wall
-  -Wunused
-  -Werror
+  # -Wunused
+  # -Werror
   -Wno-format          # int != int32_t as far as the compiler is concerned because gcc has int32_t as long int
   -Wno-unused-function # extra check to verify no unused lingering code is present
   -Wno-maybe-uninitialized
@@ -224,6 +227,8 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/config.c
   ${CMAKE_CURRENT_LIST_DIR}/src/gpio.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi_patches.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi_bankmsb0.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/mcu.c
@@ -280,9 +285,20 @@ pico_sdk_init()
 ### Include
 include_directories(".")
 
+### Double check debugging types
+if(UART_DEBUGGING EQUAL 1 AND USBCDC_DEBUGGING EQUAL 1)
+  message("ERROR cannot have both UART_DEBUGGING and USBCDC_DEBUGGING enabled!")
+  return()
+endif()
+
 ### Logging definitions
 if(USBSID_DEBUGGING EQUAL 1)
-  add_compile_definitions(USBSID_UART=1)
+  if(UART_DEBUGGING EQUAL 1)
+    add_compile_definitions(USBSID_UART=1)
+  endif()
+  if(USBCDC_DEBUGGING EQUAL 1)
+    add_compile_definitions(USB_PRINTF=1)
+  endif()
   if(DEFAULT_DEBUGGING EQUAL 1)
     add_compile_definitions(USBSID_DEBUG=1)
   endif()
@@ -308,6 +324,8 @@ endif()
 
 ### It escapes every damn time!
 add_compile_definitions(MAGIC_SMOKE=${MAGIC_SMOKE})
+
+#add_compile_definitions(PICO_QUEUE_MAX_LEVEL=6)
 
 ### Compile targets
 foreach(FILENAME PICOTYPE IN ZIP_LISTS FILENAMES PICOTYPES)

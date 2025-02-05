@@ -269,7 +269,7 @@ int detect_clocksignal(void)
     b = *BUSState; /* read complete bus */
     // DBG("[BUS]0x%"PRIu32", 0b"PRINTF_BINARY_PATTERN_INT32"", b, PRINTF_BYTE_TO_BINARY_INT32(b));
     r |= c = (b & bPIN(PHI)) >> PHI;
-    // DBG(" [PHI2]%d [R]%d\r\n", c, r);
+    // DBG(" [PHI2]%d [R]%d\n", c, r);
   }
   CFG("[RESULT] %d: %s\n", r, (r == 0 ? "INTERNAL CLOCK" : "EXTERNAL CLOCK"));
   CFG("[DETECT CLOCK] END\n");
@@ -389,7 +389,7 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
 
   /* WRITE & G_PAUSE */
   dma_channel_wait_for_finish_blocking(dma_tx_control);
-  GPIODBG("[W]$%08x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\r\n", data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word));
+  GPIODBG("[W]$%08x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\n", data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word));
   return 0;
 }
 

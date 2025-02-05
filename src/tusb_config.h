@@ -104,7 +104,11 @@
 #define CFG_TUD_TASK_QUEUE_SZ   64  /* WHAT DOES THIS BUTTON DO!? */
 
 //------------- CLASS -------------//
+#ifdef USB_PRINTF
+#define CFG_TUD_CDC              2
+#else
 #define CFG_TUD_CDC              1
+#endif
 #define CFG_TUD_MSC              0
 #define CFG_TUD_HID              0
 #define CFG_TUD_MIDI             1
