@@ -1,11 +1,11 @@
 # Changelog
 
-#### Version: 0.2.?-BETA (SNAPSHOT)
+#### Version: 0.?.?-BETA (SNAPSHOT)
 * ...
 * Beam me up Scotty!
 * Continue work on Midi handling
 
-#### Version: 0.2.4-BETA
+#### Version: 0.3.0-BETA
 * USB buffer handling overhaul
   - Add support for incoming packets of variable sizes
   - Add more command types
@@ -28,6 +28,7 @@
     - Add retry to try 3 times if detection fails
 * General code rework
   - Move util functions into separate util file
+* Update web config tool
 * Update examples
   - Add cli config-tool
   - Add USBSID-Pico-driver repo
