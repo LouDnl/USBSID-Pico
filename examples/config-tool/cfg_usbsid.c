@@ -945,7 +945,7 @@ void skpico_read_config(int debug)
 {
   // memset(skpico_config, 0, count_of(skpico_config));  // Let's keep it 0xFF'd okay?
   if (debug == 1) {
-    print_cfg_buffer(skpico_config, count_of(skpico_config)2);
+    print_cfg_buffer(skpico_config, count_of(skpico_config));
   }
 
   skpico_config_mode(debug);
