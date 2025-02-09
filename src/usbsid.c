@@ -64,7 +64,7 @@ extern void default_config(Config * config);
 extern void load_config(Config * config);
 extern void save_config(const Config * config);
 extern void handle_config_request(uint8_t * buffer);
-extern void apply_config(void);
+extern void apply_config(bool at_boot);
 extern void detect_default_config(void);
 extern void verify_clockrate(void);
 
@@ -82,7 +82,7 @@ extern void mute_sid(void);
 extern void unmute_sid(void);
 extern void reset_sid(void);
 extern void reset_sid_registers(void);
-extern void enable_sid(void);
+extern void enable_sid(bool unmute);
 extern void disable_sid(void);
 extern void clear_bus_all(void);
 extern uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data);
@@ -234,20 +234,20 @@ void init_rgb(void)
 /* Write from device to host */
 void cdc_write(uint8_t * itf, uint32_t n)
 { /* No need to check if write available with current driver code */
+  IODBG("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
   tud_cdc_n_write(*itf, write_buffer, n);  /* write n bytes of data to client */
   tud_cdc_n_write_flush(*itf);
   vu = vu == 0 ? 100 : vu;  /* NOTICE: Testfix for core1 setting dtype to 0 */
-  IODBG("[O] [%c] %02X:%02X\n", dtype, sid_buffer[1], write_buffer[0]);
   return;
 }
 
 /* Write from device to host */
 void webserial_write(uint8_t * itf, uint32_t n)
 { /* No need to check if write available with current driver code */
+  IODBG("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
   tud_vendor_write(write_buffer, n);
   tud_vendor_flush();
   vu = vu == 0 ? 100 : vu;  /* NOTICE: Testfix for core1 setting dtype to 0 */
-  IODBG("[O] [%c] DAT[0x%02x] \n", dtype, write_buffer[0]);
   return;
 }
 
@@ -265,6 +265,7 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
   if (command == CYCLED_WRITE) {
     // n_bytes = (n_bytes == 0) ? 4 : n_bytes; /* if byte count is zero, this is a single write packet */
     if (n_bytes == 0) {
+      IODBG("[I %d] [%c] $%02X:%02X %u\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
       cycled_bus_operation(sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
     } else {
       for (int i = 1; i <= n_bytes; i += 4) {
@@ -275,6 +276,7 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
           /* return; */
           continue;
         };
+        IODBG("[I %d] [%c] $%02X:%02X %u\n", i, dtype, sid_buffer[i], sid_buffer[i + 1], (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]));
         cycled_bus_operation(sid_buffer[i], sid_buffer[i + 1], (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]));
       };
     }
@@ -283,21 +285,21 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
   if (command == WRITE) {
     // n_bytes = (n_bytes == 0) ? 2 : n_bytes; /* if byte count is zero, this is a single write packet */
     if (n_bytes == 0) {
+      IODBG("[I %d] [%c] $%02X:%02X\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2]);
       bus_operation(0x10, sid_buffer[1], sid_buffer[2]);  /* write the address and value to the SID */
-      IODBG("[I] [%c] $%02X:%02X\n", dtype, sid_buffer[1], sid_buffer[2]);
     } else {
-      IODBG("[I] [%c]", dtype);
       for (int i = 1; i <= n_bytes; i += 2) {
-        IODBG(" $%02X:%02X", sid_buffer[i], sid_buffer[i + 1]);
+        IODBG("[I %d] [%c] $%02X:%02X\n", i, dtype, sid_buffer[i], sid_buffer[i + 1]);
         /* write the address and value to the SID with minimal 10 cycles in between ~ Thanks for the cycle amount erique! */
         cycled_bus_operation(sid_buffer[i], sid_buffer[i + 1], 10);
       };
-      IODBG("\n");
     }
     return;
   };
   if (command == READ) {  /* READING CAN ONLY HANDLE ONE AT A TIME, PERIOD. */
+    IODBG("[I %d] [%c] $%02X:%02X\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2]);
     write_buffer[0] = bus_operation((0x10 | READ), sid_buffer[1], sid_buffer[2]);  /* write the address to the SID and read the data back */
+    // write_buffer[0] = bus_operation((0x10 | READ), sid_buffer[1], 0x0);  /* write the address to the SID and read the data back */
     switch (dtype) {  /* write the result to the USB client */
       case 'C':
         cdc_write(itf, BYTES_TO_SEND);
@@ -341,7 +343,7 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
         break;
       case ENABLE_SID:
         DBG("[ENABLE_SID]\n");
-        enable_sid();
+        enable_sid(true);
         break;
       case CLEAR_BUS:
         DBG("[CLEAR_BUS]\n");
@@ -750,7 +752,7 @@ void core1_main(void)
   /* Set core locking for flash saving ~ note this makes SIO_IRQ_PROC1 unavailable */
   flash_safe_execute_core_init();
   /* Apply saved config to used vars */
-  apply_config();
+  apply_config(true);
   /* Detect optional external crystal */
   if (detect_clocksignal() == 0) {
     usbsid_config.external_clock = false;
@@ -841,6 +843,9 @@ int main()
   setup_dmachannels();
   /* Init midi */
   midi_init();
+  /* Enable SID chips */
+  // reset_sid_registers();  // Disable for now, this also enables the sid chips lol :)
+  enable_sid(false);
 
   /* Loop IO tasks forever */
   while (1) {
