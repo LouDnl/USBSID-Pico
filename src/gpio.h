@@ -110,6 +110,10 @@
 /* Util */
 #define bPIN(i) ( 1 << i )
 
+/* IRQ's */
+#define PIO_IRQ0 0
+#define PIO_IRQ1 1
+
 
 #ifdef __cplusplus
   }
