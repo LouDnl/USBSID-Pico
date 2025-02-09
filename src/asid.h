@@ -46,6 +46,12 @@
 #include <stdio.h>
 
 
+/* FMOPL ~ Really, CAPSLOCK ONLY HUH? */
+#define MAX_FM_REG_PAIRS 16
+#define OPL_REG_ADDRESS 0x00
+#define OPL_REG_DATA 0x10
+
+
 /* SID Register order for ASID */
 static const uint8_t asid_sid_registers[] =
 {
