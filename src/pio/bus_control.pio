@@ -41,8 +41,8 @@
 ;
 
 .define PUBLIC PHI 22
-.define PUBLIC BUSIRQ 4
-.define PUBLIC DATAIRQ 5
+.define PUBLIC BUSIRQ 0
+.define PUBLIC DATAIRQ 1
 
 ; Delay counter program
 .program delay_timer
@@ -69,13 +69,14 @@ delay:
     jmp done                ; Jump to done if write and wait
 read:
     in pins, 8              ; Read data bus into isr
+    in NULL, 24             ; Shift the isr 24 bits to the right
     push block              ; Push isr to fifo
 done:
-    out pins, 3             ; Set control to next 3 bits from fifo
     wait 0 gpio PHI         ; Wait for clock to go low
+    out pins, 3             ; Set control to next 3 bits from fifo
 .wrap
 
-; Data and address bus program
+; Data and address bus program ~ pinstate stays the same until next write
 .program data_bus
 .wrap_target
     pull block              ; Pull data from FIFO
