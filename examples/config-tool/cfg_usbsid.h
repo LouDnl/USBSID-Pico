@@ -91,12 +91,17 @@ enum
   TEST_SID2        = 0x54,
   TEST_SID3        = 0x55,
   TEST_SID4        = 0x56,
+  GET_CLOCK        = 0x57,
 
   LOAD_MIDI_STATE  = 0x60,
   SAVE_MIDI_STATE  = 0x61,
   RESET_MIDI_STATE = 0x63,
 
   USBSID_VERSION   = 0x80,
+
+  RESTART_BUS      = 0x85,
+  RESTART_BUS_CLK  = 0x86,
+  SYNC_PIOS        = 0x87,
 
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
 };

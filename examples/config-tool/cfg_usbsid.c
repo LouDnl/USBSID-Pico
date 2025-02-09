@@ -61,6 +61,7 @@ static int usid_dev = -1;
 
 /* init local usbsid-pico variables */
 static const enum config_clockrates clockrates[] = { DEFAULT, PAL, NTSC, DREAN };
+static uint32_t read_clock_rate;
 static char version[64] = {0};
 static char project_version[64] = {0};
 static uint8_t config[256] = {0};
@@ -70,7 +71,7 @@ static Config usbsid_config = USBSID_DEFAULT_CONFIG_INIT;
 /* -----SIDKICK-pico----- */
 
 /* init local skpico variables */
-static uint8_t skpico_config[64] = {0};
+static uint8_t skpico_config[64] = {0xFF};
 static uint8_t base_address = 0x0;
 static int sid_socket = 1;
 
@@ -456,6 +457,25 @@ void print_cfg_buffer(const uint8_t *buf, size_t len)
   }
   printf("[PRINT CFG BUFFER END]\n");
   return;
+}
+
+void read_sid_clockspeed(void)
+{
+  memset(config_buffer+1, 0, (count_of(config_buffer))-1);
+  config_buffer[1] = 0x57;
+  write_chars(config_buffer, count_of(config_buffer));
+
+  int len;
+  memset(read_data, 0, count_of(read_data));
+  len = read_chars(read_data, count_of(read_data));
+  if (debug == 1) printf("Read %d bytes of data, byte 0 = %02X\n", len, read_data[0]);
+  read_clock_rate = clockrates[read_data[0]];
+  return;
+}
+
+void print_sid_clockspeed(void)
+{
+  printf("USBSID-Pico SID Clockrate is set to: %u\n", read_clock_rate);
 }
 
 void read_version(int print_version)
@@ -923,9 +943,9 @@ void skpico_save_config(int debug)
 
 void skpico_read_config(int debug)
 {
-  memset(skpico_config, 0, count_of(skpico_config));
+  // memset(skpico_config, 0, count_of(skpico_config));  // Let's keep it 0xFF'd okay?
   if (debug == 1) {
-    print_cfg_buffer(skpico_config, count_of(skpico_config));
+    print_cfg_buffer(skpico_config, count_of(skpico_config)2);
   }
 
   skpico_config_mode(debug);
@@ -933,11 +953,12 @@ void skpico_read_config(int debug)
   for (int i = 0; i <= 63; ++i) {
     read_buffer[1] = (0x1d + base_address);
     int len;
+    usleep(1);  /* Teeny, weeny, usleepy */
     write_chars(read_buffer, 3);
     len = read_chars(read_data, count_of(read_data));
     skpico_config[i] = read_data[0];
     if (debug == 1) {
-      printf("[%s][WR%d]%02X $%02X:%02X\n", __func__, i, read_buffer[0], read_buffer[1], read_data[0]);
+      printf("[%s][R%d]%02X $%02X:%02X\n", __func__, i, read_buffer[0], read_buffer[1], read_data[0]);
     }
   }
 
@@ -1087,11 +1108,12 @@ void config_skpico(int argc, char **argv)
       param_count++;
       printf("Sending reset SIDs command\n");
       write_command(RESET_SID);
-      printf("Waiting a second for SKPico MCU to settle\n");
-      sleep(1);
+      printf("Waiting a second or two for SKPico MCU to settle\n");
+      sleep(2);
       printf("Read config\n");
       skpico_read_config(debug);
       skpico_end_config_mode(debug);
+      write_command(RESET_SID);
       return;
     }
     if (!strcmp(argv[param_count], "-w") || !strcmp(argv[param_count], "--write")) {
@@ -1252,6 +1274,7 @@ void print_help(void)
   printf("--[BASICS]----------------------------------------------------------------------------------------------------------\n");
   printf("  -v,       --version           : Read and print USBSID-Pico firmware version\n");
   printf("  -r,       --read-config       : Read and print USBSID-Pico config settings\n");
+  printf("  -rc,      --read-clock-speed  : Read and print USBSID-Pico SID clock speed\n");
   printf("  -rs,      --read-sock-config  : Read and print USBSID-Pico socket config settings only\n");
   printf("  -detect,  --detect-sid-types  : Send SID autodetect command to device, returns the config as with '-r' afterwards\n");
   printf("  -w,       --write-config      : Write single config item to USBSID-Pico (will read the full config first!)\n");
@@ -1259,6 +1282,9 @@ void print_help(void)
   printf("  -s,       --save-config       : Send the save config command to USBSID-Pico\n");
   printf("  -sr,      --save-reboot       : Send the save config command to USBSID-Pico and reboot it\n");
   printf("  -rl,      --reload-config     : Reload the config stored in flash, does not return anything\n");
+  printf("  -sc N,    --set-clock N       : Set and apply USBSID-Pico SID clock speed\n");
+  printf("                                  0: %d, 1: %d, 2: %d, 4: %d\n",
+         CLOCK_DEFAULT, CLOCK_PAL, CLOCK_NTSC, CLOCK_DREAN);
   printf("--[INI FILE CONFIGURATION]------------------------------------------------------------------------------------------\n");
   printf("  -default, --default-ini       : Generate an ini file with default USBSID-Pico config named `USBSID-Pico-cfg.ini`\n");
   printf("  -export F,--export-config F   : Read config from USBSID-Pico and export it to provided ini file or default in\n");
@@ -1380,6 +1406,24 @@ void config_usbsidpico(int argc, char **argv)
       for (int pc = 1; pc < argc; pc++ ) {
         if (!strcmp(argv[pc], "-d")) print_socket_config();
       }
+      break;
+    }
+    if (!strcmp(argv[param_count], "-rc") || !strcmp(argv[param_count], "--read-clock-speed")) {
+      printf("Reading SID clock speed\n");
+      read_sid_clockspeed();
+      printf("Printing SID clock speed\n");
+      print_sid_clockspeed();
+      break;
+    }
+    if (!strcmp(argv[param_count], "-sc") || !strcmp(argv[param_count], "--set-clock")) {
+      param_count++;
+      int clockrate = atoi(argv[param_count]);
+      if(clockrate >= count_of(clockrates)) {
+        printf("%d is not a correct clockrate option!\n", clockrate);
+        goto exit;
+      }
+      printf("Set SID clockrate to %d\n", clockrates[clockrate]);
+      write_config_command(SET_CLOCK, clockrate, 0x0, 0x0, 0x0);
       break;
     }
     if (!strcmp(argv[param_count], "-rs") || !strcmp(argv[param_count], "--read-sock-config")) {
