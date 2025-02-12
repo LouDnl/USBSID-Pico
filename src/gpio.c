@@ -355,6 +355,7 @@ void deinit_sidclock(void)
 
 static int __not_in_flash_func(set_bus_bits)(uint8_t address, uint8_t data)
 {
+  /* CFG("[BUS BITS]$%02X:%02X ", address, data); */
   switch (address) {
     case 0x00 ... 0x1F:
       if (one == 0b110 || one == 0b111) return 0;
@@ -368,7 +369,9 @@ static int __not_in_flash_func(set_bus_bits)(uint8_t address, uint8_t data)
       break;
     case 0x40 ... 0x5F:
       if (three == 0b110 || three == 0b111) return 0;
-      data_word = (address & three_mask) << 8 | data;
+      /* Workaround for addresses in this range, mask doesn't work properly */
+      address &= three_mask;
+      data_word = (three_mask == 0x3f ? (address + 0x20) : address) << 8 | data;
       control_word |= three;
       break;
     case 0x60 ... 0x7F:
@@ -377,6 +380,8 @@ static int __not_in_flash_func(set_bus_bits)(uint8_t address, uint8_t data)
       control_word |= four;
       break;
   }
+  /* CFG("$%04x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\n",
+    data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word)); */
   return 1;
 }
 
