@@ -93,8 +93,8 @@ const char *sidtypes[5] = { "UNKNOWN", "N/A", "MOS8580", "MOS6581", "FMOpl" };
 const char *chiptypes[2] = { "Real", "Clone" };
 const char *clonetypes[6] = { "Disabled", "Other", "SKPico", "ARMSID", "FPGASID", "RedipSID" };
 const char *int_ext[2] = { "Internal", "External" };
-const char *en_dis[2] = { "Enabled", "Disabled" };
-const char *true_false[2] = { "True", "False" };
+const char *enabled[2] = { "Disabled", "Enabled" };
+const char *true_false[2] = { "False", "True" };
 const char *single_dual[2] = { "Dual SID", "Single SID" };
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
@@ -102,6 +102,7 @@ const char *single_dual[2] = { "Dual SID", "Single SID" };
   .default_config = 1, \
   .external_clock = false, \
   .clock_rate = DEFAULT, \
+  .lock_clockrate = false, \
   .socketOne = { \
     .enabled = true, \
     .dualsid = false, \
@@ -244,8 +245,9 @@ void read_config(Config* config)
 {
   memset(socket_config_array, 0, sizeof socket_config_array);  /* Make sure we don't send garbled old data */
 
-  config_array[0] = READ_CONFIG; /* Initiator byte */
-  config_array[1] = 0x7F; /* Verification byte */
+  config_array[0] = READ_CONFIG;  /* Initiator byte */
+  config_array[1] = 0x7F;  /* Verification byte */
+  config_array[5] = (int)config->lock_clockrate;
   config_array[6] = (int)config->external_clock;
   config_array[7] = (config->clock_rate >> 16) & BYTE;
   config_array[8] = (config->clock_rate >> 8) & BYTE;
@@ -273,7 +275,7 @@ void read_config(Config* config)
   config_array[52] = (int)config->WebUSB.enabled;
   config_array[53] = (int)config->Asid.enabled;
   config_array[54] = (int)config->Midi.enabled;
-  config_array[63] = 0xFF; // Terminator byte
+  config_array[63] = 0xFF;  /* Terminator byte */
 
   return;
 }
@@ -418,6 +420,12 @@ void handle_config_request(uint8_t * buffer)
       memcpy(write_buffer_p, socket_config_array, count_of(socket_config_array));
       write_back_data(64);
       break;
+    case READ_NUMSIDS:
+      CFG("[READ_NUMSIDS]\n");
+      memset(write_buffer_p, 0, 64);
+      write_buffer_p[0] = (uint8_t)numsids;
+      write_back_data(64);
+      break;
     case APPLY_CONFIG:
       CFG("[APPLY_CONFIG]\n");
       apply_config(false);
@@ -435,8 +443,12 @@ void handle_config_request(uint8_t * buffer)
     case SET_CONFIG:
       CFG("[SET_CONFIG]\n");
       switch (buffer[1]) {
-        case 0: /* clock_rate / mixed */
+        case 0: /* clock_rate */
+          /* will always be available to change the setting since it doesn't apply it */
           usbsid_config.clock_rate = clockrates[(int)buffer[2]];
+          if (buffer[3] == 0 || buffer[3] == 1) { /* Verify correct data */
+            usbsid_config.lock_clockrate = (bool)buffer[3];
+          }
           break;
         case 1: /* socketOne */
           switch (buffer[2]) {
@@ -672,17 +684,32 @@ void handle_config_request(uint8_t * buffer)
       save_config(&usbsid_config);
       /* mcu_reset(); */
       break;
-    case SET_CLOCK: /* Change SID clock frequency */
+    case SET_CLOCK: /* Change SID clock frequency by array id */
       CFG("[SET_CLOCK]\n");
-      bool suspend_sids = (buffer[2] == 1) ? true : false;
+      /* locked clockrate check is done in apply_clockrate */
+      bool suspend_sids = (buffer[2] == 1) ? true : false;  /* Set RES low while changing clock? */
       apply_clockrate((int)buffer[1], suspend_sids);
       break;
-    case GET_CLOCK: /* Change SID clock frequency */
+    case GET_CLOCK: /* Returns the clockrate as array id in byte 0 */
       CFG("[GET_CLOCK]\n");
       int clk_rate_id = return_clockrate();
       memset(write_buffer_p, 0, 64);
       write_buffer_p[0] = clk_rate_id;
       write_back_data(1);
+      break;
+    case LOCK_CLOCK:  /* Locks the clockrate from being changed, saved in config */
+      CFG("[LOCK_CLOCK]\n");
+      if (buffer[1] == 0 || buffer[1] == 1) { /* Verify correct data */
+        usbsid_config.lock_clockrate = (bool)buffer[1];
+      } else {
+        CFG("[LOCK_CLOCK] Received incorrect value of %d\n", buffer[1]);
+      }
+      if (buffer[2] == 1) {  /* Save and apply if set to a 1 */
+        CFG("[LOCK_CLOCK SAVE_CONFIG]\n");
+        save_config(&usbsid_config);
+        load_config(&usbsid_config);
+        apply_config(false);
+      }
       break;
     case DETECT_SIDS:
       CFG("[DETECT_SIDS]\n");
@@ -792,11 +819,13 @@ void print_config_settings(void)
   CFG("[CONFIG] [USBSID VERSION] %s\n", project_version);
 
   CFG("[CONFIG] [CLOCK] %s @%d\n",
-    ((int)usbsid_config.external_clock == 0 ? int_ext[0] : int_ext[1]),
+    int_ext[(int)usbsid_config.external_clock],
     (int)usbsid_config.clock_rate);
+  CFG("[CONFIG] [CLOCK RATE LOCKED] %s\n",
+    true_false[(int)usbsid_config.lock_clockrate]);
 
   CFG("[CONFIG] [SOCKET ONE] %s as %s\n",
-    ((int)usbsid_config.socketOne.enabled == 1 ? en_dis[0] : en_dis[1]),
+    enabled[(int)usbsid_config.socketOne.enabled],
     ((int)usbsid_config.socketOne.dualsid == 1 ? single_dual[0] : single_dual[1]));
   CFG("[CONFIG] [SOCKET ONE] CHIP TYPE: %s, CLONE TYPE: %s\n",
     chiptypes[usbsid_config.socketOne.chiptype],
@@ -805,7 +834,7 @@ void print_config_settings(void)
     sidtypes[usbsid_config.socketOne.sid1type],
     sidtypes[usbsid_config.socketOne.sid2type]);
   CFG("[CONFIG] [SOCKET TWO] %s as %s\n",
-    ((int)usbsid_config.socketTwo.enabled == 1 ? en_dis[0] : en_dis[1]),
+    enabled[(int)usbsid_config.socketTwo.enabled],
     ((int)usbsid_config.socketTwo.dualsid == 1 ? single_dual[0] : single_dual[1]));
   CFG("[CONFIG] [SOCKET TWO] CHIP TYPE: %s, CLONE TYPE: %s\n",
     chiptypes[usbsid_config.socketTwo.chiptype],
@@ -814,27 +843,27 @@ void print_config_settings(void)
     sidtypes[usbsid_config.socketTwo.sid1type],
     sidtypes[usbsid_config.socketTwo.sid2type]);
   CFG("[CONFIG] [SOCKET TWO AS ONE] %s\n",
-    ((int)usbsid_config.socketTwo.act_as_one == 1 ? true_false[0] : true_false[1]));
+    true_false[(int)usbsid_config.socketTwo.act_as_one]);
 
   CFG("[CONFIG] [LED] %s, Idle breathe? %s\n",
-    ((int)usbsid_config.LED.enabled == 1 ? en_dis[0] : en_dis[1]),
-    ((int)usbsid_config.LED.idle_breathe == 1 ? true_false[0] : true_false[1]));
+    enabled[(int)usbsid_config.LED.enabled],
+    true_false[(int)usbsid_config.LED.idle_breathe]);
   CFG("[CONFIG] [RGBLED] %s, Idle breathe? %s\n",
-    ((int)usbsid_config.RGBLED.enabled == 1 ? en_dis[0] : en_dis[1]),
-    ((int)usbsid_config.RGBLED.idle_breathe == 1 ? true_false[0] : true_false[1]));
+    enabled[(int)usbsid_config.RGBLED.enabled],
+    true_false[(int)usbsid_config.RGBLED.idle_breathe]);
   CFG("[CONFIG] [RGBLED SIDTOUSE] %d\n",
     (int)usbsid_config.RGBLED.sid_to_use);
   CFG("[CONFIG] [RGBLED BRIGHTNESS] %d\n",
     (int)usbsid_config.RGBLED.brightness);
 
   CFG("[CONFIG] [CDC] %s\n",
-    ((int)usbsid_config.Cdc.enabled == 1 ? en_dis[0] : en_dis[1]));
+    enabled[(int)usbsid_config.Cdc.enabled]);
   CFG("[CONFIG] [WebUSB] %s\n",
-    ((int)usbsid_config.WebUSB.enabled == 1 ? en_dis[0] : en_dis[1]));
+    enabled[(int)usbsid_config.WebUSB.enabled]);
   CFG("[CONFIG] [Asid] %s\n",
-    ((int)usbsid_config.Asid.enabled == 1 ? en_dis[0] : en_dis[1]));
+    enabled[(int)usbsid_config.Asid.enabled]);
   CFG("[CONFIG] [Midi] %s\n",
-    ((int)usbsid_config.Midi.enabled == 1 ? en_dis[0] : en_dis[1]));
+    enabled[(int)usbsid_config.Midi.enabled]);
   CFG("[CONFIG] PRINT SETTINGS END\n");
 
   return;
@@ -843,9 +872,7 @@ void print_config_settings(void)
 void print_socket_config(void)
 {
   CFG("[SOCK_ONE EN] %s [SOCK_TWO EN] %s [ACT_AS_ONE] %s\n[NO SIDS] [SOCK_ONE] #%d [SOCK_TWO] #%d [TOTAL] #%d\n",
-    (sock_one ? true_false[0] : true_false[1]),
-    (sock_two ? true_false[0] : true_false[1]),
-    (act_as_one ? true_false[0] : true_false[1]),
+    true_false[sock_one], true_false[sock_two], true_false[act_as_one],
     sids_one, sids_two, numsids);
 
   return;
@@ -858,7 +885,12 @@ void print_bus_config(void)
     two, PRINTF_BYTE_TO_BINARY_INT8(two),
     three, PRINTF_BYTE_TO_BINARY_INT8(three),
     four, PRINTF_BYTE_TO_BINARY_INT8(four));
-    return;
+  CFG("[ADDRESS MASKS]\n");
+  CFG("[MASK_ONE]   0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", one_mask, PRINTF_BYTE_TO_BINARY_INT8(one_mask));
+  CFG("[MASK_TWO]   0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", two_mask, PRINTF_BYTE_TO_BINARY_INT8(two_mask));
+  CFG("[MASK_THREE] 0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", three_mask, PRINTF_BYTE_TO_BINARY_INT8(three_mask));
+  CFG("[MASK_FOUR]  0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", four_mask, PRINTF_BYTE_TO_BINARY_INT8(four_mask));
+  return;
 }
 
 void verify_socket_settings(void)
@@ -1039,7 +1071,7 @@ void detect_default_config(void)
 {
   CFG("[CONFIG DETECT DEFAULT] START\n");
   CFG("[IS DEFAULT CONFIG?] %s\n",
-    (usbsid_config.default_config ? true_false[0] : true_false[1]));
+    true_false[usbsid_config.default_config]);
   if(usbsid_config.default_config == 1) {
     CFG("[DETECTED DEFAULT CONFIG]\n");
     usbsid_config.default_config = 0;
@@ -1062,38 +1094,44 @@ int return_clockrate(void)
 void apply_clockrate(int n_clock, bool suspend_sids)
 {
   if (!usbsid_config.external_clock) {
-    if (clockrates[n_clock] != usbsid_config.clock_rate) {
-      if (suspend_sids) {
-        CFG("[DISABLE SID]\n");
-        disable_sid();
+    if (!usbsid_config.lock_clockrate) {
+      if (clockrates[n_clock] != usbsid_config.clock_rate) {
+        if (suspend_sids) {
+          CFG("[DISABLE SID]\n");
+          disable_sid();
+        }
+        CFG("[CLOCK FROM]%d [CLOCK TO]%d\n", usbsid_config.clock_rate, clockrates[n_clock]);
+        usbsid_config.clock_rate = clockrates[n_clock];
+        /* Cycled write buffer vars */
+        sid_hz = usbsid_config.clock_rate;
+        sid_mhz = (sid_hz / 1000 / 1000);
+        sid_us = (1 / sid_mhz);
+        CFG("[CFG PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
+        CFG("[CFG C64]  %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
+        /* Start clock set */
+        // ISSUE: EVEN THOUGH THIS IS BETTER IT DOES NOT SOLVE THE CRACKLING/BUS ROT ISSUE!
+        restart_bus_clocks();
+        stop_dma_channels();
+        start_dma_channels();
+        sync_pios();
+        if (suspend_sids) {
+          CFG("[ENABLE SID WITH UNMUTE]\n");
+          enable_sid(true);
+        }
+        // ISSUE: WHEN THIS HAPPENS THE CRACKLING ON CYCLE EXACT TUNES IS IMMENSE!
+        // THIS IS AFTER PAL -> NTSC -> PAL
+        // restart_bus();
+        return;
+      } else {
+        CFG("[CLOCK FROM]%d AND [CLOCK TO]%d ARE THE SAME, SKIPPING SET_CLOCK\n", usbsid_config.clock_rate, clockrates[n_clock]);
+        return;
       }
-      CFG("[CLOCK FROM]%d [CLOCK TO]%d\n", usbsid_config.clock_rate, clockrates[n_clock]);
-      usbsid_config.clock_rate = clockrates[n_clock];
-      /* Cycled write buffer vars */
-      sid_hz = usbsid_config.clock_rate;
-      sid_mhz = (sid_hz / 1000 / 1000);
-      sid_us = (1 / sid_mhz);
-      CFG("[CFG PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
-      CFG("[CFG C64]  %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
-      /* Start clock set */
-      // ISSUE: EVEN THOUGH THIS IS BETTER IT DOES NOT SOLVE THE CRACKLING/BUS ROT ISSUE!
-      restart_bus_clocks();
-      stop_dma_channels();
-      start_dma_channels();
-      sync_pios();
-      if (suspend_sids) {
-        CFG("[ENABLE SID WITH UNMUTE]\n");
-        enable_sid(true);
-      }
-      // ISSUE: WHEN THIS HAPPENS THE CRACKLING ON CYCLE EXACT TUNES IS IMMENSE!
-      // THIS IS AFTER PAL -> NTSC -> PAL
-      // restart_bus();
-      return;
     } else {
-      CFG("[CLOCK FROM]%d AND [CLOCK TO]%d ARE THE SAME, SKIPPING SET_CLOCK\n", usbsid_config.clock_rate, clockrates[n_clock]);
+      CFG("[CLOCK] Clockrate is locked, change from %d to %d not applied\n", usbsid_config.clock_rate, clockrates[n_clock]);
       return;
     }
   }
+  return;
 }
 
 void verify_clockrate(void)

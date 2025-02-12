@@ -75,6 +75,7 @@ typedef struct Config {
   int default_config;
   bool external_clock : 1;     /* enable / disable external oscillator */
   uint32_t clock_rate;         /* clock speed identifier */
+  bool lock_clockrate : 1;     /* lock the set clockspeed from being changed */
   struct
   {
     bool    enabled : 1;       /* enable / disable this socket */
@@ -123,7 +124,7 @@ extern Config usbsid_config;  /* Make Config struct global */
 /* Config command byte */
 enum
 {
-  RESET_USBSID     = 0x20,
+  RESET_USBSID     = 0x20,  /* Resets the MCU including the USB connection */
 
   READ_CONFIG      = 0x30,  /* Read full config as bytes */
   APPLY_CONFIG     = 0x31,  /* Apply config from memory */
@@ -134,24 +135,26 @@ enum
   WRITE_CONFIG     = 0x36,  /* Write full config as bytes */
   READ_SOCKETCFG   = 0x37,  /* Read socket config as bytes */
   RELOAD_CONFIG    = 0x38,  /* Reload and apply stored config from flash */
+  READ_NUMSIDS     = 0x39,  /* Returns the number of SIDs in byte 0 */
 
-  SINGLE_SID       = 0x40,
-  DUAL_SID         = 0x41,
-  QUAD_SID         = 0x42,
-  TRIPLE_SID       = 0x43,
-  TRIPLE_SID_TWO   = 0x44,
-  MIRRORED_SID     = 0x45,
-  DUAL_SOCKET1     = 0x46,
-  DUAL_SOCKET2     = 0x47,
+  SINGLE_SID       = 0x40,  /* Single SID Socket One */
+  DUAL_SID         = 0x41,  /* Dual SID Socket One */
+  QUAD_SID         = 0x42,  /* Four SID's in 2 sockets */
+  TRIPLE_SID       = 0x43,  /* Two SID's in socket One, One SID in socket two */
+  TRIPLE_SID_TWO   = 0x44,  /* One SID in Socket One, Two SID's in socket two */
+  MIRRORED_SID     = 0x45,  /* Socket Two is linked to Socket One */
+  DUAL_SOCKET1     = 0x46,  /* Two SID's in socket One, Socket Two disabled */
+  DUAL_SOCKET2     = 0x47,  /* Two SID's in socket Two, Socket One disabled */
 
-  SET_CLOCK        = 0x50,
-  DETECT_SIDS      = 0x51,
-  TEST_ALLSIDS     = 0x52,
-  TEST_SID1        = 0x53,
-  TEST_SID2        = 0x54,
-  TEST_SID3        = 0x55,
-  TEST_SID4        = 0x56,
-  GET_CLOCK        = 0x57,
+  SET_CLOCK        = 0x50,  /* Change SID clock frequency by array id */
+  DETECT_SIDS      = 0x51,  /* Try to detect the SID types per socket */
+  TEST_ALLSIDS     = 0x52,  /* Runs a very long test on all SID's */
+  TEST_SID1        = 0x53,  /* Runs a very long test on SID 1 */
+  TEST_SID2        = 0x54,  /* Runs a very long test on SID 2 */
+  TEST_SID3        = 0x55,  /* Runs a very long test on SID 3 */
+  TEST_SID4        = 0x56,  /* Runs a very long test on SID 4 */
+  GET_CLOCK        = 0x57,  /* Returns the clockrate as array id in byte 0 */
+  LOCK_CLOCK       = 0x58,  /* Locks the clockrate from being changed, saved in config */
 
   LOAD_MIDI_STATE  = 0x60,
   SAVE_MIDI_STATE  = 0x61,
