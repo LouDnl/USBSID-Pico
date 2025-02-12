@@ -449,7 +449,9 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
 
 void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, uint16_t cycles)
 {
-  GPIODBG("[CB] $%02X:%02X %u\n", address, data, cycles);
+  GPIODBG("[WC]$%04x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16" $%02X:%02X(%u)\n",
+    data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word),
+    address, data, cycles);
   delay_word = cycles;
   if (cycles >= 1) {  /* Minimum of 1 cycle as delay, otherwise unneeded overhead */
     dma_channel_set_read_addr(dma_tx_delay, &delay_word, true);  /* Delay cycles DMA transfer */
@@ -477,28 +479,26 @@ void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, ui
 
 void unmute_sid(void)
 {
-  DBG("[UNMUTE] ");
+  DBG("[UNMUTE]\n");
   for (int i = 0; i < numsids; i++) {
     uint8_t addr = ((0x20 * i) + 0x18);
     if ((volume_state[i] & 0xF) == 0) volume_state[i] = (volume_state[i] & 0xF0) | 0x0E;
     sid_memory[addr] = volume_state[i];
     bus_operation((0x10 | WRITE), ((0x20 * i) + 0x18), volume_state[i]);  /* Volume back */
-    DBG("[%d] $%02X:%02X ", i, addr, volume_state[i]);
+    DBG("[%d] $%02X:%02X\n", i, addr, volume_state[i]);
   }
-  DBG("\n");
   return;
 }
 
 void mute_sid(void)
 {
-  DBG("[MUTE] ");
+  DBG("[MUTE]\n");
   for (int i = 0; i < numsids; i++) {
     uint8_t addr = ((0x20 * i) + 0x18);
     volume_state[i] = sid_memory[addr];
     bus_operation((0x10 | WRITE), addr, (volume_state[i] & 0xF0));  /* Volume to 0 */
-    DBG("[%d] $%02X:%02X ", i, addr, volume_state[i]);
+    DBG("[%d] $%02X:%02X\n", i, addr, (volume_state[i] & 0xF0));
   }
-  DBG("\n");
   return;
 }
 
