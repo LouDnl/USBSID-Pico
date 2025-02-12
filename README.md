@@ -35,6 +35,8 @@ Out-of-the box playing is also supported by using [C64jukebox by Kenchis](https:
 Unofficial support is added to a fork of [Vice](https://github.com/LouDnl/Vice-USBSID), up to 3 SIDs are supported in vsid and up to 4 in xs64.  
 Unofficial support is added to a fork of [sidplayfp]() which requires a fork of [libsidplayfp]().  
 Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouDnl/RetroDebugger), up to 4 SIDs are supported.
+##### Amiga
+[erique](https://github.com/erique) and [koobo](https://github.com/koobo) have added support to [playsid](https://github.com/erique/playsid.library)
 ##### C64 Music trackers
 You should be able to use the ASID fork of [sidfactory2](https://github.com/Chordian/sidfactory2/tree/asid-support) without issues.  
 When using Vice or RetroDebugger you can freely use applications like [SID-Wizard](https://sourceforge.net/projects/sid-wizard/) for music creation.
@@ -103,6 +105,7 @@ Use `usbsidpico.uf2` for Pico1 regular green rp2040 Pico boards.
 Use `usbsidpico-rgb.uf2` for Pico1 black clone rp2040 Pico boards with RGB LED onboard.  
 Use `usbsidpico_w.uf2` for PicoW regular green rp2040 PicoW boards.  
 Use `usbsidpico2.uf2` for Pico2 regular green rp2350 Pico2 boards.  
+Use `usbsidpico2_w.uf2` for Pico2W regular green rp2350 Pico2W boards.  
 **WARNING!** Do _NOT_ use the RGB firmware for any of the (non black) rp2040 or rp2350 Pico boards that do not contain an RGB LED.
 ### How to flash
 A Raspberry Pi Pico board is incredibly easy to flash, as it comes with a built in bootloader for flashing new firmwares in the `uf2` format. 
@@ -126,15 +129,17 @@ The firmware is still in development so features might change, be added or remov
 - By default both sockets are enabled and the configuration is set to 2 SID's.
 - Custom CDC protocol for playing SID files or usage with emulators
 - WebUSB support using the same CDC protocol for WebUSB supporting players
+  - Play SID files in your browser via [Deepsid](https://deepsid.chordian.net/) by Chordian
+  - Play SID files in your browser via [C64jukebox](https://haendel.ddns.net:8443/static/c64jukebox.vue) by Kenchis
 - Midi (in) ASID support (heavily inspired by multiple sources)
   - Play SID files in your (midi supporting) browser via [Deepsid](https://deepsid.chordian.net/) by Chordian
   - Play SID files in your (midi supporting) browser via [IneSID](https://inesid.fazibear.me/) by Fazibear
 - Midi device support over USB
   - Use your USBSID-Pico as Synth with your Midi controller
 - Two SID sockets with up to 4 SID's (e.g. SKPico) supported
-  - Socket one address range $00 ~ $3F (default $00 ~ $1F)
-  - Socket two address range $20 ~ $7F (default $20 ~ $3F)
-  - Configurable (platform independent (Linux/Windows) tool still in development)
+  - Socket one address range $00 ~ $7F (default $00 ~ $1F) auto based on configuration settings
+  - Socket two address range $00 ~ $7F (default $40 ~ $7F) auto based on configuration settings
+  - Configurable via [config-tool](repo/examples/config-tool) for Linux (Windows still in development)
 - Onboard LED acts as VU meter calculated by the voices of SID1 (Pico & Pico2 only)
 - Onboard RGB LED acts as second VU meter calculated by the voices of SID1 (default)
   - Requires Black Pico clone board with RGB LED onboard!
@@ -260,8 +265,7 @@ _Available examples with USBSID-Pico support:_<br>
 [**RetroDebugger**](https://github.com/LouDnl/RetroDebugger) fork is available @ https://github.com/LouDnl/RetroDebugger<br>
 [**playsid.library**](https://github.com/erique/playsid.library) Amiga implementation is available @ https://github.com/erique/playsid.library<br>
 ### Precompiled Vice binaries
-**NOTE: Pre compiled binaries are out of date at the moment sorry!**  
-Pre compiled Vice binaries are available in my fork @ https://github.com/LouDnl/Vice-USBSID/tree/main/builds
+Pre compiled Vice binaries are available in my fork @ https://github.com/LouDnl/Vice-USBSID/releases
 
 # Acknowledgements
 Special thanks goes out to [Tobozo](https://github.com/tobozo/) for making the USBSID-Pico logo and for his (mental🤣) support since starting this project.  
