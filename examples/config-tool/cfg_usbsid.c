@@ -1046,6 +1046,8 @@ void print_help_skpico(void)
   printf("  -d,       --debug             : Prints all read write debug information\n");
   printf("  --default-config              : Resets the SKPico to default configuration\n");
   printf("  -sock     --socket            : Set the USBSID-Pico socket to use, defaults to socket 1\n");
+  printf("  -addr     --base-address      : Set the USBSID-Pico base address to use\n");
+  printf("  (-sock and -addr are mutually exclusive, you can choose only one)\n");
   printf("  -r,       --read              : Read and print SIDKICK-pico configuration\n");
   printf("  -w,       --write             : Write single config item to SIDKICK-pico (will read the current config first)\n");
   printf("--[MANUAL CONFIGURATION]--------------------------------------------------------------------------------------------\n");
@@ -1086,11 +1088,23 @@ void config_skpico(int argc, char **argv)
   }
   int debug = 0;
   for (int param_count = 2; param_count < argc; param_count++) {
+    /* -sock and -addr are mutually exclusive! */
     if (!strcmp(argv[param_count], "-sock") || !strcmp(argv[param_count], "--socket")) {
       param_count++;
       sid_socket = atoi(argv[param_count]);
       int socket_base = (sid_socket == 1) ? 0 : (sid_socket == 2) ? 1 : 0;
       base_address = (socket_base * 0x40);
+    }
+    if (!strcmp(argv[param_count], "-addr") || !strcmp(argv[param_count], "--base-address")) {
+      param_count++;
+      uint8_t addr = strtol(argv[param_count], NULL, 16);
+      if (addr == 0x0 || addr == 0x20 || addr == 0x40 || addr == 0x60) {
+        base_address = addr;
+        printf("SIDKICK-pico base address 0x%02X selected\n", base_address);
+      } else {
+        printf("Error, incorrect base address 0x%02X (%u)!\n", addr, addr);
+        goto exit;
+      }
     }
     if (!strcmp(argv[param_count], "-d") || !strcmp(argv[param_count], "--debug")) {
       debug = 1;
