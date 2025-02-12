@@ -192,6 +192,7 @@ If you want and are up to it you can create your own development board by using 
 ## Cases
 All USBSID-Pico community created cases are available in the [cases](cases/) folder, direct links below.
 * [Cartridge case](cases/spotUP/USBSID-Pico_Case.zip) by @spotUP
+* [boxy case](repo/cases/schorsch3000/usbsidpico-case-box.tgz) by @schorsch3000
 
 ## Important PCB information
 [<img src="images/v1.0-explained.png" width="30%">](images/v1.0-explained.png)<br/>
