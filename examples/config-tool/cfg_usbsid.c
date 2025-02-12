@@ -34,6 +34,7 @@
 #include <string.h> // `strerror(errno)`
 #include <ctype.h>
 #include <stdbool.h>
+#include <time.h>
 #include <libusb.h>
 
 #include "inih/ini.h"
@@ -113,6 +114,10 @@ static int import_ini(void* user, const char* section, const char* name, const c
   #define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
   if (MATCH("General", "clock_rate")) {
     ini_config->clock_rate = atoi(value);
+  }
+  if (MATCH("General", "lock_clockrate")) {
+    p = value_position(value, truefalse);
+    if (p != 666) ini_config->lock_clockrate = p;
   }
   if (MATCH("socketOne", "enabled")) {
     p = value_position(value, truefalse);
@@ -202,6 +207,8 @@ void write_config_ini(Config * config, char * filename)
     fprintf(f, "version = v%s\n", (project_version[0] == 0 ? "0.0.0-DEFAULT.19000101" : project_version + 1));
     fprintf(f, "; Possible clockrates: %d, %d, %d, %d\n", DEFAULT, PAL, NTSC, DREAN);
     fprintf(f, "clock_rate = %d\n", config->clock_rate);
+    fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
+    fprintf(f, "lock_clockrate = %s\n", truefalse[config->lock_clockrate]);
     fprintf(f, "\n");
     fprintf(f, "[socketOne]\n");
     fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
@@ -406,7 +413,9 @@ void save_config(int reboot)
 void write_config(Config * config)
 {
   /* General */
-  write_config_command(SET_CONFIG,0x0,clockspeed_n(config->clock_rate),0,0);
+  write_config_command(SET_CONFIG,0x0,
+    clockspeed_n(config->clock_rate),
+    (int)usbsid_config.lock_clockrate,0);
 
   /* socketOne */
   write_config_command(SET_CONFIG,0x1,0x0,config->socketOne.enabled,0);
@@ -506,6 +515,9 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
     switch(i) {
       case 0 ... 1:
         continue;
+      case 5:
+        usbsid_config.lock_clockrate = buff[i];
+        break;
       case 6:
         usbsid_config.external_clock = buff[i];
         break;
@@ -630,6 +642,8 @@ void print_config(void)
   } else {
     printf("[CONFIG] SID Clock externl defaults to 1MHz\n");
   }
+  printf("[CONFIG] [CLOCK RATE LOCKED] %s\n",
+    truefalse[(int)usbsid_config.lock_clockrate]);
   printf("[CONFIG] [SOCKET ONE] %s as %s\n",
     enabled[(int)usbsid_config.socketOne.enabled],
     socket[(int)usbsid_config.socketOne.dualsid]);
@@ -953,7 +967,7 @@ void skpico_read_config(int debug)
   for (int i = 0; i <= 63; ++i) {
     read_buffer[1] = (0x1d + base_address);
     int len;
-    usleep(1);  /* Teeny, weeny, usleepy */
+    nanosleep((const struct timespec[]){{0, 1000L}}, NULL);  /* Teeny, weeny, usleepy */
     write_chars(read_buffer, 3);
     len = read_chars(read_data, count_of(read_data));
     skpico_config[i] = read_data[0];
@@ -1276,6 +1290,7 @@ void print_help(void)
   printf("  -r,       --read-config       : Read and print USBSID-Pico config settings\n");
   printf("  -rc,      --read-clock-speed  : Read and print USBSID-Pico SID clock speed\n");
   printf("  -rs,      --read-sock-config  : Read and print USBSID-Pico socket config settings only\n");
+  printf("  -rn,      --read-num-sids     : Read and print USBSID-Pico configured number of SID's only\n");
   printf("  -detect,  --detect-sid-types  : Send SID autodetect command to device, returns the config as with '-r' afterwards\n");
   printf("  -w,       --write-config      : Write single config item to USBSID-Pico (will read the full config first!)\n");
   printf("  -a,       --apply-config      : Apply the current config settings (from USBSID-Pico memory) that you changed with '-w'\n");
@@ -1285,6 +1300,7 @@ void print_help(void)
   printf("  -sc N,    --set-clock N       : Set and apply USBSID-Pico SID clock speed\n");
   printf("                                  0: %d, 1: %d, 2: %d, 4: %d\n",
          CLOCK_DEFAULT, CLOCK_PAL, CLOCK_NTSC, CLOCK_DREAN);
+  printf("  -lc N,    --lock-clockrate N  : Lock and save the clock rate from changing: True (1) False (0)\n");
   printf("--[INI FILE CONFIGURATION]------------------------------------------------------------------------------------------\n");
   printf("  -default, --default-ini       : Generate an ini file with default USBSID-Pico config named `USBSID-Pico-cfg.ini`\n");
   printf("  -export F,--export-config F   : Read config from USBSID-Pico and export it to provided ini file or default in\n");
@@ -1298,6 +1314,7 @@ void print_help(void)
   printf("  -c N,     --sid-clock N       : Change SID clock to\n");
   printf("                                  0: %d, 1: %d, 2: %d, 4: %d\n",
          CLOCK_DEFAULT, CLOCK_PAL, CLOCK_NTSC, CLOCK_DREAN);
+  printf("  -l N,     --lockclockrate N   : Lock the clock rate from changing: True (1) False (0)\n");
   printf("  -led N,   --led-enabled N     : LED is Enabled (1) or Disabled (0)\n");
   printf("  -lbr N,   --led-breathe N     : LED idle breathing is Enabled (1) or Disabled (0)\n");
   printf("  -rgb N,   --rgb-enabled N     : RGBLED is Enabled (1) or Disabled (0)\n");
@@ -1426,6 +1443,17 @@ void config_usbsidpico(int argc, char **argv)
       write_config_command(SET_CLOCK, clockrate, 0x0, 0x0, 0x0);
       break;
     }
+    if (!strcmp(argv[param_count], "-lc") || !strcmp(argv[param_count], "--lock-clockrate")) {
+      param_count++;
+      int lock = atoi(argv[param_count]);
+      if(lock > 1) {
+        printf("%d is not a correct lock clockrate option!\n", lock);
+        goto exit;
+      }
+      printf("Locking and saving the clockrate from being changed\n");
+      write_config_command(LOCK_CLOCK, lock, 0x1, 0x0, 0x0);
+      break;
+    }
     if (!strcmp(argv[param_count], "-rs") || !strcmp(argv[param_count], "--read-sock-config")) {
       if (debug == 1) {
         printf("Printing default socket config\n");
@@ -1435,6 +1463,15 @@ void config_usbsidpico(int argc, char **argv)
       read_socket_config();
       printf("Printing socket config\n");
       print_socket_config();
+      break;
+    }
+    if (!strcmp(argv[param_count], "-rn") || !strcmp(argv[param_count], "--read-num-sids")) {
+      printf("Reading number of SID's\n");
+      write_config_command(READ_NUMSIDS, 0x0, 0x0, 0x0, 0x0);
+      int len;
+      len = read_chars(read_data_max, count_of(read_data_max));
+      if (debug == 1) printf("Read %d bytes of data, byte 0 = %02X\n", len, read_data_max[0]);
+      printf("USBSID-Pico is configured to use %d SID's\n", read_data_max[0]);
       break;
     }
 
@@ -1460,10 +1497,21 @@ void config_usbsidpico(int argc, char **argv)
           }
           printf("Set SID clockrate from %d to: %d\n", usbsid_config.clock_rate, clockrates[clockrate]);
           usbsid_config.clock_rate = clockrates[clockrate];
-          write_config_command(SET_CONFIG, 0x0, clockspeed_n(usbsid_config.clock_rate), 0x0, 0x0);
+
+          for (int pcl = 1; pcl < argc; pcl++) {
+            if (!strcmp(argv[pcl], "-l") || !strcmp(argv[pcl], "--lockclockrate")) {
+              pcl++;
+              int lock = atoi(argv[pcl]);
+              if(lock > 1) {
+                printf("%d is not a correct lock clockrate option!\n", lock);
+                goto exit;
+              }
+              usbsid_config.lock_clockrate = pcl;
+            }
+          }
+          write_config_command(SET_CONFIG, 0x0, clockspeed_n(usbsid_config.clock_rate), usbsid_config.lock_clockrate, 0x0);
           continue;
         }
-
         if (!strcmp(argv[pc], "-led") || !strcmp(argv[pc], "--led-enabled")) {
           pc++;
           int en = atoi(argv[pc]);
