@@ -424,7 +424,7 @@ void handle_config_request(uint8_t * buffer)
       CFG("[READ_NUMSIDS]\n");
       memset(write_buffer_p, 0, 64);
       write_buffer_p[0] = (uint8_t)numsids;
-      write_back_data(64);
+      write_back_data(1);
       break;
     case APPLY_CONFIG:
       CFG("[APPLY_CONFIG]\n");
