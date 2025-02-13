@@ -45,6 +45,12 @@ jobs:
               pico_board: pico2,
               pico_platform: rp2350-arm-s,
             }
+          - {
+              buildname: Pico2_W,
+              directory: pico2w,
+              pico_board: pico2_w,
+              pico_platform: rp2350-arm-s,
+            }
 
       fail-fast: false
 
