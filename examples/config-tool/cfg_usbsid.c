@@ -1483,9 +1483,9 @@ void config_usbsidpico(int argc, char **argv)
       printf("Reading number of SID's\n");
       write_config_command(READ_NUMSIDS, 0x0, 0x0, 0x0, 0x0);
       int len;
-      len = read_chars(read_data_max, count_of(read_data_max));
-      if (debug == 1) printf("Read %d bytes of data, byte 0 = %02X\n", len, read_data_max[0]);
-      printf("USBSID-Pico is configured to use %d SID's\n", read_data_max[0]);
+      len = read_chars(read_data, count_of(read_data));
+      if (debug == 1) printf("Read %d byte of data, byte 0 = %02X\n", len, read_data[0]);
+      printf("USBSID-Pico is configured to use %d SID's\n", read_data[0]);
       break;
     }
 
