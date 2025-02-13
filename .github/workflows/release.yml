@@ -4,9 +4,9 @@ env:
   BUILD_THREADS: 4
   BUILD_TYPE: Release
   # Pico-SDK version
-  PICO_SDK_REF: 2.0.0
-  PICO_EXTRAS_REF: sdk-2.0.0
-  PICOTOOL_REF: 2.0.0
+  PICO_SDK_REF: 2.1.0
+  PICO_EXTRAS_REF: sdk-2.1.0
+  PICOTOOL_REF: 2.1.0
 
 on:
   push:
