@@ -61,7 +61,7 @@ static int usid_dev = -1;
 /* -----USBSID-Pico------ */
 
 /* init local usbsid-pico variables */
-static const enum config_clockrates clockrates[] = { DEFAULT, PAL, NTSC, DREAN };
+static const enum config_clockrates clockrates[] = { DEFAULT, PAL, NTSC, DREAN, NTSC2 };
 static uint32_t read_clock_rate;
 static char version[64] = {0};
 static char project_version[64] = {0};

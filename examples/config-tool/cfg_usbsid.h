@@ -107,11 +107,26 @@ enum
 
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
 };
+
+/* Clock cycles per second
+ * Clock speed: 0.985 MHz (PAL) or 1.023 MHz (NTSC)
+ *
+ * For some reason both 1022727 and 1022730 are
+ * mentioned as NTSC clock cycles per second
+ * Going for the rates specified by Vice it should
+ * be 1022730, except in the link about raster time
+ * on c64 wiki it's 1022727.
+ * I chose to implement both, let's see how this
+ * works out
+ *
+ * https://sourceforge.net/p/vice-emu/code/HEAD/tree/trunk/vice/src/c64/c64.h
+ */
 typedef enum {
     CLOCK_DEFAULT  = 1000000,  /* @125MHz clock ~ 125000000 / 62,5f = 2000000 / 2 = 1000000 == 1.00MHz @ 125MHz and 1.06MHz @ 133MHz */
     CLOCK_PAL      = 985248,   /* @125MHz clock ~ 125000000 / 63,435804995f = 1970496,000009025 / 2 = 985248,000004513 */
     CLOCK_NTSC     = 1022727,  /* @125MHz clock ~ 125000000 / 61,111127407f = 2045454,000013782 / 2 = 1022727,000006891 */
-    CLOCK_DREAN    = 1023440   /* @125MHz clock ~ 125000000 / 61,068553115f = 2046879,999999489 / 2 = 1023439,999999745 */
+    CLOCK_DREAN    = 1023440,  /* @125MHz clock ~ 125000000 / 61,068553115f = 2046879,999999489 / 2 = 1023439,999999745 */
+    CLOCK_NTSC2    = 1022730,  /* @125MHz clock ~ 125000000 / 61,111127407f = 2045454,000013782 / 2 = 1022727,000006891 */
 } clock_rates;
 enum config_clockrates
 {
@@ -119,6 +134,7 @@ enum config_clockrates
     PAL     = CLOCK_PAL,      /* 1 */
     NTSC    = CLOCK_NTSC,     /* 2 */
     DREAN   = CLOCK_DREAN,    /* 3 */
+    NTSC2   = CLOCK_NTSC2,    /* 4 */
 };
 
 uint8_t read_data[1];
