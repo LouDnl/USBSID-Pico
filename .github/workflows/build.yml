@@ -149,7 +149,7 @@ jobs:
         with:
           path: master
 
-      - name: 🏭 Create build folders
+      - name: 🏭 Create build directory
         run: |
           mkdir -p ${{github.workspace}}/master/build_${{matrix.directory}}
 

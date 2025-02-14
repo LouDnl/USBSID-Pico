@@ -31,8 +31,8 @@ Out-of-the box playing is supported by using [Deepsid by Chordian](https://deeps
 by selecting `WebUSB (Hermit)` as player in the pulldown menu or  
 by selecting `ASID (MIDI)` as player in the pulldown menu.  
 Out-of-the box playing is also supported by using [C64jukebox by Kenchis](https://haendel.ddns.net:8443/static/c64jukebox.vue), note that this is still in BETA.  
-[SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux with up to 4 SIDs supported.  
-Unofficial support is added to a fork of [Vice](https://github.com/LouDnl/Vice-USBSID), up to 3 SIDs are supported in vsid and up to 4 in xs64.  
+[SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux & Windows with up to 4 SIDs supported (Windows version is buggy).  
+Unofficial support is added to a fork of [Vice](https://github.com/LouDnl/Vice-USBSID), up to 3 SIDs are supported in vsid and up to 4 in x64sc.  
 Unofficial support is added to a fork of [sidplayfp]() which requires a fork of [libsidplayfp]().  
 Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouDnl/RetroDebugger), up to 4 SIDs are supported.
 ##### Amiga
@@ -90,13 +90,37 @@ You can test your board with WebUSB and ASID here: [USBSID](https://usbsid.louda
 If needed you can change your USBSID configuration after selecting WebUSB and clicking on `Open config`.  
 <img src="images/usbsidpico-config-dark.png" width="300px"><img src="images/usbsidpico-config-light.png" width="300px"><br>
 _The player is set up with some borrowed code from Deepsid using Hermit's JsSID implementation._
+
 #### Debug functions
 For testing purposes only you can use the debug functions available on the [USBSID Debug](https://usbsid.loudai.nl/?player=webusb&debug=usbsidpico) site.
+
 ### Supported platforms
 _In development_  
 Linux: Vice, RetroDebugger, SidBerry, SidplayFp, JSidplay2, USB Midi, ASID (in webbrowser) SID Play  
-Windows: Vice  
-Windows/Android: USB Midi, ASID (in webbrowser) SID Play
+Windows: Vice, SidBerry, USB Midi, ASID (in webbrowser) SID Play  
+Android: USB Midi, ASID (in webbrowser) SID Play
+
+### Linux Udev rules
+In the [examples/udev](repo/examples/udev-rules/69-usbsid-permissions.rules) directory you can find the udev rules that I use on Linux. This purely an example file that you can use and change to your own needs.  
+Steps required for this to work
+```bash
+  # Check if you are in the plugdev group
+  groups  # should show the plugdev group
+  # Copy the udev ules file to the correct directory
+  sudo cp 69-usbsid-permissions.rules /etc/udev/rules.d
+  # Now reload the udev rules
+  udevadm control --reload-rules && udevadm trigger
+  # Not working? Try reloading the service
+  sudo systemctl restart udev
+```
+
+### Windows driver
+Use [Zadig](https://zadig.akeo.ie/) to install the correct driver for USBSID-Pico.  
+<img src="images/zadig-list-all-devices.png" width="200px">
+<img src="images/zadig-install-driver.png" width="200px">  
+Then configure check, configure and test your board on the [USBSID](https://usbsid.loudai.nl/?player=webusb) config tool website  
+<img src="images/usbsid-config-connect.png" width="200px">
+<img src="images/usbsid-config-checkversion.png" width="200px">  
 
 # Firmware
 See the [firmware changelog](CHANGELOG.md) for more information on what's changed and previous releases.
@@ -115,14 +139,14 @@ In order to flash a new firmware to your USBSID-Pico you will need to put the Pi
 	- Press and release the `RST` button on the USBSID-Pico board.
 	- Now release the `BOOTSEL` button.
 	- A new drive should appear on your computer called `RPI-RP2`.
-	- Copy the correct `uf2` firmware file to this folder.
+	- Copy the correct `uf2` firmware file to this directory.
 	- After copying the Pico will reboot and your Pico is flashed.
 2. When flashing a Pico that is not seated on the board do the following:
 	- Plug in the USB cable to your Pico and not into your computer.
 	- While holding the `BOOTSEL` button on the Pico plugin the other end of the USB cable into your computer.
 	- Now release the `BOOTSEL` button.
 	- A new drive should appear on your computer called `RPI-RP2`.
-	- Copy the correct `uf2` firmware file to this folder.
+	- Copy the correct `uf2` firmware file to this directory.
 	- After copying the Pico will reboot and your Pico is flashed.
 ### Firmware features
 The firmware is still in development so features might change, be added or removed.
@@ -190,7 +214,7 @@ If you want and are up to it you can create your own development board by using 
   <img src="images/v0.1-top.png" width="30%">  
 
 ## Cases
-All USBSID-Pico community created cases are available in the [cases](cases/) folder, direct links below.
+All USBSID-Pico community created cases are available in the [cases](cases/) directory, direct links below.
 * [Cartridge case](cases/spotUP/USBSID-Pico_Case.zip) by @spotUP
 * [boxy case](repo/cases/schorsch3000/usbsidpico-case-box.tgz) by @schorsch3000
 
