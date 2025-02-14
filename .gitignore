@@ -12,6 +12,7 @@
 !*.png
 !*.pdf
 !*.html
+!*.rules
 !*.yml
 !*.zip
 
@@ -53,6 +54,7 @@
 !examples/sidplayfp
 !examples/USBSID-Pico-driver
 !examples/hardsid-sidblaster
+!examples/udev-rules
 !cases
 !cases/**
 
