@@ -1029,6 +1029,7 @@ void apply_bus_config(void)
   if (act_as_one) {                    /* act-as-one enabled overrules all settings */
     one = two = 0;                     /* CS1 low, CS2 low */
     three = four = 0;                  /* CS1 low, CS2 low */
+    one_mask = two_mask = three_mask = four_mask = 0x1F;
   } else {
     if (sock_one && !sock_two) {       /* SocketOne enabled, SocketTwo disabled */
       one = 0b100;                     /* CS1 low, CS2 high */
