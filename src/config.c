@@ -72,6 +72,7 @@ extern void midi_bus_operation(uint8_t a, uint8_t b);
 extern void mcu_reset(void);
 
 /* Pre declarations */
+int verify_fmopl_sidno(void);
 void apply_config(bool at_boot);
 void apply_socket_change(void);
 int return_clockrate(void);
@@ -84,6 +85,8 @@ static uint8_t p_version_array[MAX_BUFFER_SIZE];
 
 /* Init vars */
 int sock_one = 0, sock_two = 0, sids_one = 0, sids_two = 0, numsids = 0, act_as_one = 0;
+int fmopl_sid = 0;
+bool fmopl_enabled = 0;
 uint8_t one = 0, two = 0, three = 0, four = 0;
 uint8_t one_mask = 0, two_mask = 0, three_mask = 0, four_mask = 0;
 const char* project_version = PROJECT_VERSION;
@@ -141,6 +144,10 @@ const char *single_dual[2] = { "Dual SID", "Single SID" };
   }, \
   .Midi = { \
     .enabled = true \
+  }, \
+  .FMOpl = { \
+    .enabled = false, \
+    .sidno = 0, \
   }, \
 } \
 
@@ -275,6 +282,8 @@ void read_config(Config* config)
   config_array[52] = (int)config->WebUSB.enabled;
   config_array[53] = (int)config->Asid.enabled;
   config_array[54] = (int)config->Midi.enabled;
+  config_array[55] = (int)config->FMOpl.enabled;
+  config_array[56] = config->FMOpl.sidno;
   config_array[63] = 0xFF;  /* Terminator byte */
 
   return;
@@ -424,6 +433,12 @@ void handle_config_request(uint8_t * buffer)
       CFG("[READ_NUMSIDS]\n");
       memset(write_buffer_p, 0, 64);
       write_buffer_p[0] = (uint8_t)numsids;
+      write_back_data(1);
+      break;
+    case READ_FMOPLSID:
+      CFG("[READ_FMOPLSID]\n");
+      memset(write_buffer_p, 0, 64);
+      write_buffer_p[0] = (uint8_t)fmopl_sid;
       write_back_data(1);
       break;
     case APPLY_CONFIG:
@@ -583,6 +598,11 @@ void handle_config_request(uint8_t * buffer)
         case 6: /* WEBUSB */
         case 7: /* ASID */
         case 8: /* MIDI */
+          break;
+        case 9: /* FMOpl */
+          usbsid_config.FMOpl.enabled = (bool)buffer[2];
+          usbsid_config.FMOpl.sidno = verify_fmopl_sidno();
+          break;
         default:
           break;
       };
@@ -864,6 +884,12 @@ void print_config_settings(void)
     enabled[(int)usbsid_config.Asid.enabled]);
   CFG("[CONFIG] [Midi] %s\n",
     enabled[(int)usbsid_config.Midi.enabled]);
+
+  CFG("[CONFIG] [FMOpl] %s\n",
+    enabled[(int)usbsid_config.FMOpl.enabled]);
+  CFG("[CONFIG] [FMOpl] SIDno %d\n",
+    usbsid_config.FMOpl.sidno);
+
   CFG("[CONFIG] PRINT SETTINGS END\n");
 
   return;
@@ -891,6 +917,42 @@ void print_bus_config(void)
   CFG("[MASK_THREE] 0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", three_mask, PRINTF_BYTE_TO_BINARY_INT8(three_mask));
   CFG("[MASK_FOUR]  0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", four_mask, PRINTF_BYTE_TO_BINARY_INT8(four_mask));
   return;
+}
+
+int verify_fmopl_sidno(void)
+{
+  int fmoplsidno = -1;
+  if (usbsid_config.FMOpl.enabled) {
+    if (usbsid_config.socketOne.enabled) {
+      if ((usbsid_config.socketOne.chiptype == 1) && (sids_one >= 1)) {
+        if (usbsid_config.socketOne.sid1type == 4) {
+          fmoplsidno = 1;
+          return fmoplsidno;
+        } else if ((usbsid_config.socketOne.sid2type == 4) && (sids_one == 2)) {
+          fmoplsidno = 2;
+          return fmoplsidno;
+        }
+      }
+    }
+    if (usbsid_config.socketTwo.enabled) {// && (fmoplsidno == -1)) {
+      if ((usbsid_config.socketTwo.chiptype == 1) && (sids_two >= 1)) {
+        if (usbsid_config.socketTwo.sid1type == 4) {
+          fmoplsidno = (sids_one == 0)
+          ? 1 : (sids_one == 1)
+          ? 2 : (sids_one == 2)
+          ? 3 : 0;
+          return fmoplsidno;
+        } else if (usbsid_config.socketTwo.sid2type == 4 && (sids_two == 2)) {
+          fmoplsidno = (sids_one == 0)
+          ? 2 : (sids_one == 1)
+          ? 3 : (sids_one == 2)
+          ? 4 : 0;
+          return fmoplsidno;
+        }
+      }
+    }
+  }
+  return fmoplsidno;
 }
 
 void verify_socket_settings(void)
@@ -932,6 +994,19 @@ void verify_socket_settings(void)
   }
 
   return;
+}
+
+void apply_fmopl_config(void)
+{
+  /* FMOpl */
+  int fmoplsid = verify_fmopl_sidno();
+  if (fmoplsid != -1) {
+    fmopl_enabled = usbsid_config.FMOpl.enabled;
+    usbsid_config.FMOpl.sidno = fmopl_sid = fmoplsid;
+  } else {
+    fmopl_enabled = usbsid_config.FMOpl.enabled = false;
+    usbsid_config.FMOpl.sidno = fmopl_sid = -1;
+  }
 }
 
 void apply_socket_config(void)
@@ -1038,6 +1113,10 @@ void apply_config(bool at_boot)
   verify_socket_settings();
   CFG("[CONFIG] Applying socket settings\n");
   apply_socket_config();
+  if (usbsid_config.FMOpl.enabled) {
+    CFG("[CONFIG] Applying optional FMOpl settings\n");
+    apply_fmopl_config();
+  };
   CFG("[CONFIG] Applying bus settings\n");
   apply_bus_config();
   if (!at_boot) {

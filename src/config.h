@@ -117,6 +117,10 @@ typedef struct Config {
     bool enabled : 1;
     uint8_t sid_states[4][32];  /* Stores states of each SID ~ 4 sids max */
   } Midi;                       /* 8 */
+  struct {
+    bool enabled : 1;           /* Requires a clone SID! */
+    int sidno;                  /* 0 = disabled, saves the sidno of the sid set to FMOpl */
+  } FMOpl;                      /* 9 */
 } Config;
 
 extern Config usbsid_config;  /* Make Config struct global */
@@ -136,6 +140,7 @@ enum
   READ_SOCKETCFG   = 0x37,  /* Read socket config as bytes */
   RELOAD_CONFIG    = 0x38,  /* Reload and apply stored config from flash */
   READ_NUMSIDS     = 0x39,  /* Returns the number of SIDs in byte 0 */
+  READ_FMOPLSID    = 0x3A,  /* Returns the sidno for FMOpl 1~4, 0 is disable  */
 
   SINGLE_SID       = 0x40,  /* Single SID Socket One */
   DUAL_SID         = 0x41,  /* Dual SID Socket One */

@@ -37,6 +37,10 @@
 #include "logging.h"
 #include "stdbool.h"
 
+/* Config externals */
+extern int fmopl_sid;
+extern bool fmopl_enabled;
+
 /* GPIO externals */
 extern uint8_t bus_operation(uint8_t command, uint8_t address, uint8_t data);
 extern void pause_sid(void);
@@ -85,13 +89,13 @@ void handle_asid_fmoplmessage(uint8_t* buffer)
 			field <<= 1;
 		}
 	}
-	/* TODO: Set correct socket and address! Is now fixed at socket 1 sid 2 */
+  uint8_t addr = ((fmopl_sid << 5) - 0x20);
 	for (uint8_t reg = 0; reg < asid_fm_register_index; reg++) {
     dtype = asid;  /* Set data type to asid */
 		if((reg % 2 == 0)) {
-			bus_operation(0x10, (OPL_REG_ADDRESS | 1 << 5), fm_registers[reg]);
+			bus_operation(0x10, (addr | OPL_REG_ADDRESS), fm_registers[reg]);
 		} else {
-			bus_operation(0x10, (OPL_REG_DATA | 1 << 5), fm_registers[reg]);
+			bus_operation(0x10, (addr | OPL_REG_DATA), fm_registers[reg]);
 		}
 	}
 	midimachine.fmopl = 0;
@@ -125,8 +129,10 @@ void decode_asid_message(uint8_t* buffer, int size)
       handle_asid_sidmessage(96, buffer, size);
       break;
     case 0x60:  /* FMOpl */
-      midimachine.fmopl = 1;
-			handle_asid_fmoplmessage(&buffer[3]);  /* Skip first 3 bytes */
+      if (fmopl_enabled) {  /* Only if FMOpl is enabled, drop otherwise */
+        midimachine.fmopl = 1;
+        handle_asid_fmoplmessage(&buffer[3]);  /* Skip first 3 bytes */
+      };
     default:
       break;
   }
