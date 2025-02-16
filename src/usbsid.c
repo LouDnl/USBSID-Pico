@@ -627,8 +627,8 @@ void tud_midi_rx_cb(uint8_t itf)
       uint32_t available = tud_midi_n_stream_read(itf, 0, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
       process_stream(midimachine.usbstreambuffer, available);
     }
-    /* Clear usb buffer after use */
-    memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer));
+    /* Clear usb buffer after use ~ Disable due to prematurely cut off tunes */
+    /* memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer)); */
     return;
   }
   return;
