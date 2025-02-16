@@ -179,7 +179,7 @@ static int import_ini(void* user, const char* section, const char* name, const c
     p = value_position(value, truefalse);
     if (p != 666) ini_config->LED.idle_breathe = p;
   }
-  if (MATCH("RGLED", "enabled")) {
+  if (MATCH("RGBLED", "enabled")) {
     p = value_position(value, enabled);
     if (p != 666) ini_config->RGBLED.enabled = p;
   }
@@ -194,6 +194,10 @@ static int import_ini(void* user, const char* section, const char* name, const c
   if (MATCH("RGBLED", "sid_to_use")) {
     p = atoi(value);
     if (p >= 1 && p <= 4) ini_config->RGBLED.sid_to_use = p;
+  }
+  if (MATCH("FMOPL", "enabled")) {
+    p = value_position(value, enabled);
+    if (p != 666) ini_config->FMOpl.enabled = p;
   }
   return 1;
 }
@@ -261,6 +265,10 @@ void write_config_ini(Config * config, char * filename)
     fprintf(f, "brightness = %d\n", config->RGBLED.brightness);
     fprintf(f, "; Possible sids to use are 1, 2, 3 or 4\n");
     fprintf(f, "sid_to_use = %d\n", config->RGBLED.sid_to_use);
+    fprintf(f, "\n");
+    fprintf(f, "[FMOPL]\n");
+    fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
+    fprintf(f, "enabled = %s\n", truefalse[config->FMOpl.enabled]);
     fprintf(f, "\n");
     fclose(f);
   };
@@ -444,6 +452,9 @@ void write_config(Config * config)
   write_config_command(SET_CONFIG,0x4,0x2,config->RGBLED.brightness,0);
   write_config_command(SET_CONFIG,0x4,0x3,config->RGBLED.sid_to_use,0);
 
+  /* FMOpl */
+  write_config_command(SET_CONFIG,0x9,config->FMOpl.enabled,0,0);
+
   save_config(0);
 
   return;
@@ -596,6 +607,12 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
       case 54:
         usbsid_config.Midi.enabled = buff[i];
         break;
+      case 55:
+        usbsid_config.FMOpl.enabled = buff[i];
+        break;
+      case 56:
+        usbsid_config.FMOpl.sidno = buff[i];
+        break;
       default:
         break;
     }
@@ -684,6 +701,11 @@ void print_config(void)
     enabled[(int)usbsid_config.Asid.enabled]);
   printf("[CONFIG] [Midi] %s\n",
     enabled[(int)usbsid_config.Midi.enabled]);
+
+  printf("[CONFIG] [FMOpl] %s\n",
+    enabled[(int)usbsid_config.FMOpl.enabled]);
+  printf("[CONFIG] [FMOpl] SIDno %d\n",
+    usbsid_config.FMOpl.sidno);
 
   return;
 }
@@ -1335,6 +1357,8 @@ void print_help(void)
   printf("  -rgbbr N  --rgb-breathe N     : RGBLED idle breathing is Enabled (1) or Disabled (0)\n");
   printf("  -rgbsid N,--rgb-sidtouse N    : Set the SID number the RGBLED uses (1, 2, 3 or 4)\n");
   printf("  -br N,    --rgb-brightness N  : Set the RGBLED Brightness to N (0 ~ 255)\n");
+  printf("  -fm N,    --fmopl-enabled N   : FMOpl is Enabled (1) or Disabled (0)\n");
+  printf("   (Requires a socket set to Clone chip and chiptype to FMOpl)\n");
   printf("  -sock N,  --socket N          : Configure socket N ~ 1 or 2\n");
   printf("  The following options additionally require '-sock N'\n");
   printf("  Note that you can only configure 1 socket at a time!\n");
@@ -1524,6 +1548,20 @@ void config_usbsidpico(int argc, char **argv)
             }
           }
           write_config_command(SET_CONFIG, 0x0, clockspeed_n(usbsid_config.clock_rate), usbsid_config.lock_clockrate, 0x0);
+          continue;
+        }
+
+        if (!strcmp(argv[pc], "-fm") || !strcmp(argv[pc], "--fmopl-enabled")) {
+          pc++;
+          int en = atoi(argv[pc]);
+          if(en >= count_of(enabled)) {
+            printf("%d is not an enable option!\n", en);
+            goto exit;
+          }
+          printf("Set FMOpl from %s to: %s\n", enabled[usbsid_config.FMOpl.enabled], enabled[en]);
+          usbsid_config.FMOpl.enabled = en;
+          write_config_command(SET_CONFIG, 0x9, en, 0x0, 0x0);
+
           continue;
         }
         if (!strcmp(argv[pc], "-led") || !strcmp(argv[pc], "--led-enabled")) {
