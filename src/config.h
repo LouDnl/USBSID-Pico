@@ -47,9 +47,21 @@
 #include "hardware/sync.h"
 
 
-/* Config constants */
+/* Config constants
+ *
+ * Ram and flash defaults on official pico boards:
+ * XIP_BASE ~ Flash base address 0x10000000
+ * rp2040 PICO_FLASH_SIZE_BYTES ~ (1 * 1024 * 1024) = 0x200000 == 2MB(2097152)
+ * rp2350 PICO_FLASH_SIZE_BYTES ~ (2 * 1024 * 1024) = 0x400000 == 4MB(4194304)
+ * rp2040 RAM_SIZE ~ 0x40000 == 256KB(262144)
+ * rp2350 RAM_SIZE ~ 0x80000 == 512KB(524288)
+ *
+ * FLASH_PAGE_SIZE ~ (1u << 8) = 0x100(0xFF) == 256B
+ * FLASH_SECTOR_SIZE ~ (1u << 12) = 0x40000 == 256KB
+ * FLASH_BLOCK_SIZE ~ (1u << 16) = 0x400000 == 4MB
+ */
 #define FLASH_TARGET_OFFSET (PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE)
-#define CONFIG_SIZE (FLASH_SECTOR_SIZE / 4)  /* 1024 Bytes */
+#define CONFIG_SIZE (FLASH_SECTOR_SIZE / 16)  /* 256 Bytes ~ FLASH_PAGE_SIZE */
 /* Compile time variable settings */
 #ifndef MAGIC_SMOKE
 #define MAGIC_SMOKE 19700101  /* DATEOFRELEASE */
