@@ -45,9 +45,6 @@ extern uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t addre
 /* ASID externals */
 extern void process_sysex(uint8_t *buffer, int size);
 
-/* Util externals */
-extern long map(long x, long in_min, long in_max, long out_min, long out_max);
-
 /* Config externals */
 extern Config usbsid_config;
 extern int numsids;

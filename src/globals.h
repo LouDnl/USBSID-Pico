@@ -34,9 +34,33 @@
 
 /* Default includes */
 #include <stdint.h>
+#include <stdlib.h>
+#include "pico/stdlib.h"
 
 /* Helper macro for constraining a value within a range */
+#ifndef constrain
 #define constrain(amt,low,high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
+#endif
+
+/* Helper macro for finding the highest value of two */
+#ifndef max
+#define max(a,b)            (((a) > (b)) ? (a) : (b))
+#endif
+
+/* Helper macro for finding the lowest value of two */
+#ifndef min
+#define min(a,b)            (((a) < (b)) ? (a) : (b))
+#endif
+
+/* Helper macro that creates a random value */
+#ifndef randval
+#define randval(min,max)    (min + rand() / (RAND_MAX / (max - min + 1) + 1))
+#endif
+
+/* Helper macro for mapping a value from a range to another range */
+#ifndef map
+#define map(x,in_min,in_max,out_min,out_max) ((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
+#endif
 
 /* USBSID command byte */
 enum
