@@ -160,9 +160,7 @@ jobs:
         run: |
           echo "PICO_SDK_PATH=${{github.workspace}}/pico-sdk" >> $GITHUB_ENV
           cd pico-sdk/lib/tinyusb
-          git checkout master
-          git pull
-          python3 tools/get_deps.py rp2040
+          python3 tools/get_deps.py ${{matrix.pico_platform}}
 
       - name: 💽 Cache Pico-Extras
         id: cache-pico-extras
