@@ -171,11 +171,23 @@ void reset_reason(void)
 #if PICO_RP2040
   io_rw_32 *rr = (io_rw_32 *) (VREG_AND_CHIP_RESET_BASE + VREG_AND_CHIP_RESET_CHIP_RESET_OFFSET);
   if (*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_POR_BITS)
-    DBG("[RESET] Caused by power on or brownout detection\n");
+    DBG("[RESET] Caused by power-on reset or brownout detection\n");
   if (*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_RUN_BITS)
     DBG("[RESET] Caused by RUN pin trigger ~ manual or ISA RESET signal\n");
   if(*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_PSM_RESTART_BITS)
     DBG("[RESET] Caused by debug port\n");
+#elif PICO_RP2350
+  io_rw_32 *rr = (io_rw_32 *) (POWMAN_BASE + POWMAN_CHIP_RESET_OFFSET);
+  if(*rr & POWMAN_CHIP_RESET_HAD_DP_RESET_REQ_BITS)
+    DBG("[RESET] Caused by arm debugger\n");
+  if(*rr & POWMAN_CHIP_RESET_HAD_RESCUE_BITS)
+    DBG("[RESET] Caused by rescure reset from arm debugger\n");
+  if (*rr & POWMAN_CHIP_RESET_HAD_RUN_LOW_BITS)
+    DBG("[RESET] Caused by RUN pin trigger ~ manual or ISA RESET signal\n");
+  if (*rr & POWMAN_CHIP_RESET_HAD_BOR_BITS)
+    DBG("[RESET] Caused by brownout detection\n");
+  if (*rr & POWMAN_CHIP_RESET_HAD_POR_BITS)
+    DBG("[RESET] Caused by power-on reset\n");
 #endif
   return;
 }
