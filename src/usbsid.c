@@ -762,6 +762,18 @@ void core1_main(void)
 {
   /* Set core locking for flash saving ~ note this makes SIO_IRQ_PROC1 unavailable */
   flash_safe_execute_core_init();
+
+  /* Workaround to make sure flash_safe_execute is executed
+   * before everything else if a default config is detected
+   * This just ping pongs bootup around with Core 0
+   *
+   * Release core 1 semaphore */
+  sem_release(&core1_init);
+  /* Create a blocking semaphore with max 1 permit */
+  sem_init(&core0_init, 0, 1);
+  /* Wait for core 0 to signal back */
+  sem_acquire_blocking(&core0_init);
+
   /* Apply saved config to used vars */
   apply_config(true);
   /* Detect optional external crystal */
@@ -834,14 +846,19 @@ int main()
   reset_reason();
   /* Load config before init of USBSID settings ~ NOTE: This cannot be run from Core 1! */
   load_config(&usbsid_config);
-  /* Create a blocking semaphore to wait until init of core 1 is complete */
+  /* Create a blocking semaphore with max 1 permit */
   sem_init(&core1_init, 0, 1);
   /* Init core 1 */
   multicore_launch_core1(core1_main);
-  /* Wait for core 1 to finish */
+  /* Wait for core 1 to signal back */
   sem_acquire_blocking(&core1_init);
-  /* Check for default config bit ~ NOTE: This cannot be run from Core 1! */
+  /* Check for default config bit
+   * NOTE: This cannot be run from Core 1! */
   detect_default_config();
+  /* Release core 0 semaphore */
+  sem_release(&core0_init);
+  /* Wait for core one to finish startup */
+  sem_acquire_blocking(&core1_init);
   /* Verify the clockrare in the config is not out of bounds */
   verify_clockrate();
   /* Init GPIO */
