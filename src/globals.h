@@ -102,7 +102,7 @@ enum
 extern char dtype, ntype, cdc, asid, midi, wusb;
 
 /* WebUSB globals */
-#define URL  "/github.com/LouDnl/USBSID-Pico"
+#define URL  "/usbsid.loudai.nl"
 enum
 {
   VENDOR_REQUEST_WEBUSB = 1,

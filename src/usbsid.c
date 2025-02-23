@@ -725,10 +725,13 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
         case VENDOR_REQUEST_WEBUSB:
           /* Match vendor request in BOS descriptor
            * Get landing page url and return it
+           * if on default config first boot
            */
-          // Disabled for now due to constant opening of url on plugin of device
-          /* return tud_control_xfer(rhport, request, (void*)(uintptr_t) &desc_url, desc_url.bLength); */
-          return tud_control_status(rhport, request);
+          if (usbsid_config.default_config == 1) {
+            return tud_control_xfer(rhport, request, (void*)(uintptr_t) &desc_url, desc_url.bLength);
+          } else {
+            return tud_control_status(rhport, request);
+          }
         case VENDOR_REQUEST_MICROSOFT:
           if (request->wIndex == 7) {
             /* Get Microsoft OS 2.0 compatible descriptor */
@@ -824,8 +827,6 @@ void core1_main(void)
 
 int main()
 {
-  (void)desc_url;  /* NOTE: Remove if going to use it */
-
   #if PICO_RP2040
   /* System clock @ 125MHz */
   set_sys_clock_pll(1500000000, 6, 2);
