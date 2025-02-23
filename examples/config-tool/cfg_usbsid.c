@@ -458,6 +458,7 @@ void write_config(Config * config)
   /* FMOpl */
   write_config_command(SET_CONFIG,0x9,config->FMOpl.enabled,0,0);
 
+  printf("Sending save config command\n");
   save_config(0);
 
   return;
@@ -527,7 +528,7 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
   static uint32_t clockrate = 0;
   for (int i = 0; i < (int)len; ++i) {
     if (debug == 1) {
-      printf("BUFF[%d] = %d\n", i, buff[i]);
+      printf("BUFF[%d] = %02X\n", i, buff[i]);
     }
     switch(i) {
       case 0 ... 1:
@@ -1820,8 +1821,8 @@ void config_usbsidpico(int argc, char **argv)
       print_config();
       printf("Writing config to USBSID-Pico\n");
       write_config(&usbsid_config);
-      printf("Sending save config command\n");
-      save_config(0);
+      /* printf("Sending save config command\n"); */
+      /* save_config(0); */ /* Disabled, already done in write_config() */
       printf("Reading back config from USBSID-Pico for visual verification\n");
       read_config();
       print_config();
