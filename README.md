@@ -9,6 +9,7 @@ USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2 (RP2350) based board for interf
 * [Firmware](#firmware)
   * [Firmware versions](#firmware-versions)
   * [How to flash new firmware](#how-to-flash)
+  * [Known issues](#known-issues)
 * [Hardware](#hardware)
   * [Where to buy](#where-to-buy)
   * [Schematic and BOM](#schematic-and-bom)
