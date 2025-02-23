@@ -73,36 +73,34 @@
 typedef struct Config {
   uint32_t magic;
   int default_config;
-  bool external_clock : 1;     /* enable / disable external oscillator */
   uint32_t clock_rate;         /* clock speed identifier */
-  bool lock_clockrate : 1;     /* lock the set clockspeed from being changed */
   struct
   {
-    bool    enabled : 1;       /* enable / disable this socket */
-    bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
     uint8_t chiptype;          /* 0 = real, 1 = clone */
     uint8_t clonetype;         /* 0 = disabled, 1 = SKPico, 2 = ARMSID, 3 = FPGASID, 4 = other */
     uint8_t sid1type;          /* 0 = unknown, 1 = N/A, 2 = MOS8085, 3 = MOS6581, 4 = FMopl */
     uint8_t sid2type;          /* 0 = unknown, 1 = N/A, 2 = MOS8085, 3 = MOS6581, 4 = FMopl */
+    bool    enabled : 1;       /* enable / disable this socket */
+    bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
   } socketOne;                 /* 1 */
   struct {
+    uint8_t chiptype;          /* 0 = real, 1 = clone */
+    uint8_t clonetype;         /* 0 = disabled, 1 = SKPico, 2 = ARMSID, 3 = FPGASID, 4 = other */
+    uint8_t sid1type;          /* 0 = unknown, 1 = N/A, 2 = MOS8085, 3 = MOS6581, 4 = FMopl */
+    uint8_t sid2type;          /* 0 = unknown, 1 = N/A, 2 = MOS8085, 3 = MOS6581, 4 = FMopl */
     bool    enabled : 1;       /* enable / disable this socket */
     bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
     bool    act_as_one : 1;    /* act as socket 1 */
-    uint8_t chiptype;          /* 0 = real, 1 = clone */
-    uint8_t clonetype;         /* 0 = disabled, 1 = SKPico, 2 = ARMSID, 3 = FPGASID, 4 = other */
-    uint8_t sid1type;          /* 0 = unknown, 1 = N/A, 2 = MOS8085, 3 = MOS6581, 4 = FMopl */
-    uint8_t sid2type;          /* 0 = unknown, 1 = N/A, 2 = MOS8085, 3 = MOS6581, 4 = FMopl */
   } socketTwo;                 /* 2 */
   struct {
     bool enabled : 1;
     bool idle_breathe : 1;
   } LED;                       /* 3 */
   struct {
-    bool    enabled : 1;
-    bool    idle_breathe : 1;
     uint8_t brightness;
     int     sid_to_use;         /* 0 = sid 1&2, 1...4 = sid 1 ... sid 4 */
+    bool    enabled : 1;
+    bool    idle_breathe : 1;
   } RGBLED;                     /* 4 */
   struct {
     bool enabled : 1;
@@ -114,13 +112,15 @@ typedef struct Config {
     bool enabled : 1;
   } Asid;                       /* 7 */
   struct {
-    bool enabled : 1;
     uint8_t sid_states[4][32];  /* Stores states of each SID ~ 4 sids max */
+    bool enabled : 1;
   } Midi;                       /* 8 */
   struct {
-    bool enabled : 1;           /* Requires a clone SID! */
     int sidno;                  /* 0 = disabled, saves the sidno of the sid set to FMOpl */
+    bool enabled : 1;           /* Requires a clone SID! */
   } FMOpl;                      /* 9 */
+  bool external_clock : 1;     /* enable / disable external oscillator */
+  bool lock_clockrate : 1;     /* lock the set clockspeed from being changed */
 } Config;
 
 extern Config usbsid_config;  /* Make Config struct global */
