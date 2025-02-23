@@ -213,19 +213,21 @@ void setup_dmachannels(void)
   return;
 }
 
-void sync_pios(void)
+void sync_pios(bool at_boot)
 { /* Sync PIO's */
   #if PICO_PIO_VERSION == 0
   CFG("[RESTART PIOS] Pico & Pico_w\n");
   pio_sm_restart(bus_pio, 0b1111);
   #elif PICO_PIO_VERSION > 0  // NOTE: rp2350 only
   CFG("[SYNC PIOS] Pico2\n");
-  pio_clkdiv_restart_sm_multi_mask(bus_pio, 0 /* 0b111 */, 0b1111, 0);
+  pio_clkdiv_restart_sm_multi_mask(bus_pio, 0, 0b1111, 0);
   #endif
-  pio_sm_clear_fifos(bus_pio, sm_clock);
-  pio_sm_clear_fifos(bus_pio, sm_control);
-  pio_sm_clear_fifos(bus_pio, sm_data);
-  pio_sm_clear_fifos(bus_pio, sm_delay);
+  if (!at_boot) {
+    pio_sm_clear_fifos(bus_pio, sm_clock);
+    pio_sm_clear_fifos(bus_pio, sm_control);
+    pio_sm_clear_fifos(bus_pio, sm_data);
+    pio_sm_clear_fifos(bus_pio, sm_delay);
+  };
   return;
 }
 
@@ -304,7 +306,7 @@ void restart_bus(void)
   /* start dma */
   setup_dmachannels();
   /* sync pios */
-  sync_pios();
+  sync_pios(false);
   CFG("[RESTART BUS END]\n");
   return;
 }
