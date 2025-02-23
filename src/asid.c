@@ -42,7 +42,7 @@ extern int fmopl_sid;
 extern bool fmopl_enabled;
 
 /* GPIO externals */
-extern uint8_t bus_operation(uint8_t command, uint8_t address, uint8_t data);
+extern void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 extern void pause_sid(void);
 extern void reset_sid(void);
 
@@ -50,7 +50,6 @@ extern void reset_sid(void);
 void handle_asid_sidmessage(uint8_t sid, uint8_t* buffer, int size)
 {
 	(void)size;  /* Stop calling me fat, I'm just big boned! */
-  // TODO: Add clockspeed check here and make sure it's on DEFAULT or PAL!
   unsigned int reg = 0;
   for (uint8_t mask = 0; mask < 4; mask++) {  /* no more then 4 masks */
     for (uint8_t bit = 0; bit < 7; bit++) {  /* each packet has 7 bits ~ stoopid midi */
@@ -61,7 +60,10 @@ void handle_asid_sidmessage(uint8_t sid, uint8_t* buffer, int size)
         }
         uint8_t address = asid_sid_registers[mask * 7 + bit];
         dtype = asid;  /* Set data type to asid */
-        bus_operation(0x10, (address |= sid), register_value);
+        /* Pico 2 requires at least 10 cycles between writes
+         * or it will be too damn fast! So we do this for other
+         * Pico's too */
+        cycled_bus_operation((address |= sid), register_value, 10);
         reg++;
       }
     }
@@ -92,10 +94,13 @@ void handle_asid_fmoplmessage(uint8_t* buffer)
   uint8_t addr = ((fmopl_sid << 5) - 0x20);
 	for (uint8_t reg = 0; reg < asid_fm_register_index; reg++) {
     dtype = asid;  /* Set data type to asid */
-		if((reg % 2 == 0)) {
-			bus_operation(0x10, (addr | OPL_REG_ADDRESS), fm_registers[reg]);
+		/* Pico 2 requires at least 10 cycles between writes
+     * or it will be too damn fast! So we do this for other
+     * Pico's too */
+    if((reg % 2 == 0)) {
+      cycled_bus_operation((addr | OPL_REG_ADDRESS), fm_registers[reg], 10);
 		} else {
-			bus_operation(0x10, (addr | OPL_REG_DATA), fm_registers[reg]);
+      cycled_bus_operation((addr | OPL_REG_DATA), fm_registers[reg], 10);
 		}
 	}
 	midimachine.fmopl = 0;
