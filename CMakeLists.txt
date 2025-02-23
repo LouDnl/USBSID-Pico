@@ -230,7 +230,6 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/sid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/mcu.c
   ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/util.c
 )
 
 ### Libraries to link
@@ -360,7 +359,7 @@ foreach(FILENAME PICOTYPE IN ZIP_LISTS FILENAMES PICOTYPES)
   if (PICO_CYW43_SUPPORTED)
     target_link_libraries(${BUILD} pico_cyw43_arch_none)
   endif()
-  # target sid types
+  # target usbsid types
   target_include_directories(${BUILD} ${TARGET_INCLUDE_DIRS})
   pico_set_program_name(${BUILD} "USBSID-Pico")
   pico_set_program_version(${BUILD} $PROJECT_VERSION)
