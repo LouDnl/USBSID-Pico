@@ -199,6 +199,9 @@ static int import_ini(void* user, const char* section, const char* name, const c
     p = value_position(value, enabled);
     if (p != 666) ini_config->FMOpl.enabled = p;
   }
+  if (debug == 1) {
+    printf("SECTION: %s NAME: %s VALUE: %s\n", section, name, value);
+  }
   return 1;
 }
 
@@ -523,6 +526,9 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
 {
   static uint32_t clockrate = 0;
   for (int i = 0; i < (int)len; ++i) {
+    if (debug == 1) {
+      printf("BUFF[%d] = %d\n", i, buff[i]);
+    }
     switch(i) {
       case 0 ... 1:
         continue;

@@ -253,6 +253,6 @@ typedef struct Config {
   }, \
   .FMOpl = { \
     .enabled = false, \
-    .sidno = 0, \
+    .sidno = -1, \
   }, \
 }
