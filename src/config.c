@@ -59,7 +59,7 @@ extern void restart_bus(void);
 extern void restart_bus_clocks(void);
 extern void stop_dma_channels(void);
 extern void start_dma_channels(void);
-extern void sync_pios(void);
+extern void sync_pios(bool at_boot);
 extern void enable_sid(bool unmute);
 extern void disable_sid(void);
 extern void mute_sid(void);
@@ -86,12 +86,13 @@ static uint8_t p_version_array[MAX_BUFFER_SIZE];
 /* Init vars */
 int sock_one = 0, sock_two = 0, sids_one = 0, sids_two = 0, numsids = 0, act_as_one = 0;
 int fmopl_sid = 0;
-bool fmopl_enabled = 0;
+bool fmopl_enabled = false;
 uint8_t one = 0, two = 0, three = 0, four = 0;
 uint8_t one_mask = 0, two_mask = 0, three_mask = 0, four_mask = 0;
-const char* project_version = PROJECT_VERSION;
+static uint32_t m_test;
 
-/* Init string vars for logging */
+/* Init string constants for logging */
+const char* project_version = PROJECT_VERSION;
 const char *sidtypes[5] = { "UNKNOWN", "N/A", "MOS8580", "MOS6581", "FMOpl" };
 const char *chiptypes[2] = { "Real", "Clone" };
 const char *clonetypes[6] = { "Disabled", "Other", "SKPico", "ARMSID", "FPGASID", "RedipSID" };
@@ -250,7 +251,7 @@ void detect_sid_types(void)
 
 void read_config(Config* config)
 {
-  memset(socket_config_array, 0, sizeof socket_config_array);  /* Make sure we don't send garbled old data */
+  memset(config_array, 0, sizeof config_array);  /* Make sure we don't send garbled old data */
 
   config_array[0] = READ_CONFIG;  /* Initiator byte */
   config_array[1] = 0x7F;  /* Verification byte */
@@ -326,10 +327,12 @@ void default_config(Config* config)
 }
 
 void load_config(Config* config)
-{
+{ /* Config saved to flash is always garbled after uf2 update on Pico2 */
+  /* Do not do any logging here after memcpy or the Pico will freeze! */
   CFG("[COPY CONFIG] [FROM]0x%x [TO]0x%x [SIZE]%u\n", XIP_BASE + FLASH_TARGET_OFFSET, (uint)&config, sizeof(Config));
   memcpy(config, (void *)(XIP_BASE + FLASH_TARGET_OFFSET), sizeof(Config));
   stdio_flush();
+  m_test = config->magic;  /* Temporary test */
   if (config->magic != MAGIC_SMOKE) {
       default_config(config);
       return;
@@ -802,7 +805,7 @@ void handle_config_request(uint8_t * buffer)
       break;
     case SYNC_PIOS:
       CFG("[SYNC_PIOS]\n");
-      sync_pios();
+      sync_pios(false);
       break;
     case TEST_FN: /* TODO: Remove before v1 release */
       CFG("[TEST_FN]\n");
@@ -816,8 +819,23 @@ void handle_config_request(uint8_t * buffer)
       CFG("A %d %d\n", (int)usbsid_config.magic, (int)MAGIC_SMOKE);
       CFG("A %d\n", usbsid_config.magic == MAGIC_SMOKE);
 
-      CFG("[USBSID_SID_MEMORY]\n");
-      print_cfg(sid_memory, (numsids * 0x20));
+
+      CFG("[TEST_CONFIG_START]\n");
+      CFG("[MAGIC_SMOKE ERROR?] config: %u header: %u m_test? %u\n", usbsid_config.magic, MAGIC_SMOKE, m_test);
+      Config test_config;
+      memcpy(&test_config, (void *)(XIP_BASE + FLASH_TARGET_OFFSET), sizeof(Config));
+      CFG("A %x %x %d\n", test_config.magic, MAGIC_SMOKE, test_config.magic != MAGIC_SMOKE);
+      CFG("A %x %x %d\n", (uint32_t)test_config.magic, (uint32_t)MAGIC_SMOKE, test_config.magic != MAGIC_SMOKE);
+      CFG("A %d %d\n", (int)test_config.magic, (int)MAGIC_SMOKE);
+      CFG("A %d\n", test_config.magic == MAGIC_SMOKE);
+      read_config(&test_config);
+      print_cfg(config_array, count_of(config_array));
+      CFG("[TEST_CONFIG_END]\n");
+
+      // CFG("[USBSID_SID_MEMORY]\n");
+      // print_cfg(sid_memory, (numsids * 0x20));
+      // uint8_t st = detect_sid_model(buffer[1]);
+      // CFG("[TEST FOUND] %u\n", st);
       break;
     default:
       break;
@@ -1124,7 +1142,7 @@ void apply_config(bool at_boot)
     CFG("[CONFIG] Applying bus clock settings\n");
     stop_dma_channels();
     restart_bus_clocks();
-    sync_pios();
+    sync_pios(false);
     start_dma_channels();
   }
   CFG("[CONFIG] Applying RGBLED SID\n");
@@ -1152,6 +1170,8 @@ void detect_default_config(void)
   CFG("[CONFIG DETECT DEFAULT] START\n");
   CFG("[IS DEFAULT CONFIG?] %s\n",
     true_false[usbsid_config.default_config]);
+  CFG("[MAGIC_SMOKE ERROR?] config struct: %u header: %u m_test? %u\n",
+    usbsid_config.magic, MAGIC_SMOKE, m_test);
   if(usbsid_config.default_config == 1) {
     CFG("[DETECTED DEFAULT CONFIG]\n");
     usbsid_config.default_config = 0;
@@ -1193,7 +1213,7 @@ void apply_clockrate(int n_clock, bool suspend_sids)
         restart_bus_clocks();
         stop_dma_channels();
         start_dma_channels();
-        sync_pios();
+        sync_pios(false);
         if (suspend_sids) {
           CFG("[ENABLE SID WITH UNMUTE]\n");
           enable_sid(true);

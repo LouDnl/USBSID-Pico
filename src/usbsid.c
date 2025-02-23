@@ -73,7 +73,7 @@ extern void init_gpio(void);
 extern void init_vu(void);
 extern void setup_piobus(void);
 extern void setup_dmachannels(void);
-extern void sync_pios(void);
+extern void sync_pios(bool at_boot);
 extern void init_sidclock(void);
 extern int detect_clocksignal(void);
 extern void pause_sid(void);
@@ -838,7 +838,7 @@ int main()
   /* Init PIO */
   setup_piobus();
   /* Sync PIOS */
-  sync_pios();
+  sync_pios(true);
   /* Init DMA */
   setup_dmachannels();
   /* Init midi */
