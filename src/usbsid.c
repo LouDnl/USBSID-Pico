@@ -60,7 +60,6 @@ uint8_t (*write_buffer_p)[MAX_BUFFER_SIZE] = &write_buffer;
 /* Config externals */
 Config usbsid_config;
 extern int sock_one, sock_two, sids_one, sids_two, numsids, act_as_one;
-extern void default_config(Config * config);
 extern void load_config(Config * config);
 extern void save_config(const Config * config);
 extern void handle_config_request(uint8_t * buffer);
