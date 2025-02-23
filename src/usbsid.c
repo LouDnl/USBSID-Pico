@@ -36,7 +36,7 @@ extern long map(long x, long in_min, long in_max, long out_min, long out_max);
 extern int randval(int min, int max);
 
 /* Init external vars */
-static semaphore_t core1_init;
+static semaphore_t core0_init, core1_init;
 
 /* Init vars ~ Do not change order to keep memory alignment! */
 uint8_t __not_in_flash("usbsid_buffer") config_buffer[5];
