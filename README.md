@@ -132,6 +132,7 @@ Use `usbsidpico2.uf2` for Pico2 regular green rp2350 Pico2 boards.
 Use `usbsidpico2_w.uf2` for Pico2W regular green rp2350 Pico2W boards.  
 **WARNING!** Do _NOT_ use the RGB firmware for any of the (non black) rp2040 or rp2350 Pico boards that do not contain an RGB LED.
 ### How to flash
+_<ins>**NOTE**: When flashing a new firmware version, all previously configured settings will be reset to default. Use the commandline configtool to save your current settings to a `ini` file if you want to save them!</ins>_  
 A Raspberry Pi Pico board is incredibly easy to flash, as it comes with a built in bootloader for flashing new firmwares in the `uf2` format. 
 In order to flash a new firmware to your USBSID-Pico you will need to put the Pico into bootloader mode. This can be done in 2 ways:
 1. While the Pico is seated on the USBSID-Pico board and with the USB cable plugged into your computer and the Pico do the following:
@@ -169,12 +170,14 @@ The firmware is still in development so features might change, be added or remov
   - Requires Black Pico clone board with RGB LED onboard!
   - SID voices to use for calculation can be changed in config
 - Uses the [TinyUSB](https://github.com/hathach/tinyusb) stack
-### ISSUES that need addressing (Any help is welcome)
+### Known issues
 * Digiplay is better in Vice then SidplayFp at the moment.  
   While not yet at 100%, most tunes will play!  
   See the [discussion](https://github.com/LouDnl/USBSID-Pico/discussions/1) about this.
+* Reflashing the same firmware version on rp2350 results in a reset of config settings to default config.
 ### Building
-You can build the firmware using the Pico SDK 2.0.0 and TinyUSB from it's Github repo, not the one included in the SDK!
+You can build the firmware using the Pico SDK 2.1.0 and the included TinyUSB. Be sure to clone the SDK with `--recurse-submodules`.  
+After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py PICO_PLATFORM` where PICO_PLATFORM is either rp2040 or rp2350 depending on the board you are using.
 
 # Hardware
 ### Where to buy
