@@ -578,8 +578,8 @@ void tud_cdc_rx_cb(uint8_t itf)
   tud_cdc_n_read_flush(*cdc_itf);
   memcpy(sid_buffer, read_buffer, cdcread);
   handle_buffer_task(cdc_itf, &cdcread);
-  memset(read_buffer, 0, count_of(read_buffer));
-  memset(sid_buffer, 0, count_of(sid_buffer));
+  /* memset(read_buffer, 0, count_of(read_buffer)); */
+  /* memset(sid_buffer, 0, count_of(sid_buffer)); */
   return;
 }
 
@@ -662,8 +662,8 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
     tud_vendor_n_read_flush(*wusb_itf);
     memcpy(sid_buffer, read_buffer, webread);
     handle_buffer_task(wusb_itf, &webread);
-    memset(read_buffer, 0, count_of(read_buffer));
-    memset(sid_buffer, 0, count_of(sid_buffer));
+    /* memset(read_buffer, 0, count_of(read_buffer)); */
+    /* memset(sid_buffer, 0, count_of(sid_buffer)); */
     return;
   }
   return;
