@@ -294,7 +294,9 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
     // n_bytes = (n_bytes == 0) ? 2 : n_bytes; /* if byte count is zero, this is a single write packet */
     if (n_bytes == 0) {
       IODBG("[I %d] [%c] $%02X:%02X\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2]);
-      bus_operation(0x10, sid_buffer[1], sid_buffer[2]);  /* write the address and value to the SID */
+      /* write the address and value to the SID with a 10 cycle period */
+      cycled_bus_operation(sid_buffer[1], sid_buffer[2], 10);
+      /* TODO: Monitor if this change causes any issues with non cycled players and skpico config etc! */
     } else {
       for (int i = 1; i <= n_bytes; i += 2) {
         IODBG("[I %d] [%c] $%02X:%02X\n", i, dtype, sid_buffer[i], sid_buffer[i + 1]);
