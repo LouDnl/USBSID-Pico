@@ -33,10 +33,10 @@
 /* Init external vars */
 extern Config usbsid_config;
 extern uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));
+extern void verify_clockrate(void);
 extern int sock_one, sock_two, sids_one, sids_two, numsids, act_as_one;
 extern uint8_t one, two, three, four;
 extern uint8_t one_mask, two_mask, three_mask, four_mask;
-extern double cpu_us, sid_hz, sid_mhz, sid_us;
 
 /* Init vars */
 PIO bus_pio = pio0;
@@ -345,6 +345,24 @@ void init_sidclock(void)
   clock_program_init(bus_pio, sm_clock, offset_clock, PHI, sidclock_frequency);
   CFG("[SID CLK INIT] FINISHED\n");
   return;
+}
+
+/* Start verification, detect and init sequence of SID clock */
+void setup_sidclock(void)
+{
+  /* Verify the clockrare in the config is not out of bounds */
+  verify_clockrate();
+
+  /* Detect optional external crystal */
+  if (detect_clocksignal() == 0) {
+    usbsid_config.external_clock = false;
+    gpio_deinit(PHI); /* Disable PHI as gpio */
+    init_sidclock();
+  } else {  /* Do nothing gpio acts as input detection */
+    usbsid_config.external_clock = true;
+    usbsid_config.clock_rate = CLOCK_DEFAULT;  /* Always 1MHz */
+  }
+
 }
 
 /* De-init nMHz square wave output */

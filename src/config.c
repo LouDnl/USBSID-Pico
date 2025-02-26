@@ -357,15 +357,14 @@ void __no_inline_not_in_flash_func(default_config)(Config* config)
 }
 
 void __no_inline_not_in_flash_func(load_config)(Config* config)
-{ /* NOTICE: Config saved to flash is always wiped after uf2 update on Pico2 */
-  /* NOTICE: Do not do any logging here after memcpy or the Pico will freeze! */
+{
   CFG("[LOAD CONFIG START]\n");
   print_cfg_addr();
   CFG("[COPY CONFIG] [FROM]0x%X [TO]0x%X [SIZE]%u\n",
     (XIP_BASE + FLASH_CONFIG_OFFSET), (uint)config, sizeof(Config));
   CFG("[COPY CONFIG ADDRESSES] [&usbsid_config]0x%X [config]0x%X [&config]0x%X\n",
     (uint)&usbsid_config, (uint)config, (uint)&config);
-
+  /* NOTICE: Do not do any logging here after memcpy or the Pico will freeze! */
   memcpy(config, (void *)(XIP_BASE + FLASH_CONFIG_OFFSET), sizeof(Config));
   stdio_flush();
   cm_verification = config->magic;  /* Store the current magic for later */

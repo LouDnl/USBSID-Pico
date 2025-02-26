@@ -62,16 +62,14 @@ extern void load_config(Config * config);
 extern void handle_config_request(uint8_t * buffer);
 extern void apply_config(bool at_boot);
 extern void detect_default_config(void);
-extern void verify_clockrate(void);
 
 /* GPIO externals */
 extern void init_gpio(void);
 extern void init_vu(void);
+extern void setup_sidclock(void);
 extern void setup_piobus(void);
 extern void setup_dmachannels(void);
 extern void sync_pios(bool at_boot);
-extern void init_sidclock(void);
-extern int detect_clocksignal(void);
 extern void pause_sid(void);
 extern void pause_sid_withmute(void);
 extern void mute_sid(void);
@@ -761,10 +759,33 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
 
 /* MAIN */
 
+/* Semaphore ping pong
+ *
+ * Core 0 -> init semapohre core1_init
+ * Core 0 -> launch core 1
+ * Core 0 -> wait for core1_init signal
+ * Core 1 -> init flash safe execute
+ * Core 1 -> release semaphore core1_init
+ * Core 0 -> continue to load and apply config
+ * Core 0 -> init SID clock
+ * Core 1 -> init semaphore core0_init
+ * Core 1 -> wait for core0_init signal
+ * Core 0 -> release semaphore core0_init
+ * Core 0 -> wait for core1_init signal
+ * Core 1 -> continue startup RGB & Vu
+ * Core 1 -> release semaphore core1_init
+ * Core 1 -> wait for core0_init signal
+ * Core 0 -> continue startup
+ * Core 0 -> release semaphore core0_init
+ * Core 0 -> enter while loop
+ * Core 1 -> continue startup
+ * Core 1 -> enter while loop
+ */
+
 void core1_main(void)
 {
   /* Set core locking for flash saving ~ note this makes SIO_IRQ_PROC1 unavailable */
-  flash_safe_execute_core_init();
+  flash_safe_execute_core_init();  /* This needs to start before any flash actions take place! */
 
   /* Workaround to make sure flash_safe_execute is executed
    * before everything else if a default config is detected
@@ -772,22 +793,11 @@ void core1_main(void)
    *
    * Release core 1 semaphore */
   sem_release(&core1_init);
+
   /* Create a blocking semaphore with max 1 permit */
   sem_init(&core0_init, 0, 1);
   /* Wait for core 0 to signal back */
   sem_acquire_blocking(&core0_init);
-
-  /* Apply saved config to used vars */
-  apply_config(true);
-  /* Detect optional external crystal */
-  if (detect_clocksignal() == 0) {
-    usbsid_config.external_clock = false;
-    gpio_deinit(PHI); /* Disable PHI as gpio */
-    init_sidclock();
-  } else {  /* Do nothing gpio acts as input detection */
-    usbsid_config.external_clock = true;
-    usbsid_config.clock_rate = CLOCK_DEFAULT;  /* Always 1MHz */
-  }
 
   /* Init RGB LED */
   init_rgb();
@@ -796,7 +806,7 @@ void core1_main(void)
   /* Start the VU */
   init_vu();
 
-  /* Init cycled write buffer vars */
+  /* Log boot CPU and C64 clock speeds */
   cpu_mhz = (clock_get_hz(clk_sys) / 1000 / 1000);
   cpu_us = (1 / cpu_mhz);
   sid_hz = usbsid_config.clock_rate;
@@ -808,6 +818,8 @@ void core1_main(void)
   /* Release semaphore when core 1 is started */
   sem_release(&core1_init);
 
+  /* Wait for core 0 to signal boot finished */
+  sem_acquire_blocking(&core0_init);
   int n_checks = 0, m_now = 0;
   m_now = to_ms_since_boot(get_absolute_time());
   while (1) {
@@ -826,10 +838,13 @@ void core1_main(void)
       }
     }
   }
+  /* Point of no return, this should never be reached */
+  return;
 }
 
 int main()
 {
+  /* Set system clockspeed */
   #if PICO_RP2040
   /* System clock @ 125MHz */
   set_sys_clock_pll(1500000000, 6, 2);
@@ -837,6 +852,7 @@ int main()
   /* System clock @ 150MHz */
   set_sys_clock_pll(1500000000, 5, 2);
   #endif
+
   /* Init TinyUSB */
   tusb_rhport_init_t dev_init = {
     .role = TUSB_ROLE_DEVICE,
@@ -847,25 +863,35 @@ int main()
   init_logging();
   /* Log reset reason */
   reset_reason();
-  /* Load config before init of USBSID settings ~ NOTE: This cannot be run from Core 1! */
-  load_config(&usbsid_config);
-  /* Create a blocking semaphore with max 1 permit */
+
+  /* Workaround to make sure flash_safe_execute is executed
+   * before everything else if a default config is detected
+   * This just ping pongs bootup around with Core 1
+   *
+   * Create a blocking semaphore with max 1 permit */
   sem_init(&core1_init, 0, 1);
   /* Init core 1 */
   multicore_launch_core1(core1_main);
   /* Wait for core 1 to signal back */
   sem_acquire_blocking(&core1_init);
+
+  /* Load config before init of USBSID settings ~ NOTE: This cannot be run from Core 1! */
+  load_config(&usbsid_config);
+  /* Apply saved config to used vars */
+  apply_config(true);
   /* Check for default config bit
    * NOTE: This cannot be run from Core 1! */
   detect_default_config();
+
   /* Release core 0 semaphore */
   sem_release(&core0_init);
   /* Wait for core one to finish startup */
   sem_acquire_blocking(&core1_init);
-  /* Verify the clockrare in the config is not out of bounds */
-  verify_clockrate();
+
   /* Init GPIO */
   init_gpio();
+  /* Start verification, detect and init sequence of SID clock */
+  setup_sidclock();
   /* Init PIO */
   setup_piobus();
   /* Sync PIOS */
@@ -877,6 +903,9 @@ int main()
   /* Enable SID chips */
   // reset_sid_registers();  // Disable for now, this also enables the sid chips lol :)
   enable_sid(false);
+
+  /* Release core 0 semaphore to signal boot finished */
+  sem_release(&core0_init);
 
   /* Loop IO tasks forever */
   while (1) {
