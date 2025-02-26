@@ -834,10 +834,12 @@ int main()
   /* System clock @ 150MHz */
   set_sys_clock_pll(1500000000, 5, 2);
   #endif
-  /* Init board */
-  board_init();
-  /* Init USB */
-  tud_init(BOARD_TUD_RHPORT);
+  /* Init TinyUSB */
+  tusb_rhport_init_t dev_init = {
+    .role = TUSB_ROLE_DEVICE,
+    .speed = TUSB_SPEED_FULL
+  };
+  tusb_init(BOARD_TUD_RHPORT, &dev_init);
   /* Init logging */
   init_logging();
   /* Log reset reason */
@@ -875,7 +877,7 @@ int main()
 
   /* Loop IO tasks forever */
   while (1) {
-    tud_task_ext(/* UINT32_MAX */0, false);  // equals tud_task();
+    tud_task_ext(/* UINT32_MAX */0, false);  /* equals tud_task(); */
   }
 
   /* Point of no return, this should never be reached */

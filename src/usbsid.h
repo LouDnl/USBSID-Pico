@@ -65,11 +65,7 @@
 #include "hardware/vreg.h"
 
 /* TinyUSB libs */
-#if __has_include("bsp/board_api.h") /* Needed to account for update in tinyUSB */
-#include "bsp/board_api.h"
-#else
-#include "bsp/board.h"       /* Tiny USB Boards Abstraction Layer */
-#endif
+#include "bsp/board_api.h"   /* Tiny USB Board Porting API */
 #include "tusb.h"            /* Tiny USB stack */
 #include "tusb_config.h"     /* Tiny USB configuration */
 
