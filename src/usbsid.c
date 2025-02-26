@@ -566,7 +566,6 @@ void core1_main(void)
   /* Init RGB LED */
   init_rgb();
 
-  queue_init(&midi_queue, sizeof(queue_entry_t), 3);
 
   /* Release semaphore when core 1 is started */
   sem_release(&core1_init);
