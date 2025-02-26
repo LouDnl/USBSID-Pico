@@ -78,10 +78,21 @@ void apply_socket_change(void);
 int return_clockrate(void);
 void apply_clockrate(int n_clock, bool suspend_sids);
 
+/* Init config vars
+ * Based on: https://community.element14.com/products/raspberry-pi/b/blog/posts/raspberry-pico-c-sdk-reserve-a-flash-memory-block-for-persistent-storage
+ */
+extern uint32_t ADDR_PERSISTENT[];  /* .section_persistent from the linker script */
+#define ADDR_PERSISTENT_BASE_ADDR (ADDR_PERSISTENT)
+#define FLASH_PERSISTENT_OFFSET ((uint32_t)ADDR_PERSISTENT_BASE_ADDR - XIP_BASE)  /* rp2040: 0x0x1FF000, rp2350: 0x3FF000 */
+#define FLASH_PERSISTENT_SIZE (PICO_FLASH_SIZE_BYTES - FLASH_PERSISTENT_OFFSET)
+#define FLASH_CONFIG_OFFSET (FLASH_PERSISTENT_OFFSET + ((FLASH_PERSISTENT_SIZE / 4) * 3))
+#define CONFIG_SIZE (FLASH_SECTOR_SIZE / 16)  /* 256 Bytes ~ FLASH_PAGE_SIZE */
+
 /* Init local vars */
 static uint8_t config_array[FLASH_PAGE_SIZE]; /* 256 MIN ~ FLASH_PAGE_SIZE & 4096 MAX ~ FLASH_SECTOR_SIZE  */
 static uint8_t socket_config_array[10]; /* 10 bytes is enough for now */
 static uint8_t p_version_array[MAX_BUFFER_SIZE];
+static uint32_t cm_verification; /* Config magic verification storage */
 
 /* Init vars */
 int sock_one = 0, sock_two = 0, sids_one = 0, sids_two = 0, numsids = 0, act_as_one = 0;
@@ -132,7 +143,7 @@ const char *single_dual[2] = { "Dual SID", "Single SID" };
     .enabled = RGB_ENABLED, \
     .idle_breathe = RGB_ENABLED, \
     .brightness = (RGB_ENABLED ? 0x7F : 0),  /* Half of max brightness or disabled if no RGB LED */ \
-    .sid_to_use = 1, \
+    .sid_to_use = (RGB_ENABLED ? 1 : -1), \
   }, \
   .Cdc = { \
     .enabled = true \
@@ -154,7 +165,24 @@ const char *single_dual[2] = { "Dual SID", "Single SID" };
 
 static const Config usbsid_default_config = USBSID_DEFAULT_CONFIG_INIT;
 
-void print_cfg(const uint8_t *buf, size_t len) {
+void print_cfg_addr(void)
+{
+  CFG("[XIP_BASE]0x%X (%u)\n[PICO_FLASH_SIZE_BYTES]0x%X (%u)\n\
+[FLASH_PAGE_SIZE]0x%X (%u)\n[FLASH_SECTOR_SIZE]0x%X (%u)\n\
+[ADDR_PERSISTENT_BASE_ADDR]0x%X (%u)\n\
+[FLASH_PERSISTENT_OFFSET]0x%X (%u)\n[FLASH_PERSISTENT_SIZE]0x%X (%u)\n\
+[FLASH_CONFIG_OFFSET]0x%X (%u)\n\
+[CONFIG_SIZE]0x%X (%u)\n[SIZEOF_CONFIG]0x%X (%u)\n",
+    XIP_BASE, XIP_BASE, PICO_FLASH_SIZE_BYTES, PICO_FLASH_SIZE_BYTES,
+    FLASH_PAGE_SIZE, FLASH_PAGE_SIZE, FLASH_SECTOR_SIZE, FLASH_SECTOR_SIZE,
+    ADDR_PERSISTENT_BASE_ADDR, ADDR_PERSISTENT_BASE_ADDR,
+    FLASH_PERSISTENT_OFFSET, FLASH_PERSISTENT_OFFSET, FLASH_PERSISTENT_SIZE, FLASH_PERSISTENT_SIZE,
+    FLASH_CONFIG_OFFSET, FLASH_CONFIG_OFFSET,
+    CONFIG_SIZE, CONFIG_SIZE, sizeof(Config), sizeof(Config));
+}
+
+void print_cfg(const uint8_t *buf, size_t len)
+{
   CFG("[PRINT CFG START]\n");
   for (size_t i = 0; i < len; ++i) {
     if (i == 0)
@@ -331,13 +359,19 @@ void __no_inline_not_in_flash_func(default_config)(Config* config)
 void __no_inline_not_in_flash_func(load_config)(Config* config)
 { /* NOTICE: Config saved to flash is always wiped after uf2 update on Pico2 */
   /* NOTICE: Do not do any logging here after memcpy or the Pico will freeze! */
-  CFG("[XIP_BASE]0x%X [FLASH_TARGET_OFFSET]0x%X [FLASH_PAGE_SIZE]%u [FLASH_SECTOR_SIZE]%u [PICO_FLASH_SIZE_BYTES]%u\n", XIP_BASE, FLASH_TARGET_OFFSET, FLASH_PAGE_SIZE, FLASH_SECTOR_SIZE, PICO_FLASH_SIZE_BYTES);
-  CFG("[COPY CONFIG] [&UC]0x%X [C]0x%X [&C]0x%X\n", (uint)&usbsid_config, (uint)config, (uint)&config);
-  CFG("[COPY CONFIG] [FROM]0x%X [TO]0x%X [SIZE]%u\n", (XIP_BASE + FLASH_TARGET_OFFSET), (uint)config, sizeof(Config));
-  memcpy(config, (void *)(XIP_BASE + FLASH_TARGET_OFFSET), sizeof(Config));
+  CFG("[LOAD CONFIG START]\n");
+  print_cfg_addr();
+  CFG("[COPY CONFIG] [FROM]0x%X [TO]0x%X [SIZE]%u\n",
+    (XIP_BASE + FLASH_CONFIG_OFFSET), (uint)config, sizeof(Config));
+  CFG("[COPY CONFIG ADDRESSES] [&usbsid_config]0x%X [config]0x%X [&config]0x%X\n",
+    (uint)&usbsid_config, (uint)config, (uint)&config);
+
+  memcpy(config, (void *)(XIP_BASE + FLASH_CONFIG_OFFSET), sizeof(Config));
   stdio_flush();
-  m_test = config->magic;  /* Temporary test */
-  if (config->magic != MAGIC_SMOKE) {
+  cm_verification = config->magic;  /* Store the current magic for later */
+  if (config->magic != MAGIC_SMOKE) {  /* Verify the magic */
+      CFG("[MAGIC ERROR] config->magic: %u != MAGIC_SMOKE: %u\n", config->magic, MAGIC_SMOKE);
+      CFG("[RESET TO DEFAULT CONFIG]\n");
       default_config(config);
       return;
   }
@@ -347,8 +381,8 @@ void __no_inline_not_in_flash_func(load_config)(Config* config)
 void __no_inline_not_in_flash_func(save_config_lowlevel)(void* config_data)
 {
   uint32_t ints = save_and_disable_interrupts();
-  flash_range_erase(FLASH_TARGET_OFFSET, FLASH_SECTOR_SIZE);  /* 4096 Bytes (sector aligend) erase as per SDK manual */
-  flash_range_program(FLASH_TARGET_OFFSET, (uint8_t*)config_data, FLASH_PAGE_SIZE);  /* 256 Bytes (page aligned) write as per SDK manual */
+  flash_range_erase(FLASH_CONFIG_OFFSET, FLASH_SECTOR_SIZE);  /* 4096 Bytes (sector aligend) erase as per SDK manual */
+  flash_range_program(FLASH_CONFIG_OFFSET, (uint8_t*)config_data, FLASH_PAGE_SIZE);  /* 256 Bytes (page aligned) write as per SDK manual */
   restore_interrupts(ints);
   return;
 }
@@ -417,7 +451,6 @@ void handle_config_request(uint8_t * buffer)
     case READ_CONFIG:
       CFG("[READ_CONFIG]\n");
       /* ISSUE: Although 4 writes are performed, only the first 2 are received */
-      CFG("[XIP_BASE]0x%X [FLASH_TARGET_OFFSET]0x%X [FLASH_PAGE_SIZE]%u [FLASH_SECTOR_SIZE]%u\n", XIP_BASE, FLASH_TARGET_OFFSET, FLASH_PAGE_SIZE, FLASH_SECTOR_SIZE);
       read_config(&usbsid_config);
       print_cfg(config_array, count_of(config_array));
       int writes = count_of(config_array) / 64;  /* ISSUE: It should send 4 packets of 64 bytes, but sends only 2 and a zero packet */
@@ -593,7 +626,11 @@ void handle_config_request(uint8_t * buffer)
               break;
             case 3: /* sid_to_use */
               if (buffer[3] <= 3) {
-                usbsid_config.RGBLED.sid_to_use = buffer[3];
+                if (RGB_ENABLED) {
+                  usbsid_config.RGBLED.sid_to_use = buffer[3];
+                } else {
+                  usbsid_config.RGBLED.sid_to_use = -1;
+                };
               };
               break;
             default:
@@ -812,7 +849,7 @@ void handle_config_request(uint8_t * buffer)
       break;
     case TEST_FN: /* TODO: Remove before v1 release */
       CFG("[TEST_FN]\n");
-      CFG("[FLASH_TARGET_OFFSET]0x%x\n", FLASH_TARGET_OFFSET);
+      CFG("[FLASH_CONFIG_OFFSET]0x%x\n", FLASH_CONFIG_OFFSET);
       CFG("[PICO_FLASH_SIZE_BYTES]0x%x\n", PICO_FLASH_SIZE_BYTES);
       CFG("[FLASH_SECTOR_SIZE]0x%x\n", FLASH_SECTOR_SIZE);
       CFG("[FLASH_PAGE_SIZE]0x%x\n", FLASH_PAGE_SIZE);
@@ -824,9 +861,10 @@ void handle_config_request(uint8_t * buffer)
 
 
       CFG("[TEST_CONFIG_START]\n");
-      CFG("[MAGIC_SMOKE ERROR?] config: %u header: %u m_test? %u\n", usbsid_config.magic, MAGIC_SMOKE, m_test);
+      CFG("[MAGIC_SMOKE ERROR?] config: %u header: %u cm_verification: %u\n", usbsid_config.magic, MAGIC_SMOKE, cm_verification);
+
       Config test_config;
-      memcpy(&test_config, (void *)(XIP_BASE + FLASH_TARGET_OFFSET), sizeof(Config));
+      memcpy(&test_config, (void *)(XIP_BASE + FLASH_CONFIG_OFFSET), sizeof(Config));
       CFG("A %x %x %d\n", test_config.magic, MAGIC_SMOKE, test_config.magic != MAGIC_SMOKE);
       CFG("A %x %x %d\n", (uint32_t)test_config.magic, (uint32_t)MAGIC_SMOKE, test_config.magic != MAGIC_SMOKE);
       CFG("A %d %d\n", (int)test_config.magic, (int)MAGIC_SMOKE);
@@ -1148,9 +1186,13 @@ void apply_config(bool at_boot)
     sync_pios(false);
     start_dma_channels();
   }
-  CFG("[CONFIG] Applying RGBLED SID\n");
-  apply_led_config();
-  CFG("[CONFIG APPLY] FINISHED\n");
+  if (RGB_ENABLED) {
+    CFG("[CONFIG] Applying RGBLED SID\n");
+    apply_led_config();
+    CFG("[CONFIG APPLY] FINISHED\n");
+  } else {
+    CFG("[CONFIG] RGBLED not available\n");
+  }
 
   print_config_settings();
   print_socket_config();
@@ -1175,11 +1217,12 @@ void detect_default_config(void)
     true_false[usbsid_config.default_config]);
   if(usbsid_config.default_config == 1) {
     CFG("[DETECTED DEFAULT CONFIG]\n");
-    CFG("[MAGIC_SMOKE ADDRS] config struct: 0x%X m_test? 0x%X\n",
-      &usbsid_config.magic, &m_test);
-    CFG("[MAGIC_SMOKE ERROR?] config struct: %u header: %u m_test? %u\n",
-      usbsid_config.magic, MAGIC_SMOKE, m_test);
+    CFG("[MAGIC_SMOKE ADDRESS] config struct: 0x%X cm_verification: 0x%X\n",
+      &usbsid_config.magic, &cm_verification);
+    CFG("[MAGIC_SMOKE VERIFICATION] config_struct: %u header: %u cm_verification: %u\n",
+      usbsid_config.magic, MAGIC_SMOKE, cm_verification);
     usbsid_config.default_config = 0;
+    CFG("[DEFAULT CONFIG STATE SET TO] %d\n", usbsid_config.default_config);
     save_config(&usbsid_config);
     CFG("[CONFIG SAVED]\n");
     CFG("[DEFAULT CONFIG STATE SET TO] %d\n", usbsid_config.default_config);

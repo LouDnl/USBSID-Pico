@@ -57,9 +57,9 @@ endif()
 # remember that enabling debugging and disabling optimizations
 # will weird out tune playing and reading from and writing to
 # SKPico will stop functioning
-SET(DEBUG_SYMBOLS 0)
-SET(DEBUGGING 0)
-SET(OPTIMIZATIONS 3)
+SET(DEBUG_SYMBOLS 0)   # 0 default, 1 debug symbols & debug build enabled
+SET(DEBUGGING 0)       # 0 default, 1~3 equals -g1~3
+SET(OPTIMIZATIONS 3)   # 3 default, 1 ~ -O1 for debugging
 
 ### Target board pico, pico_w, pico2
 if(DEFINED PICO_BOARD)
@@ -151,6 +151,11 @@ set(PICO_DEFAULT_DOUBLE_IMPL pico_double_default)
 if(DEBUG_SYMBOLS EQUAL 1)
   set(CMAKE_BUILD_TYPE Debug)  # for debugging
   set(PICO_DEOPTIMIZED_DEBUG 1)
+  set(CFG_TUSB_DEBUG 1)
+else()
+  set(CMAKE_BUILD_TYPE Release)
+  set(PICO_DEOPTIMIZED_DEBUG 0)
+  set(CFG_TUSB_DEBUG 0)
 endif()
 
 ### Define compile time debugging
@@ -321,8 +326,6 @@ endif()
 ### It escapes every damn time!
 add_compile_definitions(MAGIC_SMOKE=${MAGIC_SMOKE})
 
-#add_compile_definitions(PICO_QUEUE_MAX_LEVEL=6)
-
 ### Compile targets
 foreach(FILENAME PICOTYPE IN ZIP_LISTS FILENAMES PICOTYPES)
   # set filename
@@ -330,6 +333,7 @@ foreach(FILENAME PICOTYPE IN ZIP_LISTS FILENAMES PICOTYPES)
   message(STATUS "Building ${FILENAME} with PICOTYPE=${PICOTYPE} and MAGIC_SMOKE=${MAGIC_SMOKE}")
   # executable
   add_executable(${BUILD} ${SOURCEFILES})
+  # RGB LED
   if(PICOTYPE STREQUAL "RGB")
     target_compile_definitions(${BUILD} PRIVATE USBSID USE_RGB=1)
   else()
@@ -345,14 +349,14 @@ foreach(FILENAME PICOTYPE IN ZIP_LISTS FILENAMES PICOTYPES)
   target_sources(${BUILD} PUBLIC ${SOURCEFILES})
   target_compile_options(${BUILD} ${COMPILE_OPTS})
   target_link_options(${BUILD} PRIVATE -Xlinker --print-memory-usage)
-  if(${PICO_SDK_VERSION_MAJOR} LESS 2)
-    pico_set_linker_script(${BUILD} ${PICO_SDK_PATH}/src/memmap_custom.ld)
+  # memory map linkers
+  if(${PICO_PLATFORM} MATCHES rp2350)
+    message("Memmap linker, platform ${PICO_PLATFORM} MATCHES rp2350")
+    target_compile_definitions(${BUILD} PRIVATE USBSID PICO_EMBED_XIP_SETUP=1)
+    set_target_properties(${BUILD} PROPERTIES PICO_TARGET_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/src/usbsidpico-rp2350.ld)
   else()
-    if(${PICO_PLATFORM} MATCHES rp2350)
-      pico_set_linker_script(${BUILD} ${PICO_SDK_PATH}/src/rp2_common/pico_crt0/rp2350/memmap_default.ld)
-    else()
-      pico_set_linker_script(${BUILD} ${PICO_SDK_PATH}/src/rp2_common/pico_crt0/rp2040/memmap_default.ld)
-    endif()
+    message("Memmap linker, platform ${PICO_PLATFORM} EQUALS rp2040")
+    set_target_properties(${BUILD} PROPERTIES PICO_TARGET_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/src/usbsidpico-rp2040.ld)
   endif()
   # tell the linker what libraries to link
   target_link_libraries(${BUILD} ${TARGET_LL})
@@ -362,7 +366,7 @@ foreach(FILENAME PICOTYPE IN ZIP_LISTS FILENAMES PICOTYPES)
   # target usbsid types
   target_include_directories(${BUILD} ${TARGET_INCLUDE_DIRS})
   pico_set_program_name(${BUILD} "USBSID-Pico")
-  pico_set_program_version(${BUILD} $PROJECT_VERSION)
+  pico_set_program_version(${BUILD} "${PROJECT_VERSION}")
   # create map/bin/hex/uf2 file in addition to ELF.
   pico_add_extra_outputs(${BUILD})
   # enable uart output, disable usb output
