@@ -57,8 +57,8 @@ uint8_t (*write_buffer_p)[MAX_BUFFER_SIZE] = &write_buffer;
 /* Config externals */
 Config usbsid_config;
 extern int sock_one, sock_two, sids_one, sids_two, numsids, act_as_one;
+extern bool first_boot;
 extern void load_config(Config * config);
-extern void save_config(const Config * config);
 extern void handle_config_request(uint8_t * buffer);
 extern void apply_config(bool at_boot);
 extern void detect_default_config(void);
@@ -727,8 +727,9 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
            * Get landing page url and return it
            * if on default config first boot
            */
-          if (usbsid_config.default_config == 1) {
+          if (first_boot) {
             return tud_control_xfer(rhport, request, (void*)(uintptr_t) &desc_url, desc_url.bLength);
+            first_boot = false;
           } else {
             return tud_control_status(rhport, request);
           }

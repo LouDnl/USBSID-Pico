@@ -100,7 +100,7 @@ int fmopl_sid = 0;
 bool fmopl_enabled = false;
 uint8_t one = 0, two = 0, three = 0, four = 0;
 uint8_t one_mask = 0, two_mask = 0, three_mask = 0, four_mask = 0;
-static uint32_t m_test;
+bool first_boot = false;
 
 /* Init string constants for logging */
 const char* project_version = PROJECT_VERSION;
@@ -1223,9 +1223,9 @@ void detect_default_config(void)
       usbsid_config.magic, MAGIC_SMOKE, cm_verification);
     usbsid_config.default_config = 0;
     CFG("[DEFAULT CONFIG STATE SET TO] %d\n", usbsid_config.default_config);
+    first_boot = true;  /* Only at first boot the link popup will be sent */
     save_config(&usbsid_config);
     CFG("[CONFIG SAVED]\n");
-    CFG("[DEFAULT CONFIG STATE SET TO] %d\n", usbsid_config.default_config);
   }
   CFG("[CONFIG DETECT DEFAULT] FINISHED\n");
   return;
