@@ -1,7 +1,7 @@
 /*
- * USBSID-Pico is a RPi Pico (RP2040) based board for interfacing one or two
- * MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer,
- * phone or ASID supporting player
+ * USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2 (RP2350) based board for
+ * interfacing one or two MOS SID chips and/or hardware SID emulators over
+ * (WEB)USB with your computer, phone or ASID supporting player
  *
  * cfg_skpico.h
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
@@ -76,7 +76,6 @@ unsigned char * config_names[/* 64 */] = {
   "CFG_DIGIDETECT",      // 61   //  0  // 0 ... 1
   "","",                 // 62 -> 63
 };
-
 unsigned char * sid_types[] = {
   "6581", "8580", "8580+digiboost", "none", "FMopl"
 };
