@@ -93,6 +93,7 @@ static uint8_t config_array[FLASH_PAGE_SIZE]; /* 256 MIN ~ FLASH_PAGE_SIZE & 409
 static uint8_t socket_config_array[10]; /* 10 bytes is enough for now */
 static uint8_t p_version_array[MAX_BUFFER_SIZE];
 static uint32_t cm_verification; /* Config magic verification storage */
+static int sidtype[4]; /* Max 4 sids {S1, S2, S3, S4} defaults to 'unknown' */
 
 /* Init vars */
 int sock_one = 0, sock_two = 0, sids_one = 0, sids_two = 0, numsids = 0, act_as_one = 0;
@@ -625,7 +626,7 @@ void handle_config_request(uint8_t * buffer)
               };
               break;
             case 3: /* sid_to_use */
-              if (buffer[3] <= 3) {
+              if (buffer[3] >= 1 && buffer[3] <= 4) {
                 if (RGB_ENABLED) {
                   usbsid_config.RGBLED.sid_to_use = buffer[3];
                 } else {
@@ -1084,11 +1085,17 @@ void apply_socket_config(void)
 
 void apply_bus_config(void)
 {  /* TODO: REWORK! */
+  /* Apply defaults */
+  sidtype[0] = usbsid_config.socketOne.sid1type;  /* SID1 */
+  sidtype[1] = usbsid_config.socketOne.sid2type;  /* SID2 */
+  sidtype[2] = usbsid_config.socketTwo.sid1type;  /* SID3 */
+  sidtype[3] = usbsid_config.socketTwo.sid2type;  /* SID4 */
   /* one == 0x00, two == 0x20, three == 0x40, four == 0x60 */
   if (act_as_one) {                    /* act-as-one enabled overrules all settings */
     one = two = 0;                     /* CS1 low, CS2 low */
     three = four = 0;                  /* CS1 low, CS2 low */
     one_mask = two_mask = three_mask = four_mask = 0x1F;
+    /* No changes to sidtypes */
   } else {
     if (sock_one && !sock_two) {       /* SocketOne enabled, SocketTwo disabled */
       one = 0b100;                     /* CS1 low, CS2 high */
@@ -1099,6 +1106,11 @@ void apply_bus_config(void)
       two_mask = (sids_one == 2) ? 0x3F : 0x0;
       three_mask = 0x0;
       four_mask = 0x0;
+      /* Apply differences */
+      sidtype[1] = (sids_one == 2)  /* SID2 */
+        ? usbsid_config.socketOne.sid2type : 1;
+      sidtype[2] = 1;  /* SID3 */
+      sidtype[3] = 1;  /* SID4 */
     }
     if (!sock_one && sock_two) {       /* SocketOne disabled, SocketTwo enabled */
       one = 0b010;                     /* CS1 high, CS2 low */
@@ -1109,6 +1121,12 @@ void apply_bus_config(void)
       two_mask = (sids_two == 2) ? 0x3F : 0x0;
       three_mask = 0x0;
       four_mask = 0x0;
+      /* Apply differences */
+      sidtype[0] = usbsid_config.socketTwo.sid1type;  /* SID1 */
+      sidtype[1] = (sids_two == 2)  /* SID2 */
+        ? usbsid_config.socketTwo.sid2type : 1;
+      sidtype[2] = 1;  /* SID3 */
+      sidtype[3] = 1;  /* SID4 */
     }
     if (sock_one && sock_two) {        /* SocketOne enabled, SocketTwo enabled */
       /* TODO: Compact if else spiderweb */
@@ -1121,6 +1139,11 @@ void apply_bus_config(void)
         two_mask = 0x1F;
         three_mask = 0x0;
         four_mask = 0x0;
+        /* Apply differences */
+        sidtype[0] = usbsid_config.socketOne.sid1type;  /* SID1 */
+        sidtype[1] = usbsid_config.socketTwo.sid1type;  /* SID2 */
+        sidtype[2] = 1;  /* SID3 */
+        sidtype[3] = 1;  /* SID4 */
       }
       if (sids_one == 2 && sids_two == 1) {
         one   = 0b100;
@@ -1131,6 +1154,11 @@ void apply_bus_config(void)
         two_mask = 0x3F;
         three_mask = 0x1F;
         four_mask = 0x0;
+        /* Apply differences */
+        sidtype[0] = usbsid_config.socketOne.sid1type;  /* SID1 */
+        sidtype[1] = usbsid_config.socketOne.sid2type;  /* SID2 */
+        sidtype[2] = usbsid_config.socketTwo.sid1type;  /* SID3 */
+        sidtype[3] = 1;  /* SID4 */
       }
       if (sids_one == 1 && sids_two == 2) {
         one   = 0b100;
@@ -1141,6 +1169,11 @@ void apply_bus_config(void)
         two_mask = 0x1F;
         three_mask = 0x3F;
         four_mask = 0x0;
+        /* Apply differences */
+        sidtype[0] = usbsid_config.socketOne.sid1type;  /* SID1 */
+        sidtype[1] = usbsid_config.socketTwo.sid2type;  /* SID2 */
+        sidtype[2] = usbsid_config.socketTwo.sid2type;  /* SID3 */
+        sidtype[3] = 1;  /* SID4 */
       }
       if (sids_one == 2 && sids_two == 2) {
         one   = 0b100;
@@ -1151,6 +1184,7 @@ void apply_bus_config(void)
         two_mask = 0x3F;
         three_mask = 0x1F;
         four_mask = 0x3F;
+        /* No changes to sidtypes */
       }
     }
   }
@@ -1158,11 +1192,26 @@ void apply_bus_config(void)
 }
 
 void apply_led_config(void)
-{
-  usbsid_config.RGBLED.sid_to_use /* Make sure all SIDs are used if sid to use is higher then the number of sids */
-    = (usbsid_config.RGBLED.sid_to_use > 2)
-      && (numsids <= 2)
-        ? 0 : usbsid_config.RGBLED.sid_to_use;
+{ /* if SID to use is higher then the number of sids, use first available SID */
+  int sid = -1;
+  int stou = (usbsid_config.RGBLED.sid_to_use - 1);
+  for (int s = 0; s < 4; s++) {
+    if (sidtype[s] == 2 || sidtype[s] == 3) {
+      sid = (s + 1);
+      break;
+    }
+  }
+  CFG("[CONFIG] RGBLED REQUESTED: %d\n", usbsid_config.RGBLED.sid_to_use);
+  /* check if requested sidno is actually configured  */
+  usbsid_config.RGBLED.sid_to_use
+    = (stou > numsids)
+    || (sidtype[stou] != 2)
+    || (sidtype[stou] != 3)
+    ? (sid != -1)  /* If not still -1 */
+    ? sid  /* use the first SID that is either 8580 or 6581 */
+    : 1    /* else default to SID 1 */
+    : usbsid_config.RGBLED.sid_to_use;  /* Else use the programmed SID to use */
+  CFG("[CONFIG] RGBLED CALCULATED: %d\n", usbsid_config.RGBLED.sid_to_use);
   return;
 }
 

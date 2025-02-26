@@ -69,10 +69,6 @@
 #include "tusb.h"            /* Tiny USB stack */
 #include "tusb_config.h"     /* Tiny USB configuration */
 
-/* RGBLED */
-#if defined(USE_RGB)
-#include "ws2812.pio.h"      /* RGB led handler */
-#endif
 
 /* Maximum incoming and outgoing USB (CDC/WebUSB) buffer size
  * NOTE: 64 byte zero padded packets take longer to process
@@ -117,19 +113,6 @@
  *
  */
 #define BYTES_TO_SEND 1
-
-/* LED breathe levels */
-enum
-{
-  ALWAYS_OFF = 99999,
-  ALWAYS_ON = 0,
-  CHECK_INTV = 100,
-  MAX_CHECKS = 200,  /* 200 checks times 100ms == 20 seconds */
-  BREATHE_INTV = 1,
-  BREATHE_STEP = 100,
-  VU_MAX = 65534,
-  HZ_MAX = 40
-};
 
 
 #ifdef __cplusplus

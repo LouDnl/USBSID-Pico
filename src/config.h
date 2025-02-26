@@ -123,7 +123,7 @@ typedef struct Config {
   } LED;                       /* 3 */
   struct {
     uint8_t brightness;
-    int     sid_to_use;         /* 0 = sid 1&2, 1...4 = sid 1 ... sid 4 */
+    int     sid_to_use;         /* 0/-1 = off, 1...4 = sid 1 ... sid 4 */
     bool    enabled : 1;
     bool    idle_breathe : 1;
   } RGBLED;                     /* 4 */

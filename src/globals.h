@@ -35,7 +35,6 @@
 /* Default includes */
 #include <stdint.h>
 #include <stdlib.h>
-#include "pico/stdlib.h"
 
 /* Helper macro for constraining a value within a range */
 #ifndef constrain
@@ -60,6 +59,15 @@
 /* Helper macro for mapping a value from a range to another range */
 #ifndef map
 #define map(x,in_min,in_max,out_min,out_max) ((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
+#endif
+
+#if defined(USE_RGB)
+#ifndef urgb_u32
+#define urgb_u32(r,g,b) ((uint32_t)(r) << 8) | ((uint32_t)(g) << 16) | (uint32_t)(b)
+#endif
+#ifndef rgbb
+#define rgbb(inp,br) (uint8_t)abs((inp / 255) * br)
+#endif
 #endif
 
 /* USBSID command byte */

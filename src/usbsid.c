@@ -41,12 +41,9 @@ uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((al
 uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE] __attribute__((aligned(2 * MAX_BUFFER_SIZE)));
 uint8_t __not_in_flash("usbsid_buffer") sid_buffer[MAX_BUFFER_SIZE] __attribute__((aligned(2 * MAX_BUFFER_SIZE)));
 uint8_t __not_in_flash("usbsid_buffer") read_buffer[MAX_BUFFER_SIZE] __attribute__((aligned(2 * MAX_BUFFER_SIZE)));
-int usb_connected = 0, usbdata = 0, pwm_value = 0, updown = 1;
+int usb_connected = 0, usbdata = 0;
 uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
 uint8_t *cdc_itf = 0, *wusb_itf = 0;
-uint16_t vu = 0;
-uint32_t breathe_interval_ms = BREATHE_INTV;
-uint32_t start_ms = 0;
 char ntype = '0', dtype = '0', cdc = 'C', asid = 'A', midi = 'M', wusb = 'W';
 bool web_serial_connected = false;
 double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
@@ -82,6 +79,12 @@ extern void clear_bus_all(void);
 extern uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data);
 extern void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 
+/* Vu externals */
+extern uint16_t vu;
+extern int n_checks, m_now;
+extern void init_rgb(void);
+extern void led_runner(void);
+
 /* MCU externals */
 extern void mcu_reset(void);
 extern void mcu_jump_to_bootloader(void);
@@ -90,62 +93,6 @@ extern void mcu_jump_to_bootloader(void);
 midi_machine midimachine;
 extern void process_stream(uint8_t *buffer, size_t size);
 
-/* RGB LED */
-#if defined(USE_RGB)
-#define IS_RGBW false
-PIO pio_rgb = pio1;
-uint ws2812_sm, offset_ws2812;
-int _rgb = 0;
-uint8_t r_ = 0, g_ = 0, b_ = 0;
-unsigned char o1 = 0, o2 = 0, o3 = 0, o4 = 0, o5 = 0, o6 = 0, o7 = 0, o8 = 0, o9 = 0, o10 = 0, o11 = 0, o12 = 0;
-const __not_in_flash("usbsid_data") unsigned char color_LUT[43][6][3] =
-{
-  /* Red Green Blue Yellow Cyan Purple*/
-  {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}},
-  {{6, 0, 0}, {0, 6, 0}, {0, 0, 6}, {6, 6, 0}, {0, 6, 6}, {6, 0, 6}},
-  {{12, 0, 0}, {0, 12, 0}, {0, 0, 12}, {12, 12, 0}, {0, 12, 12}, {12, 0, 12}},
-  {{18, 0, 0}, {0, 18, 0}, {0, 0, 18}, {18, 18, 0}, {0, 18, 18}, {18, 0, 18}},
-  {{24, 0, 0}, {0, 24, 0}, {0, 0, 24}, {24, 24, 0}, {0, 24, 24}, {24, 0, 24}},
-  {{30, 0, 0}, {0, 30, 0}, {0, 0, 30}, {30, 30, 0}, {0, 30, 30}, {30, 0, 30}},
-  {{36, 0, 0}, {0, 36, 0}, {0, 0, 36}, {36, 36, 0}, {0, 36, 36}, {36, 0, 36}},
-  {{42, 0, 0}, {0, 42, 0}, {0, 0, 42}, {42, 42, 0}, {0, 42, 42}, {42, 0, 42}},
-  {{48, 0, 0}, {0, 48, 0}, {0, 0, 48}, {48, 48, 0}, {0, 48, 48}, {48, 0, 48}},
-  {{54, 0, 0}, {0, 54, 0}, {0, 0, 54}, {54, 54, 0}, {0, 54, 54}, {54, 0, 54}},
-  {{60, 0, 0}, {0, 60, 0}, {0, 0, 60}, {60, 60, 0}, {0, 60, 60}, {60, 0, 60}},
-  {{66, 0, 0}, {0, 66, 0}, {0, 0, 66}, {66, 66, 0}, {0, 66, 66}, {66, 0, 66}},
-  {{72, 0, 0}, {0, 72, 0}, {0, 0, 72}, {72, 72, 0}, {0, 72, 72}, {72, 0, 72}},
-  {{78, 0, 0}, {0, 78, 0}, {0, 0, 78}, {78, 78, 0}, {0, 78, 78}, {78, 0, 78}},
-  {{84, 0, 0}, {0, 84, 0}, {0, 0, 84}, {84, 84, 0}, {0, 84, 84}, {84, 0, 84}},
-  {{90, 0, 0}, {0, 90, 0}, {0, 0, 90}, {90, 90, 0}, {0, 90, 90}, {90, 0, 90}},
-  {{96, 0, 0}, {0, 96, 0}, {0, 0, 96}, {96, 96, 0}, {0, 96, 96}, {96, 0, 96}},
-  {{102, 0, 0}, {0, 102, 0}, {0, 0, 102}, {102, 102, 0}, {0, 102, 102}, {102, 0, 102}},
-  {{108, 0, 0}, {0, 108, 0}, {0, 0, 108}, {108, 108, 0}, {0, 108, 108}, {108, 0, 108}},
-  {{114, 0, 0}, {0, 114, 0}, {0, 0, 114}, {114, 114, 0}, {0, 114, 114}, {114, 0, 114}},
-  {{120, 0, 0}, {0, 120, 0}, {0, 0, 120}, {120, 120, 0}, {0, 120, 120}, {120, 0, 120}},
-  {{126, 0, 0}, {0, 126, 0}, {0, 0, 126}, {126, 126, 0}, {0, 126, 126}, {126, 0, 126}},
-  {{132, 0, 0}, {0, 132, 0}, {0, 0, 132}, {132, 132, 0}, {0, 132, 132}, {132, 0, 132}},
-  {{138, 0, 0}, {0, 138, 0}, {0, 0, 138}, {138, 138, 0}, {0, 138, 138}, {138, 0, 138}},
-  {{144, 0, 0}, {0, 144, 0}, {0, 0, 144}, {144, 144, 0}, {0, 144, 144}, {144, 0, 144}},
-  {{150, 0, 0}, {0, 150, 0}, {0, 0, 150}, {150, 150, 0}, {0, 150, 150}, {150, 0, 150}},
-  {{156, 0, 0}, {0, 156, 0}, {0, 0, 156}, {156, 156, 0}, {0, 156, 156}, {156, 0, 156}},
-  {{162, 0, 0}, {0, 162, 0}, {0, 0, 162}, {162, 162, 0}, {0, 162, 162}, {162, 0, 162}},
-  {{168, 0, 0}, {0, 168, 0}, {0, 0, 168}, {168, 168, 0}, {0, 168, 168}, {168, 0, 168}},
-  {{174, 0, 0}, {0, 174, 0}, {0, 0, 174}, {174, 174, 0}, {0, 174, 174}, {174, 0, 174}},
-  {{180, 0, 0}, {0, 180, 0}, {0, 0, 180}, {180, 180, 0}, {0, 180, 180}, {180, 0, 180}},
-  {{186, 0, 0}, {0, 186, 0}, {0, 0, 186}, {186, 186, 0}, {0, 186, 186}, {186, 0, 186}},
-  {{192, 0, 0}, {0, 192, 0}, {0, 0, 192}, {192, 192, 0}, {0, 192, 192}, {192, 0, 192}},
-  {{198, 0, 0}, {0, 198, 0}, {0, 0, 198}, {198, 198, 0}, {0, 198, 198}, {198, 0, 198}},
-  {{204, 0, 0}, {0, 204, 0}, {0, 0, 204}, {204, 204, 0}, {0, 204, 204}, {204, 0, 204}},
-  {{210, 0, 0}, {0, 210, 0}, {0, 0, 210}, {210, 210, 0}, {0, 210, 210}, {210, 0, 210}},
-  {{216, 0, 0}, {0, 216, 0}, {0, 0, 216}, {216, 216, 0}, {0, 216, 216}, {216, 0, 216}},
-  {{222, 0, 0}, {0, 222, 0}, {0, 0, 222}, {222, 222, 0}, {0, 222, 222}, {222, 0, 222}},
-  {{228, 0, 0}, {0, 228, 0}, {0, 0, 228}, {228, 228, 0}, {0, 228, 228}, {228, 0, 228}},
-  {{234, 0, 0}, {0, 234, 0}, {0, 0, 234}, {234, 234, 0}, {0, 234, 234}, {234, 0, 234}},
-  {{240, 0, 0}, {0, 240, 0}, {0, 0, 240}, {240, 240, 0}, {0, 240, 240}, {240, 0, 240}},
-  {{246, 0, 0}, {0, 246, 0}, {0, 0, 246}, {246, 246, 0}, {0, 246, 246}, {246, 0, 246}},
-  {{252, 0, 0}, {0, 252, 0}, {0, 0, 252}, {252, 252, 0}, {0, 252, 252}, {252, 0, 252}}
-};
-#endif
 
 /* WebUSB Description URL */
 static const tusb_desc_webusb_url_t desc_url =
@@ -186,24 +133,6 @@ void reset_reason(void)
   return;
 }
 
-#if defined(USE_RGB)
-void put_pixel(uint32_t pixel_grb) {
-  // pio_sm_put_blocking(pio_rgb, ws2812_sm, pixel_grb << 8u);
-  pio_sm_put(pio_rgb, ws2812_sm, pixel_grb << 8u);
-  return;
-}
-
-uint32_t urgb_u32(uint8_t r, uint8_t g, uint8_t b) {
-  return ((uint32_t) (r) << 8) | ((uint32_t) (g) << 16) | (uint32_t) (b);
-}
-
-uint8_t rgbb(double inp)
-{
-  int r = abs((inp / 255) * usbsid_config.RGBLED.brightness);
-  return (uint8_t)r;
-}
-#endif
-
 
 /* SETUP */
 
@@ -215,21 +144,6 @@ void init_logging(void)
   sleep_ms(100);  /* leave time for uart to settle */
   stdio_flush();
   DBG("\n[%s]\n", __func__);
-  #endif
-  return;
-}
-
-/* Init the RGB LED pio */
-void init_rgb(void)
-{
-  #if defined(USE_RGB)
-  _rgb = randval(0, 5);
-  r_ = g_ = b_ = 0;
-  offset_ws2812 = pio_add_program(pio_rgb, &ws2812_program);
-  ws2812_sm = 0;  /* PIO1 SM0 */
-  pio_sm_claim(pio_rgb, ws2812_sm);
-  ws2812_program_init(pio_rgb, ws2812_sm, offset_ws2812, 23, 800000, IS_RGBW);
-  put_pixel(urgb_u32(0,0,0));
   #endif
   return;
 }
@@ -377,160 +291,6 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
     return;
   };
   return;
-}
-
-
-/* LED SORCERERS */
-
-/* It goes up and it goes down */
-void led_vumeter_task(void)
-{
-  #if LED_PWM
-  if (to_ms_since_boot(get_absolute_time()) - start_ms < breathe_interval_ms) {
-    return;  /* not enough time */
-  }
-  start_ms = to_ms_since_boot(get_absolute_time());
-  if (usbdata == 1 && dtype != ntype) {
-    uint8_t osc1, osc2, osc3;
-    osc1 = (sid_memory[0x00] * 0.596);  /* Frequency in Hz of SID1 @ $D400 Oscillator 1 */
-    osc2 = (sid_memory[0x07] * 0.596);  /* Frequency in Hz of SID1 @ $D400 Oscillator 2 */
-    osc3 = (sid_memory[0x0E] * 0.596);  /* Frequency in Hz of SID1 @ $D400 Oscillator 3 */
-
-    #if defined(USE_RGB)
-    if(usbsid_config.RGBLED.enabled) {
-      r_ = 0, g_ = 0, b_ = 0, o1 = 0, o2 = 0, o3 = 0, o4 = 0, o5 = 0, o6 = 0, o7 = 0, o8 = 0, o9 = 0, o10 = 0, o11 = 0, o12 = 0;
-      uint8_t osc4, osc5, osc6, osc7, osc8, osc9, osc10, osc11, osc12;
-      if (numsids >= 2) {
-        osc4 = (sid_memory[0x00 + 0x20] * 0.596);  /* Frequency in Hz of SID2 @ $D420 Oscillator 1 */
-        osc5 = (sid_memory[0x07 + 0x20] * 0.596);  /* Frequency in Hz of SID2 @ $D420 Oscillator 2 */
-        osc6 = (sid_memory[0x0E + 0x20] * 0.596);  /* Frequency in Hz of SID2 @ $D420 Oscillator 3 */
-      }
-      if (numsids >= 3) {
-        osc7 = (sid_memory[0x00 + 0x40] * 0.596);  /* Frequency in Hz of SID3 @ $D440 Oscillator 1 */
-        osc8 = (sid_memory[0x07 + 0x40] * 0.596);  /* Frequency in Hz of SID3 @ $D440 Oscillator 2 */
-        osc9 = (sid_memory[0x0E + 0x40] * 0.596);  /* Frequency in Hz of SID3 @ $D440 Oscillator 3 */
-      }
-      if (numsids == 4) {
-        osc10 = (sid_memory[0x00 + 0x60] * 0.596);  /* Frequency in Hz of SID4 @ $D460 Oscillator 1 */
-        osc11 = (sid_memory[0x07 + 0x60] * 0.596);  /* Frequency in Hz of SID4 @ $D460 Oscillator 2 */
-        osc12 = (sid_memory[0x0E + 0x60] * 0.596);  /* Frequency in Hz of SID4 @ $D460 Oscillator 3 */
-      }
-      o1 = map(osc1, 0, 255, 0, 43);
-      o2 = map(osc2, 0, 255, 0, 43);
-      o3 = map(osc3, 0, 255, 0, 43);
-      if (numsids >= 2) {
-        o4 = map(osc4, 0, 255, 0, 43);
-        o5 = map(osc5, 0, 255, 0, 43);
-        o6 = map(osc6, 0, 255, 0, 43);
-      }
-      if (numsids >= 3) {
-        o7 = map(osc7, 0, 255, 0, 43);
-        o8 = map(osc8, 0, 255, 0, 43);
-        o9 = map(osc9, 0, 255, 0, 43);
-      }
-      if (numsids == 4) {
-        o10 = map(osc10, 0, 255, 0, 43);
-        o11 = map(osc11, 0, 255, 0, 43);
-        o12 = map(osc12, 0, 255, 0, 43);
-      }
-      switch (usbsid_config.RGBLED.sid_to_use) {
-      case 1:
-        r_ += color_LUT[o1][0][0] + color_LUT[o2][1][0] + color_LUT[o3][2][0] ;
-        g_ += color_LUT[o1][0][1] + color_LUT[o2][1][1] + color_LUT[o3][2][1] ;
-        b_ += color_LUT[o1][0][2] + color_LUT[o2][1][2] + color_LUT[o3][2][2] ;
-        break;
-      case 2:
-        r_ += color_LUT[o4][3][0] + color_LUT[o5][4][0] + color_LUT[o6][5][0] ;
-        g_ += color_LUT[o4][3][1] + color_LUT[o5][4][1] + color_LUT[o6][5][1] ;
-        b_ += color_LUT[o4][3][2] + color_LUT[o5][4][2] + color_LUT[o6][5][2] ;
-        break;
-      case 3:
-        r_ += color_LUT[o7][0][0] + color_LUT[o8][1][0] + color_LUT[o9][2][0] ;
-        g_ += color_LUT[o7][0][1] + color_LUT[o8][1][1] + color_LUT[o9][2][1] ;
-        b_ += color_LUT[o7][0][2] + color_LUT[o8][1][2] + color_LUT[o9][2][2] ;
-        break;
-      case 4:
-        r_ += color_LUT[o10][3][0] + color_LUT[o11][4][0] + color_LUT[o12][5][0] ;
-        g_ += color_LUT[o10][3][1] + color_LUT[o11][4][1] + color_LUT[o12][5][1] ;
-        b_ += color_LUT[o10][3][2] + color_LUT[o11][4][2] + color_LUT[o12][5][2] ;
-        break;
-      case 0:
-      default:
-        r_ += color_LUT[o1][0][0] + color_LUT[o2][1][0] + color_LUT[o3][2][0] + color_LUT[o4][3][0] + color_LUT[o5][4][0] + color_LUT[o6][5][0] ;
-        g_ += color_LUT[o1][0][1] + color_LUT[o2][1][1] + color_LUT[o3][2][1] + color_LUT[o4][3][1] + color_LUT[o5][4][1] + color_LUT[o6][5][1] ;
-        b_ += color_LUT[o1][0][2] + color_LUT[o2][1][2] + color_LUT[o3][2][2] + color_LUT[o4][3][2] + color_LUT[o5][4][2] + color_LUT[o6][5][2] ;
-        break;
-      }
-      put_pixel(urgb_u32(rgbb(r_), rgbb(g_), rgbb(b_)));
-
-      /* Color LED debugging ~ uncomment for testing */
-      // DBG("[%c][PWM]$%04x [R]%02x [G]%02x [B]%02x [O1]$%02x $%02d [O2]$%02x $%02d [O3]$%02x $%02d [O4]$%02x $%02d [O5]$%02x $%02d [O6]$%02x $%02d\n",
-      //  dtype, vu, r_, g_, b_, osc1, o1, osc2, o2, osc3, o3, osc4, o4, osc5, o5, osc6, o6);
-    }
-    #endif
-
-    vu = abs((osc1 + osc2 + osc3) / 3.0f);
-    vu = map(vu, 0, HZ_MAX, 0, VU_MAX);
-    if (usbsid_config.LED.enabled) {
-      pwm_set_gpio_level(BUILTIN_LED, vu);
-    }
-
-    MDBG("[%c:%d][PWM]$%04x[V1]$%02X%02X$%02X%02X$%02X$%02X$%02X[V2]$%02X%02X$%02X%02X$%02X$%02X$%02X[V3]$%02X%02X$%02X%02X$%02X$%02X$%02X[FC]$%02x%02x$%02x[VOL]$%02x\n",
-      dtype, usbdata, vu,
-      sid_memory[0x01], sid_memory[0x00], sid_memory[0x03], sid_memory[0x02], sid_memory[0x04], sid_memory[0x05], sid_memory[0x06],
-      sid_memory[0x08], sid_memory[0x07], sid_memory[0x0A], sid_memory[0x09], sid_memory[0x0B], sid_memory[0x0C], sid_memory[0x0D],
-      sid_memory[0x0F], sid_memory[0x0E], sid_memory[0x11], sid_memory[0x10], sid_memory[0x12], sid_memory[0x13], sid_memory[0x14],
-      sid_memory[0x16], sid_memory[0x15], sid_memory[0x17], sid_memory[0x18]);
-
-  }
-  return;
-  #endif
-}
-
-/* Mouth breather! */
-void led_breathe_task(void)
-{
-  #if LED_PWM
-  if (usbdata == 0 && dtype == ntype) {
-    if (to_ms_since_boot(get_absolute_time()) - start_ms < breathe_interval_ms) {
-      return;  /* not enough time */
-    }
-    start_ms = to_ms_since_boot(get_absolute_time());
-
-    if (pwm_value >= VU_MAX) {
-      updown = 0;
-    }
-    if (pwm_value <= 0) {
-      updown = 1;
-      #ifdef USE_RGB
-      _rgb = randval(0, 5);
-      #endif
-    }
-
-    if (updown == 1 && pwm_value <= VU_MAX)
-      pwm_value += BREATHE_STEP;
-
-    if (updown == 0 && pwm_value >= 0)
-      pwm_value -= BREATHE_STEP;
-    if (usbsid_config.LED.enabled && usbsid_config.LED.idle_breathe) {
-      pwm_set_gpio_level(BUILTIN_LED, pwm_value);
-    }
-    #if defined(USE_RGB)
-    if (usbsid_config.RGBLED.enabled && usbsid_config.RGBLED.idle_breathe) {
-      int rgb_ = map(pwm_value, 0, VU_MAX, 0, 43);
-      r_ = color_LUT[rgb_][_rgb][0];
-      g_ = color_LUT[rgb_][_rgb][1];
-      b_ = color_LUT[rgb_][_rgb][2];
-      put_pixel(urgb_u32(rgbb(r_),rgbb(g_),rgbb(b_)));
-      /* Color LED debugging ~ uncomment for testing */
-      /* DBG("[%c][PWM]$%04x [R]%02x [G]%02x [B]%02x\n", dtype, pwm_value, r_, g_, b_); */
-    } else {
-      put_pixel(urgb_u32(0,0,0));
-    }
-    #endif
-  }
-  return;
-  #endif
 }
 
 
@@ -806,37 +566,16 @@ void core1_main(void)
   /* Start the VU */
   init_vu();
 
-  /* Log boot CPU and C64 clock speeds */
-  cpu_mhz = (clock_get_hz(clk_sys) / 1000 / 1000);
-  cpu_us = (1 / cpu_mhz);
-  sid_hz = usbsid_config.clock_rate;
-  sid_mhz = (sid_hz / 1000 / 1000);
-  sid_us = (1 / sid_mhz);
-  CFG("[BOOT PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
-  CFG("[BOOT C64]  %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
-
   /* Release semaphore when core 1 is started */
   sem_release(&core1_init);
 
   /* Wait for core 0 to signal boot finished */
   sem_acquire_blocking(&core0_init);
-  int n_checks = 0, m_now = 0;
+
+  /* Apply ms once before loop */
   m_now = to_ms_since_boot(get_absolute_time());
   while (1) {
-    usbdata == 1 ? led_vumeter_task() : led_breathe_task();
-    if (to_ms_since_boot(get_absolute_time()) - m_now < CHECK_INTV) { /* 20 seconds */
-      /* NOTICE: Testfix for core1 setting dtype to 0 */
-      /* do nothing */
-    } else {
-      m_now = to_ms_since_boot(get_absolute_time());
-      if (vu == 0 && usbdata == 1) {
-        n_checks++;
-        if (n_checks >= MAX_CHECKS)
-        {
-          n_checks = 0, usbdata = 0, dtype = ntype;  /* NOTE: This sets dtype to 0 which causes buffertask write to go to default and error out with many consecutive reads from the bus */
-        }
-      }
-    }
+    led_runner();
   }
   /* Point of no return, this should never be reached */
   return;
@@ -882,6 +621,15 @@ int main()
   /* Check for default config bit
    * NOTE: This cannot be run from Core 1! */
   detect_default_config();
+
+  /* Log boot CPU and C64 clock speeds */
+  cpu_mhz = (clock_get_hz(clk_sys) / 1000 / 1000);
+  cpu_us = (1 / cpu_mhz);
+  sid_hz = usbsid_config.clock_rate;
+  sid_mhz = (sid_hz / 1000 / 1000);
+  sid_us = (1 / sid_mhz);
+  CFG("[BOOT PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
+  CFG("[BOOT C64]  %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
 
   /* Release core 0 semaphore */
   sem_release(&core0_init);
