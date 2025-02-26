@@ -27,16 +27,19 @@
 #include "config.h"
 #include "gpio.h"
 #include "logging.h"
+#include "vu.pio.h"  /* Vu LED handler */
 #if defined(USE_RGB)
-#include "ws2812.pio.h"  /* RGB led handler */
+#include "vu_rgb.pio.h"  /* Vu RGB led handler */
 #endif
 
 
 /* Init external vars */
 extern Config usbsid_config;  /* usbsid.c */
 extern uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));  /* usbsid.c */
-extern int usbdata;  /* usbsid.c */
-extern int numsids;  /* config.c */
+extern int usbdata;     /* usbsid.c */
+extern int numsids;     /* config.c */
+extern PIO led_pio;     /* gpio.c */
+extern uint sm_pwmled;  /* gpio.c */
 
 /* LED breathe levels */
 enum
@@ -60,9 +63,7 @@ uint32_t breathe_interval_ms = BREATHE_INTV;
 
 /* RGB LED */
 #if defined(USE_RGB)
-#define IS_RGBW false
-PIO pio_rgb = pio1;
-uint ws2812_sm, offset_ws2812;
+extern uint sm_vu_rgb;  /* gpio.c */
 int _rgb = 0;
 double r_ = 0, g_ = 0, b_ = 0;
 uint8_t br = 0;
@@ -117,21 +118,17 @@ const __not_in_flash("usbsid_data") unsigned char color_LUT[43][6][3] =
 };
 
 void put_pixel(uint32_t pixel_grb) {
-  pio_sm_put(pio_rgb, ws2812_sm, pixel_grb << 8u);
+  pio_sm_put(led_pio, sm_vu_rgb, pixel_grb << 8u);
   return;
 }
 #endif
 
-/* Init the RGB LED pio */
+/* Init the RGB LED */
 void init_rgb(void)
 {
   #if defined(USE_RGB)
   _rgb = randval(0, 5);
   r_ = g_ = b_ = 0;
-  offset_ws2812 = pio_add_program(pio_rgb, &ws2812_program);
-  ws2812_sm = 0;  /* PIO1 SM0 */
-  pio_sm_claim(pio_rgb, ws2812_sm);
-  ws2812_program_init(pio_rgb, ws2812_sm, offset_ws2812, 23, 800000, IS_RGBW);
   put_pixel(urgb_u32(0,0,0));
   #endif
   return;
@@ -157,7 +154,7 @@ void led_vumeter_task(void)
     vu = abs((osc1 + osc2 + osc3) / 3.0f);
     vu = map(vu, 0, HZ_MAX, 0, VU_MAX);
     if (usbsid_config.LED.enabled) {
-      pwm_set_gpio_level(BUILTIN_LED, vu);
+      pio_sm_put(led_pio, sm_pwmled, vu);
     }
 
     #if defined(USE_RGB)
@@ -224,7 +221,7 @@ void led_breathe_task(void)
     if (updown == 0 && pwm_value >= 0)
       pwm_value -= BREATHE_STEP;
     if (usbsid_config.LED.enabled && usbsid_config.LED.idle_breathe) {
-      pwm_set_gpio_level(BUILTIN_LED, pwm_value);
+      pio_sm_put(led_pio, sm_pwmled, pwm_value);
     }
     #if defined(USE_RGB)
     if (usbsid_config.RGBLED.enabled && usbsid_config.RGBLED.idle_breathe) {

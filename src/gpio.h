@@ -46,15 +46,19 @@
 #endif
 
 /* Hardware api's */
-#include "hardware/gpio.h"
-#include "hardware/pio.h"          /* Programmable I/O (PIO) API */
-#include "hardware/dma.h"          /* DMA Controller API */
-#include "hardware/pwm.h"          /* Hardware Pulse Width Modulation (PWM) API */
-#include "hardware/irq.h"          /* Hardware interrupt handling */
+#include "hardware/gpio.h"   /* General Purpose Input/Output (GPIO) API */
+#include "hardware/pio.h"    /* Programmable I/O (PIO) API */
+#include "hardware/dma.h"    /* DMA Controller API */
+#include "hardware/pwm.h"    /* Hardware Pulse Width Modulation (PWM) API */
+#include "hardware/irq.h"    /* Hardware interrupt handling */
 
 /* PIO */
 #include "bus_control.pio.h" /* Busje komt zo! */
-#include "clock.pio.h"       /* Square wave generator */
+#include "clock.pio.h"       /* TikTak */
+#include "vu.pio.h"          /* Kiem em goan! */
+#if defined(USE_RGB)
+#include "vu_rgb.pio.h"      /* Ik zie regenbogen! */
+#endif
 
 /* Uart */
 #define BAUD_RATE 115200
@@ -94,7 +98,7 @@
 #endif
 
 #if defined(USE_RGB)
-#define WS2812_PIN 23
+#define WS2812_PIN 23  /* Only available on black clones with RGB LED onboard! */
 #endif
 
 /* Unused */

@@ -3,7 +3,7 @@
 ; interfacing one or two MOS SID chips and/or hardware SID emulators over
 ; (WEB)USB with your computer, phone or ASID supporting player
 ;
-; ws2812.pio
+; vu_rgb.pio
 ; This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
 ; File author: LouD
 ;
@@ -28,7 +28,7 @@
 ; along with this program. If not, see <http://www.gnu.org/licenses/>.
 ;
 
-.program ws2812
+.program vu_rgb
 .side_set 1
 
 .define public T1 3
@@ -48,24 +48,3 @@ do_one:
 do_zero:
   nop            side 0 [T2 - 1] ; Or drive low, for a short pulse
 .wrap
-
-% c-sdk {
-#include "hardware/clocks.h"
-
-static inline void ws2812_program_init(PIO pio, uint sm, uint offset, uint pin, float freq, bool rgbw) {
-
-  pio_gpio_init(pio, pin);
-  pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
-
-  pio_sm_config c = ws2812_program_get_default_config(offset);
-  sm_config_set_sideset_pins(&c, pin);
-  sm_config_set_out_shift(&c, false, true, rgbw ? 32 : 24);
-  sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
-  int cycles_per_bit = ws2812_T1 + ws2812_T2 + ws2812_T3;
-  float div = clock_get_hz(clk_sys) / (freq * cycles_per_bit);
-  sm_config_set_clkdiv(&c, div);
-
-  pio_sm_init(pio, sm, offset, &c);
-  pio_sm_set_enabled(pio, sm, true);
-}
-%}

@@ -265,7 +265,8 @@ set(TARGET_LL
 ### Pio files
 set(PIO_BUS ${CMAKE_CURRENT_LIST_DIR}/src/pio/bus_control.pio)
 set(PIO_CLOCK ${CMAKE_CURRENT_LIST_DIR}/src/pio/clock.pio)
-set(PIO_RGB ${CMAKE_CURRENT_LIST_DIR}/src/pio/ws2812.pio)
+set(PIO_VU ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu.pio)
+set(PIO_RGB ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu_rgb.pio)
 
 ### Header folders to include
 set(TARGET_INCLUDE_DIRS PRIVATE
@@ -343,6 +344,7 @@ foreach(FILENAME PICOTYPE IN ZIP_LISTS FILENAMES PICOTYPES)
   # pio addition
   pico_generate_pio_header(${BUILD} ${PIO_BUS})
   pico_generate_pio_header(${BUILD} ${PIO_CLOCK})
+  pico_generate_pio_header(${BUILD} ${PIO_VU})
   if(PICOTYPE STREQUAL "RGB")
     pico_generate_pio_header(${BUILD} ${PIO_RGB})
   endif()

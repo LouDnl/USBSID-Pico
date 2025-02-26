@@ -49,6 +49,13 @@ static uint8_t control_word, read_data;
 static uint16_t delay_word;
 static uint32_t data_word, dir_mask;
 static float sidclock_frequency, busclock_frequency;
+#if defined(PICO_DEFAULT_LED_PIN)
+PIO led_pio = pio1;
+uint sm_pwmled, offset_pwmled;
+#if defined(USE_RGB)  /* No RGB LED on _w Pico's */
+uint sm_vu_rgb, offset_vu_rgb;
+#endif
+#endif
 
 static int paused_state = 0;
 static uint8_t volume_state[4] = {0};
@@ -82,22 +89,41 @@ void init_gpio()
 void init_vu(void)
 {
   #if defined(PICO_DEFAULT_LED_PIN)  /* Cannot use VU on PicoW :( */
-  /* PWM led */
-  gpio_init(BUILTIN_LED);
-  gpio_set_dir(BUILTIN_LED, GPIO_OUT);
-  gpio_set_function(BUILTIN_LED, GPIO_FUNC_PWM);
-  /* Init Vu */
-  int led_pin_slice = pwm_gpio_to_slice_num(BUILTIN_LED);
-	pwm_config configLED = pwm_get_default_config();
-	pwm_config_set_clkdiv(&configLED, 1);
-	pwm_config_set_wrap(&configLED, 65535);  /* LED max */
-	pwm_init(led_pin_slice, &configLED, true);
-	gpio_set_drive_strength(BUILTIN_LED, GPIO_DRIVE_STRENGTH_2MA);
-	pwm_set_gpio_level(BUILTIN_LED, 0);  /* turn off led */
+  { /* PWM led */
+    offset_pwmled = pio_add_program(led_pio, &vu_program);
+    sm_pwmled = 1;  /* PIO2 SM2 */
+    pio_sm_claim(led_pio, sm_pwmled);
+    pio_gpio_init(led_pio, BUILTIN_LED);
+    pio_sm_set_consecutive_pindirs(led_pio, sm_pwmled, BUILTIN_LED, 1, true);
+    pio_sm_config c_ledpwm = vu_program_get_default_config(offset_pwmled);
+    sm_config_set_sideset_pins(&c_ledpwm, BUILTIN_LED);
+    pio_sm_init(led_pio, sm_pwmled, offset_pwmled, &c_ledpwm);
+    pio_sm_set_enabled(led_pio, sm_pwmled, false);
+    pio_sm_put(led_pio, sm_pwmled, 65534);  /* VU_MAX = 65534 */
+    pio_sm_exec(led_pio, sm_pwmled, pio_encode_pull(false, false));
+    pio_sm_exec(led_pio, sm_pwmled, pio_encode_out(pio_isr, 32));
+    pio_sm_set_enabled(led_pio, sm_pwmled, true);
+  }
 
-  #if defined(USE_RGB)
+  #if defined(USE_RGB)  /* No RGB LED on _w Pico's */
   { /* Init RGB */
     gpio_set_drive_strength(WS2812_PIN, GPIO_DRIVE_STRENGTH_2MA);
+    offset_vu_rgb = pio_add_program(led_pio, &vu_rgb_program);
+    sm_vu_rgb = 0;  /* PIO2 SM1 */
+    pio_sm_claim(led_pio, sm_vu_rgb);
+    pio_gpio_init(led_pio, WS2812_PIN);
+    pio_sm_set_consecutive_pindirs(led_pio, sm_vu_rgb, WS2812_PIN, 1, true);
+    pio_sm_config c_vu_rgb = vu_rgb_program_get_default_config(offset_vu_rgb);
+    sm_config_set_sideset_pins(&c_vu_rgb, WS2812_PIN);
+    sm_config_set_out_shift(&c_vu_rgb, false, true, 32); /* 32 ~ IS_RGBW == false, else 24 */
+    sm_config_set_fifo_join(&c_vu_rgb, PIO_FIFO_JOIN_TX);
+    float freq = 800000;
+    int cycles_per_bit = vu_rgb_T1 + vu_rgb_T2 + vu_rgb_T3;
+    float div = clock_get_hz(clk_sys) / (freq * cycles_per_bit);
+    sm_config_set_clkdiv(&c_vu_rgb, div);
+
+    pio_sm_init(led_pio, sm_vu_rgb, offset_vu_rgb, &c_vu_rgb);
+    pio_sm_set_enabled(led_pio, sm_vu_rgb, true);
   }
   #endif
   #elif defined(CYW43_WL_GPIO_LED_PIN)

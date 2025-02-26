@@ -559,12 +559,14 @@ void core1_main(void)
   /* Wait for core 0 to signal back */
   sem_acquire_blocking(&core0_init);
 
-  /* Init RGB LED */
-  init_rgb();
   /* Clear the dirt */
   memset(sid_memory, 0, sizeof sid_memory);
   /* Start the VU */
   init_vu();
+  /* Init RGB LED */
+  init_rgb();
+
+  queue_init(&midi_queue, sizeof(queue_entry_t), 3);
 
   /* Release semaphore when core 1 is started */
   sem_release(&core1_init);
