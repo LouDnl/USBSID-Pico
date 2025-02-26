@@ -389,6 +389,7 @@ void __no_inline_not_in_flash_func(save_config_lowlevel)(void* config_data)
 
 void __no_inline_not_in_flash_func(save_config)(const Config* config)
 {
+  CFG("[SAVE CONFIG START]\n"); /* TODO: Test if this doesn't cause a lockup */
   uint8_t config_data[CONFIG_SIZE] = {0};
   static_assert(sizeof(Config) < CONFIG_SIZE, "[CONFIG SAVE ERROR] Config struct doesn't fit inside CONFIG_SIZE");
   memcpy(config_data, config, sizeof(Config));
@@ -442,14 +443,14 @@ void handle_config_request(uint8_t * buffer)
    * Byte 3 ~ new value
    * Byte 4 ~ reserved
    */
-  CFG("[CFG BUFFER] %x %x %x %x %x\n", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4]);
+  CFG("[CONFIG BUFFER] %x %x %x %x %x\n", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4]);
   switch (buffer[0]) {
     case RESET_USBSID:
-      CFG("[RESET_USBSID]\n");
+      CFG("[CMD] RESET_USBSID\n");
       mcu_reset();
       break;
     case READ_CONFIG:
-      CFG("[READ_CONFIG]\n");
+      CFG("[CMD] READ_CONFIG\n");
       /* ISSUE: Although 4 writes are performed, only the first 2 are received */
       read_config(&usbsid_config);
       print_cfg(config_array, count_of(config_array));
@@ -461,7 +462,7 @@ void handle_config_request(uint8_t * buffer)
       }
       break;
     case READ_SOCKETCFG:
-      CFG("[READ_SOCKETCFG]\n");
+      CFG("[CMD] READ_SOCKETCFG\n");
       read_socket_config(&usbsid_config);
       print_cfg(socket_config_array, count_of(socket_config_array));
       memset(write_buffer_p, 0, 64);
@@ -469,23 +470,23 @@ void handle_config_request(uint8_t * buffer)
       write_back_data(64);
       break;
     case READ_NUMSIDS:
-      CFG("[READ_NUMSIDS]\n");
+      CFG("[CMD] READ_NUMSIDS\n");
       memset(write_buffer_p, 0, 64);
       write_buffer_p[0] = (uint8_t)numsids;
       write_back_data(1);
       break;
     case READ_FMOPLSID:
-      CFG("[READ_FMOPLSID]\n");
+      CFG("[CMD] READ_FMOPLSID\n");
       memset(write_buffer_p, 0, 64);
       write_buffer_p[0] = (uint8_t)fmopl_sid;
       write_back_data(1);
       break;
     case APPLY_CONFIG:
-      CFG("[APPLY_CONFIG]\n");
+      CFG("[CMD] APPLY_CONFIG\n");
       apply_config(false);
       break;
     case RELOAD_CONFIG:
-      CFG("[RELOAD_CONFIG]\n");
+      CFG("[CMD] RELOAD_CONFIG\n");
       load_config(&usbsid_config);
       apply_config(false);
       for (int i = 0; i < count_of(clockrates); i++) {
@@ -495,7 +496,7 @@ void handle_config_request(uint8_t * buffer)
       }
       break;
     case SET_CONFIG:
-      CFG("[SET_CONFIG]\n");
+      CFG("[CMD] SET_CONFIG\n");
       switch (buffer[1]) {
         case 0: /* clock_rate */
           /* will always be available to change the setting since it doesn't apply it */
@@ -651,19 +652,19 @@ void handle_config_request(uint8_t * buffer)
       };
       break;
     case SAVE_CONFIG:
-      CFG("[SAVE_CONFIG] and RESET_MCU\n");
+      CFG("[CMD] SAVE_CONFIG and RESET_MCU\n");
       save_config(&usbsid_config);
       load_config(&usbsid_config);
       mcu_reset();
       break;
     case SAVE_NORESET:
-      CFG("[SAVE_CONFIG]\n");
+      CFG("[CMD] SAVE_CONFIG no RESET\n");
       save_config(&usbsid_config);
       load_config(&usbsid_config);
       apply_config(false);
       break;
     case RESET_CONFIG:
-      CFG("[RESET_CONFIG]\n");
+      CFG("[CMD] RESET_CONFIG\n");
       default_config(&usbsid_config);
       save_config(&usbsid_config);
       load_config(&usbsid_config);
@@ -671,38 +672,38 @@ void handle_config_request(uint8_t * buffer)
       break;
     case WRITE_CONFIG:
       /* TODO: FINISH */
-      CFG("[WRITE_CONFIG] NOT IMPLEMENTED YET!\n");
+      CFG("[CMD] WRITE_CONFIG NOT IMPLEMENTED YET!\n");
       break;
     case SINGLE_SID:
-      CFG("[SINGLE_SID]\n");
+      CFG("[CMD] SINGLE_SID\n");
       set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, false, false, usbsid_config.socketTwo.chiptype, false);
       break;
     case MIRRORED_SID:
-      CFG("[MIRRORED_SID]\n");
+      CFG("[CMD] MIRRORED_SID\n");
       set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, true, false, usbsid_config.socketTwo.chiptype, true);
       break;
     case DUAL_SID:
-      CFG("[DUAL_SID]\n");
+      CFG("[CMD] DUAL_SID\n");
       set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, true, false, usbsid_config.socketTwo.chiptype, false);
       break;
     case DUAL_SOCKET1:
-      CFG("[DUAL_SOCKET1]\n");
+      CFG("[CMD] DUAL_SOCKET 1\n");
       set_socket_config(buffer[1], true, true, usbsid_config.socketOne.chiptype, false, false, usbsid_config.socketTwo.chiptype, false);
       break;
     case DUAL_SOCKET2:
-      CFG("[DUAL_SOCKET2]\n");
+      CFG("[CMD] DUAL_SOCKET 2\n");
       set_socket_config(buffer[1], false, false, usbsid_config.socketOne.chiptype, true, true, usbsid_config.socketTwo.chiptype, false);
       break;
     case QUAD_SID:
-      CFG("[QUAD_SID]\n");
+      CFG("[CMD] QUAD_SID\n");
       set_socket_config(buffer[1], true, true, 1, true, true, 1, false);
       break;
     case TRIPLE_SID:
-      CFG("[TRIPLE_SID SOCKET 1]\n");
+      CFG("[CMD] TRIPLE_SID SOCKET 1\n");
       set_socket_config(buffer[1], true, true, 1, true, false, usbsid_config.socketTwo.chiptype, false);
       break;
     case TRIPLE_SID_TWO:
-      CFG("[TRIPLE_SID SOCKET 2]\n");
+      CFG("[CMD] TRIPLE_SID SOCKET 2\n");
       set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, true, true, 1, false);
       break;
     case LOAD_MIDI_STATE: /* Load from config into midimachine and apply to SIDs */
@@ -748,34 +749,34 @@ void handle_config_request(uint8_t * buffer)
       /* mcu_reset(); */
       break;
     case SET_CLOCK: /* Change SID clock frequency by array id */
-      CFG("[SET_CLOCK]\n");
+      CFG("[CMD] SET_CLOCK\n");
       /* locked clockrate check is done in apply_clockrate */
       bool suspend_sids = (buffer[2] == 1) ? true : false;  /* Set RES low while changing clock? */
       apply_clockrate((int)buffer[1], suspend_sids);
       break;
     case GET_CLOCK: /* Returns the clockrate as array id in byte 0 */
-      CFG("[GET_CLOCK]\n");
+      CFG("[CMD] GET_CLOCK\n");
       int clk_rate_id = return_clockrate();
       memset(write_buffer_p, 0, 64);
       write_buffer_p[0] = clk_rate_id;
       write_back_data(1);
       break;
     case LOCK_CLOCK:  /* Locks the clockrate from being changed, saved in config */
-      CFG("[LOCK_CLOCK]\n");
+      CFG("[CMD] LOCK_CLOCK\n");
       if (buffer[1] == 0 || buffer[1] == 1) { /* Verify correct data */
         usbsid_config.lock_clockrate = (bool)buffer[1];
       } else {
         CFG("[LOCK_CLOCK] Received incorrect value of %d\n", buffer[1]);
       }
       if (buffer[2] == 1) {  /* Save and apply if set to a 1 */
-        CFG("[LOCK_CLOCK SAVE_CONFIG]\n");
+        CFG("[LOCK_CLOCK] SAVE_CONFIG\n");
         save_config(&usbsid_config);
         load_config(&usbsid_config);
         apply_config(false);
       }
       break;
     case DETECT_SIDS:
-      CFG("[DETECT_SIDS]\n");
+      CFG("[CMD] DETECT_SIDS\n");
       detect_sid_types();
       memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
       read_config(&usbsid_config);  /* Read the config into the config buffer */
@@ -790,7 +791,7 @@ void handle_config_request(uint8_t * buffer)
       }
       break;
     case TEST_ALLSIDS:  /* ISSUE: This must be run on Core 1 so we can actually stop it! */
-      CFG("[TEST_ALLSIDS]\n");
+      CFG("[CMD] TEST_ALLSIDS\n");
       for (int s = 0; s < numsids; s++) {
         CFG("[START TEST SID %d]\n", s);
         sid_test(s, '1', 'A');
@@ -818,11 +819,11 @@ void handle_config_request(uint8_t * buffer)
         : buffer[2] == 3 ? 'P'  /* Pulse */
         : buffer[2] == 4 ? 'N'  /* Noise */
         : 'P');  /* Fallback to pulse waveform */
-      CFG("[TEST_SID%d] TEST: %c WF: %c\n", (s + 1), t, wf);
+      CFG("[CMD] TEST_SID %d TEST: %c WF: %c\n", (s + 1), t, wf);
       sid_test(s, t, wf);
       break;
     case USBSID_VERSION:
-      CFG("[READ_FIRMWARE_VERSION]\n");
+      CFG("[CMD] READ_FIRMWARE_VERSION\n");
       read_firmware_version();
       memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
       memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
@@ -836,19 +837,19 @@ void handle_config_request(uint8_t * buffer)
         }
       break;
     case RESTART_BUS:
-      CFG("[RESTART_BUS]\n");
+      CFG("[CMD] RESTART_BUS\n");
       restart_bus();
       break;
     case RESTART_BUS_CLK:
-     CFG("[RESTART_BUS_CLK]\n");
+     CFG("[CMD] RESTART_BUS_CLK\n");
       restart_bus_clocks();
       break;
     case SYNC_PIOS:
-      CFG("[SYNC_PIOS]\n");
+      CFG("[CMD] SYNC_PIOS\n");
       sync_pios(false);
       break;
     case TEST_FN: /* TODO: Remove before v1 release */
-      CFG("[TEST_FN]\n");
+      CFG("[CMD] TEST_FN\n");
       CFG("[FLASH_CONFIG_OFFSET]0x%x\n", FLASH_CONFIG_OFFSET);
       CFG("[PICO_FLASH_SIZE_BYTES]0x%x\n", PICO_FLASH_SIZE_BYTES);
       CFG("[FLASH_SECTOR_SIZE]0x%x\n", FLASH_SECTOR_SIZE);
