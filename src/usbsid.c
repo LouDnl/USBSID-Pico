@@ -568,8 +568,6 @@ void core1_main(void)
   /* Wait for core 0 to signal boot finished */
   sem_acquire_blocking(&core0_init);
 
-  /* Apply ms once before loop */
-  m_now = to_ms_since_boot(get_absolute_time());
   while (1) {
     led_runner();
   }
