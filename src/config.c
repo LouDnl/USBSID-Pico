@@ -118,6 +118,7 @@ const char *single_dual[2] = { "Dual SID", "Single SID" };
   .default_config = 1, \
   .external_clock = false, \
   .clock_rate = DEFAULT, \
+  .raster_rate = R_DEFAULT, \
   .lock_clockrate = false, \
   .socketOne = { \
     .enabled = true, \
@@ -505,6 +506,7 @@ void handle_config_request(uint8_t * buffer)
         case 0: /* clock_rate */
           /* will always be available to change the setting since it doesn't apply it */
           usbsid_config.clock_rate = clockrates[(int)buffer[2]];
+          usbsid_config.raster_rate = rasterrates[(int)buffer[2]]; /* Experimental */
           if (buffer[3] == 0 || buffer[3] == 1) { /* Verify correct data */
             usbsid_config.lock_clockrate = (bool)buffer[3];
           }
@@ -907,6 +909,8 @@ void print_config_settings(void)
     (int)usbsid_config.clock_rate);
   CFG("[CONFIG] [CLOCK RATE LOCKED] %s\n",
     true_false[(int)usbsid_config.lock_clockrate]);
+  CFG("[CONFIG] [RASTER RATE] @%d\n",
+    (int)usbsid_config.raster_rate);
 
   CFG("[CONFIG] [SOCKET ONE] %s as %s\n",
     enabled[(int)usbsid_config.socketOne.enabled],
@@ -1307,6 +1311,7 @@ void apply_clockrate(int n_clock, bool suspend_sids)
         }
         CFG("[CONFIG] [CLOCK FROM]%d [CLOCK TO]%d\n", usbsid_config.clock_rate, clockrates[n_clock]);
         usbsid_config.clock_rate = clockrates[n_clock];
+        usbsid_config.raster_rate = rasterrates[n_clock]; /* Experimental */
         /* Cycled write buffer vars */
         sid_hz = usbsid_config.clock_rate;
         sid_mhz = (sid_hz / 1000 / 1000);
@@ -1351,6 +1356,7 @@ void verify_clockrate(void)
       default:
         CFG("[CONFIG] [CLOCK ERROR] Detected unconventional clockrate (%ld) error in config, revert to default\n", usbsid_config.clock_rate);
         usbsid_config.clock_rate = clockrates[0];
+        usbsid_config.raster_rate = rasterrates[0]; /* Experimental */
         save_config(&usbsid_config);
         load_config(&usbsid_config);
         mcu_reset();

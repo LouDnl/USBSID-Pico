@@ -80,7 +80,7 @@
 #define MAGIC_SMOKE 19700101  /* DATEOFRELEASE */
 #endif
 #ifndef PROJECT_VERSION
-#define PROJECT_VERSION "0.3.1-BETA.20250226"  /* Must be the same as in CMakeLists.txt */
+#define PROJECT_VERSION "0.3.1-BETA.20250227"  /* Must be the same as in CMakeLists.txt */
 #endif
 
 #ifdef PICO_DEFAULT_LED_PIN
@@ -99,6 +99,7 @@ typedef struct Config {
   uint32_t magic;
   int default_config;
   uint32_t clock_rate;         /* clock speed identifier */
+  uint32_t raster_rate;        /* internal use raster rate identifier ~ not configurable */
   struct
   {
     uint8_t chiptype;          /* 0 = real, 1 = clone */

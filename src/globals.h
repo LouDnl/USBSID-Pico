@@ -62,8 +62,8 @@
 #endif
 
 #if defined(USE_RGB)
-#ifndef urgb_u32
-#define urgb_u32(r,g,b) ((uint32_t)(r) << 8) | ((uint32_t)(g) << 16) | (uint32_t)(b)
+#ifndef ugrb_u32  /* RGB ->> GRB */
+#define ugrb_u32(r,g,b) ((uint32_t)(r) << 8) | ((uint32_t)(g) << 16) | (uint32_t)(b)
 #endif
 #ifndef rgbb
 #define rgbb(inp,br) (uint8_t)abs((inp / 255) * br)

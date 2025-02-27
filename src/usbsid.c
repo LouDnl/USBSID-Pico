@@ -62,7 +62,6 @@ extern void detect_default_config(void);
 
 /* GPIO externals */
 extern void init_gpio(void);
-extern void init_vu(void);
 extern void setup_sidclock(void);
 extern void setup_piobus(void);
 extern void setup_dmachannels(void);
@@ -81,8 +80,7 @@ extern void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t d
 
 /* Vu externals */
 extern uint16_t vu;
-extern int n_checks, m_now;
-extern void init_rgb(void);
+extern void init_vu(void);
 extern void led_runner(void);
 
 /* MCU externals */
@@ -157,7 +155,6 @@ void cdc_write(uint8_t * itf, uint32_t n)
   IODBG("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
   tud_cdc_n_write(*itf, write_buffer, n);  /* write n bytes of data to client */
   tud_cdc_n_write_flush(*itf);
-  vu = vu == 0 ? 100 : vu;  /* NOTICE: Testfix for core1 setting dtype to 0 */
   return;
 }
 
@@ -167,7 +164,6 @@ void webserial_write(uint8_t * itf, uint32_t n)
   IODBG("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
   tud_vendor_write(write_buffer, n);
   tud_vendor_flush();
-  vu = vu == 0 ? 100 : vu;  /* NOTICE: Testfix for core1 setting dtype to 0 */
   return;
 }
 
@@ -178,6 +174,7 @@ void webserial_write(uint8_t * itf, uint32_t n)
 void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
 {
   usbdata = 1;
+  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
   uint8_t command = ((sid_buffer[0] & PACKET_TYPE) >> 6);
   uint8_t subcommand = (sid_buffer[0] & COMMAND_MASK);
   uint8_t n_bytes = (sid_buffer[0] & BYTE_MASK);
@@ -233,6 +230,7 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
         IODBG("[WRITE ERROR]%c\n", dtype);
         break;
     };
+    vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
     return;
   };
   if (command == COMMAND) {
@@ -330,7 +328,6 @@ void tud_cdc_rx_cb(uint8_t itf)
 { /* No need to check available bytes for reading */
   cdc_itf = &itf;
   usbdata = 1, dtype = cdc;
-  vu = vu == 0 ? 100 : vu;  /* NOTICE: Testfix for core1 setting dtype to 0 */
   cdcread = tud_cdc_n_read(*cdc_itf, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
   tud_cdc_n_read_flush(*cdc_itf);
   memcpy(sid_buffer, read_buffer, cdcread);
@@ -561,11 +558,9 @@ void core1_main(void)
 
   /* Clear the dirt */
   memset(sid_memory, 0, sizeof sid_memory);
+
   /* Start the VU */
   init_vu();
-  /* Init RGB LED */
-  init_rgb();
-
 
   /* Release semaphore when core 1 is started */
   sem_release(&core1_init);

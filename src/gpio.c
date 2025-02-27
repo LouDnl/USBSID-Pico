@@ -68,9 +68,8 @@ static uint8_t volume_state[4] = {0};
 register uint32_t b asm( "r10" );
 volatile const uint32_t *BUSState = &sio_hw->gpio_in;
 
-void init_gpio()
-{
-  /* GPIO defaults for PIO bus */
+void init_gpio(void)
+{ /* GPIO defaults for PIO bus */
   gpio_set_dir(RES, GPIO_OUT);
   gpio_set_function(RES, GPIO_FUNC_SIO);
   gpio_put(RES, 0);  /* Make sure we do not yet enable the SID on boot! */
@@ -86,7 +85,7 @@ void init_gpio()
   return;
 }
 
-void init_vu(void)
+void setup_vu(void)
 {
   #if defined(PICO_DEFAULT_LED_PIN)  /* Cannot use VU on PicoW :( */
   { /* PWM led */
@@ -115,13 +114,13 @@ void init_vu(void)
     pio_sm_set_consecutive_pindirs(led_pio, sm_vu_rgb, WS2812_PIN, 1, true);
     pio_sm_config c_vu_rgb = vu_rgb_program_get_default_config(offset_vu_rgb);
     sm_config_set_sideset_pins(&c_vu_rgb, WS2812_PIN);
-    sm_config_set_out_shift(&c_vu_rgb, false, true, 32); /* 32 ~ IS_RGBW == false, else 24 */
+    /* RGBW LED ? 32 : 24 */
+    sm_config_set_out_shift(&c_vu_rgb, false, true, 24);
     sm_config_set_fifo_join(&c_vu_rgb, PIO_FIFO_JOIN_TX);
     float freq = 800000;
     int cycles_per_bit = vu_rgb_T1 + vu_rgb_T2 + vu_rgb_T3;
     float div = clock_get_hz(clk_sys) / (freq * cycles_per_bit);
     sm_config_set_clkdiv(&c_vu_rgb, div);
-
     pio_sm_init(led_pio, sm_vu_rgb, offset_vu_rgb, &c_vu_rgb);
     pio_sm_set_enabled(led_pio, sm_vu_rgb, true);
   }
