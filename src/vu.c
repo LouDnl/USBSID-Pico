@@ -114,10 +114,10 @@ void led_vumeter_task(void)
   start_us = to_us_since_boot(get_absolute_time());
   if (usbdata == 1 && dtype != ntype) {
     /* LED always uses SID 1 */
-    static double osc1, osc2, osc3;
-    osc1 = (sid_memory[0x00] * 0.596);  /* Frequency in Hz of SID1 @ $D400 Oscillator 1 */
-    osc2 = (sid_memory[0x07] * 0.596);  /* Frequency in Hz of SID1 @ $D400 Oscillator 2 */
-    osc3 = (sid_memory[0x0E] * 0.596);  /* Frequency in Hz of SID1 @ $D400 Oscillator 3 */
+    double osc1, osc2, osc3;
+    osc1 = (sid_memory[0x00] * 0.596f);  /* Frequency in Hz of SID1 @ $D400 Oscillator 1 */
+    osc2 = (sid_memory[0x07] * 0.596f);  /* Frequency in Hz of SID1 @ $D400 Oscillator 2 */
+    osc3 = (sid_memory[0x0E] * 0.596f);  /* Frequency in Hz of SID1 @ $D400 Oscillator 3 */
 
     vu = abs((osc1 + osc2 + osc3) / 3.0f);
     vu = map(vu, 0, HZ_MAX, 0, VU_MAX);
@@ -127,24 +127,17 @@ void led_vumeter_task(void)
 
     #if defined(USE_RGB)
     if(usbsid_config.RGBLED.enabled) {
-      static int sidno;// = (usbsid_config.RGBLED.sid_to_use - 1);
-      sidno = usbsid_config.RGBLED.sid_to_use;
-      static double rgb_osc1, rgb_osc2, rgb_osc3;
-      rgb_osc1 = (sid_memory[0x00 + ((sidno - 1) * 0x20)] * 0.596);  /* Frequency in Hz of SIDn @ Oscillator 1 */
-      rgb_osc2 = (sid_memory[0x07 + ((sidno - 1) * 0x20)] * 0.596);  /* Frequency in Hz of SIDn @ Oscillator 2 */
-      rgb_osc3 = (sid_memory[0x0E + ((sidno - 1) * 0x20)] * 0.596);  /* Frequency in Hz of SIDn @ Oscillator 3 */
-      o1 = map(rgb_osc1, 0, 255, 0, 31);
-      o2 = map(rgb_osc2, 0, 255, 0, 31);
-      o3 = map(rgb_osc3, 0, 255, 0, 31);
-      r_ = (o1 * 8);
-      g_ = (o2 * 8);
-      b_ = (o3 * 8);
+      int sidno = (usbsid_config.RGBLED.sid_to_use - 1) * 0x20;
+      double rgb_osc1, rgb_osc2, rgb_osc3;
+      rgb_osc1 = ((sid_memory[0x00 + sidno] * 0.596f) * 1);  /* Frequency in Hz of SIDn @ Oscillator 1 */
+      rgb_osc2 = ((sid_memory[0x07 + sidno] * 0.596f) * 1);  /* Frequency in Hz of SIDn @ Oscillator 2 */
+      rgb_osc3 = ((sid_memory[0x0E + sidno] * 0.596f) * 1);  /* Frequency in Hz of SIDn @ Oscillator 3 */
       br = usbsid_config.RGBLED.brightness;
-      pio_sm_put(led_pio, sm_vu_rgb, (ugrb_u32(rgbb(r_,br),rgbb(g_,br),rgbb(b_,br))) << 8u);
-
+      pio_sm_put(led_pio, sm_vu_rgb, (ugrb_u32(rgbb(rgb_osc1,br),rgbb(rgb_osc2,br),rgbb(rgb_osc3,br))) << 8u);
       /* Color LED debugging ~ uncomment for testing */
-      /* DBG("[%c%d][PWM]$%04x [R]%3.g [G]%3.g [B]%3.g [O1]%2d [O2]%2d [O3]%2d [RO1]%g [RO2]%g [RO3]%g\n",
-        dtype, usbdata, vu, r_, g_, b_, o1, o2, o3, rgb_osc1, rgb_osc2, rgb_osc3); */
+      /* DBG("[%c%d][PWM]$%04x [RO1]%g [RO2]%g [RO3]%g [R]%02X [G]%02X [B]%02X\n",
+        dtype, usbdata, vu, rgb_osc1, rgb_osc2, rgb_osc3,
+        rgbb(rgb_osc1,br), rgbb(rgb_osc2,br), rgbb(rgb_osc3,br)); */
     }
     #endif
 
