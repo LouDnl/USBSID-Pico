@@ -29,7 +29,7 @@ cmake_minimum_required(VERSION 3.17)
 set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
-set(MAGIC_SMOKE "20250227")
+set(MAGIC_SMOKE "20250309")
 set(PROJECT_VERSION "0.3.1-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
 
 ### Want a cookie?
@@ -209,17 +209,21 @@ message("Compile time flags: ${COMPILE_OPTS}")
 
 ### Executable names
 list(APPEND FILENAMES
-  ${PROJECT_FILENAME}
+  ${PROJECT_FILENAME}-v1.0
+  ${PROJECT_FILENAME}-v1.3
 )
 list(APPEND PICOTYPES
   "LED"
+  "LED_AUDIOSWITCH"
 )
 if(${PICO_BOARD} STREQUAL "pico")
   list(APPEND FILENAMES
-    ${PROJECT_FILENAME}-rgb
+    ${PROJECT_FILENAME}-v1.0-rgb
+    ${PROJECT_FILENAME}-v1.3-rgb
   )
   list(APPEND PICOTYPES
     "RGB"
+    "RGB_AUDIOSWITCH"
   )
 endif()
 
@@ -335,9 +339,13 @@ foreach(FILENAME PICOTYPE IN ZIP_LISTS FILENAMES PICOTYPES)
   message(STATUS "Building ${FILENAME} with PICOTYPE=${PICOTYPE} and MAGIC_SMOKE=${MAGIC_SMOKE}")
   # executable
   add_executable(${BUILD} ${SOURCEFILES})
-  # RGB LED
-  if(PICOTYPE STREQUAL "RGB")
+  # BUILD TYPES
+  if(PICOTYPE STREQUAL "RGB" OR PICOTYPE STREQUAL "RGB_AUDIOSWITCH")
+    message("Building ")
     target_compile_definitions(${BUILD} PRIVATE USBSID USE_RGB=1)
+    target_compile_definitions(${BUILD} PRIVATE USBSID HAS_AUDIOSWITCH=1)
+  elseif(PICOTYPE STREQUAL "LED_AUDIOSWITCH")
+    target_compile_definitions(${BUILD} PRIVATE USBSID HAS_AUDIOSWITCH=1)
   else()
     target_compile_definitions(${BUILD} PRIVATE USBSID)
   endif()

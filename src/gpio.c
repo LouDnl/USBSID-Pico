@@ -82,6 +82,12 @@ void init_gpio(void)
   gpio_set_dir(CS1, GPIO_OUT);
   gpio_set_dir(CS2, GPIO_OUT);
   gpio_set_dir(RW, GPIO_OUT);
+  /* GPIO defaults for audio switch */
+  #if defined(HAS_AUDIOSWITCH)
+  gpio_set_dir(AU_SW, GPIO_OUT);
+  gpio_set_function(AU_SW, GPIO_FUNC_SIO);
+  gpio_put(AU_SW, usbsid_config.stereo_en);  /* Default on ~ stereo */
+  #endif
   return;
 }
 
@@ -625,4 +631,24 @@ void reset_sid_registers(void)
     clear_sid_registers(sid);
   }
   return;
+}
+
+void toggle_audio_switch(void)
+{ /* Toggle the SPST switch stereo <-> mono */
+  #if defined(HAS_AUDIOSWITCH)
+  static int audio_state = 0b1;
+  audio_state ^= 1;
+  CFG("[CONFIG] AUDIO SWITCH TO: %d\n", audio_state);
+  tPIN(AU_SW);
+  // gpio_put(AU_SW, audio_state);  /* toggle mono <-> stereo */
+  #endif
+}
+
+void set_audio_switch(bool state)
+{ /* Set the SPST switch */
+  #if defined(HAS_AUDIOSWITCH)
+  if (state) {
+    sPIN(AU_SW);
+  } else cPIN(AU_SW);
+  #endif
 }

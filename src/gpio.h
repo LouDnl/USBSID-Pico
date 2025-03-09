@@ -90,6 +90,11 @@
 #define CS2 21  /* Chip Select for 2 or 3 & 4 with SKPico */
 #define PHI 22  /* Pico 1Mhz PWM out ~ External Clock In */
 
+/* Audio switch (v1.3+ only) */
+#if defined(HAS_AUDIOSWITCH)
+#define AU_SW 15
+#endif
+
 /* LED */
 #if defined(PICO_DEFAULT_LED_PIN)
 #define BUILTIN_LED PICO_DEFAULT_LED_PIN  /* 25 */
@@ -103,7 +108,9 @@
 
 /* Unused */
 #define NIL0 14
+#ifndef HAS_AUDIOSWITCH
 #define NIL1 15
+#endif
 #define NIL2 26
 #define NIL3 27
 #define NIL4 28
@@ -112,7 +119,10 @@
 #define PIO_PINDIRMASK 0x3C3FFF  /* 0b00000000001111000011111111111111 18 GPIO pins */
 
 /* Util */
-#define bPIN(i) ( 1 << i )
+#define bPIN(P) (1 << P)
+#define sPIN(P) { sio_hw->gpio_set  = (1 << P); }
+#define cPIN(P) { sio_hw->gpio_clr  = (1 << P); }
+#define tPIN(P) { sio_hw->gpio_togl = (1 << P); }
 
 /* IRQ's */
 #define PIO_IRQ0 0

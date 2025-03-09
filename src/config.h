@@ -80,7 +80,7 @@
 #define MAGIC_SMOKE 19700101  /* DATEOFRELEASE */
 #endif
 #ifndef PROJECT_VERSION
-#define PROJECT_VERSION "0.3.1-BETA.20250227"  /* Must be the same as in CMakeLists.txt */
+#define PROJECT_VERSION "0.3.1-BETA.20250309"  /* Must be the same as in CMakeLists.txt */
 #endif
 
 #ifdef PICO_DEFAULT_LED_PIN
@@ -92,6 +92,11 @@
 #define RGB_ENABLED true
 #else
 #define RGB_ENABLED false
+#endif
+#ifdef HAS_AUDIOSWITCH
+#define STEREO_ENABLED true
+#else
+#define STEREO_ENABLED false
 #endif
 
 /* USBSID-Pico config struct */
@@ -145,8 +150,9 @@ typedef struct Config {
     int sidno;                  /* 0 = disabled, saves the sidno of the sid set to FMOpl */
     bool enabled : 1;           /* Requires a clone SID! */
   } FMOpl;                      /* 9 */
-  bool external_clock : 1;     /* enable / disable external oscillator */
-  bool lock_clockrate : 1;     /* lock the set clockspeed from being changed */
+  bool external_clock : 1;      /* enable / disable external oscillator */
+  bool lock_clockrate : 1;      /* lock the set clockspeed from being changed */
+  bool stereo_en : 1;           /* audio switch is off (mono) or on (stereo) ~ (PCB v1.3+ only) */
 } Config;
 
 extern Config usbsid_config;  /* Make Config struct global */
@@ -192,11 +198,13 @@ enum
   SAVE_MIDI_STATE  = 0x61,
   RESET_MIDI_STATE = 0x63,
 
-  USBSID_VERSION   = 0x80,
+  USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
 
-  RESTART_BUS      = 0x85,
-  RESTART_BUS_CLK  = 0x86,
-  SYNC_PIOS        = 0x87,
+  RESTART_BUS      = 0x85,  /* Restart DMA & PIO */
+  RESTART_BUS_CLK  = 0x86,  /* Restart PIO clocks */
+  SYNC_PIOS        = 0x87,  /* Sync PIO clocks */
+  TOGGLE_AUDIO     = 0x88,  /* Toggle mono <-> stereo (v1.2+ boards only) */
+  SET_AUDIO        = 0x89,  /* Set mono <-> stereo (v1.2+ boards only) */
 
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
 };

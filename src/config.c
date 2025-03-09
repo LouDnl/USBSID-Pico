@@ -66,6 +66,8 @@ extern void enable_sid(bool unmute);
 extern void disable_sid(void);
 extern void mute_sid(void);
 extern void reset_sid_registers(void);
+extern void toggle_audio_switch(void);
+extern void set_audio_switch(bool state);
 
 /* Midi externals */
 extern void midi_bus_operation(uint8_t a, uint8_t b);
@@ -114,6 +116,7 @@ const char *int_ext[2] = { "Internal", "External" };
 const char *enabled[2] = { "Disabled", "Enabled" };
 const char *true_false[2] = { "False", "True" };
 const char *single_dual[2] = { "Dual SID", "Single SID" };
+const char *mono_stereo[2] = { "Mono", "Stereo" };
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
   .magic = MAGIC_SMOKE, \
@@ -122,6 +125,7 @@ const char *single_dual[2] = { "Dual SID", "Single SID" };
   .clock_rate = DEFAULT, \
   .raster_rate = R_DEFAULT, \
   .lock_clockrate = false, \
+  .stereo_en = STEREO_ENABLED, \
   .socketOne = { \
     .enabled = true, \
     .dualsid = false, \
@@ -323,6 +327,7 @@ void read_config(Config* config)
   config_array[54] = (int)config->Midi.enabled;
   config_array[55] = (int)config->FMOpl.enabled;
   config_array[56] = config->FMOpl.sidno;
+  config_array[57] = config->stereo_en;
   config_array[63] = 0xFF;  /* Terminator byte */
 
   return;
@@ -505,7 +510,7 @@ void handle_config_request(uint8_t * buffer)
     case SET_CONFIG:
       CFG("[CMD] SET_CONFIG\n");
       switch (buffer[1]) {
-        case 0: /* clock_rate */
+        case  0:  /* clock_rate */
           /* will always be available to change the setting since it doesn't apply it */
           usbsid_config.clock_rate = clockrates[(int)buffer[2]];
           usbsid_config.raster_rate = rasterrates[(int)buffer[2]]; /* Experimental */
@@ -513,7 +518,7 @@ void handle_config_request(uint8_t * buffer)
             usbsid_config.lock_clockrate = (bool)buffer[3];
           }
           break;
-        case 1: /* socketOne */
+        case  1:  /* socketOne */
           switch (buffer[2]) {
               case 0: /* enabled */
                 if (buffer[3] <= 1) { /* 1 or 0 */
@@ -547,7 +552,7 @@ void handle_config_request(uint8_t * buffer)
                 break;
           };
           break;
-        case 2: /* socketTwo */
+        case  2:  /* socketTwo */
           switch (buffer[2]) {
             case 0: /* enabled */
               if (buffer[3] <= 1) { /* 1 or 0 */
@@ -586,7 +591,7 @@ void handle_config_request(uint8_t * buffer)
               break;
           };
           break;
-        case 3: /* LED */
+        case  3:  /* LED */
           switch (buffer[2]) {
             case 0: /* enabled */
               if (buffer[3] <= 1) { /* 1 or 0 */
@@ -606,7 +611,7 @@ void handle_config_request(uint8_t * buffer)
               break;
           };
           break;
-        case 4: /* RGBLED */
+        case  4:  /* RGBLED */
           switch (buffer[2]) {
             case 0: /* enabled */
               if (buffer[3] <= 1) { /* 1 or 0 */
@@ -646,14 +651,24 @@ void handle_config_request(uint8_t * buffer)
               break;
           }
           break;
-        case 5: /* CDC */
-        case 6: /* WEBUSB */
-        case 7: /* ASID */
-        case 8: /* MIDI */
+        case  5:  /* CDC */
+        case  6:  /* WEBUSB */
+        case  7:  /* ASID */
+        case  8:  /* MIDI */
           break;
-        case 9: /* FMOpl */
+        case  9:  /* FMOpl */
           usbsid_config.FMOpl.enabled = (bool)buffer[2];
           usbsid_config.FMOpl.sidno = verify_fmopl_sidno();
+          break;
+        case 10:  /* Audio switch */
+          #if defined(HAS_AUDIOSWITCH)
+           usbsid_config.stereo_en =
+            (buffer[2] == 0 || buffer[2] == 1)
+            ? (bool)buffer[2]
+           : true;  /* Default to 1 ~ stereo if incorrect value */
+          #else
+          usbsid_config.stereo_en = false;
+          #endif
           break;
         default:
           break;
@@ -714,7 +729,7 @@ void handle_config_request(uint8_t * buffer)
       CFG("[CMD] TRIPLE_SID SOCKET 2\n");
       set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, true, true, 1, false);
       break;
-    case LOAD_MIDI_STATE: /* Load from config into midimachine and apply to SIDs */
+    case LOAD_MIDI_STATE:   /* Load from config into midimachine and apply to SIDs */
       CFG("[LOAD_MIDI_STATE]\n");
       for (int i = 0; i < 4; i++) {
         CFG("[SID %d]", (i + 1));
@@ -728,7 +743,7 @@ void handle_config_request(uint8_t * buffer)
         CFG("\n");
       }
       break;
-    case SAVE_MIDI_STATE: /* Save from midimachine into config and save to flash */
+    case SAVE_MIDI_STATE:   /* Save from midimachine into config and save to flash */
       CFG("[SAVE_MIDI_STATE]\n");
       for (int i = 0; i < 4; i++) {
         CFG("[SID %d]", (i + 1));
@@ -741,7 +756,7 @@ void handle_config_request(uint8_t * buffer)
       }
       save_config(&usbsid_config);
       break;
-    case RESET_MIDI_STATE: /* Reset all settings to zero */
+    case RESET_MIDI_STATE:  /* Reset all settings to zero */
       CFG("[RESET_MIDI_STATE]\n");
       for (int i = 0; i < 4; i++) {
         CFG("[SID %d]", (i + 1));
@@ -756,20 +771,20 @@ void handle_config_request(uint8_t * buffer)
       save_config(&usbsid_config);
       /* mcu_reset(); */
       break;
-    case SET_CLOCK: /* Change SID clock frequency by array id */
+    case SET_CLOCK:         /* Change SID clock frequency by array id */
       CFG("[CMD] SET_CLOCK\n");
       /* locked clockrate check is done in apply_clockrate */
       bool suspend_sids = (buffer[2] == 1) ? true : false;  /* Set RES low while changing clock? */
       apply_clockrate((int)buffer[1], suspend_sids);
       break;
-    case GET_CLOCK: /* Returns the clockrate as array id in byte 0 */
+    case GET_CLOCK:         /* Returns the clockrate as array id in byte 0 */
       CFG("[CMD] GET_CLOCK\n");
       int clk_rate_id = return_clockrate();
       memset(write_buffer_p, 0, 64);
       write_buffer_p[0] = clk_rate_id;
       write_back_data(1);
       break;
-    case LOCK_CLOCK:  /* Locks the clockrate from being changed, saved in config */
+    case LOCK_CLOCK:        /* Locks the clockrate from being changed, saved in config */
       CFG("[CMD] LOCK_CLOCK\n");
       if (buffer[1] == 0 || buffer[1] == 1) { /* Verify correct data */
         usbsid_config.lock_clockrate = (bool)buffer[1];
@@ -783,7 +798,29 @@ void handle_config_request(uint8_t * buffer)
         apply_config(false);
       }
       break;
-    case DETECT_SIDS:
+    case TOGGLE_AUDIO:      /* Toggle the audio state regardless of config setting */
+      CFG("[CMD] TOGGLE_AUDIO\n");
+      toggle_audio_switch();  /* if HAS_AUDIOSWITCH is not defined, this doesn't do anything */
+      break;
+    case SET_AUDIO:         /* Set the audio state from buffer setting (saves config if provided) */
+      CFG("[CMD] SET_AUDIO\n");
+      #if defined(HAS_AUDIOSWITCH)
+      usbsid_config.stereo_en =
+        (buffer[1] == 0 || buffer[1] == 1)
+        ? (bool)buffer[1]
+        : true;  /* Default to 1 ~ stereo if incorrect value */
+      set_audio_switch(usbsid_config.stereo_en);
+      if (buffer[2] == 1) {  /* Save and apply if set to a 1 */
+        CFG("[SET_AUDIO] SAVE_CONFIG\n");
+        save_config(&usbsid_config);
+        load_config(&usbsid_config);
+        apply_config(false);
+      }
+      #else
+      usbsid_config.stereo_en = false;
+      #endif
+      break;
+    case DETECT_SIDS:       /* Detect SID types per socket */
       CFG("[CMD] DETECT_SIDS\n");
       detect_sid_types();
       memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
@@ -971,6 +1008,11 @@ void print_config_settings(void)
     enabled[(int)usbsid_config.FMOpl.enabled]);
   CFG("[CONFIG] [FMOpl] SIDno %d\n",
     usbsid_config.FMOpl.sidno);
+
+  #if defined(HAS_AUDIOSWITCH)
+  CFG("[CONFIG] [AUDIO_SWITCH] %s\n",
+    mono_stereo[(int)usbsid_config.stereo_en]);
+  #endif
 
   CFG("[CONFIG] PRINT SETTINGS END\n");
 
