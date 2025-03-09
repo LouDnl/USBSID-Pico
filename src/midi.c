@@ -61,8 +61,7 @@ int voice = 0;
 int curr_midi_channel;  /* For use in config.c */
 // int freevoice = 0;
 
-void midi_bus_operation(uint8_t a, uint8_t b);
-
+/* Initialize the midi handlers */
 void midi_init(void)
 {
   /* Clear buffers once */
@@ -921,8 +920,8 @@ void process_midi(uint8_t *buffer, int size)
     midimachine.channel_states[channel][sidno][MODVOL]);  // 18
 }
 
-int stream_size;
-
+/* Processes a 1 byte incoming midi buffer
+ * Figures out if we're receiving midi or sysex */
 void midi_buffer_task(uint8_t buffer)
 {
   if (midimachine.index != 0) {
@@ -944,8 +943,8 @@ void midi_buffer_task(uint8_t buffer)
         }
         break;
       case 0xF7:  /* System Exclusive End of SysEx (EOX) */
-          dtype = asid; /* Set data type to ASID */
         if (midimachine.bus == CLAIMED && midimachine.type == SYSEX) {
+          dtype = asid; /* Set data type to ASID */
           midimachine.streambuffer[midimachine.index] = buffer;
           midimachine.index++;
           process_sysex(midimachine.streambuffer, midimachine.index);

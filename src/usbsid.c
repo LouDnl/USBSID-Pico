@@ -91,8 +91,11 @@ extern void mcu_jump_to_bootloader(void);
 extern bool running_tests;
 
 /* Midi externals */
-midi_machine midimachine;
+extern void midi_init(void);
 extern void process_stream(uint8_t *buffer, size_t size);
+
+/* Midi init */
+midi_machine midimachine;
 
 /* Queues */
 queue_t sidtest_queue;

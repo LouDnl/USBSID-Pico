@@ -99,13 +99,6 @@ enum {
   V3_ACTIVE = 3,
 };
 
-/* Initialize the midi handlers */
-void midi_init(void);
-
-/* Processes a 1 byte incoming midi buffer
- * Figures out if we're receiving midi or sysex */
-void process_buffer(uint8_t buffer);
-
 /* Processes the received Midi stream */
 // void process_stream(uint8_t* buffer);  // 20240723 ~ disabled, unused
 
