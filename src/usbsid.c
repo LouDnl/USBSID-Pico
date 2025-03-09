@@ -175,8 +175,30 @@ void webserial_write(uint8_t * itf, uint32_t n)
 
 /* BUFFER HANDLING */
 
+int __not_in_flash_func(do_buffer_tick)(int top, int step)
+{
+  static int i = 1;
+  IODBG("[I %d] [%c] $%02X:%02X %u\n", i, dtype, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : 10));
+  cycled_bus_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : 10));
+  if (i+step >= top) {
+    i = 1;
+    return i;
+  }
+  i += step;
+  return 0;
+}
+
+void __not_in_flash_func(buffer_task)(int n_bytes, int step)
+{
+  int state = 0;
+  do {
+    usbdata = 1;
+    state = do_buffer_tick(n_bytes, step);
+  } while (state != 1);
+}
+
 /* Process received usb data */
-void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
+void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
 {
   usbdata = 1;
   vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
@@ -190,17 +212,7 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
       IODBG("[I %d] [%c] $%02X:%02X %u\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
       cycled_bus_operation(sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
     } else {
-      for (int i = 1; i <= n_bytes; i += 4) {
-        usbdata = 1;
-        if (sid_buffer[i] == 0xFF && sid_buffer[i + 1] == 0xF0 && sid_buffer[i + 2] == 0xFF && sid_buffer[i + 3] == 0xFF) {
-          /* EXPERIMENTAL ~ NOT WORKING YET */
-          /* reset_sid(); */
-          /* return; */
-          continue;
-        };
-        IODBG("[I %d] [%c] $%02X:%02X %u\n", i, dtype, sid_buffer[i], sid_buffer[i + 1], (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]));
-        cycled_bus_operation(sid_buffer[i], sid_buffer[i + 1], (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]));
-      };
+      buffer_task(n_bytes, 4);
     }
     return;
   };
@@ -212,11 +224,7 @@ void __not_in_flash_func(handle_buffer_task)(uint8_t * itf, uint32_t * n)
       cycled_bus_operation(sid_buffer[1], sid_buffer[2], 10);
       /* TODO: Monitor if this change causes any issues with non cycled players and skpico config etc! */
     } else {
-      for (int i = 1; i <= n_bytes; i += 2) {
-        IODBG("[I %d] [%c] $%02X:%02X\n", i, dtype, sid_buffer[i], sid_buffer[i + 1]);
-        /* write the address and value to the SID with minimal 10 cycles in between ~ Thanks for the cycle amount erique! */
-        cycled_bus_operation(sid_buffer[i], sid_buffer[i + 1], 10);
-      };
+      buffer_task(n_bytes, 2);
     }
     return;
   };
@@ -326,6 +334,24 @@ void tud_resume_cb(void)
 }
 
 
+/* USB MIDI CLASS CALLBACKS */
+
+void tud_midi_rx_cb(uint8_t itf)
+{
+  if (tud_midi_n_mounted(itf)) {
+    usbdata = 1;
+    while (tud_midi_n_available(itf, 0)) {  /* Loop as long as there is data available */
+      uint32_t available = tud_midi_n_stream_read(itf, 0, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
+      process_stream(midimachine.usbstreambuffer, available);
+    }
+    /* Clear usb buffer after use ~ Disable due to prematurely cut off tunes */
+    /* memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer)); */
+    return;
+  }
+  return;
+}
+
+
 /* USB CDC CLASS CALLBACKS */
 
 /* Read from host to device */
@@ -336,7 +362,7 @@ void tud_cdc_rx_cb(uint8_t itf)
   cdcread = tud_cdc_n_read(*cdc_itf, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
   tud_cdc_n_read_flush(*cdc_itf);
   memcpy(sid_buffer, read_buffer, cdcread);
-  handle_buffer_task(cdc_itf, &cdcread);
+  process_buffer(cdc_itf, &cdcread);
   /* memset(read_buffer, 0, count_of(read_buffer)); */
   /* memset(sid_buffer, 0, count_of(sid_buffer)); */
   return;
@@ -387,24 +413,6 @@ void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 }
 
 
-/* USB MIDI CLASS CALLBACKS */
-
-void tud_midi_rx_cb(uint8_t itf)
-{
-  if (tud_midi_n_mounted(itf)) {
-    usbdata = 1;
-    while (tud_midi_n_available(itf, 0)) {  /* Loop as long as there is data available */
-      uint32_t available = tud_midi_n_stream_read(itf, 0, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
-      process_stream(midimachine.usbstreambuffer, available);
-    }
-    /* Clear usb buffer after use ~ Disable due to prematurely cut off tunes */
-    /* memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer)); */
-    return;
-  }
-  return;
-}
-
-
 /* USB VENDOR CLASS CALLBACKS */
 
 /* Read from host to device */
@@ -420,7 +428,7 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
     webread = tud_vendor_n_read(*wusb_itf, &read_buffer, MAX_BUFFER_SIZE);
     tud_vendor_n_read_flush(*wusb_itf);
     memcpy(sid_buffer, read_buffer, webread);
-    handle_buffer_task(wusb_itf, &webread);
+    process_buffer(wusb_itf, &webread);
     /* memset(read_buffer, 0, count_of(read_buffer)); */
     /* memset(sid_buffer, 0, count_of(sid_buffer)); */
     return;
@@ -450,7 +458,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
   switch (request->bmRequestType_bit.type) { /* BitType */
     case TUSB_REQ_TYPE_STANDARD:  /* 0 */
       break;
-    case TUSB_REQ_TYPE_CLASS:  /* 1 */
+    case TUSB_REQ_TYPE_CLASS:     /* 1 */
       if (request->bRequest == WEBUSB_COMMAND) {
         DBG("request->bRequest == WEBUSB_COMMAND\n");
         if (request->wValue == WEBUSB_RESET) {
@@ -482,7 +490,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
         return tud_control_status(rhport, request);
       }
       break;
-    case TUSB_REQ_TYPE_VENDOR:  /* 2 */
+    case TUSB_REQ_TYPE_VENDOR:    /* 2 */
       switch (request->bRequest) {
         case VENDOR_REQUEST_WEBUSB:
           /* Match vendor request in BOS descriptor
