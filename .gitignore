@@ -2,18 +2,20 @@
 *
 
 # extensions
-!*.md
+!*.adoc
 !*.c
 !*.cpp
 !*.h
-!*.pio
-!*.ld
-!*.jpg
-!*.xcf
-!*.png
-!*.pdf
 !*.html
+!*.jpg
+!*.ld
+!*.md
+!*.mp3
+!*.pdf
+!*.pio
+!*.png
 !*.rules
+!*.xcf
 !*.yml
 !*.zip
 
@@ -28,7 +30,9 @@
 !.github/**
 !src
 !src/pio
+!doc
 !images
+!media
 !resources
 !examples
 !examples/cloje64
