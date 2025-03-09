@@ -1,7 +1,7 @@
 ![USBSID-Pico](images/pcbv1.0.jpg)<br>
 ![USBSID-Pico](images/usbsid.png)![LouD](images/loud.png)
 # USBSID-Pico
-USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2 (RP2350) based board for interfacing one or two MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer, phone, ASID supporting player or USB midi controller.  
+USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board for interfacing one or two MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer, phone, ASID supporting player or USB midi controller.  
 
 * [Features](#features)
 * [Questions & Support](#questions-and-support)
@@ -9,11 +9,12 @@ USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2 (RP2350) based board for interf
 * [Firmware](#firmware)
   * [Firmware versions](#firmware-versions)
   * [How to flash new firmware](#how-to-flash)
+  * [Known issues](#known-issues)
+* [Important PCB information](#important-pcb-information)
 * [Hardware](#hardware)
   * [Where to buy](#where-to-buy)
-  * [Schematic and BOM](#schematic-and-bom)
   * [Cases](#cases)
-* [Important PCB information](#important-pcb-information)
+  * [Schematic and BOM](#schematic-and-bom)
 * [PCB in action](#usbsid-pico-in-action)
 * [Software examples](#software)
   * [Pre compiled Vice binaries](#precompiled-vice-binaries)
@@ -31,10 +32,12 @@ Out-of-the box playing is supported by using [Deepsid by Chordian](https://deeps
 by selecting `WebUSB (Hermit)` as player in the pulldown menu or  
 by selecting `ASID (MIDI)` as player in the pulldown menu.  
 Out-of-the box playing is also supported by using [C64jukebox by Kenchis](https://haendel.ddns.net:8443/static/c64jukebox.vue), note that this is still in BETA.  
-[SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux with up to 4 SIDs supported.  
-Unofficial support is added to a fork of [Vice](https://github.com/LouDnl/Vice-USBSID), up to 3 SIDs are supported in vsid and up to 4 in xs64.  
+[SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux & Windows with up to 4 SIDs supported (Windows version is buggy).  
+Unofficial support is added to a fork of [Vice](https://github.com/LouDnl/Vice-USBSID), up to 3 SIDs are supported in vsid and up to 4 in x64sc.  
 Unofficial support is added to a fork of [sidplayfp]() which requires a fork of [libsidplayfp]().  
 Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouDnl/RetroDebugger), up to 4 SIDs are supported.
+##### Amiga
+[erique](https://github.com/erique) and [koobo](https://github.com/koobo) have added support to [playsid](https://github.com/erique/playsid.library)
 ##### C64 Music trackers
 You should be able to use the ASID fork of [sidfactory2](https://github.com/Chordian/sidfactory2/tree/asid-support) without issues.  
 When using Vice or RetroDebugger you can freely use applications like [SID-Wizard](https://sourceforge.net/projects/sid-wizard/) for music creation.
@@ -88,23 +91,53 @@ You can test your board with WebUSB and ASID here: [USBSID](https://usbsid.louda
 If needed you can change your USBSID configuration after selecting WebUSB and clicking on `Open config`.  
 <img src="images/usbsidpico-config-dark.png" width="300px"><img src="images/usbsidpico-config-light.png" width="300px"><br>
 _The player is set up with some borrowed code from Deepsid using Hermit's JsSID implementation._
+
 #### Debug functions
 For testing purposes only you can use the debug functions available on the [USBSID Debug](https://usbsid.loudai.nl/?player=webusb&debug=usbsidpico) site.
+
 ### Supported platforms
 _In development_  
 Linux: Vice, RetroDebugger, SidBerry, SidplayFp, JSidplay2, USB Midi, ASID (in webbrowser) SID Play  
-Windows: Vice  
-Windows/Android: USB Midi, ASID (in webbrowser) SID Play
+Windows: Vice, SidBerry, USB Midi, ASID (in webbrowser) SID Play  
+Android: USB Midi, ASID (in webbrowser) SID Play
+
+### Linux Udev rules
+In the [examples/udev](repo/examples/udev-rules/69-usbsid-permissions.rules) directory you can find the udev rules that I use on Linux. This purely an example file that you can use and change to your own needs.  
+Steps required for this to work
+```bash
+  # Check if you are in the plugdev group
+  groups  # should show the plugdev group
+  # Copy the udev ules file to the correct directory
+  sudo cp 69-usbsid-permissions.rules /etc/udev/rules.d
+  # Now reload the udev rules
+  udevadm control --reload-rules && udevadm trigger
+  # Not working? Try reloading the service
+  sudo systemctl restart udev
+```
+
+### Windows driver
+Use [Zadig](https://zadig.akeo.ie/) to install the correct driver for USBSID-Pico.  
+<img src="images/zadig-list-all-devices.png" width="200px">
+<img src="images/zadig-install-driver.png" width="200px">  
+Then configure check, configure and test your board on the [USBSID](https://usbsid.loudai.nl/?player=webusb) config tool website  
+<img src="images/usbsid-config-connect.png" width="200px">
+<img src="images/usbsid-config-checkversion.png" width="200px">  
 
 # Firmware
 See the [firmware changelog](CHANGELOG.md) for more information on what's changed and previous releases.
 ### Firmware versions
-Use `usbsidpico.uf2` for Pico1 regular green rp2040 Pico boards.  
-Use `usbsidpico-rgb.uf2` for Pico1 black clone rp2040 Pico boards with RGB LED onboard.  
-Use `usbsidpico_w.uf2` for PicoW regular green rp2040 PicoW boards.  
-Use `usbsidpico2.uf2` for Pico2 regular green rp2350 Pico2 boards.  
+Check your PCB revision, this is under the MOS logo and next to __USBSID-Pico__ on your PCB.  
+Firmware filenames containing `v1.0` are for PCB revision __v1.0__ and filenames containing `v1.3` are for PCB revision __v1.3__. Don't worry if you use the incorrect version, this causes no harm.  
+<sub>(The X.X in each filename equals for the PCB revision)</sub>  
+
+`usbsidpico-v1.X.uf2` for Pico1 regular green rp2040 Pico boards.  
+`usbsidpico-rgb-v1.X.uf2` for Pico1 black clone rp2040 Pico boards with RGB LED onboard.  
+`usbsidpico_w-v1.X.uf2` for PicoW regular green rp2040 PicoW boards.  
+`usbsidpico2-v1.X.uf2` for Pico2 regular green rp2350 Pico2 boards.  
+`usbsidpico2_w-v1.X.uf2` for Pico2W regular green rp2350 Pico2W boards.  
 **WARNING!** Do _NOT_ use the RGB firmware for any of the (non black) rp2040 or rp2350 Pico boards that do not contain an RGB LED.
 ### How to flash
+_<ins>**NOTE**: When flashing a new firmware version, all previously configured settings will be reset to default. Use the commandline configtool to save your current settings to a `ini` file if you want to save them!</ins>_  
 A Raspberry Pi Pico board is incredibly easy to flash, as it comes with a built in bootloader for flashing new firmwares in the `uf2` format. 
 In order to flash a new firmware to your USBSID-Pico you will need to put the Pico into bootloader mode. This can be done in 2 ways:
 1. While the Pico is seated on the USBSID-Pico board and with the USB cable plugged into your computer and the Pico do the following:
@@ -112,40 +145,43 @@ In order to flash a new firmware to your USBSID-Pico you will need to put the Pi
 	- Press and release the `RST` button on the USBSID-Pico board.
 	- Now release the `BOOTSEL` button.
 	- A new drive should appear on your computer called `RPI-RP2`.
-	- Copy the correct `uf2` firmware file to this folder.
+	- Copy the correct `uf2` firmware file to this directory.
 	- After copying the Pico will reboot and your Pico is flashed.
 2. When flashing a Pico that is not seated on the board do the following:
 	- Plug in the USB cable to your Pico and not into your computer.
 	- While holding the `BOOTSEL` button on the Pico plugin the other end of the USB cable into your computer.
 	- Now release the `BOOTSEL` button.
 	- A new drive should appear on your computer called `RPI-RP2`.
-	- Copy the correct `uf2` firmware file to this folder.
+	- Copy the correct `uf2` firmware file to this directory.
 	- After copying the Pico will reboot and your Pico is flashed.
 ### Firmware features
 The firmware is still in development so features might change, be added or removed.
 - By default both sockets are enabled and the configuration is set to 2 SID's.
 - Custom CDC protocol for playing SID files or usage with emulators
 - WebUSB support using the same CDC protocol for WebUSB supporting players
+  - Play SID files in your browser via [Deepsid](https://deepsid.chordian.net/) by Chordian
+  - Play SID files in your browser via [C64jukebox](https://haendel.ddns.net:8443/static/c64jukebox.vue) by Kenchis
 - Midi (in) ASID support (heavily inspired by multiple sources)
   - Play SID files in your (midi supporting) browser via [Deepsid](https://deepsid.chordian.net/) by Chordian
   - Play SID files in your (midi supporting) browser via [IneSID](https://inesid.fazibear.me/) by Fazibear
 - Midi device support over USB
   - Use your USBSID-Pico as Synth with your Midi controller
 - Two SID sockets with up to 4 SID's (e.g. SKPico) supported
-  - Socket one address range $00 ~ $3F (default $00 ~ $1F)
-  - Socket two address range $20 ~ $7F (default $20 ~ $3F)
-  - Configurable (platform independent (Linux/Windows) tool still in development)
+  - Socket one address range $00 ~ $7F (default $00 ~ $1F) auto based on configuration settings
+  - Socket two address range $00 ~ $7F (default $40 ~ $7F) auto based on configuration settings
+  - Configurable via [config-tool](repo/examples/config-tool) for Linux (Windows still in development)
 - Onboard LED acts as VU meter calculated by the voices of SID1 (Pico & Pico2 only)
 - Onboard RGB LED acts as second VU meter calculated by the voices of SID1 (default)
   - Requires Black Pico clone board with RGB LED onboard!
   - SID voices to use for calculation can be changed in config
 - Uses the [TinyUSB](https://github.com/hathach/tinyusb) stack
-### ISSUES that need addressing (Any help is welcome)
+### Known issues
 * Digiplay is better in Vice then SidplayFp at the moment.  
   While not yet at 100%, most tunes will play!  
   See the [discussion](https://github.com/LouDnl/USBSID-Pico/discussions/1) about this.
 ### Building
-You can build the firmware using the Pico SDK 2.0.0 and TinyUSB from it's Github repo, not the one included in the SDK!
+You can build the firmware using the Pico SDK 2.1.0 and the included TinyUSB. Be sure to clone the SDK with `--recurse-submodules`.  
+After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py PICO_PLATFORM` where PICO_PLATFORM is either rp2040 or rp2350 depending on the board you are using.
 
 # Hardware
 ### Where to buy
@@ -154,11 +190,48 @@ You can build the firmware using the Pico SDK 2.0.0 and TinyUSB from it's Github
 Click [this link](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/) to go to their product page
 #### PCBWay
 At a minimum of 5 bare or assembled boards it is also possible to purchase at [PCBWay here](https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html).  
-#### Me (while I still have boards)
-While still available you can purchase assembled boards minus Pico from me - send me a message on any of my socials.  
+No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral link](https://pcbway.com/g/2458i7) to register, thanks!
+#### Me (when I have boards)
+If available you can purchase (semi) assembled boards minus Pico from me - send me a message on any of my socials.  
+
+## Important PCB information
+PCB revision v1.0
+- [View jumper information (online)](doc/PCBv1.0-INFO.adoc)
+- [View jumper information (PDF download)](doc/PCBv1.0-INFO.pdf)
+
+PCB revision v1.3
+- _N/A_
+
+## Cases
+All USBSID-Pico community created cases are available in the [cases](cases/) directory, direct links below.  
+_Cases for PCB revision v1.0:_
+* [Cartridge case](cases/spotUP/USBSID-Pico_Case.zip) by @spotUP
+* [boxy case](repo/cases/schorsch3000/usbsidpico-case-box.tgz) by @schorsch3000
+
+_Cases for PCB revision v1.3:_
+* None yet, sorry!
 
 ### Schematic and BOM
 If you want and are up to it you can create your own development board by using the provided [schematic](resources/v1.0-schematic.pdf) and [interactive BOM](https://loudnl.github.io/).
+### PCB Features ~ v1.3
+Includes all features from v1.0 except the audio jumper
+- IO controlled Stereo/Mono switch, can be set in config or toggled during play
+- Supports mixed voltage!
+  e.g. you can use one MOS6581 (12v) together with one MOS6582 (9v) or MOS8580 (9v)
+- Voltage is jumper controlled
+- SID socket placement is more spread out for:
+  - easier filter capacitor access
+  - more room for FPGA SID
+  - optional ZIF sockets
+- 3 voltage regulators for filtered voltages to the SIDS
+  - 1x fixed 5 volts and 2x 9 volts or 12 volts
+- Better IO port layout
+  - Unused GPIO pins for optional expansion boards
+  - IO5/8 pins for quad SID configuration
+  - Uart pins
+  - SID Ext in pins (requires closing the solder jumper on the bottom)
+  - Ground pin
+  - New soldermask art ;)
 ### PCB Features ~ v1.0
 - Supports all MOS SID chips e.g. MOS6581, MOS6582 & MOS8580
 - Supports SID chip replacements e.g. [SIDKick-Pico](https://github.com/frntc/SIDKick-pico), [SwinSID](https://github.com/dmantione/swinsid), ARMSID (untested), FPGASID (untested)
@@ -177,77 +250,27 @@ If you want and are up to it you can create your own development board by using 
   - SID1 audio left & SID2 audio right
 - Optional EXT-IN pulldown resistor as filter bypass to reduce filter noise for Digiplay on 8580 SID's
 ### PCB Development
+* v1.3 release board<br>
+  __N/A__
+* v1.2 testboard<br>
+  [<img src="images/v1.2-top.png" width="30%">](images/v1.2-top.png) 
+* v1.1 unfinished and skipped
 * v1.0 release board<br>
-  <img src="images/v1.0-top.png" width="30%">
+  [<img src="images/v1.0-top.png" width="30%">](images/v1.0-top.png) 
 * v0.2 improved testboard<br>
-  <img src="images/v0.2-top.png" width="30%">
+  [<img src="images/v0.2-top.png" width="30%">](images/v0.2-top.png) 
 * v0.1 testboard<br>
-  <img src="images/v0.1-top.png" width="30%">  
-
-## Cases
-All USBSID-Pico community created cases are available in the [cases](cases/) folder, direct links below.
-* [Cartridge case](cases/spotUP/USBSID-Pico_Case.zip) by @spotUP
-
-## Important PCB information
-[<img src="images/v1.0-explained.png" width="30%">](images/v1.0-explained.png)<br/>
-_Click image for larger view_
-1. 12 volt or 9 volt selection jumper  
-  ![Voltage jumper](images/voltage-jumper-smaller.png)
-  - open = 12 volt (for 6581 SID only!!)
-  - closed = 9 volt (for 8580 SID)
-2. Socket 2 6581 / 8580 SID type selection jumpers  
-  ![SID2 selection jumper](images/SID2-jumper-smaller.png)
-  - both closed left = 6581
-  - both closed right = 8580
-3. Socket 1 6581 / 8580 SID type selection jumpers  
-  ![SID1 selection jumper](images/SID1-jumper-smaller.png)
-  - both closed left = 6581
-  - both closed right = 8580
-4. Audio channel selection jumper  
-  ![Audio jumper](images/audio-jumper-smaller.png)
-  - closed on Socket 1 side = left & right channel for socket 1
-  - closed on Socket 2 side = left channel for socket 2 & right channel for socket 1
-5. Address line A5 for adressess above $1F (SKPico 2nd SID for example)  
-  ![Address 5 pins](images/A5-pins-smaller.png)
-  - both pins are routed to the same GPIO for using adresses higher then $20
-6. Uart debugging output port  
-  ![UART port](images/uart-port-smaller.png)
-  - TX on the right
-  - RX on the left
-7. Optional 330k pulldown resistor hooked up to EXT-IN for 8580 filter bypass in socket 2  
-    ![EXTIN bypass](images/SID2-extin-bypass-smaller.png)
-  - solder closed = enabled
-8. Optional 330k pulldown resistor hooked up to EXT-IN for 8580 filter bypass in socket 1  
-  ![EXTIN bypass](images/SID1-extin-bypass-smaller.png)
-  - solder pad closed = enabled
-9. Optional 1MHz crystal socket (not included in BOM)  
-  ![Optional Crystal](images/optional-crystal-smaller.png)
-  - solder pad closed = enabled (when a crystal is socketed) 
-  - this disables the internal clock generation on the Pico
-10. Optional 1k resistor for 6581 SID in socket 2
-  - **ATTENTION!**: _This solder pad label is incorrect, it should read 6581!_  
-  ![6581 jumper](images/SID2-audio-solderjumper-smaller.png)
-  - solder pad closed = enabled
-11. Optional 1k resistor for 6581 SID in socket 2
-  - **ATTENTION!**: _This solder pad label is incorrect, it should read 6581!_  
-  ![6581 jumper](images/SID1-audio-solderjumper-smaller.png)
-  - solder pad closed = enabled
-12. Socket 2 audio out via dupont connector  
-  ![Audio out](images/audio-out-smaller.png)
-  - Ground and S2 as labeled
-13. Socket 1 audio out via dupont connector  
-  ![Audio out](images/audio-out-smaller.png)
-  - Ground and S1 as labeled
-14. Reset button  
-  ![Reset button](images/reset-button-smaller.png)
+  [<img src="images/v0.1-top.png" width="30%">](images/v0.1-top.png) 
 
 # Examples
 ### USBSID-Pico in action
 While in development any videos and/or audio links are subject to be changed or updated.
+#### Audio recordings
+[Reed's Flamethrower](media/Reed-Flamethrower.mp3)
 #### MOS8580 chip
-| **Layers<br>Finnish Gold** | **Mojo<br>Bonzai & Pretzel Logic** | **Spy vs Spy II<br>The Island Caper** |
-|:-:|:-:|:-:|
-| [![MOS8580](https://img.youtube.com/vi/UQVDTNV3mgs/1.jpg)](https://www.youtube.com/watch?v=UQVDTNV3mgs) | [![MOS8580](https://img.youtube.com/vi/lXxlArB3VS4/1.jpg)](https://www.youtube.com/watch?v=lXxlArB3VS4) | [![MOS8580](https://img.youtube.com/vi/B4iYnZELbSc/1.jpg)](https://www.youtube.com/watch?v=B4iYnZELbSc) |
+| **Codeboys & Endians** | **No Limit** |
+|:-:|:-:|
+| [![MOS8580](https://img.youtube.com/vi/sSDsOih1Wbw/1.jpg)](https://www.youtube.com/watch?v=sSDsOih1Wbw)<br><small><sub>by Booze Design</sub></small> | [![MOS8580](https://img.youtube.com/vi/hJit04tWUaM/1.jpg)](https://www.youtube.com/watch?v=hJit04tWUaM)<br><small><sub>Quantum tracker demo</sub></small> |
 
 Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-29KQ), [other socials](https://github.com/LouDnl) or the [SHOWCASE](SHOWCASE.md) page to see more examples.
 ### Software
@@ -260,8 +283,7 @@ _Available examples with USBSID-Pico support:_<br>
 [**RetroDebugger**](https://github.com/LouDnl/RetroDebugger) fork is available @ https://github.com/LouDnl/RetroDebugger<br>
 [**playsid.library**](https://github.com/erique/playsid.library) Amiga implementation is available @ https://github.com/erique/playsid.library<br>
 ### Precompiled Vice binaries
-**NOTE: Pre compiled binaries are out of date at the moment sorry!**  
-Pre compiled Vice binaries are available in my fork @ https://github.com/LouDnl/Vice-USBSID/tree/main/builds
+Pre compiled Vice binaries are available in my fork @ https://github.com/LouDnl/Vice-USBSID/releases
 
 # Acknowledgements
 Special thanks goes out to [Tobozo](https://github.com/tobozo/) for making the USBSID-Pico logo and for his (mental🤣) support since starting this project.  

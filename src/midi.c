@@ -1,7 +1,7 @@
 /*
- * USBSID-Pico is a RPi Pico (RP2040) based board for interfacing one or two
- * MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer,
- * phone or ASID supporting player
+ * USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board
+ * for interfacing one or two MOS SID chips and/or hardware SID emulators over
+ * (WEB)USB with your computer, phone or ASID supporting player
  *
  * midi.c
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
@@ -45,9 +45,6 @@ extern uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t addre
 /* ASID externals */
 extern void process_sysex(uint8_t *buffer, int size);
 
-/* Util externals */
-extern long map(long x, long in_min, long in_max, long out_min, long out_max);
-
 /* Config externals */
 extern Config usbsid_config;
 extern int numsids;
@@ -64,8 +61,7 @@ int voice = 0;
 int curr_midi_channel;  /* For use in config.c */
 // int freevoice = 0;
 
-void midi_bus_operation(uint8_t a, uint8_t b);
-
+/* Initialize the midi handlers */
 void midi_init(void)
 {
   /* Clear buffers once */
@@ -924,10 +920,10 @@ void process_midi(uint8_t *buffer, int size)
     midimachine.channel_states[channel][sidno][MODVOL]);  // 18
 }
 
-int stream_size;
-
-void process_buffer(uint8_t buffer)
-{ /* ISSUE: Processing the stream byte by byte makes it prone to latency */
+/* Processes a 1 byte incoming midi buffer
+ * Figures out if we're receiving midi or sysex */
+void midi_buffer_task(uint8_t buffer)
+{
   if (midimachine.index != 0) {
     if (midimachine.type != SYSEX) MIDBG(" [B%d]$%02x#%03d", midimachine.index, buffer, buffer);
   }
@@ -937,6 +933,7 @@ void process_buffer(uint8_t buffer)
       /* System Exclusive */
       case 0xF0:  /* System Exclusive Start */
         if (midimachine.bus != CLAIMED && midimachine.type == NONE) {
+          dtype = asid; /* Set data type to ASID */
           midimachine.state = RECEIVING;
           midimachine.type = SYSEX;
           midimachine.bus = CLAIMED;
@@ -947,6 +944,7 @@ void process_buffer(uint8_t buffer)
         break;
       case 0xF7:  /* System Exclusive End of SysEx (EOX) */
         if (midimachine.bus == CLAIMED && midimachine.type == SYSEX) {
+          dtype = asid; /* Set data type to ASID */
           midimachine.streambuffer[midimachine.index] = buffer;
           midimachine.index++;
           process_sysex(midimachine.streambuffer, midimachine.index);
@@ -973,6 +971,7 @@ void process_buffer(uint8_t buffer)
       /* Midi 2 Bytes per message */
       case 0xC0 ... 0xCF:  /* Channel 0~16 Program (Patch) change */
       case 0xD0 ... 0xDF:  /* Channel 0~16 Pressure (After-touch) */
+        dtype = midi; /* Set data type to midi */
         midi_bytes = 2;
         if (midimachine.bus != CLAIMED && midimachine.type == NONE) {
           if (midimachine.index == 0) MIDBG("[M][B%d]$%02x#%03d", midimachine.index, buffer, buffer);
@@ -990,6 +989,7 @@ void process_buffer(uint8_t buffer)
       case 0xA0 ... 0xAF:  /* Channel 0~16 Polyphonic Key Pressure (Aftertouch) */
       case 0xB0 ... 0xBF:  /* Channel 0~16 Control/Mode Change */
       case 0xE0 ... 0xEF:  /* Channel 0~16 Pitch Bend Change */
+        dtype = midi; /* Set data type to midi */
         midi_bytes = 3;
         if (midimachine.bus != CLAIMED && midimachine.type == NONE) {
           if (midimachine.index == 0) MIDBG("[M][B%d]$%02x#%03d", midimachine.index, buffer, buffer);
@@ -1035,10 +1035,10 @@ void process_buffer(uint8_t buffer)
 }
 
 void process_stream(uint8_t *buffer, size_t size)
-{
+{ /* ISSUE: Processing the stream byte by byte makes it more prone to latency */
   int n = 0;
   while (1) {
-    process_buffer(buffer[n++]);
+    midi_buffer_task(buffer[n++]);
     if (n == size) return;
   }
 }

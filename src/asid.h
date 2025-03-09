@@ -1,7 +1,7 @@
 /*
- * USBSID-Pico is a RPi Pico (RP2040) based board for interfacing one or two
- * MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer,
- * phone or ASID supporting player
+ * USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board
+ * for interfacing one or two MOS SID chips and/or hardware SID emulators over
+ * (WEB)USB with your computer, phone or ASID supporting player
  *
  * asid.h
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
@@ -44,6 +44,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+
+/* FMOPL ~ Really, CAPSLOCK ONLY HUH? */
+#define MAX_FM_REG_PAIRS 16
+#define OPL_REG_ADDRESS 0x00
+#define OPL_REG_DATA 0x10
 
 
 /* SID Register order for ASID */

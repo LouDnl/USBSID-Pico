@@ -1,7 +1,7 @@
 /*
- * USBSID-Pico is a RPi Pico (RP2040) based board for interfacing one or two
- * MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer,
- * phone or ASID supporting player
+ * USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board
+ * for interfacing one or two MOS SID chips and/or hardware SID emulators over
+ * (WEB)USB with your computer, phone or ASID supporting player
  *
  * usbsid.h
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
@@ -65,18 +65,10 @@
 #include "hardware/vreg.h"
 
 /* TinyUSB libs */
-#if __has_include("bsp/board_api.h") /* Needed to account for update in tinyUSB */
-#include "bsp/board_api.h"
-#else
-#include "bsp/board.h"       /* Tiny USB Boards Abstraction Layer */
-#endif
+#include "bsp/board_api.h"   /* Tiny USB Board Porting API */
 #include "tusb.h"            /* Tiny USB stack */
 #include "tusb_config.h"     /* Tiny USB configuration */
 
-/* RGBLED */
-#if defined(USE_RGB)
-#include "ws2812.pio.h"      /* RGB led handler */
-#endif
 
 /* Maximum incoming and outgoing USB (CDC/WebUSB) buffer size
  * NOTE: 64 byte zero padded packets take longer to process
@@ -121,19 +113,6 @@
  *
  */
 #define BYTES_TO_SEND 1
-
-/* LED breathe levels */
-enum
-{
-  ALWAYS_OFF = 99999,
-  ALWAYS_ON = 0,
-  CHECK_INTV = 100,
-  MAX_CHECKS = 200,  /* 200 checks times 100ms == 20 seconds */
-  BREATHE_INTV = 1,
-  BREATHE_STEP = 100,
-  VU_MAX = 65534,
-  HZ_MAX = 40
-};
 
 
 #ifdef __cplusplus

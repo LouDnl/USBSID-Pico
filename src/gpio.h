@@ -1,7 +1,7 @@
 /*
- * USBSID-Pico is a RPi Pico (RP2040) based board for interfacing one or two
- * MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer,
- * phone or ASID supporting player
+ * USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board
+ * for interfacing one or two MOS SID chips and/or hardware SID emulators over
+ * (WEB)USB with your computer, phone or ASID supporting player
  *
  * gpio.h
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
@@ -46,15 +46,19 @@
 #endif
 
 /* Hardware api's */
-#include "hardware/gpio.h"
-#include "hardware/pio.h"          /* Programmable I/O (PIO) API */
-#include "hardware/dma.h"          /* DMA Controller API */
-#include "hardware/pwm.h"          /* Hardware Pulse Width Modulation (PWM) API */
-#include "hardware/irq.h"          /* Hardware interrupt handling */
+#include "hardware/gpio.h"   /* General Purpose Input/Output (GPIO) API */
+#include "hardware/pio.h"    /* Programmable I/O (PIO) API */
+#include "hardware/dma.h"    /* DMA Controller API */
+#include "hardware/pwm.h"    /* Hardware Pulse Width Modulation (PWM) API */
+#include "hardware/irq.h"    /* Hardware interrupt handling */
 
 /* PIO */
 #include "bus_control.pio.h" /* Busje komt zo! */
-#include "clock.pio.h"       /* Square wave generator */
+#include "clock.pio.h"       /* TikTak */
+#include "vu.pio.h"          /* Kiem em goan! */
+#if defined(USE_RGB)
+#include "vu_rgb.pio.h"      /* Ik zie regenbogen! */
+#endif
 
 /* Uart */
 #define BAUD_RATE 115200
@@ -86,6 +90,11 @@
 #define CS2 21  /* Chip Select for 2 or 3 & 4 with SKPico */
 #define PHI 22  /* Pico 1Mhz PWM out ~ External Clock In */
 
+/* Audio switch (v1.3+ only) */
+#if defined(HAS_AUDIOSWITCH)
+#define AU_SW 15
+#endif
+
 /* LED */
 #if defined(PICO_DEFAULT_LED_PIN)
 #define BUILTIN_LED PICO_DEFAULT_LED_PIN  /* 25 */
@@ -94,12 +103,14 @@
 #endif
 
 #if defined(USE_RGB)
-#define WS2812_PIN 23
+#define WS2812_PIN 23  /* Only available on black clones with RGB LED onboard! */
 #endif
 
 /* Unused */
 #define NIL0 14
+#ifndef HAS_AUDIOSWITCH
 #define NIL1 15
+#endif
 #define NIL2 26
 #define NIL3 27
 #define NIL4 28
@@ -108,7 +119,14 @@
 #define PIO_PINDIRMASK 0x3C3FFF  /* 0b00000000001111000011111111111111 18 GPIO pins */
 
 /* Util */
-#define bPIN(i) ( 1 << i )
+#define bPIN(P) (1 << P)
+#define sPIN(P) { sio_hw->gpio_set  = (1 << P); }
+#define cPIN(P) { sio_hw->gpio_clr  = (1 << P); }
+#define tPIN(P) { sio_hw->gpio_togl = (1 << P); }
+
+/* IRQ's */
+#define PIO_IRQ0 0
+#define PIO_IRQ1 1
 
 
 #ifdef __cplusplus

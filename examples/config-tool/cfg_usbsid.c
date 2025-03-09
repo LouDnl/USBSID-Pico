@@ -1,7 +1,7 @@
 /*
- * USBSID-Pico is a RPi Pico (RP2040) based board for interfacing one or two
- * MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer,
- * phone or ASID supporting player
+ * USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board
+ * for interfacing one or two MOS SID chips and/or hardware SID emulators over
+ * (WEB)USB with your computer, phone or ASID supporting player
  *
  * cfg_usbsid.c
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
@@ -34,6 +34,7 @@
 #include <string.h> // `strerror(errno)`
 #include <ctype.h>
 #include <stdbool.h>
+#include <time.h>
 #include <libusb.h>
 
 #include "inih/ini.h"
@@ -60,7 +61,8 @@ static int usid_dev = -1;
 /* -----USBSID-Pico------ */
 
 /* init local usbsid-pico variables */
-static const enum config_clockrates clockrates[] = { DEFAULT, PAL, NTSC, DREAN };
+static const enum config_clockrates clockrates[] = { DEFAULT, PAL, NTSC, DREAN, NTSC2 };
+static uint32_t read_clock_rate;
 static char version[64] = {0};
 static char project_version[64] = {0};
 static uint8_t config[256] = {0};
@@ -70,7 +72,7 @@ static Config usbsid_config = USBSID_DEFAULT_CONFIG_INIT;
 /* -----SIDKICK-pico----- */
 
 /* init local skpico variables */
-static uint8_t skpico_config[64] = {0};
+static uint8_t skpico_config[64] = {0xFF};
 static uint8_t base_address = 0x0;
 static int sid_socket = 1;
 
@@ -112,6 +114,10 @@ static int import_ini(void* user, const char* section, const char* name, const c
   #define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
   if (MATCH("General", "clock_rate")) {
     ini_config->clock_rate = atoi(value);
+  }
+  if (MATCH("General", "lock_clockrate")) {
+    p = value_position(value, truefalse);
+    if (p != 666) ini_config->lock_clockrate = p;
   }
   if (MATCH("socketOne", "enabled")) {
     p = value_position(value, truefalse);
@@ -173,7 +179,7 @@ static int import_ini(void* user, const char* section, const char* name, const c
     p = value_position(value, truefalse);
     if (p != 666) ini_config->LED.idle_breathe = p;
   }
-  if (MATCH("RGLED", "enabled")) {
+  if (MATCH("RGBLED", "enabled")) {
     p = value_position(value, enabled);
     if (p != 666) ini_config->RGBLED.enabled = p;
   }
@@ -189,6 +195,17 @@ static int import_ini(void* user, const char* section, const char* name, const c
     p = atoi(value);
     if (p >= 1 && p <= 4) ini_config->RGBLED.sid_to_use = p;
   }
+  if (MATCH("FMOPL", "enabled")) {
+    p = value_position(value, enabled);
+    if (p != 666) ini_config->FMOpl.enabled = p;
+  }
+  if (MATCH("Audioswitch", "set_to")) {
+    p = value_position(value, mono_stereo);
+    if (p != 666) ini_config->stereo_en = p;
+  }
+  if (debug == 1) {
+    printf("SECTION: %s NAME: %s VALUE: %s\n", section, name, value);
+  }
   return 1;
 }
 
@@ -201,6 +218,8 @@ void write_config_ini(Config * config, char * filename)
     fprintf(f, "version = v%s\n", (project_version[0] == 0 ? "0.0.0-DEFAULT.19000101" : project_version + 1));
     fprintf(f, "; Possible clockrates: %d, %d, %d, %d\n", DEFAULT, PAL, NTSC, DREAN);
     fprintf(f, "clock_rate = %d\n", config->clock_rate);
+    fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
+    fprintf(f, "lock_clockrate = %s\n", truefalse[config->lock_clockrate]);
     fprintf(f, "\n");
     fprintf(f, "[socketOne]\n");
     fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
@@ -253,6 +272,14 @@ void write_config_ini(Config * config, char * filename)
     fprintf(f, "brightness = %d\n", config->RGBLED.brightness);
     fprintf(f, "; Possible sids to use are 1, 2, 3 or 4\n");
     fprintf(f, "sid_to_use = %d\n", config->RGBLED.sid_to_use);
+    fprintf(f, "\n");
+    fprintf(f, "[FMOPL]\n");
+    fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
+    fprintf(f, "enabled = %s\n", truefalse[config->FMOpl.enabled]);
+    fprintf(f, "\n");
+    fprintf(f, "[Audioswitch]\n");
+    fprintf(f, "; Possible options: %s, %s\n", mono_stereo[0], mono_stereo[1]);
+    fprintf(f, "set_to = %s\n", mono_stereo[config->stereo_en]);
     fprintf(f, "\n");
     fclose(f);
   };
@@ -405,7 +432,9 @@ void save_config(int reboot)
 void write_config(Config * config)
 {
   /* General */
-  write_config_command(SET_CONFIG,0x0,clockspeed_n(config->clock_rate),0,0);
+  write_config_command(SET_CONFIG,0x0,
+    clockspeed_n(config->clock_rate),
+    (int)usbsid_config.lock_clockrate,0);
 
   /* socketOne */
   write_config_command(SET_CONFIG,0x1,0x0,config->socketOne.enabled,0);
@@ -434,6 +463,13 @@ void write_config(Config * config)
   write_config_command(SET_CONFIG,0x4,0x2,config->RGBLED.brightness,0);
   write_config_command(SET_CONFIG,0x4,0x3,config->RGBLED.sid_to_use,0);
 
+  /* FMOpl */
+  write_config_command(SET_CONFIG,0x9,config->FMOpl.enabled,0,0);
+
+  /* Audio switch (works on PCB v1.3+ only) */
+  write_config_command(SET_CONFIG,0xA,config->stereo_en,0,0);
+
+  printf("Sending save config command\n");
   save_config(0);
 
   return;
@@ -456,6 +492,25 @@ void print_cfg_buffer(const uint8_t *buf, size_t len)
   }
   printf("[PRINT CFG BUFFER END]\n");
   return;
+}
+
+void read_sid_clockspeed(void)
+{
+  memset(config_buffer+1, 0, (count_of(config_buffer))-1);
+  config_buffer[1] = 0x57;
+  write_chars(config_buffer, count_of(config_buffer));
+
+  int len;
+  memset(read_data, 0, count_of(read_data));
+  len = read_chars(read_data, count_of(read_data));
+  if (debug == 1) printf("Read %d bytes of data, byte 0 = %02X\n", len, read_data[0]);
+  read_clock_rate = clockrates[read_data[0]];
+  return;
+}
+
+void print_sid_clockspeed(void)
+{
+  printf("USBSID-Pico SID Clockrate is set to: %u\n", read_clock_rate);
 }
 
 void read_version(int print_version)
@@ -483,9 +538,15 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
 {
   static uint32_t clockrate = 0;
   for (int i = 0; i < (int)len; ++i) {
+    if (debug == 1) {
+      printf("BUFF[%d] = %02X\n", i, buff[i]);
+    }
     switch(i) {
       case 0 ... 1:
         continue;
+      case 5:
+        usbsid_config.lock_clockrate = buff[i];
+        break;
       case 6:
         usbsid_config.external_clock = buff[i];
         break;
@@ -564,6 +625,15 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
       case 54:
         usbsid_config.Midi.enabled = buff[i];
         break;
+      case 55:
+        usbsid_config.FMOpl.enabled = buff[i];
+        break;
+      case 56:
+        usbsid_config.FMOpl.sidno = buff[i];
+        break;
+      case 57:
+        usbsid_config.stereo_en = buff[i];
+        break;
       default:
         break;
     }
@@ -610,6 +680,8 @@ void print_config(void)
   } else {
     printf("[CONFIG] SID Clock externl defaults to 1MHz\n");
   }
+  printf("[CONFIG] [CLOCK RATE LOCKED] %s\n",
+    truefalse[(int)usbsid_config.lock_clockrate]);
   printf("[CONFIG] [SOCKET ONE] %s as %s\n",
     enabled[(int)usbsid_config.socketOne.enabled],
     socket[(int)usbsid_config.socketOne.dualsid]);
@@ -651,7 +723,13 @@ void print_config(void)
   printf("[CONFIG] [Midi] %s\n",
     enabled[(int)usbsid_config.Midi.enabled]);
 
-  return;
+  printf("[CONFIG] [FMOpl] %s\n",
+    enabled[(int)usbsid_config.FMOpl.enabled]);
+  printf("[CONFIG] [FMOpl] SIDno %d\n",
+    usbsid_config.FMOpl.sidno);
+  printf("[CONFIG] [AUDIO_SWITCH] %s\n",
+    mono_stereo[(int)usbsid_config.stereo_en]);
+    return;
 }
 
 void sid_autodetect(void)
@@ -923,7 +1001,7 @@ void skpico_save_config(int debug)
 
 void skpico_read_config(int debug)
 {
-  memset(skpico_config, 0, count_of(skpico_config));
+  // memset(skpico_config, 0, count_of(skpico_config));  // Let's keep it 0xFF'd okay?
   if (debug == 1) {
     print_cfg_buffer(skpico_config, count_of(skpico_config));
   }
@@ -933,11 +1011,12 @@ void skpico_read_config(int debug)
   for (int i = 0; i <= 63; ++i) {
     read_buffer[1] = (0x1d + base_address);
     int len;
+    nanosleep((const struct timespec[]){{0, 1000L}}, NULL);  /* Teeny, weeny, usleepy */
     write_chars(read_buffer, 3);
     len = read_chars(read_data, count_of(read_data));
     skpico_config[i] = read_data[0];
     if (debug == 1) {
-      printf("[%s][WR%d]%02X $%02X:%02X\n", __func__, i, read_buffer[0], read_buffer[1], read_data[0]);
+      printf("[%s][R%d]%02X $%02X:%02X\n", __func__, i, read_buffer[0], read_buffer[1], read_data[0]);
     }
   }
 
@@ -1011,6 +1090,8 @@ void print_help_skpico(void)
   printf("  -d,       --debug             : Prints all read write debug information\n");
   printf("  --default-config              : Resets the SKPico to default configuration\n");
   printf("  -sock     --socket            : Set the USBSID-Pico socket to use, defaults to socket 1\n");
+  printf("  -addr     --base-address      : Set the USBSID-Pico base address to use\n");
+  printf("  (-sock and -addr are mutually exclusive, you can choose only one)\n");
   printf("  -r,       --read              : Read and print SIDKICK-pico configuration\n");
   printf("  -w,       --write             : Write single config item to SIDKICK-pico (will read the current config first)\n");
   printf("--[MANUAL CONFIGURATION]--------------------------------------------------------------------------------------------\n");
@@ -1051,11 +1132,23 @@ void config_skpico(int argc, char **argv)
   }
   int debug = 0;
   for (int param_count = 2; param_count < argc; param_count++) {
+    /* -sock and -addr are mutually exclusive! */
     if (!strcmp(argv[param_count], "-sock") || !strcmp(argv[param_count], "--socket")) {
       param_count++;
       sid_socket = atoi(argv[param_count]);
       int socket_base = (sid_socket == 1) ? 0 : (sid_socket == 2) ? 1 : 0;
       base_address = (socket_base * 0x40);
+    }
+    if (!strcmp(argv[param_count], "-addr") || !strcmp(argv[param_count], "--base-address")) {
+      param_count++;
+      uint8_t addr = strtol(argv[param_count], NULL, 16);
+      if (addr == 0x0 || addr == 0x20 || addr == 0x40 || addr == 0x60) {
+        base_address = addr;
+        printf("SIDKICK-pico base address 0x%02X selected\n", base_address);
+      } else {
+        printf("Error, incorrect base address 0x%02X (%u)!\n", addr, addr);
+        goto exit;
+      }
     }
     if (!strcmp(argv[param_count], "-d") || !strcmp(argv[param_count], "--debug")) {
       debug = 1;
@@ -1087,11 +1180,12 @@ void config_skpico(int argc, char **argv)
       param_count++;
       printf("Sending reset SIDs command\n");
       write_command(RESET_SID);
-      printf("Waiting a second for SKPico MCU to settle\n");
-      sleep(1);
+      printf("Waiting a second or two for SKPico MCU to settle\n");
+      sleep(2);
       printf("Read config\n");
       skpico_read_config(debug);
       skpico_end_config_mode(debug);
+      write_command(RESET_SID);
       return;
     }
     if (!strcmp(argv[param_count], "-w") || !strcmp(argv[param_count], "--write")) {
@@ -1237,6 +1331,7 @@ void print_help(void)
   printf("  -reboot,  --reboot-usp        : Reboot USBSID-Pico\n");
   printf("  -boot,    --bootloader        : Reboot USBSID-Pico to the bootloader for firmware upload\n");
   printf("  -skpico   --sidkickpico       : Enter SIDKICK-pico config mode\n");
+  printf("  -config   --config-command    : Send custom config command\n");
   printf("--[DEFAULTS]---------------------------------------------------------------------------------------------------------\n");
   printf("  -defaults,--config-defaults   : Reset USBSID-Pico config to defaults\n");
   printf("--[PRESETS]---------------------------------------------------------------------------------------------------------\n");
@@ -1252,13 +1347,22 @@ void print_help(void)
   printf("--[BASICS]----------------------------------------------------------------------------------------------------------\n");
   printf("  -v,       --version           : Read and print USBSID-Pico firmware version\n");
   printf("  -r,       --read-config       : Read and print USBSID-Pico config settings\n");
+  printf("  -rc,      --read-clock-speed  : Read and print USBSID-Pico SID clock speed\n");
   printf("  -rs,      --read-sock-config  : Read and print USBSID-Pico socket config settings only\n");
+  printf("  -rn,      --read-num-sids     : Read and print USBSID-Pico configured number of SID's only\n");
   printf("  -detect,  --detect-sid-types  : Send SID autodetect command to device, returns the config as with '-r' afterwards\n");
   printf("  -w,       --write-config      : Write single config item to USBSID-Pico (will read the full config first!)\n");
   printf("  -a,       --apply-config      : Apply the current config settings (from USBSID-Pico memory) that you changed with '-w'\n");
   printf("  -s,       --save-config       : Send the save config command to USBSID-Pico\n");
   printf("  -sr,      --save-reboot       : Send the save config command to USBSID-Pico and reboot it\n");
   printf("  -rl,      --reload-config     : Reload the config stored in flash, does not return anything\n");
+  printf("  -sc N,    --set-clock N       : Set and apply USBSID-Pico SID clock speed\n");
+  printf("                                  0: %d, 1: %d, 2: %d, 4: %d\n",
+         CLOCK_DEFAULT, CLOCK_PAL, CLOCK_NTSC, CLOCK_DREAN);
+  printf("  -lc N,    --lock-clockrate N  : Lock and save the clock rate from changing: True (1) False (0)\n");
+  printf("  -tau,     --toggle-audio      : Toggle the mono/stereo audio switch (PCB v1.3+ only!)\n");
+  printf("  -sau,     --set-audio N       : Set and save the mono/stereo audio switch (PCB v1.3+ only!)\n");
+  printf("                                  0: %s, 1:%s\n", mono_stereo[0], mono_stereo[1]);
   printf("--[INI FILE CONFIGURATION]------------------------------------------------------------------------------------------\n");
   printf("  -default, --default-ini       : Generate an ini file with default USBSID-Pico config named `USBSID-Pico-cfg.ini`\n");
   printf("  -export F,--export-config F   : Read config from USBSID-Pico and export it to provided ini file or default in\n");
@@ -1272,12 +1376,17 @@ void print_help(void)
   printf("  -c N,     --sid-clock N       : Change SID clock to\n");
   printf("                                  0: %d, 1: %d, 2: %d, 4: %d\n",
          CLOCK_DEFAULT, CLOCK_PAL, CLOCK_NTSC, CLOCK_DREAN);
+  printf("  -l N,     --lockclockrate N   : Lock the clock rate from changing: True (1) False (0)\n");
   printf("  -led N,   --led-enabled N     : LED is Enabled (1) or Disabled (0)\n");
   printf("  -lbr N,   --led-breathe N     : LED idle breathing is Enabled (1) or Disabled (0)\n");
   printf("  -rgb N,   --rgb-enabled N     : RGBLED is Enabled (1) or Disabled (0)\n");
   printf("  -rgbbr N  --rgb-breathe N     : RGBLED idle breathing is Enabled (1) or Disabled (0)\n");
   printf("  -rgbsid N,--rgb-sidtouse N    : Set the SID number the RGBLED uses (1, 2, 3 or 4)\n");
   printf("  -br N,    --rgb-brightness N  : Set the RGBLED Brightness to N (0 ~ 255)\n");
+  printf("  -fm N,    --fmopl-enabled N   : FMOpl is Enabled (1) or Disabled (0)\n");
+  printf("   (Requires a socket set to Clone chip and chiptype to FMOpl)\n");
+  printf("  -au ,     --audio-switch N    : Set the mono/stereo audio switch (PCB v1.3+ only!)\n");
+  printf("                                  0: %s, 1:%s\n", mono_stereo[0], mono_stereo[1]);
   printf("  -sock N,  --socket N          : Configure socket N ~ 1 or 2\n");
   printf("  The following options additionally require '-sock N'\n");
   printf("  Note that you can only configure 1 socket at a time!\n");
@@ -1382,6 +1491,35 @@ void config_usbsidpico(int argc, char **argv)
       }
       break;
     }
+    if (!strcmp(argv[param_count], "-rc") || !strcmp(argv[param_count], "--read-clock-speed")) {
+      printf("Reading SID clock speed\n");
+      read_sid_clockspeed();
+      printf("Printing SID clock speed\n");
+      print_sid_clockspeed();
+      break;
+    }
+    if (!strcmp(argv[param_count], "-sc") || !strcmp(argv[param_count], "--set-clock")) {
+      param_count++;
+      int clockrate = atoi(argv[param_count]);
+      if(clockrate >= count_of(clockrates)) {
+        printf("%d is not a correct clockrate option!\n", clockrate);
+        goto exit;
+      }
+      printf("Set SID clockrate to %d\n", clockrates[clockrate]);
+      write_config_command(SET_CLOCK, clockrate, 0x0, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-lc") || !strcmp(argv[param_count], "--lock-clockrate")) {
+      param_count++;
+      int lock = atoi(argv[param_count]);
+      if(lock > 1) {
+        printf("%d is not a correct lock clockrate option!\n", lock);
+        goto exit;
+      }
+      printf("Locking and saving the clockrate from being changed\n");
+      write_config_command(LOCK_CLOCK, lock, 0x1, 0x0, 0x0);
+      break;
+    }
     if (!strcmp(argv[param_count], "-rs") || !strcmp(argv[param_count], "--read-sock-config")) {
       if (debug == 1) {
         printf("Printing default socket config\n");
@@ -1393,7 +1531,39 @@ void config_usbsidpico(int argc, char **argv)
       print_socket_config();
       break;
     }
-
+    if (!strcmp(argv[param_count], "-rn") || !strcmp(argv[param_count], "--read-num-sids")) {
+      printf("Reading number of SID's\n");
+      write_config_command(READ_NUMSIDS, 0x0, 0x0, 0x0, 0x0);
+      int len;
+      len = read_chars(read_data, count_of(read_data));
+      if (debug == 1) printf("Read %d byte of data, byte 0 = %02X\n", len, read_data[0]);
+      printf("USBSID-Pico is configured to use %d SID's\n", read_data[0]);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-tau") || !strcmp(argv[param_count], "--toggle-audio")) {
+      printf("Toggling mono/stereo audio switch\n");
+      write_config_command(TOGGLE_AUDIO, 0x0, 0x0, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-sau") || !strcmp(argv[param_count], "--set-audio")) {
+      param_count++;
+      int sw = atoi(argv[param_count]);
+      printf("Set mono/stereo audio switch to '%s' and save config\n", mono_stereo[sw]);
+      write_config_command(SET_AUDIO, sw, 0x1, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-config") || !strcmp(argv[param_count], "--config-command")) {
+      printf("Requires 5 positional config arguments!\n");
+      param_count++;
+      uint8_t cmd = strtol(argv[param_count++], NULL, 16);
+      uint8_t a = strtol(argv[param_count++], NULL, 16);
+      uint8_t b = strtol(argv[param_count++], NULL, 16);
+      uint8_t c = strtol(argv[param_count++], NULL, 16);
+      uint8_t d = strtol(argv[param_count++], NULL, 16);
+      printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", cmd, a, b, c, d);
+      write_config_command(cmd, a, b, c, d);
+      break;
+    }
     if (!strcmp(argv[param_count], "-detect") || !strcmp(argv[param_count], "--detect-sid-types")) {
       printf("Sending autodetect SID's command to USBSID-Pico and reading config\n");
       sid_autodetect();
@@ -1416,10 +1586,40 @@ void config_usbsidpico(int argc, char **argv)
           }
           printf("Set SID clockrate from %d to: %d\n", usbsid_config.clock_rate, clockrates[clockrate]);
           usbsid_config.clock_rate = clockrates[clockrate];
-          write_config_command(SET_CONFIG, 0x0, clockspeed_n(usbsid_config.clock_rate), 0x0, 0x0);
+
+          for (int pcl = 1; pcl < argc; pcl++) {
+            if (!strcmp(argv[pcl], "-l") || !strcmp(argv[pcl], "--lockclockrate")) {
+              pcl++;
+              int lock = atoi(argv[pcl]);
+              if(lock > 1) {
+                printf("%d is not a correct lock clockrate option!\n", lock);
+                goto exit;
+              }
+              usbsid_config.lock_clockrate = pcl;
+            }
+          }
+          write_config_command(SET_CONFIG, 0x0, clockspeed_n(usbsid_config.clock_rate), usbsid_config.lock_clockrate, 0x0);
           continue;
         }
-
+        if (!strcmp(argv[pc], "-au") || !strcmp(argv[pc], "--audio-switch")) {
+          pc++;
+          int sw = atoi(argv[pc]);
+          printf("Set mono/stereo audio switch from '%s' to '%s'\n", mono_stereo[usbsid_config.stereo_en], mono_stereo[sw]);
+          write_config_command(SET_CONFIG, 0xA, sw, 0x0, 0x0);
+          continue;
+        }
+        if (!strcmp(argv[pc], "-fm") || !strcmp(argv[pc], "--fmopl-enabled")) {
+          pc++;
+          int en = atoi(argv[pc]);
+          if(en >= count_of(enabled)) {
+            printf("%d is not an enable option!\n", en);
+            goto exit;
+          }
+          printf("Set FMOpl from %s to: %s\n", enabled[usbsid_config.FMOpl.enabled], enabled[en]);
+          usbsid_config.FMOpl.enabled = en;
+          write_config_command(SET_CONFIG, 0x9, en, 0x0, 0x0);
+          continue;
+        }
         if (!strcmp(argv[pc], "-led") || !strcmp(argv[pc], "--led-enabled")) {
           pc++;
           int en = atoi(argv[pc]);
@@ -1444,7 +1644,6 @@ void config_usbsidpico(int argc, char **argv)
           write_config_command(SET_CONFIG, 0x3, 0x1, en, 0x0);
           continue;
         }
-
         if (!strcmp(argv[pc], "-rgb") || !strcmp(argv[pc], "--rgb-enabled")) {
           pc++;
           int en = atoi(argv[pc]);
@@ -1670,8 +1869,8 @@ void config_usbsidpico(int argc, char **argv)
       print_config();
       printf("Writing config to USBSID-Pico\n");
       write_config(&usbsid_config);
-      printf("Sending save config command\n");
-      save_config(0);
+      /* printf("Sending save config command\n"); */
+      /* save_config(0); */ /* Disabled, already done in write_config() */
       printf("Reading back config from USBSID-Pico for visual verification\n");
       read_config();
       print_config();

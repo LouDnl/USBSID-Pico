@@ -2,16 +2,20 @@
 *
 
 # extensions
-!*.md
+!*.adoc
 !*.c
 !*.cpp
 !*.h
-!*.pio
-!*.jpg
-!*.xcf
-!*.png
-!*.pdf
 !*.html
+!*.jpg
+!*.ld
+!*.md
+!*.mp3
+!*.pdf
+!*.pio
+!*.png
+!*.rules
+!*.xcf
 !*.yml
 !*.zip
 
@@ -26,7 +30,9 @@
 !.github/**
 !src
 !src/pio
+!doc
 !images
+!media
 !resources
 !examples
 !examples/cloje64
@@ -53,6 +59,7 @@
 !examples/sidplayfp
 !examples/USBSID-Pico-driver
 !examples/hardsid-sidblaster
+!examples/udev-rules
 !cases
 !cases/**
 

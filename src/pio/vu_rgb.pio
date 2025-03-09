@@ -1,0 +1,46 @@
+;
+; USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board
+; for interfacing one or two MOS SID chips and/or hardware SID emulators over
+; (WEB)USB with your computer, phone or ASID supporting player
+;
+; vu_rgb.pio
+; This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
+; File author: LouD
+;
+; Copyright (c) 2024-2025 LouD
+;
+; The contents of this file are based upon and heavily inspired by the sourcecode from
+; Source: https://github.com/raspberrypi/pico-examples/blob/master/pio/ws2812/ws2812.pio
+;
+; Any licensing conditions from the above named source automatically
+; apply to this code
+;
+; This program is free software: you can redistribute it and/or modify
+; it under the terms of the GNU General Public License as published by
+; the Free Software Foundation, version 2.
+;
+; This program is distributed in the hope that it will be useful, but
+; WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+; General Public License for more details.
+;
+; You should have received a copy of the GNU General Public License
+; along with this program. If not, see <http://www.gnu.org/licenses/>.
+;
+
+.program vu_rgb
+.side_set 1
+
+.define public T1 3
+.define public T2 3
+.define public T3 4
+
+.wrap_target
+bitloop:
+  out x, 1       side 0 [T3 - 1] ; Side-set still takes place when instruction stalls
+  jmp !x do_zero side 1 [T1 - 1] ; Branch on the bit we shifted out. Positive pulse
+do_one:
+  jmp  bitloop   side 1 [T2 - 1] ; Continue driving high, for a long pulse
+do_zero:
+  nop            side 0 [T2 - 1] ; Or drive low, for a short pulse
+.wrap

@@ -1,0 +1,6 @@
+ACTION=="*", KERNEL=="ttyUSB[0-9]*",MODE="0777", GROUP:="plugdev", TAG+="uaccess"
+ACTION=="*", KERNEL=="ttyACM[0-9]*",MODE="0777", GROUP:="plugdev", TAG+="uaccess"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="cafe", ATTRS{idProduct}=="4011", MODE="0777"
+SUBSYSTEMS=="tty", ATTRS{idVendor}=="cafe", ATTRS{idProduct}=="4011", MODE="0777"
+SUBSYSTEMS=="tty", ATTRS{idVendor}=="cafe", ATTRS{idProduct}=="4011", MODE="0777", SYMLINK+="usbsid%n"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="cafe", ATTRS{idProduct}=="4011", MODE="0777", SYMLINK+="usbsid%n"

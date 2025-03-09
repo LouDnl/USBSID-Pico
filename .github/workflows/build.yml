@@ -4,9 +4,9 @@ env:
   BUILD_THREADS: 4
   BUILD_TYPE: Release
   # Pico-SDK version
-  PICO_SDK_REF: 2.0.0
-  PICO_EXTRAS_REF: sdk-2.0.0
-  PICOTOOL_REF: 2.0.0
+  PICO_SDK_REF: 2.1.0
+  PICO_EXTRAS_REF: sdk-2.1.0
+  PICOTOOL_REF: 2.1.0
 
 on:
   push:
@@ -43,6 +43,12 @@ jobs:
               buildname: Pico2,
               directory: pico2,
               pico_board: pico2,
+              pico_platform: rp2350-arm-s,
+            }
+          - {
+              buildname: Pico2_W,
+              directory: pico2w,
+              pico_board: pico2_w,
               pico_platform: rp2350-arm-s,
             }
 
@@ -89,10 +95,7 @@ jobs:
         run: |
           echo "PICO_SDK_PATH=${{github.workspace}}/pico-sdk" >> $GITHUB_ENV
           cd pico-sdk/lib/tinyusb
-          git checkout master
-          git pull
-          python3 tools/get_deps.py rp2040
-          python3 tools/get_deps.py rp2350
+          python3 tools/get_deps.py ${{matrix.pico_platform}}
 
       - name: 💽 Cache Pico-Extras
         id: cache-pico-extras
@@ -143,7 +146,7 @@ jobs:
         with:
           path: master
 
-      - name: 🏭 Create build folders
+      - name: 🏭 Create build directory
         run: |
           mkdir -p ${{github.workspace}}/master/build_${{matrix.directory}}
 

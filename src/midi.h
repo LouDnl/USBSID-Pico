@@ -1,7 +1,7 @@
 /*
- * USBSID-Pico is a RPi Pico (RP2040) based board for interfacing one or two
- * MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer,
- * phone or ASID supporting player
+ * USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board
+ * for interfacing one or two MOS SID chips and/or hardware SID emulators over
+ * (WEB)USB with your computer, phone or ASID supporting player
  *
  * midi.h
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
@@ -98,13 +98,6 @@ enum {
   V2_ACTIVE = 2,
   V3_ACTIVE = 3,
 };
-
-/* Initialize the midi handlers */
-void midi_init(void);
-
-/* Processes a 1 byte incoming midi buffer
- * Figures out if we're receiving midi or sysex */
-void process_buffer(uint8_t buffer);
 
 /* Processes the received Midi stream */
 // void process_stream(uint8_t* buffer);  // 20240723 ~ disabled, unused
