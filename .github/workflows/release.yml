@@ -4,9 +4,9 @@ env:
   BUILD_THREADS: 4
   BUILD_TYPE: Release
   # Pico-SDK version
-  PICO_SDK_REF: 2.1.0
-  PICO_EXTRAS_REF: sdk-2.1.0
-  PICOTOOL_REF: 2.1.0
+  PICO_SDK_REF: 2.1.1
+  PICO_EXTRAS_REF: sdk-2.1.1
+  PICOTOOL_REF: 2.1.1
 
 on:
   push:
@@ -159,7 +159,7 @@ jobs:
       - name: 🔖 Add PICO_SDK_PATH to Environment
         run: |
           echo "PICO_SDK_PATH=${{github.workspace}}/pico-sdk" >> $GITHUB_ENV
-          cd pico-sdk/lib/tinyusb
+          cd pico-sdk/lib/tiny2
           python3 tools/get_deps.py ${{matrix.pico_platform}}
 
       - name: 💽 Cache Pico-Extras
