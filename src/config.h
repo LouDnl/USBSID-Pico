@@ -186,6 +186,7 @@ enum
   TEST_SID4        = 0x56,  /* Runs a very long test on SID 4 */
   GET_CLOCK        = 0x57,  /* Returns the clockrate as array id in byte 0 */
   LOCK_CLOCK       = 0x58,  /* Locks the clockrate from being changed, saved in config */
+  STOP_TESTS       = 0x59,  /* Interrupt any running SID tests */
 
   LOAD_MIDI_STATE  = 0x60,
   SAVE_MIDI_STATE  = 0x61,

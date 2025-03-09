@@ -87,10 +87,15 @@ extern void led_runner(void);
 extern void mcu_reset(void);
 extern void mcu_jump_to_bootloader(void);
 
+/* SID externals */
+extern bool running_tests;
+
 /* Midi externals */
 midi_machine midimachine;
 extern void process_stream(uint8_t *buffer, size_t size);
 
+/* Queues */
+queue_t sidtest_queue;
 
 /* WebUSB Description URL */
 static const tusb_desc_webusb_url_t desc_url =
@@ -562,6 +567,9 @@ void core1_main(void)
   /* Start the VU */
   init_vu();
 
+  /* Init queues */
+  queue_init(&sidtest_queue, sizeof(sidtest_queue_entry_t), 1);  /* 1 entry deep */
+
   /* Release semaphore when core 1 is started */
   sem_release(&core1_init);
 
@@ -569,6 +577,13 @@ void core1_main(void)
   sem_acquire_blocking(&core0_init);
 
   while (1) {
+    /* Check SID test queue */
+    if (running_tests) {
+      sidtest_queue_entry_t s_entry;
+      if (queue_try_remove(&sidtest_queue, &s_entry)) {
+        s_entry.func(s_entry.s, s_entry.t, s_entry.wf);
+      }
+    }
     led_runner();
   }
   /* Point of no return, this should never be reached */

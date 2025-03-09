@@ -35,6 +35,14 @@
 /* Default includes */
 #include <stdint.h>
 
+/* Queues */
+typedef struct {
+  // void sid_test(int sidno, char test, char wf)
+  void (*func)(int,char,char);
+  int s;
+  char t;
+  char wf;
+} sidtest_queue_entry_t;
 
 
 /* Rasterrates (cycles) in microseconds

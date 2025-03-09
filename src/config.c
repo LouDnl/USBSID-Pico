@@ -48,10 +48,12 @@ extern uint8_t *write_buffer_p;
 extern double cpu_mhz, cpu_us;
 extern double sid_hz, sid_mhz, sid_us;
 extern uint8_t sid_memory[];
+extern queue_t sidtest_queue;
 
 /* SID externals */
 extern uint8_t detect_sid_version(uint8_t start_addr);
 extern void sid_test(int sidno, char test, char wf);
+extern bool running_tests;
 
 /* GPIO externals */
 extern void reset_sid(void);
@@ -798,9 +800,14 @@ void handle_config_request(uint8_t * buffer)
       break;
     case TEST_ALLSIDS:  /* ISSUE: This must be run on Core 1 so we can actually stop it! */
       CFG("[CMD] TEST_ALLSIDS\n");
+      running_tests = true;
       for (int s = 0; s < numsids; s++) {
         CFG("[START TEST SID %d]\n", s);
-        sid_test(s, '1', 'A');
+        if (running_tests) {
+          sidtest_queue_entry_t s_entry = {sid_test, s, '1', 'A'};
+          queue_try_add(&sidtest_queue, &s_entry);
+          /* sid_test(s, '1', 'A'); */
+        } else return;
       };
       break;
     /* ISSUE: This must be run on Core 1 so we can actually stop it! */
@@ -826,7 +833,14 @@ void handle_config_request(uint8_t * buffer)
         : buffer[2] == 4 ? 'N'  /* Noise */
         : 'P');  /* Fallback to pulse waveform */
       CFG("[CMD] TEST_SID %d TEST: %c WF: %c\n", (s + 1), t, wf);
-      sid_test(s, t, wf);
+      running_tests = true;
+      sidtest_queue_entry_t s_entry = {sid_test, s, t, wf};
+      queue_try_add(&sidtest_queue, &s_entry);
+      /* sid_test(s, t, wf); */
+      break;
+    case STOP_TESTS:
+      CFG("[CMD] STOP_TESTS\n");
+      running_tests = false;
       break;
     case USBSID_VERSION:
       CFG("[CMD] READ_FIRMWARE_VERSION\n");
