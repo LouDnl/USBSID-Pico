@@ -1,6 +1,6 @@
 /*
- * USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2 (RP2350) based board for
- * interfacing one or two MOS SID chips and/or hardware SID emulators over
+ * USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board
+ * for interfacing one or two MOS SID chips and/or hardware SID emulators over
  * (WEB)USB with your computer, phone or ASID supporting player
  *
  * midi.h
