@@ -80,7 +80,7 @@
 #define MAGIC_SMOKE 19700101  /* DATEOFRELEASE */
 #endif
 #ifndef PROJECT_VERSION
-#define PROJECT_VERSION "0.3.1-BETA.20250309"  /* Must be the same as in CMakeLists.txt */
+#define PROJECT_VERSION "0.4.0-BETA.20250309"  /* Must be the same as in CMakeLists.txt */
 #endif
 
 #ifdef PICO_DEFAULT_LED_PIN

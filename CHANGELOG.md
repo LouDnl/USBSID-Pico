@@ -1,9 +1,37 @@
 # Changelog
 
-#### Version: 0.?.?-BETA (SNAPSHOT)
-* ...
-* Beam me up Scotty!
-* Continue work on Midi handling
+#### In progress
+* Rework Midi handling
+
+#### Version: 0.4.0-BETA
+* Fix SID reads
+* Fix bug causing mirrored SID config from working
+* Fix ASID/Midi cutoff during play
+* Fix ASID play on Pico2 not working
+* Fix reset reason not working on Pico2
+* Fix Pico2 default config error withing same fw version
+* Improve buffer handling
+  - migrate for loops into state machines
+* Improve SID test runs
+  - add option to stop tests
+  - run tests from Core 1
+* Improve and compress Vu (RGB) LED handling
+  - migrate Vu LED PWM into PIO PWM
+  - remove use of large RGB lookup table
+* Improvemets in SID bus handling
+* Improve bootup sequence
+* Update TinyUSB API use
+* Update NTSC clockspeeds
+* Update SDK dependency to 2.1
+* Add support for PCB v1.3 audio switch
+* Add reserverd flash partition for persistent storage
+* Add optional clockrate locking
+  - this locks the clockrate in config so it can no
+    longer be changed
+* Add workaround fix for SID3 not always working
+* Add FMOpl support (Clone SID only)
+* Add Pico2W support
+* Add auto config website opening on default config
 
 #### Version: 0.3.0-BETA
 * USB buffer handling overhaul
