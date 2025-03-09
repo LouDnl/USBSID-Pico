@@ -95,18 +95,19 @@ enum
   TEST_SID4        = 0x56,  /* Runs a very long test on SID 4 */
   GET_CLOCK        = 0x57,  /* Returns the clockrate as array id in byte 0 */
   LOCK_CLOCK       = 0x58,  /* Locks the clockrate from being changed, saved in config */
+  STOP_TESTS       = 0x59,  /* Interrupt any running SID tests */
 
   LOAD_MIDI_STATE  = 0x60,
   SAVE_MIDI_STATE  = 0x61,
   RESET_MIDI_STATE = 0x63,
 
-  USBSID_VERSION   = 0x80,
+  USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
 
-  RESTART_BUS      = 0x85,
-  RESTART_BUS_CLK  = 0x86,
-  SYNC_PIOS        = 0x87,
-
-  TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
+  RESTART_BUS      = 0x85,  /* Restart DMA & PIO */
+  RESTART_BUS_CLK  = 0x86,  /* Restart PIO clocks */
+  SYNC_PIOS        = 0x87,  /* Sync PIO clocks */
+  TOGGLE_AUDIO     = 0x88,  /* Toggle mono <-> stereo (v1.2+ boards only) */
+  SET_AUDIO        = 0x89,  /* Set mono <-> stereo (v1.2+ boards only) */
 };
 
 /* Clock cycles per second
@@ -146,7 +147,7 @@ uint8_t write_buffer[3]   = { (WRITE << 6), 0x0, 0x0 };
 uint8_t command_buffer[3] = { (COMMAND << 6), 0x0, 0x0 };
 uint8_t config_buffer[6]  = { ((COMMAND << 6) | 18), 0x0, 0x0, 0x0, 0x0, 0x0 };
 
-const char * error_type = "ERROR";
+const char * error_type[] = {"ERROR"};
 const char * enabled[] = {"Disabled", "Enabled"};
 const char * intext[] = { "Internal", "External" };
 const char * onoff[] = {"Off", "On"};
@@ -155,6 +156,7 @@ const char * socket[] = { "Single SID", "Dual SID" };
 const char * chiptypes[] = {"Real", "Clone"};
 const char * sidtypes[] = {"Unknown", "N/A", "MOS8580", "MOS6581", "FMopl"};
 const char * clonetypes[] = { "Disabled", "Other", "SKPico", "ARMSID", "FPGASID", "RedipSID" };
+const char * mono_stereo[] = { "Mono", "Stereo" };
 
 /* USBSID-Pico config struct */
 typedef struct Config {
@@ -206,12 +208,14 @@ typedef struct Config {
     bool enabled : 1;           /* Requires a clone SID! */
     int sidno;                  /* 0 = disabled, saves the sidno of the sid set to FMOpl */
   } FMOpl;                      /* 9 */
+  bool stereo_en : 1;           /* audio switch is off (mono) or on (stereo) ~ (HW v1.3+ only) */
 } Config;
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
   .external_clock = false, \
   .clock_rate = DEFAULT, \
   .lock_clockrate = false, \
+  .stereo_en = true,  /* PCB v1.3+ only */ \
   .socketOne = { \
     .enabled = true, \
     .dualsid = false, \

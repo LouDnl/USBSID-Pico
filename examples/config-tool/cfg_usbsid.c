@@ -199,6 +199,10 @@ static int import_ini(void* user, const char* section, const char* name, const c
     p = value_position(value, enabled);
     if (p != 666) ini_config->FMOpl.enabled = p;
   }
+  if (MATCH("Audioswitch", "set_to")) {
+    p = value_position(value, mono_stereo);
+    if (p != 666) ini_config->stereo_en = p;
+  }
   if (debug == 1) {
     printf("SECTION: %s NAME: %s VALUE: %s\n", section, name, value);
   }
@@ -272,6 +276,10 @@ void write_config_ini(Config * config, char * filename)
     fprintf(f, "[FMOPL]\n");
     fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
     fprintf(f, "enabled = %s\n", truefalse[config->FMOpl.enabled]);
+    fprintf(f, "\n");
+    fprintf(f, "[Audioswitch]\n");
+    fprintf(f, "; Possible options: %s, %s\n", mono_stereo[0], mono_stereo[1]);
+    fprintf(f, "set_to = %s\n", mono_stereo[config->stereo_en]);
     fprintf(f, "\n");
     fclose(f);
   };
@@ -458,6 +466,9 @@ void write_config(Config * config)
   /* FMOpl */
   write_config_command(SET_CONFIG,0x9,config->FMOpl.enabled,0,0);
 
+  /* Audio switch (works on PCB v1.3+ only) */
+  write_config_command(SET_CONFIG,0xA,config->stereo_en,0,0);
+
   printf("Sending save config command\n");
   save_config(0);
 
@@ -620,6 +631,9 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
       case 56:
         usbsid_config.FMOpl.sidno = buff[i];
         break;
+      case 57:
+        usbsid_config.stereo_en = buff[i];
+        break;
       default:
         break;
     }
@@ -713,8 +727,9 @@ void print_config(void)
     enabled[(int)usbsid_config.FMOpl.enabled]);
   printf("[CONFIG] [FMOpl] SIDno %d\n",
     usbsid_config.FMOpl.sidno);
-
-  return;
+  printf("[CONFIG] [AUDIO_SWITCH] %s\n",
+    mono_stereo[(int)usbsid_config.stereo_en]);
+    return;
 }
 
 void sid_autodetect(void)
@@ -1316,6 +1331,7 @@ void print_help(void)
   printf("  -reboot,  --reboot-usp        : Reboot USBSID-Pico\n");
   printf("  -boot,    --bootloader        : Reboot USBSID-Pico to the bootloader for firmware upload\n");
   printf("  -skpico   --sidkickpico       : Enter SIDKICK-pico config mode\n");
+  printf("  -config   --config-command    : Send custom config command\n");
   printf("--[DEFAULTS]---------------------------------------------------------------------------------------------------------\n");
   printf("  -defaults,--config-defaults   : Reset USBSID-Pico config to defaults\n");
   printf("--[PRESETS]---------------------------------------------------------------------------------------------------------\n");
@@ -1344,6 +1360,9 @@ void print_help(void)
   printf("                                  0: %d, 1: %d, 2: %d, 4: %d\n",
          CLOCK_DEFAULT, CLOCK_PAL, CLOCK_NTSC, CLOCK_DREAN);
   printf("  -lc N,    --lock-clockrate N  : Lock and save the clock rate from changing: True (1) False (0)\n");
+  printf("  -tau,     --toggle-audio      : Toggle the mono/stereo audio switch (PCB v1.3+ only!)\n");
+  printf("  -sau,     --set-audio N       : Set and save the mono/stereo audio switch (PCB v1.3+ only!)\n");
+  printf("                                  0: %s, 1:%s\n", mono_stereo[0], mono_stereo[1]);
   printf("--[INI FILE CONFIGURATION]------------------------------------------------------------------------------------------\n");
   printf("  -default, --default-ini       : Generate an ini file with default USBSID-Pico config named `USBSID-Pico-cfg.ini`\n");
   printf("  -export F,--export-config F   : Read config from USBSID-Pico and export it to provided ini file or default in\n");
@@ -1366,6 +1385,8 @@ void print_help(void)
   printf("  -br N,    --rgb-brightness N  : Set the RGBLED Brightness to N (0 ~ 255)\n");
   printf("  -fm N,    --fmopl-enabled N   : FMOpl is Enabled (1) or Disabled (0)\n");
   printf("   (Requires a socket set to Clone chip and chiptype to FMOpl)\n");
+  printf("  -au ,     --audio-switch N    : Set the mono/stereo audio switch (PCB v1.3+ only!)\n");
+  printf("                                  0: %s, 1:%s\n", mono_stereo[0], mono_stereo[1]);
   printf("  -sock N,  --socket N          : Configure socket N ~ 1 or 2\n");
   printf("  The following options additionally require '-sock N'\n");
   printf("  Note that you can only configure 1 socket at a time!\n");
@@ -1519,7 +1540,30 @@ void config_usbsidpico(int argc, char **argv)
       printf("USBSID-Pico is configured to use %d SID's\n", read_data[0]);
       break;
     }
-
+    if (!strcmp(argv[param_count], "-tau") || !strcmp(argv[param_count], "--toggle-audio")) {
+      printf("Toggling mono/stereo audio switch\n");
+      write_config_command(TOGGLE_AUDIO, 0x0, 0x0, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-sau") || !strcmp(argv[param_count], "--set-audio")) {
+      param_count++;
+      int sw = atoi(argv[param_count]);
+      printf("Set mono/stereo audio switch to '%s' and save config\n", mono_stereo[sw]);
+      write_config_command(SET_AUDIO, sw, 0x1, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-config") || !strcmp(argv[param_count], "--config-command")) {
+      printf("Requires 5 positional config arguments!\n");
+      param_count++;
+      uint8_t cmd = strtol(argv[param_count++], NULL, 16);
+      uint8_t a = strtol(argv[param_count++], NULL, 16);
+      uint8_t b = strtol(argv[param_count++], NULL, 16);
+      uint8_t c = strtol(argv[param_count++], NULL, 16);
+      uint8_t d = strtol(argv[param_count++], NULL, 16);
+      printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", cmd, a, b, c, d);
+      write_config_command(cmd, a, b, c, d);
+      break;
+    }
     if (!strcmp(argv[param_count], "-detect") || !strcmp(argv[param_count], "--detect-sid-types")) {
       printf("Sending autodetect SID's command to USBSID-Pico and reading config\n");
       sid_autodetect();
@@ -1557,7 +1601,13 @@ void config_usbsidpico(int argc, char **argv)
           write_config_command(SET_CONFIG, 0x0, clockspeed_n(usbsid_config.clock_rate), usbsid_config.lock_clockrate, 0x0);
           continue;
         }
-
+        if (!strcmp(argv[pc], "-au") || !strcmp(argv[pc], "--audio-switch")) {
+          pc++;
+          int sw = atoi(argv[pc]);
+          printf("Set mono/stereo audio switch from '%s' to '%s'\n", mono_stereo[usbsid_config.stereo_en], mono_stereo[sw]);
+          write_config_command(SET_CONFIG, 0xA, sw, 0x0, 0x0);
+          continue;
+        }
         if (!strcmp(argv[pc], "-fm") || !strcmp(argv[pc], "--fmopl-enabled")) {
           pc++;
           int en = atoi(argv[pc]);
@@ -1568,7 +1618,6 @@ void config_usbsidpico(int argc, char **argv)
           printf("Set FMOpl from %s to: %s\n", enabled[usbsid_config.FMOpl.enabled], enabled[en]);
           usbsid_config.FMOpl.enabled = en;
           write_config_command(SET_CONFIG, 0x9, en, 0x0, 0x0);
-
           continue;
         }
         if (!strcmp(argv[pc], "-led") || !strcmp(argv[pc], "--led-enabled")) {
@@ -1595,7 +1644,6 @@ void config_usbsidpico(int argc, char **argv)
           write_config_command(SET_CONFIG, 0x3, 0x1, en, 0x0);
           continue;
         }
-
         if (!strcmp(argv[pc], "-rgb") || !strcmp(argv[pc], "--rgb-enabled")) {
           pc++;
           int en = atoi(argv[pc]);
