@@ -221,8 +221,7 @@ void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
     if (n_bytes == 0) {
       IODBG("[I %d] [%c] $%02X:%02X\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2]);
       /* write the address and value to the SID with a 10 cycle period */
-      cycled_bus_operation(sid_buffer[1], sid_buffer[2], 10);
-      /* TODO: Monitor if this change causes any issues with non cycled players and skpico config etc! */
+      bus_operation(0x10, sid_buffer[1], sid_buffer[2]);  /* Leave this on non cycled, errornous playback otherwise! */
     } else {
       buffer_task(n_bytes, 2);
     }
