@@ -1,9 +1,9 @@
 ### Audio recordings
-- [Reed's Flamethrower](repo/media/Reed-Flamethrower.mp3)
-- [Fanta - Coma Light 13 (partial recording)](repo/media/Fanta-ComaLight13(partial).mp3)
-- [Fanta in Space (partial recording)](repo/media/Fanta-InSpace(partial).mp3)
-- [Jammer - Make Some Noise (partial recording)](repo/media/Jammer-MakeSomeNoise(partial).mp3)
-- [Mahoney - Musik Run Stop (partial recording)](repo/media/Mahoney-MusikRunStop(partial).mp3)
+- [Reed's Flamethrower](media/Reed-Flamethrower.mp3)
+- [Fanta - Coma Light 13 (partial recording)](media/Fanta-ComaLight13(partial).mp3)
+- [Fanta in Space (partial recording)](media/Fanta-InSpace(partial).mp3)
+- [Jammer - Make Some Noise (partial recording)](media/Jammer-MakeSomeNoise(partial).mp3)
+- [Mahoney - Musik Run Stop (partial recording)](media/Mahoney-MusikRunStop(partial).mp3)
 
 ### MOS8580 chip
  **Layers<br>Finnish Gold** | **Mojo<br>Bonzai & Pretzel Logic** | **Spy vs Spy II<br>The Island Caper** |

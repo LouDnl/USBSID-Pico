@@ -266,7 +266,7 @@ Includes all features from v1.0 except the audio jumper
 ### USBSID-Pico in action
 While in development any videos and/or audio links are subject to be changed or updated.
 #### Audio recordings
-[Reed's Flamethrower](repo/media/Reed-Flamethrower.mp3)
+[Reed's Flamethrower](media/Reed-Flamethrower.mp3)
 #### MOS8580 chip
 | **Codeboys & Endians** | **No Limit** |
 |:-:|:-:|
