@@ -2,7 +2,7 @@
 
 .Click image for larger view
 [#img-v1explained,link=images/v1.0-explained.png]
-image::images/v1.0-explained.png[title=Explained,30%]
+image::images/v1.0-explained.png[title=Explained]
 
 1. 12 volt or 9 volt selection jumper +
   image:images/voltage-jumper-smaller.png[title=Voltage jumper]

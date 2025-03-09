@@ -196,7 +196,7 @@ If available you can purchase (semi) assembled boards minus Pico from me - send 
 
 ## Important PCB information
 PCB revision v1.0
-- [View jumper information (online)](doc/PCBv1.0-INFO.adoc)
+- [View jumper information (online)](PCBv1.0-INFO.adoc)
 - [View jumper information (PDF download)](doc/PCBv1.0-INFO.pdf)
 
 PCB revision v1.3
