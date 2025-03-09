@@ -923,8 +923,8 @@ void process_midi(uint8_t *buffer, int size)
 
 int stream_size;
 
-void process_buffer(uint8_t buffer)
-{ /* ISSUE: Processing the stream byte by byte makes it prone to latency */
+void midi_buffer_task(uint8_t buffer)
+{
   if (midimachine.index != 0) {
     if (midimachine.type != SYSEX) MIDBG(" [B%d]$%02x#%03d", midimachine.index, buffer, buffer);
   }
@@ -934,6 +934,7 @@ void process_buffer(uint8_t buffer)
       /* System Exclusive */
       case 0xF0:  /* System Exclusive Start */
         if (midimachine.bus != CLAIMED && midimachine.type == NONE) {
+          dtype = asid; /* Set data type to ASID */
           midimachine.state = RECEIVING;
           midimachine.type = SYSEX;
           midimachine.bus = CLAIMED;
@@ -943,6 +944,7 @@ void process_buffer(uint8_t buffer)
         }
         break;
       case 0xF7:  /* System Exclusive End of SysEx (EOX) */
+          dtype = asid; /* Set data type to ASID */
         if (midimachine.bus == CLAIMED && midimachine.type == SYSEX) {
           midimachine.streambuffer[midimachine.index] = buffer;
           midimachine.index++;
@@ -970,6 +972,7 @@ void process_buffer(uint8_t buffer)
       /* Midi 2 Bytes per message */
       case 0xC0 ... 0xCF:  /* Channel 0~16 Program (Patch) change */
       case 0xD0 ... 0xDF:  /* Channel 0~16 Pressure (After-touch) */
+        dtype = midi; /* Set data type to midi */
         midi_bytes = 2;
         if (midimachine.bus != CLAIMED && midimachine.type == NONE) {
           if (midimachine.index == 0) MIDBG("[M][B%d]$%02x#%03d", midimachine.index, buffer, buffer);
@@ -987,6 +990,7 @@ void process_buffer(uint8_t buffer)
       case 0xA0 ... 0xAF:  /* Channel 0~16 Polyphonic Key Pressure (Aftertouch) */
       case 0xB0 ... 0xBF:  /* Channel 0~16 Control/Mode Change */
       case 0xE0 ... 0xEF:  /* Channel 0~16 Pitch Bend Change */
+        dtype = midi; /* Set data type to midi */
         midi_bytes = 3;
         if (midimachine.bus != CLAIMED && midimachine.type == NONE) {
           if (midimachine.index == 0) MIDBG("[M][B%d]$%02x#%03d", midimachine.index, buffer, buffer);
@@ -1032,10 +1036,10 @@ void process_buffer(uint8_t buffer)
 }
 
 void process_stream(uint8_t *buffer, size_t size)
-{
+{ /* ISSUE: Processing the stream byte by byte makes it more prone to latency */
   int n = 0;
   while (1) {
-    process_buffer(buffer[n++]);
+    midi_buffer_task(buffer[n++]);
     if (n == size) return;
   }
 }
