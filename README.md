@@ -10,11 +10,11 @@ USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2 (RP2350) based board for interf
   * [Firmware versions](#firmware-versions)
   * [How to flash new firmware](#how-to-flash)
   * [Known issues](#known-issues)
+* [Important PCB information](#important-pcb-information)
 * [Hardware](#hardware)
   * [Where to buy](#where-to-buy)
-  * [Schematic and BOM](#schematic-and-bom)
   * [Cases](#cases)
-* [Important PCB information](#important-pcb-information)
+  * [Schematic and BOM](#schematic-and-bom)
 * [PCB in action](#usbsid-pico-in-action)
 * [Software examples](#software)
   * [Pre compiled Vice binaries](#precompiled-vice-binaries)
@@ -126,11 +126,15 @@ Then configure check, configure and test your board on the [USBSID](https://usbs
 # Firmware
 See the [firmware changelog](CHANGELOG.md) for more information on what's changed and previous releases.
 ### Firmware versions
-Use `usbsidpico.uf2` for Pico1 regular green rp2040 Pico boards.  
-Use `usbsidpico-rgb.uf2` for Pico1 black clone rp2040 Pico boards with RGB LED onboard.  
-Use `usbsidpico_w.uf2` for PicoW regular green rp2040 PicoW boards.  
-Use `usbsidpico2.uf2` for Pico2 regular green rp2350 Pico2 boards.  
-Use `usbsidpico2_w.uf2` for Pico2W regular green rp2350 Pico2W boards.  
+Check your PCB revision, this is under the MOS logo and next to __USBSID-Pico__ on your PCB.  
+Firmware filenames containing `v1.0` are for PCB revision __v1.0__ and filenames containing `v1.3` are for PCB revision __v1.3__. Don't worry if you use the incorrect version, this causes no harm.  
+<sub>(The X.X in each filename equals for the PCB revision)</sub>  
+
+`usbsidpico-v1.X.uf2` for Pico1 regular green rp2040 Pico boards.  
+`usbsidpico-rgb-v1.X.uf2` for Pico1 black clone rp2040 Pico boards with RGB LED onboard.  
+`usbsidpico_w-v1.X.uf2` for PicoW regular green rp2040 PicoW boards.  
+`usbsidpico2-v1.X.uf2` for Pico2 regular green rp2350 Pico2 boards.  
+`usbsidpico2_w-v1.X.uf2` for Pico2W regular green rp2350 Pico2W boards.  
 **WARNING!** Do _NOT_ use the RGB firmware for any of the (non black) rp2040 or rp2350 Pico boards that do not contain an RGB LED.
 ### How to flash
 _<ins>**NOTE**: When flashing a new firmware version, all previously configured settings will be reset to default. Use the commandline configtool to save your current settings to a `ini` file if you want to save them!</ins>_  
@@ -186,11 +190,48 @@ After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py
 Click [this link](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/) to go to their product page
 #### PCBWay
 At a minimum of 5 bare or assembled boards it is also possible to purchase at [PCBWay here](https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html).  
-#### Me (while I still have boards)
-While still available you can purchase assembled boards minus Pico from me - send me a message on any of my socials.  
+No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral link](https://pcbway.com/g/2458i7) to register, thanks!
+#### Me (when I have boards)
+If available you can purchase (semi) assembled boards minus Pico from me - send me a message on any of my socials.  
+
+## Important PCB information
+PCB revision v1.0
+- [View jumper information (online)](doc/PCBv1.0-INFO.adoc)
+- [View jumper information (PDF download)](doc/PCBv1.0-INFO.pdf)
+
+PCB revision v1.3
+- _N/A_
+
+## Cases
+All USBSID-Pico community created cases are available in the [cases](cases/) directory, direct links below.  
+_Cases for PCB revision v1.0:_
+* [Cartridge case](cases/spotUP/USBSID-Pico_Case.zip) by @spotUP
+* [boxy case](repo/cases/schorsch3000/usbsidpico-case-box.tgz) by @schorsch3000
+
+_Cases for PCB revision v1.3:_
+* None yet, sorry!
 
 ### Schematic and BOM
 If you want and are up to it you can create your own development board by using the provided [schematic](resources/v1.0-schematic.pdf) and [interactive BOM](https://loudnl.github.io/).
+### PCB Features ~ v1.3
+Includes all features from v1.0 except the audio jumper
+- IO controlled Stereo/Mono switch, can be set in config or toggled during play
+- Supports mixed voltage!
+  e.g. you can use one MOS6581 (12v) together with one MOS6582 (9v) or MOS8580 (9v)
+- Voltage is jumper controlled
+- SID socket placement is more spread out for:
+  - easier filter capacitor access
+  - more room for FPGA SID
+  - optional ZIF sockets
+- 3 voltage regulators for filtered voltages to the SIDS
+  - 1x fixed 5 volts and 2x 9 volts or 12 volts
+- Better IO port layout
+  - Unused GPIO pins for optional expansion boards
+  - IO5/8 pins for quad SID configuration
+  - Uart pins
+  - SID Ext in pins (requires closing the solder jumper on the bottom)
+  - Ground pin
+  - New soldermask art ;)
 ### PCB Features ~ v1.0
 - Supports all MOS SID chips e.g. MOS6581, MOS6582 & MOS8580
 - Supports SID chip replacements e.g. [SIDKick-Pico](https://github.com/frntc/SIDKick-pico), [SwinSID](https://github.com/dmantione/swinsid), ARMSID (untested), FPGASID (untested)
@@ -209,78 +250,27 @@ If you want and are up to it you can create your own development board by using 
   - SID1 audio left & SID2 audio right
 - Optional EXT-IN pulldown resistor as filter bypass to reduce filter noise for Digiplay on 8580 SID's
 ### PCB Development
+* v1.3 release board<br>
+  __N/A__
+* v1.2 testboard<br>
+  [<img src="images/v1.2-top.png" width="30%">](images/v1.2-top.png) 
+* v1.1 unfinished and skipped
 * v1.0 release board<br>
-  <img src="images/v1.0-top.png" width="30%">
+  [<img src="images/v1.0-top.png" width="30%">](images/v1.0-top.png) 
 * v0.2 improved testboard<br>
-  <img src="images/v0.2-top.png" width="30%">
+  [<img src="images/v0.2-top.png" width="30%">](images/v0.2-top.png) 
 * v0.1 testboard<br>
-  <img src="images/v0.1-top.png" width="30%">  
-
-## Cases
-All USBSID-Pico community created cases are available in the [cases](cases/) directory, direct links below.
-* [Cartridge case](cases/spotUP/USBSID-Pico_Case.zip) by @spotUP
-* [boxy case](repo/cases/schorsch3000/usbsidpico-case-box.tgz) by @schorsch3000
-
-## Important PCB information
-[<img src="images/v1.0-explained.png" width="30%">](images/v1.0-explained.png)<br/>
-_Click image for larger view_
-1. 12 volt or 9 volt selection jumper  
-  ![Voltage jumper](images/voltage-jumper-smaller.png)
-  - open = 12 volt (for 6581 SID only!!)
-  - closed = 9 volt (for 8580 SID)
-2. Socket 2 6581 / 8580 SID type selection jumpers  
-  ![SID2 selection jumper](images/SID2-jumper-smaller.png)
-  - both closed left = 6581
-  - both closed right = 8580
-3. Socket 1 6581 / 8580 SID type selection jumpers  
-  ![SID1 selection jumper](images/SID1-jumper-smaller.png)
-  - both closed left = 6581
-  - both closed right = 8580
-4. Audio channel selection jumper  
-  ![Audio jumper](images/audio-jumper-smaller.png)
-  - closed on Socket 1 side = left & right channel for socket 1
-  - closed on Socket 2 side = left channel for socket 2 & right channel for socket 1
-5. Address line A5 for adressess above $1F (SKPico 2nd SID for example)  
-  ![Address 5 pins](images/A5-pins-smaller.png)
-  - both pins are routed to the same GPIO for using adresses higher then $20
-6. Uart debugging output port  
-  ![UART port](images/uart-port-smaller.png)
-  - TX on the right
-  - RX on the left
-7. Optional 330k pulldown resistor hooked up to EXT-IN for 8580 filter bypass in socket 2  
-    ![EXTIN bypass](images/SID2-extin-bypass-smaller.png)
-  - solder closed = enabled
-8. Optional 330k pulldown resistor hooked up to EXT-IN for 8580 filter bypass in socket 1  
-  ![EXTIN bypass](images/SID1-extin-bypass-smaller.png)
-  - solder pad closed = enabled
-9. Optional 1MHz crystal socket (not included in BOM)  
-  ![Optional Crystal](images/optional-crystal-smaller.png)
-  - solder pad closed = enabled (when a crystal is socketed) 
-  - this disables the internal clock generation on the Pico
-10. Optional 1k resistor for 6581 SID in socket 2
-  - **ATTENTION!**: _This solder pad label is incorrect, it should read 6581!_  
-  ![6581 jumper](images/SID2-audio-solderjumper-smaller.png)
-  - solder pad closed = enabled
-11. Optional 1k resistor for 6581 SID in socket 2
-  - **ATTENTION!**: _This solder pad label is incorrect, it should read 6581!_  
-  ![6581 jumper](images/SID1-audio-solderjumper-smaller.png)
-  - solder pad closed = enabled
-12. Socket 2 audio out via dupont connector  
-  ![Audio out](images/audio-out-smaller.png)
-  - Ground and S2 as labeled
-13. Socket 1 audio out via dupont connector  
-  ![Audio out](images/audio-out-smaller.png)
-  - Ground and S1 as labeled
-14. Reset button  
-  ![Reset button](images/reset-button-smaller.png)
+  [<img src="images/v0.1-top.png" width="30%">](images/v0.1-top.png) 
 
 # Examples
 ### USBSID-Pico in action
 While in development any videos and/or audio links are subject to be changed or updated.
+#### Audio recordings
+[Reed's Flamethrower](repo/media/Reed-Flamethrower.mp3)
 #### MOS8580 chip
-| **Layers<br>Finnish Gold** | **Mojo<br>Bonzai & Pretzel Logic** | **Spy vs Spy II<br>The Island Caper** |
-|:-:|:-:|:-:|
-| [![MOS8580](https://img.youtube.com/vi/UQVDTNV3mgs/1.jpg)](https://www.youtube.com/watch?v=UQVDTNV3mgs) | [![MOS8580](https://img.youtube.com/vi/lXxlArB3VS4/1.jpg)](https://www.youtube.com/watch?v=lXxlArB3VS4) | [![MOS8580](https://img.youtube.com/vi/B4iYnZELbSc/1.jpg)](https://www.youtube.com/watch?v=B4iYnZELbSc) |
+| **Codeboys & Endians** | **No Limit** |
+|:-:|:-:|
+| [![MOS8580](https://img.youtube.com/vi/sSDsOih1Wbw/1.jpg)](https://www.youtube.com/watch?v=sSDsOih1Wbw)<br><small><sub>by Booze Design</sub></small> | [![MOS8580](https://img.youtube.com/vi/hJit04tWUaM/1.jpg)](https://www.youtube.com/watch?v=hJit04tWUaM)<br><small><sub>Quantum tracker demo</sub></small> |
 
 Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-29KQ), [other socials](https://github.com/LouDnl) or the [SHOWCASE](SHOWCASE.md) page to see more examples.
 ### Software
