@@ -180,7 +180,7 @@ The firmware is still in development so features might change, be added or remov
   While not yet at 100%, most tunes will play!  
   See the [discussion](https://github.com/LouDnl/USBSID-Pico/discussions/1) about this.
 ### Building
-You can build the firmware using the Pico SDK 2.1.0 and the included TinyUSB. Be sure to clone the SDK with `--recurse-submodules`.  
+You can build the firmware using the Pico SDK 2.1.1 and the included TinyUSB. Be sure to clone the SDK with `--recurse-submodules`.  
 After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py PICO_PLATFORM` where PICO_PLATFORM is either rp2040 or rp2350 depending on the board you are using.
 
 # Hardware
