@@ -30,9 +30,6 @@ extern "C" {
 #endif
 
 
-/* Binary printing */
-#include "macros.h"
-
 #ifdef USB_PRINTF
 /* TinyUSB libs */
 #if __has_include("bsp/board_api.h") /* Needed to account for update in tinyUSB */

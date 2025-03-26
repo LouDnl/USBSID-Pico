@@ -57,6 +57,40 @@
 #define PRINTF_BYTE_TO_BINARY_INT64(i) \
   PRINTF_BYTE_TO_BINARY_INT32((i) >> 32), PRINTF_BYTE_TO_BINARY_INT32(i)
 
+/* Helper macro for constraining a value within a range */
+#ifndef constrain
+#define constrain(amt,low,high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
+#endif
+
+/* Helper macro for finding the highest value of two */
+#ifndef max
+#define max(a,b)            (((a) > (b)) ? (a) : (b))
+#endif
+
+/* Helper macro for finding the lowest value of two */
+#ifndef min
+#define min(a,b)            (((a) < (b)) ? (a) : (b))
+#endif
+
+/* Helper macro that creates a random value */
+#ifndef randval
+#define randval(min,max)    (min + rand() / (RAND_MAX / (max - min + 1) + 1))
+#endif
+
+/* Helper macro for mapping a value from a range to another range */
+#ifndef map
+#define map(x,in_min,in_max,out_min,out_max) ((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
+#endif
+
+#if defined(USE_RGB)
+#ifndef ugrb_u32  /* RGB ->> GRB */
+#define ugrb_u32(r,g,b) ((uint32_t)(r) << 8) | ((uint32_t)(g) << 16) | (uint32_t)(b)
+#endif
+#ifndef rgbb
+#define rgbb(inp,br) (uint8_t)abs((inp / 255) * br)
+#endif
+#endif
+
 
 #ifdef __cplusplus
  }

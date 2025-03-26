@@ -36,38 +36,22 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-/* Helper macro for constraining a value within a range */
-#ifndef constrain
-#define constrain(amt,low,high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
+#include "macros.h"
+
+
+/* Compile time variable settings */
+#ifndef MAGIC_SMOKE
+#define MAGIC_SMOKE 19700101  /* DATEOFRELEASE */
+#endif
+#ifndef PROJECT_VERSION
+#define PROJECT_VERSION "0.4.1-BETA.20250326"  /* Must be the same as in CMakeLists.txt */
+#endif
+#ifndef PCB_VERSION
+#define PCB_VERSION 1.0
 #endif
 
-/* Helper macro for finding the highest value of two */
-#ifndef max
-#define max(a,b)            (((a) > (b)) ? (a) : (b))
-#endif
-
-/* Helper macro for finding the lowest value of two */
-#ifndef min
-#define min(a,b)            (((a) < (b)) ? (a) : (b))
-#endif
-
-/* Helper macro that creates a random value */
-#ifndef randval
-#define randval(min,max)    (min + rand() / (RAND_MAX / (max - min + 1) + 1))
-#endif
-
-/* Helper macro for mapping a value from a range to another range */
-#ifndef map
-#define map(x,in_min,in_max,out_min,out_max) ((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
-#endif
-
-#if defined(USE_RGB)
-#ifndef ugrb_u32  /* RGB ->> GRB */
-#define ugrb_u32(r,g,b) ((uint32_t)(r) << 8) | ((uint32_t)(g) << 16) | (uint32_t)(b)
-#endif
-#ifndef rgbb
-#define rgbb(inp,br) (uint8_t)abs((inp / 255) * br)
-#endif
+#ifndef USBSID_MAX_SIDS
+#define USBSID_MAX_SIDS 4  /* 2x Real or up to 4 with Clones */
 #endif
 
 /* USBSID command byte */
