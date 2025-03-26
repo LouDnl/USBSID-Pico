@@ -38,6 +38,9 @@ extern int sock_one, sock_two, sids_one, sids_two, numsids, act_as_one;
 extern uint8_t one, two, three, four;
 extern uint8_t one_mask, two_mask, three_mask, four_mask;
 
+/* Vu externals */
+extern uint16_t vu;
+
 /* Init vars */
 PIO bus_pio = pio0;
 static uint sm_control, offset_control;
@@ -447,6 +450,7 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
   control_word = 0b110000;
   dir_mask |= (is_read ? 0b1111111100000000 : 0b1111111111111111);
   control_word |= (is_read ? 1 : 0);
+  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
   if (set_bus_bits(address, data) != 1) {
     return 0;
   }

@@ -180,6 +180,11 @@ static const uint8_t sid_registers[29] =
 };
 
 enum {
+  NO_SID_REGISTERS = 25, /* 29 - 4 non writeable */
+  NO_VOICES_PER_SID = 3,
+};
+
+enum {
   /* sid_states ~  SID registers */
   /* VOICE 1 */
   NOTELO = 0,

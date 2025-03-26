@@ -54,6 +54,10 @@
 #define USBSID_MAX_SIDS 4  /* 2x Real or up to 4 with Clones */
 #endif
 
+#ifndef MIN_CYCLES
+#define MIN_CYCLES 10  /* 10 cycles for non cycled writes when in sequence */
+#endif
+
 /* USBSID command byte */
 enum
 {

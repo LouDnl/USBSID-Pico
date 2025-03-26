@@ -99,6 +99,7 @@ midi_machine midimachine;
 
 /* Queues */
 queue_t sidtest_queue;
+queue_t logging_queue;
 
 /* WebUSB Description URL */
 static const tusb_desc_webusb_url_t desc_url =
@@ -181,8 +182,8 @@ void webserial_write(uint8_t * itf, uint32_t n)
 int __not_in_flash_func(do_buffer_tick)(int top, int step)
 {
   static int i = 1;
-  IODBG("[I %d] [%c] $%02X:%02X %u\n", i, dtype, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : 10));
-  cycled_bus_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : 10));
+  cycled_bus_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
+  WRITEDBG(dtype, i, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   if (i+step >= top) {
     i = 1;
     return i;
@@ -212,8 +213,8 @@ void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
   if (command == CYCLED_WRITE) {
     // n_bytes = (n_bytes == 0) ? 4 : n_bytes; /* if byte count is zero, this is a single write packet */
     if (n_bytes == 0) {
-      IODBG("[I %d] [%c] $%02X:%02X %u\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
       cycled_bus_operation(sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
+      WRITEDBG(dtype, n_bytes, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
     } else {
       buffer_task(n_bytes, 4);
     }
@@ -222,9 +223,8 @@ void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
   if (command == WRITE) {
     // n_bytes = (n_bytes == 0) ? 2 : n_bytes; /* if byte count is zero, this is a single write packet */
     if (n_bytes == 0) {
-      IODBG("[I %d] [%c] $%02X:%02X\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2]);
-      /* write the address and value to the SID with a 10 cycle period */
       bus_operation(0x10, sid_buffer[1], sid_buffer[2]);  /* Leave this on non cycled, errornous playback otherwise! */
+      WRITEDBG(dtype, 0, sid_buffer[1], sid_buffer[2], 0);
     } else {
       buffer_task(n_bytes, 2);
     }
@@ -579,6 +579,9 @@ void core1_main(void)
 
   /* Init queues */
   queue_init(&sidtest_queue, sizeof(sidtest_queue_entry_t), 1);  /* 1 entry deep */
+  #ifdef WRITE_DEBUG  /* Only init this queue when needed */
+  queue_init(&logging_queue, sizeof(writelogging_queue_entry_t), 16);  /* 16 entries deep */
+  #endif
 
   /* Release semaphore when core 1 is started */
   sem_release(&core1_init);
@@ -594,6 +597,16 @@ void core1_main(void)
         s_entry.func(s_entry.s, s_entry.t, s_entry.wf);
       }
     }
+
+    #ifdef WRITE_DEBUG  /* Only run this queue when needed */
+    if (usbdata == 1) {
+      writelogging_queue_entry_t l_entry;
+      if (queue_try_remove(&logging_queue, &l_entry)) {
+        DBG("[CORE2] [WRITE %c:%02d] $%02X:%02X %u\n", l_entry.dtype, l_entry.n, l_entry.reg, l_entry.val, l_entry.cycles);
+      }
+    }
+    #endif
+
     led_runner();
   }
   /* Point of no return, this should never be reached */
