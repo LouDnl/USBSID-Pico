@@ -131,10 +131,10 @@ void handle_asid_fmoplmessage(uint8_t* buffer)
      * Pico's too */
     if((reg % 2 == 0)) {
       cycled_bus_operation((addr | OPL_REG_ADDRESS), fm_registers[reg], 10);
-      WRITEDBG(dtype, 0, (addr | OPL_REG_ADDRESS), fm_registers[reg], 10);
+      WRITEDBG(dtype, reg, asid_fm_register_index, (addr | OPL_REG_ADDRESS), fm_registers[reg], 10);
 		} else {
       cycled_bus_operation((addr | OPL_REG_DATA), fm_registers[reg], 10);
-      WRITEDBG(dtype, 0, (addr | OPL_REG_DATA), fm_registers[reg], 10);
+      WRITEDBG(dtype, reg, asid_fm_register_index, (addr | OPL_REG_DATA), fm_registers[reg], 10);
 		}
 	}
 	midimachine.fmopl = 0;
@@ -159,7 +159,7 @@ void handle_complete_asid_buffer(uint8_t sid, uint8_t* buffer, int size)
          * or it will be too damn fast! So we do this for other
          * Pico's too */
         cycled_bus_operation((address |= sid), register_value, 10);
-        WRITEDBG(dtype, 0, (address |= sid), register_value, 10);
+        WRITEDBG(dtype, reg, size, (address |= sid), register_value, 10);
         reg++;
       }
     }
@@ -184,7 +184,7 @@ void handle_asid_message(uint8_t sid, uint8_t* buffer, int size)
          * or it will be too damn fast! So we do this for other
          * Pico's too */
         cycled_bus_operation((address |= sid), register_value, 10);
-        WRITEDBG(dtype, 0, (address |= sid), register_value, 10);
+        WRITEDBG(dtype, reg, size, (address |= sid), register_value, 10);
         reg++;
       }
     }
@@ -236,7 +236,7 @@ void handle_writeordered_asid_message(uint8_t sid, uint8_t* buffer)
     if (writeOrder[chip][pos].wait_us != 0xff) {
         /* Perform write including wait cycles */
         cycled_bus_operation((writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us);
-        WRITEDBG(dtype, pos, (writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us);
+        WRITEDBG(dtype, pos, NO_SID_REGISTERS_ASID, (writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us);
     }
   }
   for (size_t pos = 0; pos < NO_SID_REGISTERS_ASID; pos++) {

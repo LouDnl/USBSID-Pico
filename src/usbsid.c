@@ -183,7 +183,7 @@ int __not_in_flash_func(do_buffer_tick)(int top, int step)
 {
   static int i = 1;
   cycled_bus_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
-  WRITEDBG(dtype, i, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
+  WRITEDBG(dtype, i, top, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   if (i+step >= top) {
     i = 1;
     return i;
@@ -214,7 +214,7 @@ void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
     // n_bytes = (n_bytes == 0) ? 4 : n_bytes; /* if byte count is zero, this is a single write packet */
     if (n_bytes == 0) {
       cycled_bus_operation(sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
-      WRITEDBG(dtype, n_bytes, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
+      WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
     } else {
       buffer_task(n_bytes, 4);
     }
@@ -224,7 +224,7 @@ void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
     // n_bytes = (n_bytes == 0) ? 2 : n_bytes; /* if byte count is zero, this is a single write packet */
     if (n_bytes == 0) {
       bus_operation(0x10, sid_buffer[1], sid_buffer[2]);  /* Leave this on non cycled, errornous playback otherwise! */
-      WRITEDBG(dtype, 0, sid_buffer[1], sid_buffer[2], 0);
+      WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], 0);
     } else {
       buffer_task(n_bytes, 2);
     }
