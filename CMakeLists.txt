@@ -29,7 +29,7 @@ cmake_minimum_required(VERSION 3.17)
 set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
-set(MAGIC_SMOKE "20250326")
+set(MAGIC_SMOKE "20250406")
 set(PROJECT_VERSION "0.4.1-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
 
 ### Want a cookie?
@@ -39,14 +39,14 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(USBSID_DEBUGGING 1)     # Enable debugging ~ mandatory enable for all other logging types
   set(UART_DEBUGGING 1)       # Enable debugging over uart pins
   set(USBCDC_DEBUGGING 0)     # Enable debugging over cdc port 2
+  set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
+  set(SIDWRITES_DEBUGGING 1)  # Enable logging of SID writes one core 2
   set(DEFAULT_DEBUGGING 1)    # Enable debugging in usbsid.c
-  set(CONFIG_DEBUGGING 1)     # Enable debugging in config.c
   set(USBIO_DEBUGGING 0)      # Enable debugging in usbsid.c
+  set(CONFIG_DEBUGGING 1)     # Enable debugging in config.c
   set(GPIOBUS_DEBUGGING 0)    # Enable debugging in gpio.c
   set(MIDI_DEBUGGING 0)       # Enable debugging in midi.c
   set(MIDIVOICE_DEBUGGING 0)  # Enable debugging in midi.c
-  set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
-  set(SIDWRITES_DEBUGGING 0)  # Enable logging of SID writes one core 2
 endif()
 
 
