@@ -336,17 +336,32 @@ void tud_resume_cb(void)
 }
 
 
-/* USB MIDI CLASS CALLBACKS */
+/* USB MIDI CLASS TASK & CALLBACKS */
+
+void midi_task(void)
+{ /* Same as the callback routine */
+  if (tud_midi_n_mounted(MIDI_ITF)) {
+    usbdata = 1;
+    while (tud_midi_n_available(MIDI_ITF, MIDI_CABLE)) {  /* Loop as long as there is data available */
+      uint32_t available = tud_midi_n_stream_read(MIDI_ITF, MIDI_CABLE, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
+      process_stream(midimachine.usbstreambuffer, available);
+    }
+    /* Clear usb buffer after use ~ Disabled due to prematurely cut off tunes */
+    /* memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer)); */
+    return;
+  }
+  return;
+}
 
 void tud_midi_rx_cb(uint8_t itf)
 {
-  if (tud_midi_n_mounted(itf)) {
+  if (tud_midi_n_mounted(itf) && itf == MIDI_ITF) {
     usbdata = 1;
-    while (tud_midi_n_available(itf, 0)) {  /* Loop as long as there is data available */
-      uint32_t available = tud_midi_n_stream_read(itf, 0, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
+    while (tud_midi_n_available(itf, MIDI_CABLE)) {  /* Loop as long as there is data available */
+      uint32_t available = tud_midi_n_stream_read(itf, MIDI_CABLE, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
       process_stream(midimachine.usbstreambuffer, available);
     }
-    /* Clear usb buffer after use ~ Disable due to prematurely cut off tunes */
+    /* Clear usb buffer after use ~ Disabled due to prematurely cut off tunes */
     /* memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer)); */
     return;
   }
@@ -354,19 +369,37 @@ void tud_midi_rx_cb(uint8_t itf)
 }
 
 
-/* USB CDC CLASS CALLBACKS */
+/* USB CDC CLASS TASK & CALLBACKS */
 
 /* Read from host to device */
+void cdc_task(void)
+{ /* Same as the callback routine */
+  if (tud_cdc_n_connected(CDC_ITF)) {
+    if (tud_cdc_n_available(CDC_ITF)) {
+      cdc_itf = CDC_ITF;
+      usbdata = 1, dtype = cdc;
+      cdcread = tud_cdc_n_read(CDC_ITF, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
+      tud_cdc_n_read_flush(CDC_ITF);
+      memcpy(sid_buffer, read_buffer, cdcread);
+      process_buffer(cdc_itf, &cdcread);
+      return;
+    }
+    return;
+  }
+  return;
+}
+
 void tud_cdc_rx_cb(uint8_t itf)
 { /* No need to check available bytes for reading */
-  cdc_itf = &itf;
-  usbdata = 1, dtype = cdc;
-  cdcread = tud_cdc_n_read(*cdc_itf, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
-  tud_cdc_n_read_flush(*cdc_itf);
-  memcpy(sid_buffer, read_buffer, cdcread);
-  process_buffer(cdc_itf, &cdcread);
-  /* memset(read_buffer, 0, count_of(read_buffer)); */
-  /* memset(sid_buffer, 0, count_of(sid_buffer)); */
+  if (itf == CDC_ITF) {
+    cdc_itf = &itf;
+    usbdata = 1, dtype = cdc;
+    cdcread = tud_cdc_n_read(*cdc_itf, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
+    tud_cdc_n_read_flush(*cdc_itf);
+    memcpy(sid_buffer, read_buffer, cdcread);
+    process_buffer(cdc_itf, &cdcread);
+    return;
+  }
   return;
 }
 
@@ -600,7 +633,7 @@ void core1_main(void)
     if (usbdata == 1) {
       writelogging_queue_entry_t l_entry;
       if (queue_try_remove(&logging_queue, &l_entry)) {
-        DBG("[CORE2] [WRITE %c:%02d] $%02X:%02X %u\n", l_entry.dtype, l_entry.n, l_entry.reg, l_entry.val, l_entry.cycles);
+        DBG("[CORE2] [WRITE %c:%02d/%02d] $%02X:%02X %u\n", l_entry.dtype, l_entry.n, l_entry.s, l_entry.reg, l_entry.val, l_entry.cycles);
       }
     }
     #endif
@@ -688,6 +721,11 @@ int main()
   /* Loop IO tasks forever */
   while (1) {
     tud_task_ext(/* UINT32_MAX */0, false);  /* equals tud_task(); */
+    /* Additional tasks to support the callbacks
+     * for improved throughput! */
+    cdc_task();
+    midi_task();
+    /* No vendor task here, fifo is disabled! */
   }
 
   /* Point of no return, this should never be reached */

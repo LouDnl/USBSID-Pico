@@ -92,7 +92,16 @@ enum
   WEBUSB_COMMAND  = 0xFF,
   WEBUSB_RESET    = 0x15,
   WEBUSB_CONTINUE = 0x16,
+  WEBUSB_NUMSIDS  = 0x39,
+  WEBUSB_FMOPLSID = 0x3A,
+  WEBUSB_TOGGLEAU = 0x3B,
 };
+
+/* Global USB definitions */
+#define CDC_ITF 0
+#define MIDI_ITF 0
+#define WUSB_ITF 0
+#define MIDI_CABLE 0
 
 /* USB data type */
 extern char dtype, ntype, cdc, asid, midi, wusb;

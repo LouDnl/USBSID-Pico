@@ -196,8 +196,8 @@ enum
   RESTART_BUS      = 0x85,  /* Restart DMA & PIO */
   RESTART_BUS_CLK  = 0x86,  /* Restart PIO clocks */
   SYNC_PIOS        = 0x87,  /* Sync PIO clocks */
-  TOGGLE_AUDIO     = 0x88,  /* Toggle mono <-> stereo (v1.2+ boards only) */
-  SET_AUDIO        = 0x89,  /* Set mono <-> stereo (v1.2+ boards only) */
+  TOGGLE_AUDIO     = 0x88,  /* Toggle mono <-> stereo (v1.3+ boards only) */
+  SET_AUDIO        = 0x89,  /* Set mono <-> stereo (v1.3+ boards only) */
 
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
 };
