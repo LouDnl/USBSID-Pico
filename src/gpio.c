@@ -643,7 +643,7 @@ void toggle_audio_switch(void)
   #if defined(HAS_AUDIOSWITCH)
   static int audio_state = 0b1;
   audio_state ^= 1;
-  CFG("[CONFIG] AUDIO SWITCH TO: %d\n", audio_state);
+  CFG("[CONFIG] TOGGLE AUDIO SWITCH TO: %d\n", audio_state);
   tPIN(AU_SW);
   // gpio_put(AU_SW, audio_state);  /* toggle mono <-> stereo */
   #endif
@@ -652,6 +652,7 @@ void toggle_audio_switch(void)
 void set_audio_switch(bool state)
 { /* Set the SPST switch */
   #if defined(HAS_AUDIOSWITCH)
+  CFG("[CONFIG] SET AUDIO SWITCH TO: %d\n", state);
   if (state) {
     sPIN(AU_SW);
   } else cPIN(AU_SW);
