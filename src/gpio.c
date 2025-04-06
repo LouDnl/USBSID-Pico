@@ -519,6 +519,7 @@ void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, ui
     pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, PIO_IRQ1));  /* Preset the statemachine IRQ to not wait for a 1 */
   }
   sid_memory[(address & 0x7F)] = data;
+  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
   control_word = 0b111000;
   dir_mask = 0b1111111111111111;  /* Always OUT never IN */
   if (set_bus_bits(address, data) != 1) {

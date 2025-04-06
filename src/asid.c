@@ -61,41 +61,77 @@ struct asid_regpair_t {  /* thanks to thomasj */
   uint8_t index;
   uint8_t wait_us;
 };
+struct asid_regpair_t default_asid_to_writeorder[NO_SID_REGISTERS_ASID] = {  /* thanks to thomasj ~ SF2 Driver 11 no waits */
+  /* VOICE 1 */
+  { 0, 0},  /* 0x00 */
+  { 1, 0},  /* 0x01 */
+  { 2, 0},  /* 0x02 */
+  { 3, 0},  /* 0x03 */
+  { 4, 0},  /* 0x04 */
+  { 5, 0},  /* 0x05 */
+  /* VOICE 2 */
+  { 6, 0},  /* 0x06 */
+  { 7, 0},  /* 0x07 */
+  { 8, 0},  /* 0x08 */
+  { 9, 0},  /* 0x09 */
+  {10, 0},  /* 0x0A */
+  {11, 0},  /* 0x0B */
+  /* VOICE 3 */
+  {12, 0},  /* 0x0C */
+  {13, 0},  /* 0x0D */
+  {14, 0},  /* 0x0E */
+  {15, 0},  /* 0x0F */
+  {16, 0},  /* 0x10 */
+  {17, 0},  /* 0x11 */
+  /* FILTER & VOLUME */
+  {18, 0},  /* 0x12 */
+  {19, 0},  /* 0x13 */
+  {20, 0},  /* 0x14 */
+  {21, 0},  /* 0x15 */
+  /* CONTROL - GROUP1 */
+  {22, 0},  /* 0x16 */
+  {23, 0},  /* 0x17 */
+  {24, 0},  /* 0x18 */
+  /* CONTROL - GROUP2 */
+  {25, 0},  /* 0x19 */
+  {26, 0},  /* 0x1A */
+  {27, 0},  /* 0x1B */
+};
 struct asid_regpair_t asid_to_writeorder[NO_SID_REGISTERS_ASID] = {  /* thanks to thomasj ~ SF2 Driver 11 no waits */
   /* VOICE 1 */
   { 0, 0},  /* 0x00 */
   { 1, 0},  /* 0x01 */
   { 4, 0},  /* 0x02 */
   { 5, 0},  /* 0x03 */
-  { 3, 0},  /* 0x04 */
-  { 2, 0},  /* 0x05 */
-  { 7, 0},  /* 0x06 */
+  { 3, 0},  /* 0x05 */
+  { 2, 0},  /* 0x06 */
   /* VOICE 2 */
-  { 8, 0},  /* 0x07 */
-  {11, 0},  /* 0x08 */
-  {12, 0},  /* 0x09 */
-  {10, 0},  /* 0x0A */
-  { 9, 0},  /* 0x0B */
-  {14, 0},  /* 0x0C */
-  {15, 0},  /* 0x0D */
+  { 7, 0},  /* 0x07 */
+  { 8, 0},  /* 0x08 */
+  {11, 0},  /* 0x09 */
+  {12, 0},  /* 0x0A */
+  {10, 0},  /* 0x0C */
+  { 9, 0},  /* 0x0D */
   /* VOICE 3 */
-  {18, 0},  /* 0x0E */
-  {19, 0},  /* 0x0F */
-  {17, 0},  /* 0x10 */
-  {16, 0},  /* 0x11 */
-  {21, 0},  /* 0x12 */
-  {22, 0},  /* 0x13 */
-  {23, 0},  /* 0x14 */
-  /* FILTER */
-  {24, 0},  /* 0x15 */
-  { 6, 0},  /* 0x16 */
-  {13, 0},  /* 0x17 */
-  /* MODE / VOLUME */
-  {20, 0},  /* 0x18 */
-  /* READ ONLY */
-  {25, 0},  /* 0x19 */
-  {26, 0},  /* 0x1A */
-  {27, 0},  /* 0x1B */
+  {14, 0},  /* 0x0E */
+  {15, 0},  /* 0x0F */
+  {18, 0},  /* 0x10 */
+  {19, 0},  /* 0x11 */
+  {17, 0},  /* 0x13 */
+  {16, 0},  /* 0x14 */
+  /* FILTER & VOLUME */
+  {21, 0},  /* 0x15 */
+  {22, 0},  /* 0x16 */
+  {23, 0},  /* 0x17 */
+  {24, 0},  /* 0x18 */
+  /* CONTROL - GROUP1 */
+  { 6, 0},  /* 0x04 */
+  {13, 0},  /* 0x0B */
+  {20, 0},  /* 0x12 */
+  /* CONTROL - GROUP2 */
+  {25, 0},  /* 0x04 */
+  {26, 0},  /* 0x0B */
+  {27, 0},  /* 0x12 */
 };
 
 void reset_asid_to_writeorder(void)
@@ -103,6 +139,7 @@ void reset_asid_to_writeorder(void)
   DBG("[ASID] RESET WRITEORDER REGISTERS");
   write_ordered = false;
   for (int i = 0; i < NO_SID_REGISTERS_ASID; i++) {
+    asid_to_writeorder[i].index = default_asid_to_writeorder[i].index;
     asid_to_writeorder[i].wait_us = 0;
   }
 }
@@ -196,7 +233,7 @@ void handle_asid_message(uint8_t sid, uint8_t* buffer, int size)
     }
   }
 }
-extern uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4)))); /* TEMPORARY */
+
 /* But this one lost all control */
 void handle_writeordered_asid_message(uint8_t sid, uint8_t* buffer)
 { /* Assumes byte 0-2 are not included in the buffer */
