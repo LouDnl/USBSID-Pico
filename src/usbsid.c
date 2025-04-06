@@ -338,11 +338,11 @@ void tud_resume_cb(void)
 
 /* USB MIDI CLASS TASK & CALLBACKS */
 
-void midi_task(void)
+void midi_task(void) /* Disabled in loop ~ keeping for later use */
 { /* Same as the callback routine */
   if (tud_midi_n_mounted(MIDI_ITF)) {
-    usbdata = 1;
     while (tud_midi_n_available(MIDI_ITF, MIDI_CABLE)) {  /* Loop as long as there is data available */
+      usbdata = 1;
       uint32_t available = tud_midi_n_stream_read(MIDI_ITF, MIDI_CABLE, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
       process_stream(midimachine.usbstreambuffer, available);
     }
@@ -355,9 +355,9 @@ void midi_task(void)
 
 void tud_midi_rx_cb(uint8_t itf)
 {
-  if (tud_midi_n_mounted(itf) && itf == MIDI_ITF) {
-    usbdata = 1;
+  if (tud_midi_n_mounted(itf)) {
     while (tud_midi_n_available(itf, MIDI_CABLE)) {  /* Loop as long as there is data available */
+      usbdata = 1;
       uint32_t available = tud_midi_n_stream_read(itf, MIDI_CABLE, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
       process_stream(midimachine.usbstreambuffer, available);
     }
@@ -724,7 +724,6 @@ int main()
     /* Additional tasks to support the callbacks
      * for improved throughput! */
     cdc_task();
-    midi_task();
     /* No vendor task here, fifo is disabled! */
   }
 
