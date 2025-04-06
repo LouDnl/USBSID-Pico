@@ -56,46 +56,52 @@ extern void reset_sid(void);
 extern uint16_t vu;
 
 /* Some locals, rural and such */
-
+bool write_ordered = false;
 struct asid_regpair_t {  /* thanks to thomasj */
   uint8_t index;
   uint8_t wait_us;
 };
-
 struct asid_regpair_t asid_to_writeorder[NO_SID_REGISTERS_ASID] = {  /* thanks to thomasj ~ SF2 Driver 11 no waits */
-  { 0, 0},
-  { 1, 0},
-  { 4, 0},
-  { 5, 0},
-  { 3, 0},
-  { 2, 0},
-  { 7, 0},
-  { 8, 0},
-  {11, 0},
-  {12, 0},
-  {10, 0},
-  { 9, 0},
-  {14, 0},
-  {15, 0},
-  {18, 0},
-  {19, 0},
-  {17, 0},
-  {16, 0},
-  {21, 0},
-  {22, 0},
-  {23, 0},
-  {24, 0},
-  { 6, 0},
-  {13, 0},
-  {20, 0},
-  {25, 0},
-  {26, 0},
-  {27, 0},
+  /* VOICE 1 */
+  { 0, 0},  /* 0x00 */
+  { 1, 0},  /* 0x01 */
+  { 4, 0},  /* 0x02 */
+  { 5, 0},  /* 0x03 */
+  { 3, 0},  /* 0x04 */
+  { 2, 0},  /* 0x05 */
+  { 7, 0},  /* 0x06 */
+  /* VOICE 2 */
+  { 8, 0},  /* 0x07 */
+  {11, 0},  /* 0x08 */
+  {12, 0},  /* 0x09 */
+  {10, 0},  /* 0x0A */
+  { 9, 0},  /* 0x0B */
+  {14, 0},  /* 0x0C */
+  {15, 0},  /* 0x0D */
+  /* VOICE 3 */
+  {18, 0},  /* 0x0E */
+  {19, 0},  /* 0x0F */
+  {17, 0},  /* 0x10 */
+  {16, 0},  /* 0x11 */
+  {21, 0},  /* 0x12 */
+  {22, 0},  /* 0x13 */
+  {23, 0},  /* 0x14 */
+  /* FILTER */
+  {24, 0},  /* 0x15 */
+  { 6, 0},  /* 0x16 */
+  {13, 0},  /* 0x17 */
+  /* MODE / VOLUME */
+  {20, 0},  /* 0x18 */
+  /* READ ONLY */
+  {25, 0},  /* 0x19 */
+  {26, 0},  /* 0x1A */
+  {27, 0},  /* 0x1B */
 };
 
 void reset_asid_to_writeorder(void)
 {
   DBG("[ASID] RESET WRITEORDER REGISTERS");
+  write_ordered = false;
   for (int i = 0; i < NO_SID_REGISTERS_ASID; i++) {
     asid_to_writeorder[i].wait_us = 0;
   }
@@ -190,7 +196,7 @@ void handle_asid_message(uint8_t sid, uint8_t* buffer, int size)
     }
   }
 }
-
+extern uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4)))); /* TEMPORARY */
 /* But this one lost all control */
 void handle_writeordered_asid_message(uint8_t sid, uint8_t* buffer)
 { /* Assumes byte 0-2 are not included in the buffer */
@@ -208,7 +214,7 @@ void handle_writeordered_asid_message(uint8_t sid, uint8_t* buffer)
     uint8_t wait_us;
   };
   static struct asid_regpair_local_t writeOrder[USBSID_MAX_SIDS][NO_SID_REGISTERS_ASID];
-
+  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
   unsigned int reg = 0;
   for (uint8_t mask = 0; mask < 4; mask++) {  /* no more then 4 masks */
     for (uint8_t bit = 0; bit < 7; bit++) {  /* each packet has 7 bits ~ stoopid midi */
@@ -232,11 +238,12 @@ void handle_writeordered_asid_message(uint8_t sid, uint8_t* buffer)
       }
     }
   }
+  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
   for (size_t pos = 0; pos < NO_SID_REGISTERS_ASID; pos++) {
     if (writeOrder[chip][pos].wait_us != 0xff) {
-        /* Perform write including wait cycles */
-        cycled_bus_operation((writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us);
-        WRITEDBG(dtype, pos, NO_SID_REGISTERS_ASID, (writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us);
+      /* Perform write including wait cycles */
+      cycled_bus_operation((writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us);
+      WRITEDBG(dtype, pos, NO_SID_REGISTERS_ASID, (writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us);
     }
   }
   for (size_t pos = 0; pos < NO_SID_REGISTERS_ASID; pos++) {
@@ -319,6 +326,7 @@ void decode_asid_message(uint8_t* buffer, int size)
       midimachine.bus = FREE;
       break;
     case 0x30:  /* Write order timing (order and delay between individual SID register writes, to closely match the C64 driver used) */
+      write_ordered = true;
       handle_asid_writeorder_config(&buffer[3]);
       break;
     case 0x31:  /* SID environment - PAL/NTSC, speed, frame delta time */

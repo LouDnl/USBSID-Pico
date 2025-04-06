@@ -46,6 +46,7 @@ extern uint sm_pwmled;  /* gpio.c */
 extern void setup_vu(void);
 
 /* ASID externals */
+extern bool write_ordered;
 extern void reset_asid_to_writeorder(void);
 
 /* LED breathe levels */
@@ -219,7 +220,9 @@ void led_runner(void)
       n_checks++;
       if (n_checks >= MAX_CHECKS)  /* 100 checks */
       {
-        if (dtype == 'A') reset_asid_to_writeorder();  /* ASID write order needs a butt slap after playtime ;) */
+        if (dtype == 'A' && write_ordered == true) {
+          reset_asid_to_writeorder();  /* ASID write order needs a butt slap after playtime ;) */
+        }
         n_checks = 0, usbdata = 0, dtype = ntype;  /* NOTE: This sets dtype to 0 which causes buffertask write to go to default and error out with many consecutive reads from the bus */
       }
     }
