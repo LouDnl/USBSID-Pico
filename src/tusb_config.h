@@ -127,8 +127,8 @@
 
 // Vendor FIFO size of TX and RX
 // If not configured vendor endpoints will not be buffered
-#define CFG_TUD_VENDOR_RX_BUFSIZE (TUD_OPT_HIGH_SPEED ? 512 : 64)  // Even at 512KB only 64KB will be used
-#define CFG_TUD_VENDOR_TX_BUFSIZE (TUD_OPT_HIGH_SPEED ? 512 : 64)  // Even at 512KB only 64KB will be used
+#define CFG_TUD_VENDOR_RX_BUFSIZE 0  /* Set to 0 to disable buffering (the fifo is not used) */
+#define CFG_TUD_VENDOR_TX_BUFSIZE 0  /* Set to 0 to disable buffering (the fifo is not used) */
 
 
 #ifdef __cplusplus
