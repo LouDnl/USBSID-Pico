@@ -111,13 +111,14 @@ typedef struct {
   /* Handles logging from Core 2 */
   char dtype;
   int n;
+  int s;
   uint8_t reg;
   uint8_t val;
   uint16_t cycles;
 } writelogging_queue_entry_t;
-#define write_to_q(a,b,c,d,e) \
+#define write_to_q(a,b,c,d,e,f) \
 do {                    \
-  writelogging_queue_entry_t l_entry = {a,b,c,d,e}; \
+  writelogging_queue_entry_t l_entry = {a,b,c,d,e,f}; \
   queue_try_add(&logging_queue, &l_entry); \
 } while(0)
 #define WRITEDBG(...) write_to_q(__VA_ARGS__)
