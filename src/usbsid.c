@@ -420,19 +420,17 @@ void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 /* Read from host to device */
 void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
 {
-  /* buffer contains incoming data, but of the previous read so we void it */
-  (void)buffer;
-  (void)bufsize;
+  /* With the fifo buffer disabled the buffer contains the newest incoming data */
+  /* If the fifo buffer is enabled the buffer contains data from the previous read */
 
-  if (web_serial_connected) { /* vendor class has no connect check, thus use this */
-    wusb_itf = &itf;
-    usbdata = 1, dtype = wusb;
-    webread = tud_vendor_n_read(*wusb_itf, &read_buffer, MAX_BUFFER_SIZE);
-    tud_vendor_n_read_flush(*wusb_itf);
-    memcpy(sid_buffer, read_buffer, webread);
-    process_buffer(wusb_itf, &webread);
-    /* memset(read_buffer, 0, count_of(read_buffer)); */
-    /* memset(sid_buffer, 0, count_of(sid_buffer)); */
+  /* vendor class has no connect check, thus use this */
+  if (web_serial_connected && itf == WUSB_ITF) {
+      wusb_itf = &itf; /* Since there's only 1 vendor interface, we know it's 0 */
+      usbdata = 1, dtype = wusb;
+      webread = bufsize;
+      memcpy(sid_buffer, buffer, bufsize);
+      /* No need to flush since we have no fifo */
+      process_buffer(wusb_itf, &webread);
     return;
   }
   return;
