@@ -39,14 +39,14 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(USBSID_DEBUGGING 1)     # Enable debugging ~ mandatory enable for all other logging types
   set(UART_DEBUGGING 1)       # Enable debugging over uart pins
   set(USBCDC_DEBUGGING 0)     # Enable debugging over cdc port 2
-  set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
-  set(SIDWRITES_DEBUGGING 1)  # Enable logging of SID writes one core 2
   set(DEFAULT_DEBUGGING 1)    # Enable debugging in usbsid.c
-  set(USBIO_DEBUGGING 0)      # Enable debugging in usbsid.c
   set(CONFIG_DEBUGGING 1)     # Enable debugging in config.c
+  set(USBIO_DEBUGGING 0)      # Enable debugging in usbsid.c
   set(GPIOBUS_DEBUGGING 0)    # Enable debugging in gpio.c
   set(MIDI_DEBUGGING 0)       # Enable debugging in midi.c
   set(MIDIVOICE_DEBUGGING 0)  # Enable debugging in midi.c
+  set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
+  set(SIDWRITES_DEBUGGING 0)  # Enable logging of SID writes one core 2
 endif()
 
 
