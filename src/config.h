@@ -86,11 +86,6 @@
 #else
 #define RGB_ENABLED false
 #endif
-#ifdef HAS_AUDIOSWITCH
-#define STEREO_ENABLED true
-#else
-#define STEREO_ENABLED false
-#endif
 
 /* USBSID-Pico config struct */
 typedef struct Config {

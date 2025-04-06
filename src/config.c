@@ -125,7 +125,7 @@ const char *mono_stereo[2] = { "Mono", "Stereo" };
   .clock_rate = DEFAULT, \
   .raster_rate = R_DEFAULT, \
   .lock_clockrate = false, \
-  .stereo_en = STEREO_ENABLED, \
+  .stereo_en = false, \
   .socketOne = { \
     .enabled = true, \
     .dualsid = false, \
@@ -661,14 +661,10 @@ void handle_config_request(uint8_t * buffer)
           usbsid_config.FMOpl.sidno = verify_fmopl_sidno();
           break;
         case 10:  /* Audio switch */
-          #if defined(HAS_AUDIOSWITCH)
-           usbsid_config.stereo_en =
-            (buffer[2] == 0 || buffer[2] == 1)
-            ? (bool)buffer[2]
-           : true;  /* Default to 1 ~ stereo if incorrect value */
-          #else
-          usbsid_config.stereo_en = false;
-          #endif
+          usbsid_config.stereo_en =
+          (buffer[2] == 0 || buffer[2] == 1)
+          ? (bool)buffer[2]
+          : true;  /* Default to 1 ~ stereo if incorrect value */
           break;
         default:
           break;
@@ -804,7 +800,6 @@ void handle_config_request(uint8_t * buffer)
       break;
     case SET_AUDIO:         /* Set the audio state from buffer setting (saves config if provided) */
       CFG("[CMD] SET_AUDIO\n");
-      #if defined(HAS_AUDIOSWITCH)
       usbsid_config.stereo_en =
         (buffer[1] == 0 || buffer[1] == 1)
         ? (bool)buffer[1]
@@ -816,9 +811,6 @@ void handle_config_request(uint8_t * buffer)
         load_config(&usbsid_config);
         apply_config(false);
       }
-      #else
-      usbsid_config.stereo_en = false;
-      #endif
       break;
     case DETECT_SIDS:       /* Detect SID types per socket */
       CFG("[CMD] DETECT_SIDS\n");
@@ -953,7 +945,7 @@ void print_config_settings(void)
   #endif
   CFG("[CONFIG] [PICO] LED_PWM = %d\n", LED_PWM);  // pio.h PICO_PIO_VERSION
   CFG("[CONFIG] PRINT SETTINGS START\n");
-  CFG("[CONFIG] [USBSID PCB VERSION] %.*f\n", 1, PCB_VERSION);
+  CFG("[CONFIG] [USBSID PCB VERSION] %s\n", PCB_VERSION);
   CFG("[CONFIG] [USBSID FIRMWARE VERSION] %s\n", project_version);
 
   CFG("[CONFIG] [CLOCK] %s @%d\n",

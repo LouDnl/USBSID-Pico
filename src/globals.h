@@ -47,7 +47,7 @@
 #define PROJECT_VERSION "0.4.1-BETA.20250406"  /* Must be the same as in CMakeLists.txt */
 #endif
 #ifndef PCB_VERSION
-#define PCB_VERSION 1.0
+#define PCB_VERSION "1.0"
 #endif
 
 #ifndef USBSID_MAX_SIDS
