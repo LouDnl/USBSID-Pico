@@ -61,85 +61,15 @@ struct asid_regpair_t {  /* thanks to thomasj */
   uint8_t index;
   uint8_t wait_us;
 };
-struct asid_regpair_t default_asid_to_writeorder[NO_SID_REGISTERS_ASID] = {  /* thanks to thomasj ~ SF2 Driver 11 no waits */
-  /* VOICE 1 */
-  { 0, 0},  /* 0x00 */
-  { 1, 0},  /* 0x01 */
-  { 2, 0},  /* 0x02 */
-  { 3, 0},  /* 0x03 */
-  { 4, 0},  /* 0x04 */
-  { 5, 0},  /* 0x05 */
-  /* VOICE 2 */
-  { 6, 0},  /* 0x06 */
-  { 7, 0},  /* 0x07 */
-  { 8, 0},  /* 0x08 */
-  { 9, 0},  /* 0x09 */
-  {10, 0},  /* 0x0A */
-  {11, 0},  /* 0x0B */
-  /* VOICE 3 */
-  {12, 0},  /* 0x0C */
-  {13, 0},  /* 0x0D */
-  {14, 0},  /* 0x0E */
-  {15, 0},  /* 0x0F */
-  {16, 0},  /* 0x10 */
-  {17, 0},  /* 0x11 */
-  /* FILTER & VOLUME */
-  {18, 0},  /* 0x12 */
-  {19, 0},  /* 0x13 */
-  {20, 0},  /* 0x14 */
-  {21, 0},  /* 0x15 */
-  /* CONTROL - GROUP1 */
-  {22, 0},  /* 0x16 */
-  {23, 0},  /* 0x17 */
-  {24, 0},  /* 0x18 */
-  /* CONTROL - GROUP2 */
-  {25, 0},  /* 0x19 */
-  {26, 0},  /* 0x1A */
-  {27, 0},  /* 0x1B */
-};
-struct asid_regpair_t asid_to_writeorder[NO_SID_REGISTERS_ASID] = {  /* thanks to thomasj ~ SF2 Driver 11 no waits */
-  /* VOICE 1 */
-  { 0, 0},  /* 0x00 */
-  { 1, 0},  /* 0x01 */
-  { 4, 0},  /* 0x02 */
-  { 5, 0},  /* 0x03 */
-  { 3, 0},  /* 0x05 */
-  { 2, 0},  /* 0x06 */
-  /* VOICE 2 */
-  { 7, 0},  /* 0x07 */
-  { 8, 0},  /* 0x08 */
-  {11, 0},  /* 0x09 */
-  {12, 0},  /* 0x0A */
-  {10, 0},  /* 0x0C */
-  { 9, 0},  /* 0x0D */
-  /* VOICE 3 */
-  {14, 0},  /* 0x0E */
-  {15, 0},  /* 0x0F */
-  {18, 0},  /* 0x10 */
-  {19, 0},  /* 0x11 */
-  {17, 0},  /* 0x13 */
-  {16, 0},  /* 0x14 */
-  /* FILTER & VOLUME */
-  {21, 0},  /* 0x15 */
-  {22, 0},  /* 0x16 */
-  {23, 0},  /* 0x17 */
-  {24, 0},  /* 0x18 */
-  /* CONTROL - GROUP1 */
-  { 6, 0},  /* 0x04 */
-  {13, 0},  /* 0x0B */
-  {20, 0},  /* 0x12 */
-  /* CONTROL - GROUP2 */
-  {25, 0},  /* 0x04 */
-  {26, 0},  /* 0x0B */
-  {27, 0},  /* 0x12 */
-};
+
+struct asid_regpair_t asid_to_writeorder[NO_SID_REGISTERS_ASID] = {};  /* thanks to thomasj ~ SF2 Driver 11 no waits */
 
 void reset_asid_to_writeorder(void)
 {
-  DBG("[ASID] RESET WRITEORDER REGISTERS");
+  DBG("[ASID] RESET WRITEORDER REGISTERS\n");
   write_ordered = false;
   for (int i = 0; i < NO_SID_REGISTERS_ASID; i++) {
-    asid_to_writeorder[i].index = default_asid_to_writeorder[i].index;
+    asid_to_writeorder[i].index = i;
     asid_to_writeorder[i].wait_us = 0;
   }
 }
@@ -210,9 +140,8 @@ void handle_complete_asid_buffer(uint8_t sid, uint8_t* buffer, int size)
 }
 
 /* And so does this */
-void handle_asid_message(uint8_t sid, uint8_t* buffer, int size)
+void handle_asid_message(uint8_t sid, uint8_t* buffer)
 { /* Assumes byte 0-2 are not included in the buffer */
-	(void)size;  /* Stop calling me fat, I'm just big boned! */
   unsigned int reg = 0;
   for (uint8_t mask = 0; mask < 4; mask++) {  /* no more then 4 masks */
     for (uint8_t bit = 0; bit < 7; bit++) {  /* each packet has 7 bits ~ stoopid midi */
@@ -275,7 +204,6 @@ void handle_writeordered_asid_message(uint8_t sid, uint8_t* buffer)
       }
     }
   }
-  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
   for (size_t pos = 0; pos < NO_SID_REGISTERS_ASID; pos++) {
     if (writeOrder[chip][pos].wait_us != 0xff) {
       /* Perform write including wait cycles */
@@ -299,6 +227,7 @@ void handle_asid_writeorder_config(uint8_t* buffer)
     cycles = ((data & 0x40) << 1) + buffer[(i << 1) + 1];
     /* asid_to_writeorder[i].wait_us = max(0, cycles - 7); */ /* USP doesn't have overhead, disabled */
     asid_to_writeorder[i].wait_us = cycles;
+    CFG("[ASID WRITE ORDER %d] {%02u,%02u}\n", i, asid_to_writeorder[i].index, asid_to_writeorder[i].wait_us);
   }
 }
 
@@ -375,16 +304,24 @@ void decode_asid_message(uint8_t* buffer, int size)
     case 0x4F:  /* Display characters */
       break;
     case 0x4E:  /* SID 1 */
-      handle_writeordered_asid_message(0, &buffer[3]);
+      if (write_ordered)
+        handle_writeordered_asid_message(0, &buffer[3]);
+      else handle_asid_message(0, &buffer[3]);
       break;
     case 0x50:  /* SID 2 */
-      handle_writeordered_asid_message(32, &buffer[3]);
+      if (write_ordered)
+        handle_writeordered_asid_message(32, &buffer[3]);
+      else handle_asid_message(32, &buffer[3]);
       break;
     case 0x51:  /* SID 3 */
-      handle_writeordered_asid_message(64, &buffer[3]);
+      if (write_ordered)
+        handle_writeordered_asid_message(64, &buffer[3]);
+      else handle_asid_message(64, &buffer[3]);
       break;
     case 0x52:  /* SID 4 */
-      handle_writeordered_asid_message(96, &buffer[3]);
+      if (write_ordered)
+        handle_writeordered_asid_message(96, &buffer[3]);
+      else handle_asid_message(96, &buffer[3]);
       break;
     case 0x60:  /* FMOpl */
       if (fmopl_enabled) {  /* Only if FMOpl is enabled, drop otherwise */
