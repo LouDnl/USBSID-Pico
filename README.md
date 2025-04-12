@@ -195,12 +195,11 @@ No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral
 If available you can purchase (semi) assembled boards minus Pico from me - send me a message on any of my socials.  
 
 ## Important PCB information
-PCB revision v1.0
+### PCB revision v1.0
 - [View jumper information (online)](PCBv1.0-INFO.adoc)
 - [View jumper information (PDF download)](doc/PCBv1.0-INFO.pdf)
-
-PCB revision v1.3
-- _N/A_
+### PCB revision v1.3
+- Coming soon!
 
 ## Cases
 All USBSID-Pico community created cases are available in the [cases](cases/) directory, direct links below.  
@@ -209,10 +208,14 @@ _Cases for PCB revision v1.0:_
 * [boxy case](repo/cases/schorsch3000/usbsidpico-case-box.tgz) by @schorsch3000
 
 _Cases for PCB revision v1.3:_
-* None yet, sorry!
+* Updated cartridge case coming soon!
 
 ### Schematic and BOM
-If you want and are up to it you can create your own development board by using the provided [schematic](resources/v1.0-schematic.pdf) and [interactive BOM](https://loudnl.github.io/).
+If you want and are up to it you can solder your own PCB or create your own development board using the documents below
+#### v1.0
+[v1.0 schematic](resources/v1.0-schematic.pdf) and [v1.0 interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/resources/v1.0-ibom.html)
+#### v1.3
+[v1.3 schematic](resources/v1.3-schematic.pdf) and [v1.3 interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/resources/v1.3-ibom.html)
 ### PCB Features ~ v1.3
 Includes all features from v1.0 except the audio jumper
 - IO controlled Stereo/Mono switch, can be set in config or toggled during play

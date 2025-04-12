@@ -513,10 +513,10 @@ void print_sid_clockspeed(void)
   printf("USBSID-Pico SID Clockrate is set to: %u\n", read_clock_rate);
 }
 
-void read_version(int print_version)
+void read_version(uint8_t cmd, int print_version)
 {
   memset(config_buffer+1, 0, (count_of(config_buffer))-1);
-  config_buffer[1] = 0x80;
+  config_buffer[1] = cmd;
   write_chars(config_buffer, count_of(config_buffer));
 
   int len;
@@ -527,8 +527,8 @@ void read_version(int print_version)
   for (int i = 0; i < count_of(version) ; i++) {
     version[i] = read_data_uber[i];
   }
-  if (len == 128 && read_data_uber[0] == 0x80) len = read_chars(read_data_uber, count_of(read_data_uber));
-  memcpy(&project_version[0], &version[1], count_of(project_version));
+  if (len == 128 && read_data_uber[0] == cmd) len = read_chars(read_data_uber, count_of(read_data_uber));
+  memcpy(&project_version[0], &version[1], count_of(project_version) - 1);
   if(print_version == 1 || debug == 1) printf("v%s\n", project_version);
   if(debug == 1) print_cfg_buffer(read_data_uber, 128);
   return;
@@ -741,7 +741,7 @@ void sid_autodetect(void)
   len = read_chars(read_data_uber, count_of(read_data_uber));
   //if (len == 0) len = read_chars(read_data_uber, count_of(read_data_uber));
   if (debug == 1) printf("Read %d bytes of data, byte 0 = %02X\n", len, read_data_uber[0]);
-  memcpy(&config[0], &read_data_uber[0], count_of(config));
+  memcpy(&config[0], &read_data_uber[0], count_of(read_data_uber));
 
   if (debug == 1) print_cfg_buffer(config, count_of(config));
   set_cfg_from_buffer(config, count_of(config));
@@ -757,7 +757,7 @@ void read_config(void)
   int len;
   len = read_chars(read_data_uber, count_of(read_data_uber));
   if (debug == 1) printf("Read %d bytes of data, byte 0 = %02X\n", len, read_data_uber[0]);
-  memcpy(&config, &read_data_uber, count_of(config));
+  memcpy(&config, &read_data_uber, count_of(read_data_uber));
   if (len == 128) len = read_chars(read_data_uber, count_of(read_data_uber));
 
   if (debug == 1) print_cfg_buffer(config, count_of(config));
@@ -1032,15 +1032,15 @@ void skpico_read_config(int debug)
     if (i >= 13 && i <= 56) continue;
     if (i == 62 || i == 63) continue;
     if (i == 0 || i == 8) {
-      printf("[%02ld] %s: %02X ~ %s\n", i, config_names[i], skpico_config[i], (skpico_config[i] < s_sid_types) ? sid_types[skpico_config[i]] : error_type);
+      printf("[%02ld] %s: %02X ~ %s\n", i, config_names[i], skpico_config[i], (skpico_config[i] < s_sid_types) ? (char*)sid_types[skpico_config[i]] : (char*)error_type[0]);
       continue;
     }
     if (i == 10) {
-      printf("[%02ld] %s: %02X ~ %s\n", i, config_names[i], skpico_config[i], (skpico_config[i] < s_sid2_address) ? sid2_address[skpico_config[i]] : error_type);
+      printf("[%02ld] %s: %02X ~ %s\n", i, config_names[i], skpico_config[i], (skpico_config[i] < s_sid2_address) ? (char*)sid2_address[skpico_config[i]] : (char*)error_type[0]);
       continue;
     }
     if (i == 59) {
-      printf("[%02ld] %s: %02X ~ %s\n", i, config_names[i], skpico_config[i], (skpico_config[i] < s_clock_speed) ? clock_speed[skpico_config[i]] : error_type);
+      printf("[%02ld] %s: %02X ~ %s\n", i, config_names[i], skpico_config[i], (skpico_config[i] < s_clock_speed) ? (char*)clock_speed[skpico_config[i]] : (char*)error_type[0]);
       continue;
     }
     printf("[%02ld] %s: %02X\n", i, config_names[i], skpico_config[i]);
@@ -1418,8 +1418,10 @@ void config_usbsidpico(int argc, char **argv)
     }
 
     if (!strcmp(argv[param_count], "-v") || !strcmp(argv[param_count], "--version")) {
-      printf("Reading version: ");
-      read_version(1);
+      printf("Reading firmware version: ");
+      read_version(USBSID_VERSION, 1);
+      printf("Reading PCB version: ");
+      read_version(US_PCB_VERSION, 1);
       break;
     }
 

@@ -102,6 +102,7 @@ enum
   RESET_MIDI_STATE = 0x63,
 
   USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
+  US_PCB_VERSION   = 0x81,  /* Read PCB version */
 
   RESTART_BUS      = 0x85,  /* Restart DMA & PIO */
   RESTART_BUS_CLK  = 0x86,  /* Restart PIO clocks */

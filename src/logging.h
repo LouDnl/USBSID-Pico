@@ -30,8 +30,7 @@ extern "C" {
 #endif
 
 
-/* Binary printing */
-#include "macros.h"
+/* Logging to USB uart */
 
 #ifdef USB_PRINTF
 /* TinyUSB libs */
@@ -43,20 +42,22 @@ extern "C" {
 /* Sourced from:
  * https://github.com/hathach/tinyusb/blob/eca025f7143141fd2bc99a94619c62a6fd666f28/examples/dual/host_info_to_device_cdc/src/main.c
  */
-#define cdc_printf(...)                \
-do {                                   \
-    char _tempbuf[1024];               \
-    sprintf(_tempbuf, __VA_ARGS__);    \
-    uint32_t count = sprintf(_tempbuf, __VA_ARGS__); \
-    for (int i = 0; i < count; i ++) tud_cdc_n_write_char(1, _tempbuf[i]); \
-    tud_cdc_n_write_flush(1);            \
-    tud_task_ext(0, true);               \
-    } while(0)
+#define cdc_printf(...)              \
+do {                                 \
+  char _tempbuf[1024];               \
+  sprintf(_tempbuf, __VA_ARGS__);    \
+  uint32_t count = sprintf(_tempbuf, __VA_ARGS__); \
+  for (int i = 0; i < count; i ++) tud_cdc_n_write_char(1, _tempbuf[i]); \
+  tud_cdc_n_write_flush(1);          \
+  tud_task_ext(0, true);             \
+} while(0)
 #define _US_DBG(...) cdc_printf(__VA_ARGS__)
 #else
 #define _US_DBG(...) printf(__VA_ARGS__)
 #endif
 
+
+/* Logging macro's */
 
 #ifdef MEM_DEBUG
 #define MDBG(...) _US_DBG(__VA_ARGS__)
@@ -98,6 +99,31 @@ do {                                   \
 #define MVDBG(...) _US_DBG(__VA_ARGS__)
 #else
 #define MVDBG(...) ((void)0)
+#endif
+
+
+/* Global logging queues */
+
+#ifdef WRITE_DEBUG
+#include "pico/util/queue.h"  /* Inter core queue */
+extern queue_t logging_queue;
+typedef struct {
+  /* Handles logging from Core 2 */
+  char dtype;
+  int n;
+  int s;
+  uint8_t reg;
+  uint8_t val;
+  uint16_t cycles;
+} writelogging_queue_entry_t;
+#define write_to_q(a,b,c,d,e,f) \
+do {                    \
+  writelogging_queue_entry_t l_entry = {a,b,c,d,e,f}; \
+  queue_try_add(&logging_queue, &l_entry); \
+} while(0)
+#define WRITEDBG(...) write_to_q(__VA_ARGS__)
+#else
+#define WRITEDBG(...) ((void)0)
 #endif
 
 

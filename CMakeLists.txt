@@ -29,8 +29,8 @@ cmake_minimum_required(VERSION 3.17)
 set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
-set(MAGIC_SMOKE "20250309")
-set(PROJECT_VERSION "0.4.0-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
+set(MAGIC_SMOKE "20250406")
+set(PROJECT_VERSION "0.4.1-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
 
 ### Want a cookie?
 # NOTICE: ENABLING THESE DEBUGGING DEFINITIONS WILL HAVE SIGNIFICANT IMPACT AND WILL DELAY PLAYING!
@@ -39,13 +39,14 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(USBSID_DEBUGGING 1)     # Enable debugging ~ mandatory enable for all other logging types
   set(UART_DEBUGGING 1)       # Enable debugging over uart pins
   set(USBCDC_DEBUGGING 0)     # Enable debugging over cdc port 2
-  set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
   set(DEFAULT_DEBUGGING 1)    # Enable debugging in usbsid.c
-  set(USBIO_DEBUGGING 0)      # Enable debugging in usbsid.c
   set(CONFIG_DEBUGGING 1)     # Enable debugging in config.c
+  set(USBIO_DEBUGGING 0)      # Enable debugging in usbsid.c
   set(GPIOBUS_DEBUGGING 0)    # Enable debugging in gpio.c
   set(MIDI_DEBUGGING 0)       # Enable debugging in midi.c
   set(MIDIVOICE_DEBUGGING 0)  # Enable debugging in midi.c
+  set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
+  set(SIDWRITES_DEBUGGING 0)  # Enable logging of SID writes one core 2
 endif()
 
 
@@ -60,6 +61,7 @@ endif()
 SET(DEBUG_SYMBOLS 0)   # 0 default, 1 debug symbols & debug build enabled
 SET(DEBUGGING 0)       # 0 default, 1~3 equals -g1~3
 SET(OPTIMIZATIONS 3)   # 3 default, 1 ~ -O1 for debugging
+SET(TUSB_DEBUG 0)      # 0 default, 0~3 non verbose to very verbose
 
 ### Target board pico, pico_w, pico2
 if(DEFINED PICO_BOARD)
@@ -84,24 +86,10 @@ else()
   endif()
 endif()
 
-### Target product & output filename
-if(${PICO_BOARD} STREQUAL "pico")
-  set(PROJECT_PRODUCT ${PRODUCT_STRING})
-  set(PROJECT_FILENAME ${PROJECT_NAME})
-elseif(${PICO_BOARD} STREQUAL "pico_w")
-  set(PROJECT_PRODUCT "${PRODUCT_STRING}_W")
-  set(PROJECT_FILENAME "${PROJECT_NAME}_w")
-elseif(${PICO_BOARD} STREQUAL "pico2")
-  set(PROJECT_PRODUCT "${PRODUCT_STRING}2")
-  set(PROJECT_FILENAME "${PROJECT_NAME}2")
-elseif(${PICO_BOARD} STREQUAL "pico2_w")
-  set(PROJECT_PRODUCT "${PRODUCT_STRING}2_W")
-  set(PROJECT_FILENAME "${PROJECT_NAME}2_w")
-endif()
 
 ### Version validation
-if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/src/config.h)
-  file(STRINGS ${CMAKE_CURRENT_LIST_DIR}/src/config.h VALIDATION_FILE)
+if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/src/globals.h)
+  file(STRINGS ${CMAKE_CURRENT_LIST_DIR}/src/globals.h VALIDATION_FILE)
   set(VALIDATION_SUCCESS False)
   set(VALIDATION_LINE "#define PROJECT_VERSION")
   while(VALIDATION_FILE)
@@ -110,23 +98,19 @@ if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/src/config.h)
       string(REGEX REPLACE "^${VALIDATION_LINE} " "" VERSION ${LINE})
       if(${VERSION} MATCHES ${PROJECT_VERSION})
         set(REDUCTION_SUCCESS True)
-        message("VALIDATED config version ${VERSION} matches project version \"${PROJECT_VERSION}\"")
-        set(USBSID_PRODUCT ${PROJECT_PRODUCT})
+        message("VALIDATED header version ${VERSION}\nMATCHES project version \"${PROJECT_VERSION}\"")
         set(USBSID_MANUFACTURER "${PROJECT_MANUFACTURER} (v${PROJECT_VERSION})")
-        add_compile_definitions(USBSID_PRODUCT="${USBSID_PRODUCT}")
         add_compile_definitions(USBSID_MANUFACTURER="${USBSID_MANUFACTURER}")
-        message("Set USB manufacturer: ${USBSID_MANUFACTURER}")
-        message("Set USB product: ${USBSID_PRODUCT}")
         break()
       else()
-      message("ERROR config version ${VERSION} does not match project version \"${PROJECT_VERSION}\"")
+      message("ERROR header version ${VERSION} does not match project version \"${PROJECT_VERSION}\"")
         set(REDUCTION_SUCCESS False)
         return()
       endif()
     endif()
   endwhile()
 else()
-  message("ERROR config.h missing")
+  message("ERROR globals.h missing")
   return()
 endif()
 
@@ -151,11 +135,23 @@ set(PICO_DEFAULT_DOUBLE_IMPL pico_double_default)
 if(DEBUG_SYMBOLS EQUAL 1)
   set(CMAKE_BUILD_TYPE Debug)  # for debugging
   set(PICO_DEOPTIMIZED_DEBUG 1)
-  set(CFG_TUSB_DEBUG 1)
+  if(TUSB_DEBUG EQUAL 0)
+    set(CFG_TUSB_DEBUG 1)
+    # add_compile_definitions(CFG_TUSB_DEBUG=1)
+  else()
+    set(CFG_TUSB_DEBUG TUSB_DEBUG)
+  endif()
 else()
   set(CMAKE_BUILD_TYPE Release)
   set(PICO_DEOPTIMIZED_DEBUG 0)
-  set(CFG_TUSB_DEBUG 0)
+  ### TinyUSB debug logging
+  if(TUSB_DEBUG GREATER 0)
+    message("TinyUSB debugging set to ${TUSB_DEBUG}")
+    set(CFG_TUSB_DEBUG ${TUSB_DEBUG})
+    # add_compile_definitions(CFG_TUSB_DEBUG=${TUSB_DEBUG})
+  else()
+    set(CFG_TUSB_DEBUG 0)
+  endif()
 endif()
 
 ### Define compile time debugging
@@ -207,6 +203,21 @@ set(COMPILE_OPTS PRIVATE
 )
 message("Compile time flags: ${COMPILE_OPTS}")
 
+### Target product & output filename
+if(${PICO_BOARD} STREQUAL "pico")
+  set(PROJECT_PRODUCT ${PRODUCT_STRING})
+  set(PROJECT_FILENAME ${PROJECT_NAME})
+elseif(${PICO_BOARD} STREQUAL "pico_w")
+  set(PROJECT_PRODUCT "${PRODUCT_STRING}_W")
+  set(PROJECT_FILENAME "${PROJECT_NAME}_w")
+elseif(${PICO_BOARD} STREQUAL "pico2")
+  set(PROJECT_PRODUCT "${PRODUCT_STRING}2")
+  set(PROJECT_FILENAME "${PROJECT_NAME}2")
+elseif(${PICO_BOARD} STREQUAL "pico2_w")
+  set(PROJECT_PRODUCT "${PRODUCT_STRING}2_W")
+  set(PROJECT_FILENAME "${PROJECT_NAME}2_w")
+endif()
+
 ### Executable names
 list(APPEND FILENAMES
   ${PROJECT_FILENAME}-v1.0
@@ -215,6 +226,10 @@ list(APPEND FILENAMES
 list(APPEND PICOTYPES
   "LED"
   "LED_AUDIOSWITCH"
+)
+list(APPEND PCBVERSIONS
+  "1.0"
+  "1.3"
 )
 if(${PICO_BOARD} STREQUAL "pico")
   list(APPEND FILENAMES
@@ -225,7 +240,12 @@ if(${PICO_BOARD} STREQUAL "pico")
     "RGB"
     "RGB_AUDIOSWITCH"
   )
+  list(APPEND PCBVERSIONS
+  "1.0"
+  "1.3"
+)
 endif()
+
 
 ### Source files to compile
 set(SOURCEFILES
@@ -312,6 +332,9 @@ if(USBSID_DEBUGGING EQUAL 1)
   if(MEMORY_LOGGING EQUAL 1)
     add_compile_definitions(MEM_DEBUG=1)
   endif()
+  if(SIDWRITES_DEBUGGING EQUAL 1)
+    add_compile_definitions(WRITE_DEBUG=1)
+  endif()
   if(CONFIG_DEBUGGING EQUAL 1)
     add_compile_definitions(CONFIG_DEBUG=1)
   endif()
@@ -333,21 +356,29 @@ endif()
 add_compile_definitions(MAGIC_SMOKE=${MAGIC_SMOKE})
 
 ### Compile targets
-foreach(FILENAME PICOTYPE IN ZIP_LISTS FILENAMES PICOTYPES)
+foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSIONS)
   # set filename
   set(BUILD ${FILENAME})
+  set(BUILD_VERSION "")
+  string(CONCAT BUILD_VERSION ${PROJECT_PRODUCT} " v" ${PCBVERSION})
   message(STATUS "Building ${FILENAME} with PICOTYPE=${PICOTYPE} and MAGIC_SMOKE=${MAGIC_SMOKE}")
+  message("Set USB manufacturer: ${USBSID_MANUFACTURER}")
+  message("Set USB product: ${BUILD_VERSION}")
   # executable
+  # add_executable(${BUILD} ${SOURCEFILES} ${LIBSOURCEFILES})
   add_executable(${BUILD} ${SOURCEFILES})
   # BUILD TYPES
-  if(PICOTYPE STREQUAL "RGB" OR PICOTYPE STREQUAL "RGB_AUDIOSWITCH")
-    message("Building ")
-    target_compile_definitions(${BUILD} PRIVATE USBSID USE_RGB=1)
-    target_compile_definitions(${BUILD} PRIVATE USBSID HAS_AUDIOSWITCH=1)
+  if(PICOTYPE STREQUAL "RGB")
+    target_compile_definitions(${BUILD} PRIVATE USBSID USBSID_PRODUCT="${BUILD_VERSION}" USE_RGB=1 PCB_VERSION="${PCBVERSION}")
+    # add_compile_definitions(USE_RGB=1)
+  elseif(PICOTYPE STREQUAL "RGB_AUDIOSWITCH")
+    target_compile_definitions(${BUILD} PRIVATE USBSID USBSID_PRODUCT="${BUILD_VERSION}" USE_RGB=1 HAS_AUDIOSWITCH=1 PCB_VERSION="${PCBVERSION}")
+    # add_compile_definitions(USE_RGB=1 HAS_AUDIOSWITCH=1)
   elseif(PICOTYPE STREQUAL "LED_AUDIOSWITCH")
-    target_compile_definitions(${BUILD} PRIVATE USBSID HAS_AUDIOSWITCH=1)
+    target_compile_definitions(${BUILD} PRIVATE USBSID USBSID_PRODUCT="${BUILD_VERSION}" HAS_AUDIOSWITCH=1 PCB_VERSION="${PCBVERSION}")
+    # add_compile_definitions(HAS_AUDIOSWITCH=1)
   else()
-    target_compile_definitions(${BUILD} PRIVATE USBSID)
+    target_compile_definitions(${BUILD} PRIVATE USBSID USBSID_PRODUCT="${BUILD_VERSION}" PCB_VERSION="${PCBVERSION}")
   endif()
   # pio addition
   pico_generate_pio_header(${BUILD} ${PIO_BUS})

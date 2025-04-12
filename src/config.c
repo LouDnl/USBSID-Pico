@@ -109,6 +109,7 @@ bool first_boot = false;
 
 /* Init string constants for logging */
 const char* project_version = PROJECT_VERSION;
+const char* pcb_version = PCB_VERSION;
 const char *sidtypes[5] = { "UNKNOWN", "N/A", "MOS8580", "MOS6581", "FMOpl" };
 const char *chiptypes[2] = { "Real", "Clone" };
 const char *clonetypes[6] = { "Disabled", "Other", "SKPico", "ARMSID", "FPGASID", "RedipSID" };
@@ -125,7 +126,7 @@ const char *mono_stereo[2] = { "Mono", "Stereo" };
   .clock_rate = DEFAULT, \
   .raster_rate = R_DEFAULT, \
   .lock_clockrate = false, \
-  .stereo_en = STEREO_ENABLED, \
+  .stereo_en = false, \
   .socketOne = { \
     .enabled = true, \
     .dualsid = false, \
@@ -355,11 +356,19 @@ void read_socket_config(Config* config)
   return;
 }
 
-void read_firmware_version()
+void read_firmware_version(void)
 {
   p_version_array[0] = USBSID_VERSION;  /* Initiator byte */
   p_version_array[1] = strlen(project_version);  /* Length of version string */
   memcpy(p_version_array+2, project_version, strlen(project_version));
+  return;
+}
+
+void read_pcb_version(void)
+{
+  p_version_array[0] = US_PCB_VERSION;  /* Initiator byte */
+  p_version_array[1] = strlen(pcb_version);  /* Length of version string */
+  memcpy(p_version_array+2, pcb_version, strlen(pcb_version));
   return;
 }
 
@@ -661,14 +670,10 @@ void handle_config_request(uint8_t * buffer)
           usbsid_config.FMOpl.sidno = verify_fmopl_sidno();
           break;
         case 10:  /* Audio switch */
-          #if defined(HAS_AUDIOSWITCH)
-           usbsid_config.stereo_en =
-            (buffer[2] == 0 || buffer[2] == 1)
-            ? (bool)buffer[2]
-           : true;  /* Default to 1 ~ stereo if incorrect value */
-          #else
-          usbsid_config.stereo_en = false;
-          #endif
+          usbsid_config.stereo_en =
+          (buffer[2] == 0 || buffer[2] == 1)
+          ? (bool)buffer[2]
+          : true;  /* Default to 1 ~ stereo if incorrect value */
           break;
         default:
           break;
@@ -804,7 +809,6 @@ void handle_config_request(uint8_t * buffer)
       break;
     case SET_AUDIO:         /* Set the audio state from buffer setting (saves config if provided) */
       CFG("[CMD] SET_AUDIO\n");
-      #if defined(HAS_AUDIOSWITCH)
       usbsid_config.stereo_en =
         (buffer[1] == 0 || buffer[1] == 1)
         ? (bool)buffer[1]
@@ -816,9 +820,6 @@ void handle_config_request(uint8_t * buffer)
         load_config(&usbsid_config);
         apply_config(false);
       }
-      #else
-      usbsid_config.stereo_en = false;
-      #endif
       break;
     case DETECT_SIDS:       /* Detect SID types per socket */
       CFG("[CMD] DETECT_SIDS\n");
@@ -881,7 +882,23 @@ void handle_config_request(uint8_t * buffer)
       break;
     case USBSID_VERSION:
       CFG("[CMD] READ_FIRMWARE_VERSION\n");
+      memset(p_version_array, 0, count_of(p_version_array));
       read_firmware_version();
+      memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
+      memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
+        switch (dtype) {
+          case 'C':
+            cdc_write(cdc_itf, MAX_BUFFER_SIZE);
+            break;
+          case 'W':
+            webserial_write(wusb_itf, MAX_BUFFER_SIZE);
+            break;
+        }
+      break;
+    case US_PCB_VERSION:
+      CFG("[CMD] READ_PCB_VERSION\n");
+      memset(p_version_array, 0, count_of(p_version_array));
+      read_pcb_version();
       memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
       memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
         switch (dtype) {
@@ -953,7 +970,8 @@ void print_config_settings(void)
   #endif
   CFG("[CONFIG] [PICO] LED_PWM = %d\n", LED_PWM);  // pio.h PICO_PIO_VERSION
   CFG("[CONFIG] PRINT SETTINGS START\n");
-  CFG("[CONFIG] [USBSID VERSION] %s\n", project_version);
+  CFG("[CONFIG] [USBSID PCB VERSION] %s\n", PCB_VERSION);
+  CFG("[CONFIG] [USBSID FIRMWARE VERSION] %s\n", project_version);
 
   CFG("[CONFIG] [CLOCK] %s @%d\n",
     int_ext[(int)usbsid_config.external_clock],

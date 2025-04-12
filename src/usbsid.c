@@ -99,6 +99,7 @@ midi_machine midimachine;
 
 /* Queues */
 queue_t sidtest_queue;
+queue_t logging_queue;
 
 /* WebUSB Description URL */
 static const tusb_desc_webusb_url_t desc_url =
@@ -181,8 +182,8 @@ void webserial_write(uint8_t * itf, uint32_t n)
 int __not_in_flash_func(do_buffer_tick)(int top, int step)
 {
   static int i = 1;
-  IODBG("[I %d] [%c] $%02X:%02X %u\n", i, dtype, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : 10));
-  cycled_bus_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : 10));
+  cycled_bus_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
+  WRITEDBG(dtype, i, top, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   if (i+step >= top) {
     i = 1;
     return i;
@@ -212,8 +213,8 @@ void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
   if (command == CYCLED_WRITE) {
     // n_bytes = (n_bytes == 0) ? 4 : n_bytes; /* if byte count is zero, this is a single write packet */
     if (n_bytes == 0) {
-      IODBG("[I %d] [%c] $%02X:%02X %u\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
       cycled_bus_operation(sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
+      WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
     } else {
       buffer_task(n_bytes, 4);
     }
@@ -222,9 +223,8 @@ void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
   if (command == WRITE) {
     // n_bytes = (n_bytes == 0) ? 2 : n_bytes; /* if byte count is zero, this is a single write packet */
     if (n_bytes == 0) {
-      IODBG("[I %d] [%c] $%02X:%02X\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2]);
-      /* write the address and value to the SID with a 10 cycle period */
       bus_operation(0x10, sid_buffer[1], sid_buffer[2]);  /* Leave this on non cycled, errornous playback otherwise! */
+      WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], 0);
     } else {
       buffer_task(n_bytes, 2);
     }
@@ -336,17 +336,32 @@ void tud_resume_cb(void)
 }
 
 
-/* USB MIDI CLASS CALLBACKS */
+/* USB MIDI CLASS TASK & CALLBACKS */
+
+void midi_task(void) /* Disabled in loop ~ keeping for later use */
+{ /* Same as the callback routine */
+  if (tud_midi_n_mounted(MIDI_ITF)) {
+    while (tud_midi_n_available(MIDI_ITF, MIDI_CABLE)) {  /* Loop as long as there is data available */
+      usbdata = 1;
+      uint32_t available = tud_midi_n_stream_read(MIDI_ITF, MIDI_CABLE, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
+      process_stream(midimachine.usbstreambuffer, available);
+    }
+    /* Clear usb buffer after use ~ Disabled due to prematurely cut off tunes */
+    /* memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer)); */
+    return;
+  }
+  return;
+}
 
 void tud_midi_rx_cb(uint8_t itf)
 {
   if (tud_midi_n_mounted(itf)) {
-    usbdata = 1;
-    while (tud_midi_n_available(itf, 0)) {  /* Loop as long as there is data available */
-      uint32_t available = tud_midi_n_stream_read(itf, 0, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
+    while (tud_midi_n_available(itf, MIDI_CABLE)) {  /* Loop as long as there is data available */
+      usbdata = 1;
+      uint32_t available = tud_midi_n_stream_read(itf, MIDI_CABLE, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
       process_stream(midimachine.usbstreambuffer, available);
     }
-    /* Clear usb buffer after use ~ Disable due to prematurely cut off tunes */
+    /* Clear usb buffer after use ~ Disabled due to prematurely cut off tunes */
     /* memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer)); */
     return;
   }
@@ -354,19 +369,37 @@ void tud_midi_rx_cb(uint8_t itf)
 }
 
 
-/* USB CDC CLASS CALLBACKS */
+/* USB CDC CLASS TASK & CALLBACKS */
 
 /* Read from host to device */
+void cdc_task(void)
+{ /* Same as the callback routine */
+  if (tud_cdc_n_connected(CDC_ITF)) {
+    if (tud_cdc_n_available(CDC_ITF)) {
+      cdc_itf = CDC_ITF;
+      usbdata = 1, dtype = cdc;
+      cdcread = tud_cdc_n_read(CDC_ITF, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
+      tud_cdc_n_read_flush(CDC_ITF);
+      memcpy(sid_buffer, read_buffer, cdcread);
+      process_buffer(cdc_itf, &cdcread);
+      return;
+    }
+    return;
+  }
+  return;
+}
+
 void tud_cdc_rx_cb(uint8_t itf)
 { /* No need to check available bytes for reading */
-  cdc_itf = &itf;
-  usbdata = 1, dtype = cdc;
-  cdcread = tud_cdc_n_read(*cdc_itf, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
-  tud_cdc_n_read_flush(*cdc_itf);
-  memcpy(sid_buffer, read_buffer, cdcread);
-  process_buffer(cdc_itf, &cdcread);
-  /* memset(read_buffer, 0, count_of(read_buffer)); */
-  /* memset(sid_buffer, 0, count_of(sid_buffer)); */
+  if (itf == CDC_ITF) {
+    cdc_itf = &itf;
+    usbdata = 1, dtype = cdc;
+    cdcread = tud_cdc_n_read(*cdc_itf, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
+    tud_cdc_n_read_flush(*cdc_itf);
+    memcpy(sid_buffer, read_buffer, cdcread);
+    process_buffer(cdc_itf, &cdcread);
+    return;
+  }
   return;
 }
 
@@ -420,19 +453,17 @@ void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 /* Read from host to device */
 void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
 {
-  /* buffer contains incoming data, but of the previous read so we void it */
-  (void)buffer;
-  (void)bufsize;
+  /* With the fifo buffer disabled the buffer contains the newest incoming data */
+  /* If the fifo buffer is enabled the buffer contains data from the previous read */
 
-  if (web_serial_connected) { /* vendor class has no connect check, thus use this */
-    wusb_itf = &itf;
-    usbdata = 1, dtype = wusb;
-    webread = tud_vendor_n_read(*wusb_itf, &read_buffer, MAX_BUFFER_SIZE);
-    tud_vendor_n_read_flush(*wusb_itf);
-    memcpy(sid_buffer, read_buffer, webread);
-    process_buffer(wusb_itf, &webread);
-    /* memset(read_buffer, 0, count_of(read_buffer)); */
-    /* memset(sid_buffer, 0, count_of(sid_buffer)); */
+  /* vendor class has no connect check, thus use this */
+  if (web_serial_connected && itf == WUSB_ITF) {
+      wusb_itf = &itf; /* Since there's only 1 vendor interface, we know it's 0 */
+      usbdata = 1, dtype = wusb;
+      webread = bufsize;
+      memcpy(sid_buffer, buffer, bufsize);
+      /* No need to flush since we have no fifo */
+      process_buffer(wusb_itf, &webread);
     return;
   }
   return;
@@ -579,6 +610,9 @@ void core1_main(void)
 
   /* Init queues */
   queue_init(&sidtest_queue, sizeof(sidtest_queue_entry_t), 1);  /* 1 entry deep */
+  #ifdef WRITE_DEBUG  /* Only init this queue when needed */
+  queue_init(&logging_queue, sizeof(writelogging_queue_entry_t), 16);  /* 16 entries deep */
+  #endif
 
   /* Release semaphore when core 1 is started */
   sem_release(&core1_init);
@@ -594,6 +628,16 @@ void core1_main(void)
         s_entry.func(s_entry.s, s_entry.t, s_entry.wf);
       }
     }
+
+    #ifdef WRITE_DEBUG  /* Only run this queue when needed */
+    if (usbdata == 1) {
+      writelogging_queue_entry_t l_entry;
+      if (queue_try_remove(&logging_queue, &l_entry)) {
+        DBG("[CORE2] [WRITE %c:%02d/%02d] $%02X:%02X %u\n", l_entry.dtype, l_entry.n, l_entry.s, l_entry.reg, l_entry.val, l_entry.cycles);
+      }
+    }
+    #endif
+
     led_runner();
   }
   /* Point of no return, this should never be reached */
@@ -677,6 +721,10 @@ int main()
   /* Loop IO tasks forever */
   while (1) {
     tud_task_ext(/* UINT32_MAX */0, false);  /* equals tud_task(); */
+    /* Additional tasks to support the callbacks
+     * for improved throughput! */
+    cdc_task();
+    /* No vendor task here, fifo is disabled! */
   }
 
   /* Point of no return, this should never be reached */
