@@ -254,7 +254,7 @@ Includes all features from v1.0 except the audio jumper
 - Optional EXT-IN pulldown resistor as filter bypass to reduce filter noise for Digiplay on 8580 SID's
 ### PCB Development
 * v1.3 release board<br>
-  __N/A__
+  [<img src="images/v1.3-top.png" width="30%">](images/v1.3-top.png) 
 * v1.2 testboard<br>
   [<img src="images/v1.2-top.png" width="30%">](images/v1.2-top.png) 
 * v1.1 unfinished and skipped
