@@ -529,6 +529,12 @@ void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, ui
 
   dma_channel_set_read_addr(dma_tx_data, &data_word, true); /* Data & Address DMA transfer */
   dma_channel_set_read_addr(dma_tx_control, &control_word, true); /* Control lines RW, CS1 & CS2 DMA transfer */
+  /* DMA wait call
+   * dma_tx_control ~ normal
+   * dma_tx_data ~ not as good as control, maybe a bit more cracks
+   * dma_tx_delay ~ white noise
+   * neither ~ broken play
+   */
   dma_channel_wait_for_finish_blocking(dma_tx_control);
   return;
 }
