@@ -61,6 +61,7 @@ endif()
 SET(DEBUG_SYMBOLS 0)   # 0 default, 1 debug symbols & debug build enabled
 SET(DEBUGGING 0)       # 0 default, 1~3 equals -g1~3
 SET(OPTIMIZATIONS 3)   # 3 default, 1 ~ -O1 for debugging
+SET(TUSB_DEBUG 0)      # 0 default, 0~3 non verbose to very verbose
 
 ### Target board pico, pico_w, pico2
 if(DEFINED PICO_BOARD)
@@ -134,11 +135,23 @@ set(PICO_DEFAULT_DOUBLE_IMPL pico_double_default)
 if(DEBUG_SYMBOLS EQUAL 1)
   set(CMAKE_BUILD_TYPE Debug)  # for debugging
   set(PICO_DEOPTIMIZED_DEBUG 1)
-  set(CFG_TUSB_DEBUG 1)
+  if(TUSB_DEBUG EQUAL 0)
+    set(CFG_TUSB_DEBUG 1)
+    # add_compile_definitions(CFG_TUSB_DEBUG=1)
+  else()
+    set(CFG_TUSB_DEBUG TUSB_DEBUG)
+  endif()
 else()
   set(CMAKE_BUILD_TYPE Release)
   set(PICO_DEOPTIMIZED_DEBUG 0)
-  set(CFG_TUSB_DEBUG 0)
+  ### TinyUSB debug logging
+  if(TUSB_DEBUG GREATER 0)
+    message("TinyUSB debugging set to ${TUSB_DEBUG}")
+    set(CFG_TUSB_DEBUG ${TUSB_DEBUG})
+    # add_compile_definitions(CFG_TUSB_DEBUG=${TUSB_DEBUG})
+  else()
+    set(CFG_TUSB_DEBUG 0)
+  endif()
 endif()
 
 ### Define compile time debugging
@@ -214,6 +227,10 @@ list(APPEND PICOTYPES
   "LED"
   "LED_AUDIOSWITCH"
 )
+list(APPEND PCBVERSIONS
+  "1.0"
+  "1.3"
+)
 if(${PICO_BOARD} STREQUAL "pico")
   list(APPEND FILENAMES
     ${PROJECT_FILENAME}-v1.0-rgb
@@ -223,12 +240,12 @@ if(${PICO_BOARD} STREQUAL "pico")
     "RGB"
     "RGB_AUDIOSWITCH"
   )
+  list(APPEND PCBVERSIONS
+  "1.0"
+  "1.3"
+)
 endif()
 
-list(APPEND PCBVERSIONS
-  "v1.0"
-  "v1.3"
-)
 
 ### Source files to compile
 set(SOURCEFILES
@@ -343,10 +360,10 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   # set filename
   set(BUILD ${FILENAME})
   set(BUILD_VERSION "")
-  string(CONCAT BUILD_VERSION ${PROJECT_PRODUCT} " " ${PCBVERSION})
+  string(CONCAT BUILD_VERSION ${PROJECT_PRODUCT} " v" ${PCBVERSION})
+  message(STATUS "Building ${FILENAME} with PICOTYPE=${PICOTYPE} and MAGIC_SMOKE=${MAGIC_SMOKE}")
   message("Set USB manufacturer: ${USBSID_MANUFACTURER}")
   message("Set USB product: ${BUILD_VERSION}")
-  message(STATUS "Building ${FILENAME} with PICOTYPE=${PICOTYPE} and MAGIC_SMOKE=${MAGIC_SMOKE}")
   # executable
   # add_executable(${BUILD} ${SOURCEFILES} ${LIBSOURCEFILES})
   add_executable(${BUILD} ${SOURCEFILES})
