@@ -109,6 +109,7 @@ bool first_boot = false;
 
 /* Init string constants for logging */
 const char* project_version = PROJECT_VERSION;
+const char* pcb_version = PCB_VERSION;
 const char *sidtypes[5] = { "UNKNOWN", "N/A", "MOS8580", "MOS6581", "FMOpl" };
 const char *chiptypes[2] = { "Real", "Clone" };
 const char *clonetypes[6] = { "Disabled", "Other", "SKPico", "ARMSID", "FPGASID", "RedipSID" };
@@ -355,11 +356,19 @@ void read_socket_config(Config* config)
   return;
 }
 
-void read_firmware_version()
+void read_firmware_version(void)
 {
   p_version_array[0] = USBSID_VERSION;  /* Initiator byte */
   p_version_array[1] = strlen(project_version);  /* Length of version string */
   memcpy(p_version_array+2, project_version, strlen(project_version));
+  return;
+}
+
+void read_pcb_version(void)
+{
+  p_version_array[0] = US_PCB_VERSION;  /* Initiator byte */
+  p_version_array[1] = strlen(pcb_version);  /* Length of version string */
+  memcpy(p_version_array+2, pcb_version, strlen(pcb_version));
   return;
 }
 
@@ -873,7 +882,23 @@ void handle_config_request(uint8_t * buffer)
       break;
     case USBSID_VERSION:
       CFG("[CMD] READ_FIRMWARE_VERSION\n");
+      memset(p_version_array, 0, count_of(p_version_array));
       read_firmware_version();
+      memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
+      memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
+        switch (dtype) {
+          case 'C':
+            cdc_write(cdc_itf, MAX_BUFFER_SIZE);
+            break;
+          case 'W':
+            webserial_write(wusb_itf, MAX_BUFFER_SIZE);
+            break;
+        }
+      break;
+    case US_PCB_VERSION:
+      CFG("[CMD] READ_PCB_VERSION\n");
+      memset(p_version_array, 0, count_of(p_version_array));
+      read_pcb_version();
       memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
       memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
         switch (dtype) {
