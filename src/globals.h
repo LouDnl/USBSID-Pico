@@ -104,7 +104,7 @@ enum
 #define MIDI_CABLE 0
 
 /* USB data type */
-extern char dtype, ntype, cdc, asid, midi, wusb;
+extern char dtype, ntype, cdc, asid, midi, sysex, wusb;
 
 /* WebUSB globals */
 #define URL  "/usbsid.loudai.nl"

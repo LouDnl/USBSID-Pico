@@ -333,18 +333,3 @@ void decode_asid_message(uint8_t* buffer, int size)
   }
 	return;
 }
-
-/* Is it ? */
-void process_sysex(uint8_t* buffer, int size)
-{
-  switch(buffer[1]) {
-    case 0x2D:  /* 0x2D = ASID sysex message */
-      dtype = asid;  /* Set data type to ASID */
-      vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
-      decode_asid_message(buffer, size);
-      break;
-    default:
-      break;
-  }
-	return;
-}

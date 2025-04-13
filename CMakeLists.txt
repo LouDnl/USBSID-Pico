@@ -257,6 +257,7 @@ set(SOURCEFILES
   # ${CMAKE_CURRENT_LIST_DIR}/src/midi_patches.c
   # ${CMAKE_CURRENT_LIST_DIR}/src/midi_bankmsb0.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/sysex.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/mcu.c
   ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c
