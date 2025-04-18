@@ -60,7 +60,7 @@ uint sm_vu_rgb, offset_vu_rgb;
 #endif
 #endif
 
-static int paused_state = 0;
+extern int paused_state, reset_state;
 static uint8_t volume_state[4] = {0};
 
 /* Read GPIO macro
@@ -625,15 +625,17 @@ void pause_sid_withmute(void)
 
 void reset_sid(void)
 {
+  reset_state = 1;
   paused_state = 0;
   memset(volume_state, 0, 4);
   memset(sid_memory, 0, count_of(sid_memory));
   gpio_put(RES, 0);
   if (usbsid_config.socketOne.chiptype == 0 ||
       usbsid_config.socketTwo.chiptype == 0) {
-      cycled_bus_operation(0xFF, 0xFF, 10);  /* 10x PHI(02) cycles as per datasheet for REAL SIDs only */
-    }
+    delay_operation(10);  /* 10x PHI(02) cycles as per datasheet for REAL SIDs only */
+  }
   gpio_put(RES, 1);
+  reset_state = 0;
   return;
 }
 
@@ -647,10 +649,12 @@ void clear_sid_registers(int sidno)
 
 void reset_sid_registers(void)
 { /* NOTICE: CAUSES ISSUES IF USED RIGHT BEFORE PLAYING */
+  reset_state = 1;
   paused_state = 0;
   for (int sid = 0; sid < numsids; sid++) {
     clear_sid_registers(sid);
   }
+  reset_state = 0;
   return;
 }
 

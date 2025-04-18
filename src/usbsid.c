@@ -47,6 +47,7 @@ uint8_t *cdc_itf = 0, *wusb_itf = 0;
 char ntype = '0', dtype = '0', cdc = 'C', asid = 'A', midi = 'M', sysex = 'S', wusb = 'W';
 bool web_serial_connected = false;
 double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
+int paused_state = 0, reset_state = 0;
 
 /* Init var pointers for external use */
 uint8_t (*write_buffer_p)[MAX_BUFFER_SIZE] = &write_buffer;
@@ -209,6 +210,7 @@ void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
   uint8_t command = ((sid_buffer[0] & PACKET_TYPE) >> 6);
   uint8_t subcommand = (sid_buffer[0] & COMMAND_MASK);
   uint8_t n_bytes = (sid_buffer[0] & BYTE_MASK);
+  while (reset_state == 1) { asm("nop"); };  /* Stall if in reset state */
 
   if (command == CYCLED_WRITE) {
     // n_bytes = (n_bytes == 0) ? 4 : n_bytes; /* if byte count is zero, this is a single write packet */
