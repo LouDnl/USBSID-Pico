@@ -377,7 +377,7 @@ void tud_midi_rx_cb(uint8_t itf)
 void cdc_task(void)
 { /* Same as the callback routine */
   if (tud_cdc_n_connected(CDC_ITF)) {
-    if (tud_cdc_n_available(CDC_ITF)) {
+    while (tud_cdc_n_available(CDC_ITF) > 0) {
       cdc_itf = CDC_ITF;
       usbdata = 1, dtype = cdc;
       cdcread = tud_cdc_n_read(CDC_ITF, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
@@ -393,6 +393,7 @@ void cdc_task(void)
 
 void tud_cdc_rx_cb(uint8_t itf)
 { /* No need to check available bytes for reading */
+#ifdef USE_CDC_CALLBACK
   if (itf == CDC_ITF) {
     cdc_itf = &itf;
     usbdata = 1, dtype = cdc;
@@ -402,6 +403,7 @@ void tud_cdc_rx_cb(uint8_t itf)
     process_buffer(cdc_itf, &cdcread);
     return;
   }
+#endif
   return;
 }
 
@@ -451,6 +453,21 @@ void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 
 
 /* USB VENDOR CLASS CALLBACKS */
+
+void vendor_task(void)
+{ /* Same as the callback routine */
+  /* If the fifo buffer is disabled, this function has no use */
+  if (web_serial_connected) {
+      wusb_itf = WUSB_ITF;
+      usbdata = 1, dtype = wusb;
+      webread = tud_vendor_n_read(WUSB_ITF, &read_buffer, MAX_BUFFER_SIZE);
+      tud_vendor_n_read_flush(*wusb_itf);
+      memcpy(sid_buffer, read_buffer, webread);
+      process_buffer(wusb_itf, &webread);
+    return;
+  }
+  return;
+}
 
 /* Read from host to device */
 void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
@@ -723,9 +740,9 @@ int main()
   /* Loop IO tasks forever */
   while (1) {
     tud_task_ext(/* UINT32_MAX */0, false);  /* equals tud_task(); */
-    /* Additional tasks to support the callbacks
-     * for improved throughput! */
-    cdc_task();
+#ifndef USE_CDC_CALLBACK
+    cdc_task();  /* Only use this if no callbacks */
+#endif
     /* No vendor task here, fifo is disabled! */
   }
 
