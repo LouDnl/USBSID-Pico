@@ -897,18 +897,26 @@ void handle_config_request(uint8_t * buffer)
       break;
     case US_PCB_VERSION:
       CFG("[CMD] READ_PCB_VERSION\n");
-      memset(p_version_array, 0, count_of(p_version_array));
-      read_pcb_version();
-      memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
-      memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
-        switch (dtype) {
-          case 'C':
-            cdc_write(cdc_itf, MAX_BUFFER_SIZE);
-            break;
-          case 'W':
-            webserial_write(wusb_itf, MAX_BUFFER_SIZE);
-            break;
-        }
+      if (buffer[1] == 0) {  /* Large write 64 bytes */
+        memset(p_version_array, 0, count_of(p_version_array));
+        read_pcb_version();
+        memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
+        memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
+          switch (dtype) {
+            case 'C':
+              cdc_write(cdc_itf, MAX_BUFFER_SIZE);
+              break;
+            case 'W':
+              webserial_write(wusb_itf, MAX_BUFFER_SIZE);
+              break;
+          }
+      } else {  /* Small write single byte */
+        memset(write_buffer_p, 0, 64);
+        int pcbver = (pcb_version == "1.3" ? 13 : 10);
+        printf("%d %s\n", pcbver, pcb_version);
+        write_buffer_p[0] = pcbver;
+        write_back_data(1);
+      }
       break;
     case RESTART_BUS:
       CFG("[CMD] RESTART_BUS\n");
@@ -1364,6 +1372,7 @@ void detect_default_config(void)
   CFG("[CONFIG] DETECT DEFAULT FINISHED\n");
   return;
 }
+
 int return_clockrate(void)
 {
   for (int i = 0; i < count_of(clockrates); i++) {
