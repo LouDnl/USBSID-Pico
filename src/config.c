@@ -912,7 +912,7 @@ void handle_config_request(uint8_t * buffer)
           }
       } else {  /* Small write single byte */
         memset(write_buffer_p, 0, 64);
-        int pcbver = (pcb_version == "1.3" ? 13 : 10);
+        int pcbver = (strcmp(pcb_version, "1.3") == 0 ? 13 : 10);
         printf("%d %s\n", pcbver, pcb_version);
         write_buffer_p[0] = pcbver;
         write_back_data(1);
