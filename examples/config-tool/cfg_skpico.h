@@ -23,6 +23,15 @@
  *
  */
 
+#define SKPICO_VER_SIZE 36
+#define SKPICO_VER_LEN 20
+#define SKPICO_SIG_START 20
+#define SKPICO_SIG_LEN 8
+#define SKPICO_FWVER_START 28
+#define SKPICO_FWVER_LEN 2
+#define SKPICO_DAC_START 30
+#define SKPICO_DAC_LEN 1
+
 const uint8_t init_configmode[3] = { 0x0, 0x1F, 0xFF };       /* Inits and extends config mode */
 const uint8_t config_extend[3] = { 0x0, 0x1D, 0xFA };         /* Clear address lines and extend config mode */
 const uint8_t config_exit[3] = { 0x0, 0x1D, 0xFB };           /* Exit config mode without reset */
