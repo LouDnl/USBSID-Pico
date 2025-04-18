@@ -32,6 +32,9 @@
 
 /* GPIO externals */
 extern uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data);
+extern void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint16_t __not_in_flash_func(delay_operation)(uint16_t cycles);
+extern void reset_sid(void);
 extern void clear_sid_registers(int sidno);
 extern void reset_sid_registers(void);
 
@@ -39,18 +42,59 @@ extern void reset_sid_registers(void);
 volatile bool running_tests = false;
 uint8_t waveforms[4] = { 16, 32, 64, 128 };
 
+
+uint8_t detect_sid_model(uint8_t start_addr)
+{ /* https://github.com/GideonZ/1541ultimate/blob/master/software/6502/sidcrt/player/advanced/detection.asm */
+  reset_sid();
+  sleep_ms(10); /* Wait for bus to settle */
+  static int restart = 0;
+restart:
+  // lda #$48  ~ 2 cycles
+  // sta $d412 ~ 4 cycles
+  cycled_bus_operation((start_addr + 0x12), 0x48, 6);
+  // sta $d40f ~ 4 cycles
+  cycled_bus_operation((start_addr + 0x0F), 0x48, 4);
+  // lsr ~ 2 cycles
+  // sta $d412 ~ 4 cycles
+  cycled_bus_operation((start_addr + 0x12), 0x24, 6);
+  // lda $d41b ~ 4 cycles
+  delay_operation(4);
+  uint8_t sidtype = bus_operation(0x11, (start_addr + 0x1B), 0x00);
+  if (restart == 3) goto end;
+  if (sidtype != 0 || sidtype != 1) {
+    restart++;
+    sleep_ms(10); /* Needed in case of restart */
+    goto restart;
+  }
+end:
+  restart = 0;
+  /* output 0 = 8580, 1 = 6581, 2 = unknown
+   * that is: Carry flag is set for 6581, and clear for 8580. */
+  CFG("[SID] 0x%02X detect_sid_model raw %u\n", start_addr, sidtype);
+  sidtype = (sidtype == 0 ? 2 : sidtype == 1 ? 3 : 0);  /* return 0 = unknown, 2 = 8580, 3 = 6581 */
+  CFG("[SID] 0x%02X detect_sid_model %u\n", start_addr, sidtype);
+  return sidtype;
+}
+
 uint8_t detect_sid_version(uint8_t start_addr)  /* Not working on real SIDS!? */
 {
   static int restart = 0;
 restart:
+  // LDA #$ff ~ 2 cycles
+  // STA $d412 ~ 4 cycles
   bus_operation(0x10, (start_addr + 0x12), 0xFF);  /* Set testbit in voice 3 control register to disable oscillator */
   sleep_ms(1);
+  // STA $d40e ~ 4 cycles
   bus_operation(0x10, (start_addr + 0x0E), 0xFF);  /* Set frequency in voice 3 to $ffff */
   sleep_ms(1);
+  // STA $d40f ~ 4 cycles
   bus_operation(0x10, (start_addr + 0x0F), 0xFF);  /* Set frequency in voice 3 to $ffff */
   sleep_ms(1);
+  // LDA #$20 ~ 2 cycles
+  // STA $d412 ~ 4 cycles
   bus_operation(0x10, (start_addr + 0x12), 0x20);  /* Set Sawtooth wave and gatebit OFF to start oscillator again */
   sleep_ms(1);
+  // LDA $d41b ~ 4 cycles
   uint8_t sidtype = bus_operation(0x11, (start_addr + 0x1B), 0x00);  /* Accu now has different value depending on sid model (6581=3/8580=2) */
   if (restart == 3) goto end;
   if (sidtype != 2 || sidtype != 3) {
@@ -59,7 +103,10 @@ restart:
   }
 end:
   restart = 0;
-  return (sidtype < 4 ? sidtype : 0);  /* that is: Carry flag is set for 6581, and clear for 8580. */
+  CFG("[SID] 0x%02X detect_sid_version raw %u\n", start_addr, sidtype);
+  sidtype = (sidtype < 4 ? sidtype : 0);
+  CFG("[SID] 0x%02X detect_sid_version %u\n", start_addr, sidtype);
+  return sidtype;  /* that is: Carry flag is set for 6581, and clear for 8580. */
 }
 
 void test_operation(uint8_t reg, uint8_t val)

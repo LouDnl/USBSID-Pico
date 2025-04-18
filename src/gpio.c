@@ -502,6 +502,16 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
   return 0;
 }
 
+uint16_t __not_in_flash_func(delay_operation)(uint16_t cycles)
+{
+  delay_word = cycles;
+  dma_channel_set_read_addr(dma_tx_delay, &delay_word, true);  /* Delay cycles DMA transfer */
+  dma_channel_wait_for_finish_blocking(dma_tx_delay);
+  pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ0));  /* Preset the statemachine IRQ to not wait for a 1 */
+  pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ1));  /* Preset the statemachine IRQ to not wait for a 1 */
+  return cycles;
+}
+
 void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, uint16_t cycles)
 {
   GPIODBG("[WC]$%04x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16" $%02X:%02X(%u)\n",

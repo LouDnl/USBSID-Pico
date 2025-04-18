@@ -52,10 +52,12 @@ extern queue_t sidtest_queue;
 
 /* SID externals */
 extern uint8_t detect_sid_version(uint8_t start_addr);
+extern uint8_t detect_sid_model(uint8_t start_addr);
 extern void sid_test(int sidno, char test, char wf);
 extern bool running_tests;
 
 /* GPIO externals */
+extern uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data);
 extern void reset_sid(void);
 extern void restart_bus(void);
 extern void restart_bus_clocks(void);
@@ -111,7 +113,7 @@ bool first_boot = false;
 const char* project_version = PROJECT_VERSION;
 const char* pcb_version = PCB_VERSION;
 const char *sidtypes[5] = { "UNKNOWN", "N/A", "MOS8580", "MOS6581", "FMOpl" };
-const char *chiptypes[2] = { "Real", "Clone" };
+const char *chiptypes[3] = { "Real", "Clone", "Unknown" };
 const char *clonetypes[6] = { "Disabled", "Other", "SKPico", "ARMSID", "FPGASID", "RedipSID" };
 const char *int_ext[2] = { "Internal", "External" };
 const char *enabled[2] = { "Disabled", "Enabled" };
@@ -214,24 +216,91 @@ void print_cfg(const uint8_t *buf, size_t len)
   return;
 }
 
+bool detect_skpico(uint8_t base_address)
+{
+  /* SKPico routine */
+  char skpico_version[36] = {0};
+  bus_operation(0x10, (0x1F + base_address), 0xFF); /* Init config mode */
+  bus_operation(0x10, (0x1D + base_address), 0xFA); /* Extend config mode */
+  for (int i = 0; i < 36; i++) {
+    bus_operation(0x10, (0x1E + base_address), 0xE0 + i);
+    skpico_version[i] = bus_operation(0x11, (0x1D + base_address), 0);
+    if (i >= 2 && i <= 5) skpico_version[i] |= 0x60;
+  }
+  /* Reset after writes
+   * is needed for Real SID's to recover for SID detection
+   * but breaks SKPico SID detection
+   * disabled here due to no longer being in the SID detection routine */
+  /* reset_sid(); */
+  if (skpico_version[2] == 0x70
+      && skpico_version[3] == 0x69
+      && skpico_version[4] == 0x63
+      && skpico_version[5] == 0x6F) {
+    printf("[CONFIG] SIDKICK-pico @ 0x%02X version is: %.36s\n", base_address, skpico_version);
+    return true;
+  }
+  return false;
+}
+
+void detect_clone_types(bool sockone, bool onedual, bool socktwo, bool twodual)
+{
+  uint8_t base_address = 0x00;
+  if (sockone && detect_skpico(base_address)) {
+    usbsid_config.socketOne.chiptype  = 1;  /* Clone */
+    usbsid_config.socketOne.clonetype = 2;  /* SKpico */
+  } else {
+    usbsid_config.socketOne.chiptype  = 2;  /* Unknown */
+    usbsid_config.socketOne.clonetype = 1;  /* Other */
+  }
+  if (!onedual)
+    base_address = 0x20;
+  if (onedual)
+    base_address = 0x40;
+  if(socktwo && (base_address > 0x00) && detect_skpico(base_address)) {
+    usbsid_config.socketTwo.chiptype  = 1;  /* Clone */
+    usbsid_config.socketTwo.clonetype = 2;  /* SKpico */
+  } else {
+    usbsid_config.socketTwo.chiptype  = 2;  /* Unknown */
+    usbsid_config.socketTwo.clonetype = 1;  /* Other */
+  }
+}
+
 void detect_sid_types(void)
 {
   int sid1 = 0, sid2 = 0, sid3 = 0, sid4 = 0;
 
   if (numsids >= 1) {
     sid1 = detect_sid_version(0x00);
+    if (sid1 == 0) {
+      sid1 = detect_sid_model(0x00);
+      if (sid1 != 0) {  /* Very high chance that this is a real SID */
+        usbsid_config.socketOne.chiptype  = 0;  /* Real */
+        usbsid_config.socketOne.clonetype = 0;  /* Disabled */
+      }
+    }
     CFG("[CONFIG] [READ SID1] [%02x %s]\n", sid1, sidtypes[sid1]);
   }
   if (numsids >= 2) {
     sid2 = detect_sid_version(0x20);
+    if (sid2 == 0) {
+      sid2 = detect_sid_model(0x20);
+      if (sid2 != 0
+          && !usbsid_config.socketOne.dualsid
+          && !usbsid_config.socketTwo.dualsid) {  /* Very high chance that this is a real SID */
+        usbsid_config.socketTwo.chiptype  = 0;  /* Real */
+        usbsid_config.socketTwo.clonetype = 0;  /* Disabled */
+      }
+    }
     CFG("[CONFIG] [READ SID2] [%02x %s]\n", sid2, sidtypes[sid2]);
   }
   if (numsids >= 3) {
     sid3 = detect_sid_version(0x40);
+    if (sid3 == 0) sid3 = detect_sid_model(0x40);
     CFG("[CONFIG] [READ SID3] [%02x %s]\n", sid3, sidtypes[sid3]);
   }
   if (numsids == 4) {
     sid4 = detect_sid_version(0x60);
+    if (sid4 == 0) sid4 = detect_sid_model(0x60);
     CFG("[CONFIG] [READ SID4] [%02x %s]\n", sid4, sidtypes[sid4]);
   }
 
@@ -836,6 +905,13 @@ void handle_config_request(uint8_t * buffer)
           break;
       }
       break;
+    case DETECT_CLONES:  // TODO: FINISH
+      CFG("[CMD] DETECT_CLONES\n");
+      detect_clone_types(usbsid_config.socketOne.enabled,
+                     usbsid_config.socketOne.dualsid,
+                     usbsid_config.socketTwo.enabled,
+                     usbsid_config.socketTwo.dualsid);
+      break;
     case TEST_ALLSIDS:  /* ISSUE: This must be run on Core 1 so we can actually stop it! */
       CFG("[CMD] TEST_ALLSIDS\n");
       running_tests = true;
@@ -1365,6 +1441,7 @@ void detect_default_config(void)
     usbsid_config.default_config = 0;
     CFG("[CONFIG] DEFAULT CONFIG STATE SET TO %d\n", usbsid_config.default_config);
     first_boot = true;  /* Only at first boot the link popup will be sent */
+    detect_sid_types();  /* Detect SID types at default config once */
     save_config(&usbsid_config);
     CFG("[CONFIG] CONFIG SAVED\n");
   }
