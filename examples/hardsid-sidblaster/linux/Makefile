@@ -58,50 +58,50 @@ libhardsid_usb: build_libhardsid_usb
 
 .PHONY : clean
 clean:
-	$(info Cleaning build directory)
-	rm -f $(BUILD_DIR)/*.o
-	rm -f $(BUILD_DIR)/*.a
+  $(info Cleaning build directory)
+  rm -f $(BUILD_DIR)/*.o
+  rm -f $(BUILD_DIR)/*.a
 
 .PHONY : clean_all
 clean_all:
-	$(info Removing build directory contents)
-	rm -f $(BUILD_DIR)/*
-	rm -f $(BUILD_DIR)/.*
-	rm -f $(BUILD_DIR)/*.*
+  $(info Removing build directory contents)
+  rm -f $(BUILD_DIR)/*
+  rm -f $(BUILD_DIR)/.*
+  rm -f $(BUILD_DIR)/*.*
 
 install:
-	mkdir -p $(TARGET_LIB_DIR)
-	mkdir -p $(TARGET_INCLUDE_DIR_L)
-	mkdir -p $(TARGET_INCLUDE_DIR_LL)
-	cp $(BUILD_DIR)/$(TARGET_EXEC_HARDSID) $(TARGET_LIB_DIR)
-	cp $(BUILD_DIR)/$(TARGET_EXEC_HARDSIDUSB) $(TARGET_LIB_DIR)
-	cp $(BUILD_DIR)/$(TARGET_HEADER_HARDSID) $(TARGET_INCLUDE_DIR)
-	cp $(BUILD_DIR)/$(TARGET_HEADER_HARDSIDUSB) $(TARGET_INCLUDE_DIR)
-	cp $(BUILD_DIR)/$(TARGET_HEADER_HARDSID) $(TARGET_INCLUDE_DIR_L)/$(TARGET_HEADER_HARDSID_L)
-	cp $(BUILD_DIR)/$(TARGET_HEADER_HARDSID) $(TARGET_INCLUDE_DIR_LL)/$(TARGET_HEADER_HARDSID_L)
+  mkdir -p $(TARGET_LIB_DIR)
+  mkdir -p $(TARGET_INCLUDE_DIR_L)
+  mkdir -p $(TARGET_INCLUDE_DIR_LL)
+  cp $(BUILD_DIR)/$(TARGET_EXEC_HARDSID) $(TARGET_LIB_DIR)
+  cp $(BUILD_DIR)/$(TARGET_EXEC_HARDSIDUSB) $(TARGET_LIB_DIR)
+  cp $(BUILD_DIR)/$(TARGET_HEADER_HARDSID) $(TARGET_INCLUDE_DIR)
+  cp $(BUILD_DIR)/$(TARGET_HEADER_HARDSIDUSB) $(TARGET_INCLUDE_DIR)
+  cp $(BUILD_DIR)/$(TARGET_HEADER_HARDSID) $(TARGET_INCLUDE_DIR_L)/$(TARGET_HEADER_HARDSID_L)
+  cp $(BUILD_DIR)/$(TARGET_HEADER_HARDSID) $(TARGET_INCLUDE_DIR_LL)/$(TARGET_HEADER_HARDSID_L)
 
 uninstall:
-	rm $(TARGET_LIB_DIR)/$(TARGET_EXEC_HARDSID)
-	rm $(TARGET_LIB_DIR)/$(TARGET_EXEC_HARDSIDUSB)
-	rm $(TARGET_INCLUDE_DIR)/$(TARGET_HEADER_HARDSID)
-	rm $(TARGET_INCLUDE_DIR)/$(TARGET_HEADER_HARDSIDUSB)
-	rm $(TARGET_INCLUDE_DIR_L)/$(TARGET_HEADER_HARDSID_L)
-	rm $(TARGET_INCLUDE_DIR_LL)/$(TARGET_HEADER_HARDSID_L)
+  rm $(TARGET_LIB_DIR)/$(TARGET_EXEC_HARDSID)
+  rm $(TARGET_LIB_DIR)/$(TARGET_EXEC_HARDSIDUSB)
+  rm $(TARGET_INCLUDE_DIR)/$(TARGET_HEADER_HARDSID)
+  rm $(TARGET_INCLUDE_DIR)/$(TARGET_HEADER_HARDSIDUSB)
+  rm $(TARGET_INCLUDE_DIR_L)/$(TARGET_HEADER_HARDSID_L)
+  rm $(TARGET_INCLUDE_DIR_LL)/$(TARGET_HEADER_HARDSID_L)
 
 default::
-	$(info Creating build directory)
-	mkdir -p $(BUILD_DIR)
+  $(info Creating build directory)
+  mkdir -p $(BUILD_DIR)
 
 # gcc -c hardsid.cpp
 # gcc -g3 -shared -o libhardsid.so -Wl,-export-dynamic hardsid.o
 build_libhardsid: CPPFLAGS += $(CPPLIBS)
 build_libhardsid::
-	$(info Starting $@)
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(SRCS) -o $(BUILD_DIR)/$(TARGET_EXEC_HARDSID) $(LDFLAGS) $(LDLIBS)
-	cp $(SRC_DIRS)/$(HEADER) $(BUILD_DIR)/$(TARGET_HEADER_HARDSID)
+  $(info Starting $@)
+  $(CXX) $(CXXFLAGS) $(CPPFLAGS) $(SRCS) -o $(BUILD_DIR)/$(TARGET_EXEC_HARDSID) $(LDFLAGS) $(LDLIBS)
+  cp $(SRC_DIRS)/$(HEADER) $(BUILD_DIR)/$(TARGET_HEADER_HARDSID)
 
 build_libhardsid_usb: CPPFLAGS += $(CPPLIBS)
 build_libhardsid_usb::
-	$(info Starting $@)
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(SRCS) -o $(BUILD_DIR)/$(TARGET_EXEC_HARDSIDUSB) $(LDFLAGS) $(LDLIBS)
-	cp $(SRC_DIRS)/$(HEADER) $(BUILD_DIR)/$(TARGET_HEADER_HARDSIDUSB)
+  $(info Starting $@)
+  $(CXX) $(CXXFLAGS) $(CPPFLAGS) $(SRCS) -o $(BUILD_DIR)/$(TARGET_EXEC_HARDSIDUSB) $(LDFLAGS) $(LDLIBS)
+  cp $(SRC_DIRS)/$(HEADER) $(BUILD_DIR)/$(TARGET_HEADER_HARDSIDUSB)

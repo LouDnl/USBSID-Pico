@@ -977,7 +977,7 @@ void print_config_settings(void)
   #endif
   CFG("[CONFIG] [PICO] LED_PWM = %d\n", LED_PWM);  // pio.h PICO_PIO_VERSION
   CFG("[CONFIG] PRINT SETTINGS START\n");
-  CFG("[CONFIG] [USBSID PCB VERSION] %s\n", PCB_VERSION);
+  CFG("[CONFIG] [USBSID PCB VERSION] %s\n", pcb_version);
   CFG("[CONFIG] [USBSID FIRMWARE VERSION] %s\n", project_version);
 
   CFG("[CONFIG] [CLOCK] %s @%d\n",

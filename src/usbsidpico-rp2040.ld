@@ -183,7 +183,7 @@ SECTIONS
 
     .tdata : {
         . = ALIGN(4);
-		*(.tdata .tdata.* .gnu.linkonce.td.*)
+        *(.tdata .tdata.* .gnu.linkonce.td.*)
         /* All data end */
         __tdata_end = .;
     } > RAM AT> FLASH

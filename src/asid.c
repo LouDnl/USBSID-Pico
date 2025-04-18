@@ -77,47 +77,47 @@ void reset_asid_to_writeorder(void)
 /* Pling, plong, ploink!? */
 void handle_asid_fmoplmessage(uint8_t* buffer)
 { /* Assumes byte 0-2 are not included in the buffer */
-	uint8_t ndata_in_buffer = (buffer[0] + 1) << 1;
-	uint8_t nmask_bytes = (ndata_in_buffer - 1) / 7 + 1;
-	uint8_t data_index = nmask_bytes + 1;
-	uint8_t data, field;
-	uint8_t asid_fm_register_index = 0;
+  uint8_t ndata_in_buffer = (buffer[0] + 1) << 1;
+  uint8_t nmask_bytes = (ndata_in_buffer - 1) / 7 + 1;
+  uint8_t data_index = nmask_bytes + 1;
+  uint8_t data, field;
+  uint8_t asid_fm_register_index = 0;
 
-	static uint8_t fm_registers[MAX_FM_REG_PAIRS * 2];
+  static uint8_t fm_registers[MAX_FM_REG_PAIRS * 2];
 
-	for (uint8_t mask = 0; mask < nmask_bytes; mask++) {
-		field = 0x01;
-		for (uint8_t bit = 0; (bit < 7) && (asid_fm_register_index < ndata_in_buffer); bit++) {
-			data = buffer[data_index++];
-			if ((buffer[1 + mask] & field) == field) {
-				data += 0x80;
-			}
-			fm_registers[asid_fm_register_index++] = data;
-			field <<= 1;
-		}
-	}
+  for (uint8_t mask = 0; mask < nmask_bytes; mask++) {
+    field = 0x01;
+    for (uint8_t bit = 0; (bit < 7) && (asid_fm_register_index < ndata_in_buffer); bit++) {
+      data = buffer[data_index++];
+      if ((buffer[1 + mask] & field) == field) {
+        data += 0x80;
+      }
+      fm_registers[asid_fm_register_index++] = data;
+      field <<= 1;
+    }
+  }
   uint8_t addr = ((fmopl_sid << 5) - 0x20);
-	for (uint8_t reg = 0; reg < asid_fm_register_index; reg++) {
+  for (uint8_t reg = 0; reg < asid_fm_register_index; reg++) {
     dtype = asid;  /* Set data type to asid */
-		/* Pico 2 requires at least 10 cycles between writes
+    /* Pico 2 requires at least 10 cycles between writes
      * or it will be too damn fast! So we do this for other
      * Pico's too */
     if((reg % 2 == 0)) {
       cycled_bus_operation((addr | OPL_REG_ADDRESS), fm_registers[reg], 10);
       WRITEDBG(dtype, reg, asid_fm_register_index, (addr | OPL_REG_ADDRESS), fm_registers[reg], 10);
-		} else {
+    } else {
       cycled_bus_operation((addr | OPL_REG_DATA), fm_registers[reg], 10);
       WRITEDBG(dtype, reg, asid_fm_register_index, (addr | OPL_REG_DATA), fm_registers[reg], 10);
-		}
-	}
-	midimachine.fmopl = 0;
-	return;
+    }
+  }
+  midimachine.fmopl = 0;
+  return;
 }
 
 /* Well, it does what it does */
 void handle_complete_asid_buffer(uint8_t sid, uint8_t* buffer, int size)
 { /* Assumes byte 0-2 are included in the buffer and skips these */
-	(void)size;  /* Stop calling me fat, I'm just big boned! */
+  (void)size;  /* Stop calling me fat, I'm just big boned! */
   unsigned int reg = 0;
   for (uint8_t mask = 0; mask < 4; mask++) {  /* no more then 4 masks */
     for (uint8_t bit = 0; bit < 7; bit++) {  /* each packet has 7 bits ~ stoopid midi */
@@ -331,5 +331,5 @@ void decode_asid_message(uint8_t* buffer, int size)
     default:
       break;
   }
-	return;
+  return;
 }

@@ -67,7 +67,7 @@ void decode_sysex_command(uint8_t* buffer, int size)
     default:
       break;
   }
-	return;
+  return;
 }
 
 /* Is it ? */
@@ -86,5 +86,5 @@ void process_sysex(uint8_t* buffer, int size)
     default:
       break;
   }
-	return;
+  return;
 }

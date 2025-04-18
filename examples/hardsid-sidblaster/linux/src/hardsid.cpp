@@ -1,6 +1,6 @@
 #include "hardsid.hpp"
 
-#define HARDSID_VERSION			0x0200
+#define HARDSID_VERSION 0x0200
 
 /* #define HSDBEBUG */
 #ifdef HSDBEBUG
@@ -30,7 +30,7 @@ uint8_t HardSID_Devices(void) {
 
 uint8_t HardSID_SIDCount(void) {
   HSDBG("%s\r\n", __func__);
-	return (MAXSID);
+  return (MAXSID);
 }
 
 uint8_t HardSID_Read(uint8_t DeviceID, int Cycles, uint8_t SID_reg ) {
@@ -133,17 +133,17 @@ void InitHardSID_Mapper(void) {
 
 uint8_t GetHardSIDCount(void) {
   HSDBG("GetHardSIDCount\r\n");
-	return( HardSID_Devices() );
+  return( HardSID_Devices() );
 }
 
 void WriteToHardSID(uint8_t DeviceID, uint8_t SID_reg, uint8_t Data) {
   HSDBG("WriteToHardSID: 0x%04x 0x%04x 0x%04x\r\n", DeviceID, SID_reg, Data);
-	HardSID_Write( DeviceID, 1, SID_reg, Data );
+  HardSID_Write( DeviceID, 1, SID_reg, Data );
 }
 
 uint8_t ReadFromHardSID(uint8_t DeviceID, uint8_t SID_reg) {
   HSDBG("ReadFromHardSID: 0x%04x 0x%04x\r\n", DeviceID, SID_reg);
-	return( HardSID_Read( DeviceID, 1, SID_reg ) );
+  return( HardSID_Read( DeviceID, 1, SID_reg ) );
 }
 
 void MuteHardSID_Line(int Mute) {

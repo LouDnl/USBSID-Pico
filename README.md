@@ -141,19 +141,19 @@ _<ins>**NOTE**: When flashing a new firmware version, all previously configured 
 A Raspberry Pi Pico board is incredibly easy to flash, as it comes with a built in bootloader for flashing new firmwares in the `uf2` format. 
 In order to flash a new firmware to your USBSID-Pico you will need to put the Pico into bootloader mode. This can be done in 2 ways:
 1. While the Pico is seated on the USBSID-Pico board and with the USB cable plugged into your computer and the Pico do the following:
-	- Press and hold the `BOOTSEL` button on the Pico.
-	- Press and release the `RST` button on the USBSID-Pico board.
-	- Now release the `BOOTSEL` button.
-	- A new drive should appear on your computer called `RPI-RP2`.
-	- Copy the correct `uf2` firmware file to this directory.
-	- After copying the Pico will reboot and your Pico is flashed.
+  - Press and hold the `BOOTSEL` button on the Pico.
+  - Press and release the `RST` button on the USBSID-Pico board.
+  - Now release the `BOOTSEL` button.
+  - A new drive should appear on your computer called `RPI-RP2`.
+  - Copy the correct `uf2` firmware file to this directory.
+  - After copying the Pico will reboot and your Pico is flashed.
 2. When flashing a Pico that is not seated on the board do the following:
-	- Plug in the USB cable to your Pico and not into your computer.
-	- While holding the `BOOTSEL` button on the Pico plugin the other end of the USB cable into your computer.
-	- Now release the `BOOTSEL` button.
-	- A new drive should appear on your computer called `RPI-RP2`.
-	- Copy the correct `uf2` firmware file to this directory.
-	- After copying the Pico will reboot and your Pico is flashed.
+  - Plug in the USB cable to your Pico and not into your computer.
+  - While holding the `BOOTSEL` button on the Pico plugin the other end of the USB cable into your computer.
+  - Now release the `BOOTSEL` button.
+  - A new drive should appear on your computer called `RPI-RP2`.
+  - Copy the correct `uf2` firmware file to this directory.
+  - After copying the Pico will reboot and your Pico is flashed.
 ### Firmware features
 The firmware is still in development so features might change, be added or removed.
 - By default both sockets are enabled and the configuration is set to 2 SID's.
