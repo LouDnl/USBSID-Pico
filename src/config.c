@@ -858,13 +858,13 @@ void handle_config_request(uint8_t * buffer)
         : buffer[0] == TEST_SID3 ? 2
         : buffer[0] == TEST_SID4 ? 3
         : 0);  /* Fallback to SID 0 */
-      int t = (buffer[1] == 1 ? '1'  /* All tests */
+      char t = (buffer[1] == 1 ? '1'  /* All tests */
         : buffer[1] == 2 ? '2'  /* All waveforms test */
         : buffer[1] == 3 ? '3'  /* Filter tests */
         : buffer[1] == 4 ? '4'  /* Envelope tests */
         : buffer[1] == 5 ? '5'  /* Modulation tests */
         : '1');  /* Fallback to all tests */
-      int wf = (buffer[2] == 0 ? 'A'  /* All */
+      char wf = (buffer[2] == 0 ? 'A'  /* All */
         : buffer[2] == 1 ? 'T'  /* Triangle */
         : buffer[2] == 2 ? 'S'  /* Sawtooth */
         : buffer[2] == 3 ? 'P'  /* Pulse */
