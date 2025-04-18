@@ -253,8 +253,8 @@ Includes all features from v1.0 except the audio jumper
   - SID1 audio left & SID2 audio right
 - Optional EXT-IN pulldown resistor as filter bypass to reduce filter noise for Digiplay on 8580 SID's
 ### PCB Development
-* v1.3 release board<br>
-  [<img src="images/v1.3-top.png" width="30%">](images/v1.3-top.png) 
+* v1.3b release board<br>
+  [<img src="images/v1.3b-top.png" width="30%">](images/v1.3b-top.png) 
 * v1.2 testboard<br>
   [<img src="images/v1.2-top.png" width="30%">](images/v1.2-top.png) 
 * v1.1 unfinished and skipped
@@ -267,13 +267,10 @@ Includes all features from v1.0 except the audio jumper
 
 # Examples
 ### USBSID-Pico in action
-While in development any videos and/or audio links are subject to be changed or updated.
-#### Audio recordings
-[Reed's Flamethrower](media/Reed-Flamethrower.mp3)
-#### MOS8580 chip
-| **Codeboys & Endians** | **No Limit** |
+Videos and/or audio links are subject to be changed or updated at any time.
+| **Van Halen's Jump<br>in Stereo!** | **Flamethrower** |
 |:-:|:-:|
-| [![MOS8580](https://img.youtube.com/vi/sSDsOih1Wbw/1.jpg)](https://www.youtube.com/watch?v=sSDsOih1Wbw)<br><small><sub>by Booze Design</sub></small> | [![MOS8580](https://img.youtube.com/vi/hJit04tWUaM/1.jpg)](https://www.youtube.com/watch?v=hJit04tWUaM)<br><small><sub>Quantum tracker demo</sub></small> |
+| [![Dual MOS8580](https://img.youtube.com/vi/lzvkWlDq2TM/1.jpg)](https://www.youtube.com/watch?v=lzvkWlDq2TM)<br><small><sub>by Nordischsound</sub></small> | [![MOS8580](https://img.youtube.com/vi/Mfbj21ntQXA/1.jpg)](https://www.youtube.com/watch?v=Mfbj21ntQXA)<br><small><sub>by Reed</sub></small> |
 
 Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-29KQ), [other socials](https://github.com/LouDnl) or the [SHOWCASE](SHOWCASE.md) page to see more examples.
 ### Software
