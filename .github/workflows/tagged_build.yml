@@ -123,6 +123,7 @@ jobs:
 
   build:
     name: Build
+    needs: create_release
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/d')
     strategy:
