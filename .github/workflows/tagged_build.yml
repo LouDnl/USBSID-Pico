@@ -278,10 +278,28 @@ jobs:
           echo "DATETIME=$(date +'%Y%m%dT%H%M%S')" >> $GITHUB_ENV
 
       - name: 💾 Upload Artifacts
-        uses: actions/upload-artifact@v4
+        id: upload_artifacts
+        uses: actions/github-script@v7
+        env:
+          UPLOAD_URL: ${{ needs.create_release.outputs.upload_url }}
+          ASSET_PATH: ${{github.workspace}}/master/dist
+          ASSET_NAME: usbsid${{matrix.pico_board}}-taggedbuild-${{github.run_number}}-${{env.DATETIME}}
+          ASSET_CONTENT_TYPE: application/zip
         with:
-          name: usbsid${{matrix.pico_board}}-taggedbuild-${{github.run_number}}-${{env.DATETIME}}
-          path: ${{github.workspace}}/master/dist
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          retries: 3
+          script: |
+            const fs = require('fs');
+            const { UPLOAD_URL, ASSET_PATH, ASSET_NAME, ASSET_CONTENT_TYPE } = process.env;
+            const uploadAssetResponse = await github.rest.repos.uploadReleaseAsset({
+              url: UPLOAD_URL,
+              headers: {
+                'content-type': ASSET_CONTENT_TYPE,
+                'content-length': fs.statSync(ASSET_PATH).size
+              },
+              name: ASSET_NAME,
+              data: fs.readFileSync(ASSET_PATH)
+            });
 
   publish_release:
     name: Publish Release
