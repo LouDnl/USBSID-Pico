@@ -22,15 +22,32 @@
 ; along with this program. If not, see <http://www.gnu.org/licenses/>.
 ;
 
+; Raspberry Pi rp2040/rp2350 PIO riddle, help?
+;
+; The Pi Sysclk is 125Mhz for the rp2040 and 150Mhz for the rp2350
+;
 ; BUS clock = 32 * SID clock
+; 1 Second = 1000000 µs
+; 1 µs = 1000 ns
+; (1/Hz)*µs = µs per cycle
+;
 ; Example:
+;
 ; 32MHz BUS clock @ 1MHz SID clock
-; 32MHZ is 0.03125µs per cycle
-; 32MHZ is 31.25ns per cycle
-; 1MHz is 1µs per cycle
-; 1MHz is 1000ns per cycle
+; 32MHZ is 0,03125µs per cycle ~ (1/32000000 Hz)*1000000 µs
+; 32MHZ is 31,25ns per cycle ~ ((1/32000000 Hz)*1000000 µs)*1000 ns
+; 1MHz is 1µs per cycle ~ (1/1000000 Hz)*1000000 µs
+; 1MHz is 1000ns per cycle ~ ((1/1000000 Hz)*1000000 µs *1000 ns)
 ; A 1MHz/1µs SID cycle _should_ contain 32 BUS cycles
-; This _should_ mean that 1 command or NOP == 31.25ns
+; This _should_ mean that 1 command or NOP == 31,25ns
+;
+; 31527936Hz BUS clock @ PAL 985248Hz SID clock
+; 31527936Hz is 0.031717902µs per cycle
+; 31527936Hz is 31,717902498ns per cycle
+; 985248Hz is 1,01497288µs per cycle
+; 985248Hz is 1014,97288ns per cycle
+; A PAL/1.01497288µs SID cycle _should_ contain 32 BUS cycles
+; This _should_ mean that 1 command or NOP == 31.72ns
 ;
 ; Except?
 ; nop 26 waits 15 cycles to and including out pins
@@ -41,49 +58,51 @@
 ;
 
 .define PUBLIC PHI 22
-.define PUBLIC BUSIRQ 0
-.define PUBLIC DATAIRQ 1
+.define PUBLIC CONTROL 0  ; 0b000
+.define PUBLIC DATABUS 1  ; 0b001
 
-; Delay counter program
-.program delay_timer
-.wrap_target
-    pull block              ; Pull data from FIFO
-    out x 16                ; Move data into scratch register x
-delay:
-    wait 1 gpio PHI         ; Wait for clock to go high
-    wait 0 gpio PHI         ; Wait for clock to go low
-    jmp x-- delay           ; Decrease x and restart count
-    irq set BUSIRQ          ; Set IRQ and continue
-    irq wait DATAIRQ        ; Set IRQ and wait for its release
-.wrap
-
-; Bus control program
+; Bus control program ~ SM1
 .program bus_control
 .wrap_target
-    pull block              ; Pull data from FIFO
-    wait 1 irq BUSIRQ       ; Wait for IRQ signal
-    wait 0 gpio PHI   [26]  ; Wait for clock to go low
-    out pins, 3             ; Set control pins (19-21)
-    wait 1 gpio PHI   [24]  ; Wait for clock to go high
-    jmp pin read            ; Jump to read if IN pin is high
-    jmp done                ; Jump to done if write and wait
+    pull block               ; Pull data from TX fifo, block if no data
+    wait 1 irq CONTROL       ; Wait for IRQ signal
+    wait 0 gpio PHI    [24]  ; Wait for clock to go low
+    out pins, 3              ; Set control pins (19-21)
+    wait 1 gpio PHI          ; Wait for clock to go high
+    jmp pin read             ; Jump to read if RW is high
+    jmp done                 ; Jump to done if not
 read:
-    in pins, 8              ; Read data bus into isr
-    in NULL, 24             ; Shift the isr 24 bits to the right
-    push block              ; Push isr to fifo
+    nop                [26]  ; Nop and wait for another 26 NOP's
+    in pins 8                ; Read data pins
+    in NULL 24               ; Move ISR 24 bits to the right
+    push block               ; push ISR in to RX fifo, block if it's full
 done:
-    wait 0 gpio PHI         ; Wait for clock to go low
-    out pins, 3             ; Set control to next 3 bits from fifo
+    wait 0 gpio PHI          ; Wait for clock to go low
+    out pins 3               ; Set control to next 3 bits from TX fifo
 .wrap
 
-; Data and address bus program ~ pinstate stays the same until next write
+; Data and address bus program ~ SM2
+; pinstate stays the same until next write
 .program data_bus
 .wrap_target
-    pull block              ; Pull data from FIFO
-    wait 1 irq DATAIRQ      ; Wait for data irq signal ~ should trigger exactly 1 cycle after datairq
-    wait 0 gpio PHI    [26] ; Wait for clock to go low
-    out pins, 16            ; Set data bus pins
-    out pindirs 16          ; Set pin directions
-    wait 1 gpio PHI         ; Wait for clock to go high
-    wait 0 gpio PHI         ; Wait for clock to go low
+    pull block               ; Pull data from FIFO, block if no data
+    wait 1 irq DATABUS       ; Wait for IRQ signal ~ should trigger exactly 1 cycle after CONTROL
+    wait 0 gpio PHI    [24]  ; Wait for clock to go low
+    out pins 16              ; Set data bus pins
+    out pindirs 16           ; Set data bus pindirs
+    wait 1 gpio PHI          ; Wait for clock to go high
+    wait 0 gpio PHI          ; Wait for clock to go low
+.wrap
+
+; Delay counter program ~ SM3
+.program delay_timer
+.wrap_target
+    pull block               ; Pull data from FIFO, block if no data
+    out x 16                 ; Move data into scratch register X
+delay:
+    wait 1 gpio PHI          ; Wait for clock to go high
+    wait 0 gpio PHI          ; Wait for clock to go low
+    jmp x-- delay            ; Decrease X and restart count
+    irq set CONTROL          ; Set IRQ and continue
+    irq wait DATABUS         ; Set IRQ and wait for its release
 .wrap
