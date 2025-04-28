@@ -58,6 +58,10 @@
 #define MIN_CYCLES 10  /* 10 cycles for non cycled writes when in sequence */
 #endif
 
+#ifndef USE_CDC_CALLBACK
+#define USE_CDC_CALLBACK 1  /* Force CDC callback use over cdc_task */
+#endif
+
 /* USBSID command byte */
 enum
 {

@@ -86,7 +86,7 @@
  * - CFG_TUSB_MEM_ALIGN   : __attribute__ ((aligned(4)))
  */
 #ifndef CFG_TUSB_MEM_SECTION
-#define CFG_TUSB_MEM_SECTION
+#define CFG_TUSB_MEM_SECTION  __attribute__ ((section(".usb_ram")))
 #endif
 
 #ifndef CFG_TUSB_MEM_ALIGN
@@ -101,7 +101,7 @@
 #define CFG_TUD_ENDPOINT0_SIZE  64
 #endif
 
-#define CFG_TUD_TASK_QUEUE_SZ   64  /* WHAT DOES THIS BUTTON DO!? */
+#define CFG_TUD_TASK_QUEUE_SZ   100  /* WHAT DOES THIS BUTTON DO!? */
 
 //------------- CLASS -------------//
 #ifdef USB_PRINTF

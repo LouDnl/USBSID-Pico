@@ -396,10 +396,11 @@ void tud_midi_rx_cb(uint8_t itf)
 /* USB CDC CLASS TASK & CALLBACKS */
 
 /* Read from host to device */
+#ifndef USE_CDC_CALLBACK
 void cdc_task(void)
 { /* Same as the callback routine */
   if (tud_cdc_n_connected(CDC_ITF)) {
-    while (tud_cdc_n_available(CDC_ITF) > 0) {
+    if (tud_cdc_n_available(CDC_ITF) > 0) {
       cdc_itf = CDC_ITF;
       usbdata = 1, dtype = cdc;
       cdcread = tud_cdc_n_read(CDC_ITF, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
@@ -412,6 +413,7 @@ void cdc_task(void)
   }
   return;
 }
+#endif
 
 void tud_cdc_rx_cb(uint8_t itf)
 { /* No need to check available bytes for reading */
@@ -425,6 +427,8 @@ void tud_cdc_rx_cb(uint8_t itf)
     process_buffer(cdc_itf, &cdcread);
     return;
   }
+#else
+  (void)itf;
 #endif
   return;
 }
@@ -476,6 +480,7 @@ void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 
 /* USB VENDOR CLASS CALLBACKS */
 
+#ifdef USE_VENDOR_BUFFER
 void vendor_task(void)
 { /* Same as the callback routine */
   /* If the fifo buffer is disabled, this function has no use */
@@ -490,6 +495,7 @@ void vendor_task(void)
   }
   return;
 }
+#endif
 
 /* Read from host to device */
 void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
@@ -753,7 +759,6 @@ int main()
   /* Init midi */
   midi_init();
   /* Enable SID chips */
-  // reset_sid_registers();  // Disable for now, this also enables the sid chips lol :)
   enable_sid(false);
 
   /* Release core 0 semaphore to signal boot finished */
@@ -765,7 +770,9 @@ int main()
 #ifndef USE_CDC_CALLBACK
     cdc_task();  /* Only use this if no callbacks */
 #endif
-    /* No vendor task here, fifo is disabled! */
+#ifdef USE_VENDOR_BUFFER
+    vendor_task();  /* Only use this if buffering and fifo are enabled */
+#endif
   }
 
   /* Point of no return, this should never be reached */
