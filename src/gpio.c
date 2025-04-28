@@ -482,7 +482,8 @@ static int __not_in_flash_func(set_bus_bits)(uint8_t address, uint8_t data)
 }
 
 uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data)
-{
+{ /* WARNING: DEPRECATED AND NO LONGER WORKS */
+  return 0;
   if ((command & 0xF0) != 0x10) {
     return 0; // Sync bit not set, ignore operation
   }
@@ -497,13 +498,7 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
     return 0;
   }
   data_word = (dir_mask << 16) | data_word;
-  pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, PIO_IRQ0));  /* Preset the statemachine IRQ to not wait for a 1 */
-  pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, PIO_IRQ1));  /* Preset the statemachine IRQ to not wait for a 1 */
   switch (sid_command) {
-    case G_PAUSE:
-      control_word = 0b110110;
-      dma_channel_set_read_addr(dma_tx_control, &control_word, true); /* Control lines RW, CS1 & CS2 DMA transfer */
-      break;
     case WRITE:
       sid_memory[(address & 0x7F)] = data;
       pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, PIO_IRQ0));  /* Preset the statemachine IRQ to not wait for a 1 */
@@ -530,14 +525,7 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
         read_data, PRINTF_BYTE_TO_BINARY_INT32(read_data));
       sid_memory[(address & 0x7F)] = read_data & 0xFF;
       return read_data & 0xFF;
-    case G_CLEAR_BUS:
-      dir_mask = 0b1111111111111111;
-      data_word = (dir_mask << 16) | 0x0;
-      dma_channel_set_read_addr(dma_tx_control, &control_word, true); /* Control lines RW, CS1 & CS2 DMA transfer */
-      dma_channel_set_read_addr(dma_tx_data, &data_word, true); /* Data & Address DMA transfer */
-      break;
   }
-
   /* WRITE, G_PAUSE & G_CLEAR_BUS*/
   dma_channel_wait_for_finish_blocking(dma_tx_control);
   GPIODBG("[W]$%08x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\n", data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word));
@@ -636,7 +624,7 @@ void unmute_sid(void)
     uint8_t addr = ((0x20 * i) + 0x18);
     if ((volume_state[i] & 0xF) == 0) volume_state[i] = (volume_state[i] & 0xF0) | 0x0E;
     sid_memory[addr] = volume_state[i];
-    bus_operation((0x10 | WRITE), ((0x20 * i) + 0x18), volume_state[i]);  /* Volume back */
+    cycled_write_operation(((0x20 * i) + 0x18), volume_state[i], 0);  /* Volume back */
     DBG("[%d] $%02X:%02X\n", i, addr, volume_state[i]);
   }
   return;
@@ -648,7 +636,7 @@ void mute_sid(void)
   for (int i = 0; i < numsids; i++) {
     uint8_t addr = ((0x20 * i) + 0x18);
     volume_state[i] = sid_memory[addr];
-    bus_operation((0x10 | WRITE), addr, (volume_state[i] & 0xF0));  /* Volume to 0 */
+    cycled_write_operation(addr, (volume_state[i] & 0xF0), 0);  /* Volume to 0 */
     DBG("[%d] $%02X:%02X\n", i, addr, (volume_state[i] & 0xF0));
   }
   return;
@@ -674,7 +662,7 @@ void disable_sid(void)
 
 void clear_bus(int sidno)
 {
-  bus_operation((0x10 | G_CLEAR_BUS), (sidno * 0x20), 0x0);
+  cycled_write_operation((sidno * 0x20), 0x0, 0);
   return;
 }
 
@@ -688,7 +676,8 @@ void clear_bus_all(void)
 
 void pause_sid(void)
 {
-  bus_operation((0x10 | G_PAUSE), 0x0, 0x0);
+  gpio_put(CS1, 1);
+  gpio_put(CS2, 1);
   return;
 }
 
@@ -697,7 +686,8 @@ void pause_sid_withmute(void)
   DBG("[PAUSE STATE PRE] %d\n", paused_state);
   if (paused_state == 0) mute_sid();
   if (paused_state == 1) unmute_sid();
-  bus_operation((0x10 | G_PAUSE), 0x0, 0x0);
+  gpio_put(CS1, 1);
+  gpio_put(CS2, 1);
   paused_state = !paused_state;
   DBG("[PAUSE STATE POST] %d\n", paused_state);
   return;
@@ -712,7 +702,7 @@ void reset_sid(void)
   gpio_put(RES, 0);
   if (usbsid_config.socketOne.chiptype == 0 ||
       usbsid_config.socketTwo.chiptype == 0) {
-    delay_operation(10);  /* 10x PHI(02) cycles as per datasheet for REAL SIDs only */
+    cycled_delay_operation(10);  /* 10x PHI(02) cycles as per datasheet for REAL SIDs only */
   }
   gpio_put(RES, 1);
   reset_state = 0;
@@ -722,7 +712,7 @@ void reset_sid(void)
 void clear_sid_registers(int sidno)
 { /* NOTICE: CAUSES ISSUES IF USED RIGHT BEFORE PLAYING */
   for (int reg = 0; reg < count_of(sid_registers) - 4; reg++) {
-    bus_operation((0x10 | WRITE), ((sidno * 0x20) | sid_registers[reg]), 0x0);
+    cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0x0, 0);
   }
   return;
 }
@@ -744,8 +734,7 @@ void toggle_audio_switch(void)
   static int audio_state = 0b1;
   audio_state ^= 1;
   CFG("[CONFIG] TOGGLE AUDIO SWITCH TO: %d\n", audio_state);
-  tPIN(AU_SW);
-  // gpio_put(AU_SW, audio_state);  /* toggle mono <-> stereo */
+  tPIN(AU_SW);  /* toggle mono <-> stereo */
   #endif
 }
 
@@ -754,7 +743,7 @@ void set_audio_switch(bool state)
   #if defined(HAS_AUDIOSWITCH)
   CFG("[CONFIG] SET AUDIO SWITCH TO: %d\n", state);
   if (state) {
-    sPIN(AU_SW);
-  } else cPIN(AU_SW);
+    sPIN(AU_SW);      /* set   mono <-> stereo pin */
+  } else cPIN(AU_SW);  /* clear mono <-> stereo pin */
   #endif
 }

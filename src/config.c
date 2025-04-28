@@ -53,6 +53,11 @@ extern queue_t sidtest_queue;
 /* SID externals */
 extern uint8_t detect_sid_version(uint8_t start_addr);
 extern uint8_t detect_sid_model(uint8_t start_addr);
+extern uint8_t detect_sid_version_skpico(uint8_t start_addr);
+extern uint8_t detect_sid_unsafe(uint8_t start_addr);
+uint8_t (*sid_detection[4])(uint8_t) = { detect_sid_model, detect_sid_version, detect_sid_version_skpico, detect_sid_unsafe };
+extern bool detect_fmopl(uint8_t base_address);
+extern void detect_clone_types(bool sockone, bool onedual, bool socktwo, bool twodual);
 extern void sid_test(int sidno, char test, char wf);
 extern bool running_tests;
 
@@ -216,91 +221,27 @@ void print_cfg(const uint8_t *buf, size_t len)
   return;
 }
 
-bool detect_skpico(uint8_t base_address)
+void detect_sid_types(int detection_routine)
 {
-  /* SKPico routine */
-  char skpico_version[36] = {0};
-  bus_operation(0x10, (0x1F + base_address), 0xFF); /* Init config mode */
-  bus_operation(0x10, (0x1D + base_address), 0xFA); /* Extend config mode */
-  for (int i = 0; i < 36; i++) {
-    bus_operation(0x10, (0x1E + base_address), 0xE0 + i);
-    skpico_version[i] = bus_operation(0x11, (0x1D + base_address), 0);
-    if (i >= 2 && i <= 5) skpico_version[i] |= 0x60;
-  }
-  /* Reset after writes
-   * is needed for Real SID's to recover for SID detection
-   * but breaks SKPico SID detection
-   * disabled here due to no longer being in the SID detection routine */
-  /* reset_sid(); */
-  if (skpico_version[2] == 0x70
-      && skpico_version[3] == 0x69
-      && skpico_version[4] == 0x63
-      && skpico_version[5] == 0x6F) {
-    printf("[CONFIG] SIDKICK-pico @ 0x%02X version is: %.36s\n", base_address, skpico_version);
-    return true;
-  }
-  return false;
-}
+  /* Check if routine number is within range */
+  detection_routine = (detection_routine > 4 ? 0 : detection_routine);
 
-void detect_clone_types(bool sockone, bool onedual, bool socktwo, bool twodual)
-{
-  uint8_t base_address = 0x00;
-  if (sockone && detect_skpico(base_address)) {
-    usbsid_config.socketOne.chiptype  = 1;  /* Clone */
-    usbsid_config.socketOne.clonetype = 2;  /* SKpico */
-  } else {
-    usbsid_config.socketOne.chiptype  = 2;  /* Unknown */
-    usbsid_config.socketOne.clonetype = 1;  /* Other */
-  }
-  if (!onedual)
-    base_address = 0x20;
-  if (onedual)
-    base_address = 0x40;
-  if(socktwo && (base_address > 0x00) && detect_skpico(base_address)) {
-    usbsid_config.socketTwo.chiptype  = 1;  /* Clone */
-    usbsid_config.socketTwo.clonetype = 2;  /* SKpico */
-  } else {
-    usbsid_config.socketTwo.chiptype  = 2;  /* Unknown */
-    usbsid_config.socketTwo.clonetype = 1;  /* Other */
-  }
-}
-
-void detect_sid_types(void)
-{
   int sid1 = 0, sid2 = 0, sid3 = 0, sid4 = 0;
 
   if (numsids >= 1) {
-    sid1 = detect_sid_version(0x00);
-    if (sid1 == 0) {
-      sid1 = detect_sid_model(0x00);
-      if (sid1 != 0) {  /* Very high chance that this is a real SID */
-        usbsid_config.socketOne.chiptype  = 0;  /* Real */
-        usbsid_config.socketOne.clonetype = 0;  /* Disabled */
-      }
-    }
+    sid1 = sid_detection[detection_routine](0x00);
     CFG("[CONFIG] [READ SID1] [%02x %s]\n", sid1, sidtypes[sid1]);
   }
   if (numsids >= 2) {
-    sid2 = detect_sid_version(0x20);
-    if (sid2 == 0) {
-      sid2 = detect_sid_model(0x20);
-      if (sid2 != 0
-          && !usbsid_config.socketOne.dualsid
-          && !usbsid_config.socketTwo.dualsid) {  /* Very high chance that this is a real SID */
-        usbsid_config.socketTwo.chiptype  = 0;  /* Real */
-        usbsid_config.socketTwo.clonetype = 0;  /* Disabled */
-      }
-    }
+    sid2 = sid_detection[detection_routine](0x20);
     CFG("[CONFIG] [READ SID2] [%02x %s]\n", sid2, sidtypes[sid2]);
   }
   if (numsids >= 3) {
-    sid3 = detect_sid_version(0x40);
-    if (sid3 == 0) sid3 = detect_sid_model(0x40);
+    sid3 = sid_detection[detection_routine](0x40);
     CFG("[CONFIG] [READ SID3] [%02x %s]\n", sid3, sidtypes[sid3]);
   }
   if (numsids == 4) {
-    sid4 = detect_sid_version(0x60);
-    if (sid4 == 0) sid4 = detect_sid_model(0x60);
+    sid4 = sid_detection[detection_routine](0x60);
     CFG("[CONFIG] [READ SID4] [%02x %s]\n", sid4, sidtypes[sid4]);
   }
 
@@ -892,7 +833,9 @@ void handle_config_request(uint8_t * buffer)
       break;
     case DETECT_SIDS:       /* Detect SID types per socket */
       CFG("[CMD] DETECT_SIDS\n");
-      detect_sid_types();
+      uint detection_routine = buffer[1];
+      if (detection_routine > 3) detection_routine = 0;
+      detect_sid_types(detection_routine);
       memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
       read_config(&usbsid_config);  /* Read the config into the config buffer */
       memcpy(write_buffer_p, config_array, 64);  /* Copy the first 64 bytes from the buffer into the write buffer */
@@ -905,12 +848,23 @@ void handle_config_request(uint8_t * buffer)
           break;
       }
       break;
-    case DETECT_CLONES:  // TODO: FINISH
+    case DETECT_CLONES:
       CFG("[CMD] DETECT_CLONES\n");
       detect_clone_types(usbsid_config.socketOne.enabled,
                      usbsid_config.socketOne.dualsid,
                      usbsid_config.socketTwo.enabled,
                      usbsid_config.socketTwo.dualsid);
+      memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
+      read_config(&usbsid_config);  /* Read the config into the config buffer */
+      memcpy(write_buffer_p, config_array, 64);  /* Copy the first 64 bytes from the buffer into the write buffer */
+      switch (dtype) {
+        case 'C':
+          cdc_write(cdc_itf, 64);
+          break;
+        case 'W':
+          webserial_write(wusb_itf, 64);
+          break;
+      }
       break;
     case TEST_ALLSIDS:  /* ISSUE: This must be run on Core 1 so we can actually stop it! */
       CFG("[CMD] TEST_ALLSIDS\n");
@@ -1016,7 +970,6 @@ void handle_config_request(uint8_t * buffer)
       CFG("A %x %x %d\n", (uint32_t)usbsid_config.magic, (uint32_t)MAGIC_SMOKE, usbsid_config.magic != MAGIC_SMOKE);
       CFG("A %d %d\n", (int)usbsid_config.magic, (int)MAGIC_SMOKE);
       CFG("A %d\n", usbsid_config.magic == MAGIC_SMOKE);
-
 
       CFG("[TEST_CONFIG_START]\n");
       CFG("[MAGIC_SMOKE ERROR?] config: %u header: %u cm_verification: %u\n", usbsid_config.magic, MAGIC_SMOKE, cm_verification);
@@ -1441,7 +1394,7 @@ void detect_default_config(void)
     usbsid_config.default_config = 0;
     CFG("[CONFIG] DEFAULT CONFIG STATE SET TO %d\n", usbsid_config.default_config);
     first_boot = true;  /* Only at first boot the link popup will be sent */
-    detect_sid_types();  /* Detect SID types at default config once */
+    detect_sid_types(0);  /* Detect SID types at default config once */
     save_config(&usbsid_config);
     CFG("[CONFIG] CONFIG SAVED\n");
   }
@@ -1479,15 +1432,15 @@ void apply_clockrate(int n_clock, bool suspend_sids)
         CFG("[CONFIG] [CFG C64]  %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
         /* Start clock set */
         // ISSUE: EVEN THOUGH THIS IS BETTER IT DOES NOT SOLVE THE CRACKLING/BUS ROT ISSUE!
-        restart_bus_clocks();
         stop_dma_channels();
+        restart_bus_clocks();
         start_dma_channels();
         sync_pios(false);
         if (suspend_sids) {
           CFG("[ENABLE SID WITH UNMUTE]\n");
           enable_sid(true);
         }
-        // ISSUE: WHEN THIS HAPPENS THE CRACKLING ON CYCLE EXACT TUNES IS IMMENSE!
+        // ISSUE: WHEN THE BUS IS RESTARTED THE CRACKLING ON CYCLE EXACT TUNES IS IMMENSE!
         // THIS IS AFTER PAL -> NTSC -> PAL
         // restart_bus();
         return;

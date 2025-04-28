@@ -40,7 +40,7 @@
 
 
 /* GPIO externals */
-extern uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data);
+extern uint8_t __not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 
 /* ASID externals */
 extern void process_sysex(uint8_t *buffer, int size);
@@ -84,7 +84,7 @@ void midi_init(void)
 
 void midi_bus_operation(uint8_t a, uint8_t b)
 {
-  bus_operation(0x10, a, b);
+  cycled_write_operation(a, b, 10);  /* 10 cycles constant */
 }
 
 void write(int channel, int sidno, int reg)

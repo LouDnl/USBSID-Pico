@@ -172,7 +172,7 @@ enum
   DUAL_SOCKET2     = 0x47,  /* Two SID's in socket Two, Socket One disabled */
 
   SET_CLOCK        = 0x50,  /* Change SID clock frequency by array id */
-  DETECT_SIDS      = 0x51,  /* Try to detect the SID types per socket */
+  DETECT_SIDS      = 0x51,  /* Try to detect the SID types per socket ~ routines see below */
   TEST_ALLSIDS     = 0x52,  /* Runs a very long test on all SID's */
   TEST_SID1        = 0x53,  /* Runs a very long test on SID 1 */
   TEST_SID2        = 0x54,  /* Runs a very long test on SID 2 */
@@ -198,6 +198,12 @@ enum
 
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
 };
+
+/* SID detection routines
+ * routine 1: https://github.com/GideonZ/1541ultimate/blob/master/software/6502/sidcrt/player/advanced/detection.asm
+ * routine 2: https://codebase64.org/doku.php?id=base:detecting_sid_type_-_safe_method
+ * routine 3: https://codebase64.org/doku.php?id=base:detecting_sid_type
+ */
 
 
 #ifdef __cplusplus

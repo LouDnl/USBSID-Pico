@@ -72,6 +72,8 @@ enum
   COMMAND      =   3,   /*       0b11 ~ 0xC0 */
   /* BYTE 0 - lower 6 bits for byte count */
   /* BYTE 0 - lower 5 bits for Commands */
+  CYCLED_READ  =   4,   /*      0b100 ~ 0x04 */
+  DELAY_CYCLES =   5,   /*      0b101 ~ 0x05 */
   PAUSE        =  10,   /*     0b1010 ~ 0x0A */
   UNPAUSE      =  11,   /*     0b1011 ~ 0x0B */
   MUTE         =  12,   /*     0b1100 ~ 0x0C */
@@ -83,10 +85,6 @@ enum
   CONFIG       =  18,   /*    0b10010 ~ 0x12 */
   RESET_MCU    =  19,   /*    0b10011 ~ 0x13 */
   BOOTLOADER   =  20,   /*    0b10100 ~ 0x14 */
-
-  /* INTERNAL BUS COMMANDS */
-  G_PAUSE      = 2,
-  G_CLEAR_BUS  = 3,
 
   /* WEBSUSB ADDITIONAL COMMANDS */
   WEBUSB_COMMAND  = 0xFF,

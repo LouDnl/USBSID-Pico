@@ -76,8 +76,9 @@ extern void reset_sid_registers(void);
 extern void enable_sid(bool unmute);
 extern void disable_sid(void);
 extern void clear_bus_all(void);
-extern uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data);
-extern void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint16_t __not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
+extern uint8_t __not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
+extern void __not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 
 /* Vu externals */
 extern uint16_t vu;
@@ -183,8 +184,9 @@ void webserial_write(uint8_t * itf, uint32_t n)
 int __not_in_flash_func(do_buffer_tick)(int top, int step)
 {
   static int i = 1;
-  cycled_bus_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
+  cycled_write_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   WRITEDBG(dtype, i, top, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
+  IODBG("[I %d] [%c] $%02X:%02X (%u)\n", i, dtype, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   if (i+step >= top) {
     i = 1;
     return i;
@@ -215,8 +217,9 @@ void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
   if (command == CYCLED_WRITE) {
     // n_bytes = (n_bytes == 0) ? 4 : n_bytes; /* if byte count is zero, this is a single write packet */
     if (n_bytes == 0) {
-      cycled_bus_operation(sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
+      cycled_write_operation(sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
       WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
+      IODBG("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
     } else {
       buffer_task(n_bytes, 4);
     }
@@ -225,8 +228,9 @@ void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
   if (command == WRITE) {
     // n_bytes = (n_bytes == 0) ? 2 : n_bytes; /* if byte count is zero, this is a single write packet */
     if (n_bytes == 0) {
-      bus_operation(0x10, sid_buffer[1], sid_buffer[2]);  /* Leave this on non cycled, errornous playback otherwise! */
+      cycled_write_operation(sid_buffer[1], sid_buffer[2], 0);
       WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], 0);
+      IODBG("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], 0);
     } else {
       buffer_task(n_bytes, 2);
     }
@@ -234,8 +238,7 @@ void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
   };
   if (command == READ) {  /* READING CAN ONLY HANDLE ONE AT A TIME, PERIOD. */
     IODBG("[I %d] [%c] $%02X:%02X\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2]);
-    write_buffer[0] = bus_operation((0x10 | READ), sid_buffer[1], sid_buffer[2]);  /* write the address to the SID and read the data back */
-    // write_buffer[0] = bus_operation((0x10 | READ), sid_buffer[1], 0x0);  /* write the address to the SID and read the data back */
+    write_buffer[0] = cycled_read_operation(sid_buffer[1], 0);  /* write the address to the SID and read the data back */
     switch (dtype) {  /* write the result to the USB client */
       case 'C':
         cdc_write(itf, BYTES_TO_SEND);
@@ -252,6 +255,25 @@ void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
   };
   if (command == COMMAND) {
     switch (subcommand) {
+      case CYCLED_READ:
+        IODBG("[I %d] [%c] $%02X %u\n", n_bytes, dtype, sid_buffer[1], (sid_buffer[2] << 8 | sid_buffer[3]));
+        write_buffer[0] = cycled_read_operation(sid_buffer[1], (sid_buffer[2] << 8 | sid_buffer[3]));
+        switch (dtype) {  /* write the result to the USB client */
+          case 'C':
+            cdc_write(itf, BYTES_TO_SEND);
+            break;
+          case 'W':
+            webserial_write(itf, BYTES_TO_SEND);
+            break;
+          default:
+            IODBG("[WRITE ERROR]%c\n", dtype);
+            break;
+        };
+        vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+        return;
+      case DELAY_CYCLES:
+        cycled_delay_operation((sid_buffer[1] << 8 | sid_buffer[2]));
+        return;
       case PAUSE:
         DBG("[PAUSE_SID]\n");
         pause_sid();
