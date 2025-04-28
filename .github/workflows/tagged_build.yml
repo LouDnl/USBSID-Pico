@@ -11,7 +11,7 @@ env:
 on:
   push:
     tags:
-      - "d[0-9]+" # any tag name that looks like a a date 20250101 etc.
+      - "d[0-9a-z]+" # any tag name that looks like a a date 20250101 etc.
     branches: [master, dev]
   # Allows you to run this workflow manually from the Actions tab when needed
   workflow_dispatch:
