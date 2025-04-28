@@ -1,4 +1,4 @@
-name: USBSID-Pico Build
+name: USBSID-Pico Tagged Build
 
 env:
   BUILD_THREADS: 4
@@ -124,7 +124,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-
+    if: startsWith(github.ref, 'refs/tags/d')
     strategy:
       matrix:
         include:
@@ -152,9 +152,7 @@ jobs:
               pico_board: pico2_w,
               pico_platform: rp2350-arm-s,
             }
-
       fail-fast: false
-
     steps:
       - name: 🛠️ Arm GNU Toolchain (arm-none-eabi-gcc)
         uses: carlosperate/arm-none-eabi-gcc-action@v1
@@ -282,7 +280,7 @@ jobs:
       - name: 💾 Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: usbsid${{matrix.pico_board}}-${{env.BRANCHNAME}}-autobuild-${{github.run_number}}-${{env.DATETIME}}
+          name: usbsid${{matrix.pico_board}}-taggedbuild-${{github.run_number}}-${{env.DATETIME}}
           path: ${{github.workspace}}/master/dist
 
   publish_release:
