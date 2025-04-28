@@ -23,7 +23,7 @@ jobs:
   cleanup_previous_builds: # Delete unfinished draft prereleases, and prereleases older than 30 days (but keep at least 10)
     name: Cleanup Previous Builds
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/d')
+    if: startsWith(github.ref, 'refs/tags/d')
     steps:
       - uses: actions/github-script@v7
         with:
@@ -97,7 +97,7 @@ jobs:
     name: Create Draft Release
     needs: cleanup_previous_builds
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/d')
+    if: startsWith(github.ref, 'refs/tags/d')
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       release_id: ${{ steps.create_release.outputs.release_id }}
@@ -292,7 +292,7 @@ jobs:
     name: Publish Release
     needs: [create_release, build]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/d')
+    if: startsWith(github.ref, 'refs/tags/d')
     steps:
       - uses: actions/github-script@v7
         with:
