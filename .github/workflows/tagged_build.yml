@@ -268,7 +268,7 @@ jobs:
         run: |
           mkdir dist
           cp -av build_${{matrix.directory}}/*.uf2 dist/
-          zip -r usbsid${{matrix.pico_board}}-taggedbuild-${{github.run_number}}-${{env.DATETIME}}.zip dist/
+          zip -r usbsid${{matrix.pico_board}}-taggedbuild-${{github.run_number}}.zip dist/
 
       - name: Get current branch
         run: |
@@ -283,8 +283,8 @@ jobs:
         uses: actions/github-script@v7
         env:
           UPLOAD_URL: ${{ needs.create_release.outputs.upload_url }}
-          ASSET_PATH: ${{github.workspace}}/master/usbsid${{matrix.pico_board}}-taggedbuild-${{github.run_number}}-${{env.DATETIME}}.zip
-          ASSET_NAME: usbsid${{matrix.pico_board}}-taggedbuild-${{github.run_number}}-${{env.DATETIME}}.zip
+          ASSET_PATH: ${{github.workspace}}/master/usbsid${{matrix.pico_board}}-taggedbuild-${{github.run_number}}.zip
+          ASSET_NAME: usbsid${{matrix.pico_board}}-taggedbuild-${{github.run_number}}.zip
           ASSET_CONTENT_TYPE: application/zip
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
