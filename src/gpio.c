@@ -489,7 +489,7 @@ static int __not_in_flash_func(set_bus_bits)(uint8_t address, uint8_t data)
   return 1;
 }
 
-uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data)
+uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data)
 { /* WARNING: DEPRECATED AND NO LONGER WORKS */
   return 0;
   if ((command & 0xF0) != 0x10) {
@@ -540,7 +540,7 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
   return 0;
 }
 
-uint16_t __not_in_flash_func(cycled_delay_operation)(uint16_t cycles)
+uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles)
 { /* This is a blocking function! */
   if (cycles == 0) return 0; /* No point in waiting zero cycles */
   delay_word = cycles;
@@ -560,7 +560,7 @@ uint16_t __not_in_flash_func(cycled_delay_operation)(uint16_t cycles)
   return 0;
 }
 
-uint8_t __not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles)
+uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles)
 {
   delay_word = cycles;
   control_word = data_word = dir_mask = 0;
@@ -589,7 +589,7 @@ uint8_t __not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cyc
   return (read_data & 0xFF);
 }
 
-void __not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles)
+void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles)
 {
   delay_word = cycles;
   sid_memory[(address & 0x7F)] = data;

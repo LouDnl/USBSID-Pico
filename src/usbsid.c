@@ -76,9 +76,9 @@ extern void reset_sid_registers(void);
 extern void enable_sid(bool unmute);
 extern void disable_sid(void);
 extern void clear_bus_all(void);
-extern uint16_t __not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
-extern uint8_t __not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
-extern void __not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
+extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
+extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 
 /* Vu externals */
 extern uint16_t vu;
@@ -181,7 +181,7 @@ void webserial_write(uint8_t * itf, uint32_t n)
 
 /* BUFFER HANDLING */
 
-int __not_in_flash_func(do_buffer_tick)(int top, int step)
+int __no_inline_not_in_flash_func(do_buffer_tick)(int top, int step)
 {
   static int i = 1;
   cycled_write_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
@@ -195,7 +195,7 @@ int __not_in_flash_func(do_buffer_tick)(int top, int step)
   return 0;
 }
 
-void __not_in_flash_func(buffer_task)(int n_bytes, int step)
+void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
 {
   int state = 0;
   do {
@@ -205,7 +205,7 @@ void __not_in_flash_func(buffer_task)(int n_bytes, int step)
 }
 
 /* Process received usb data */
-void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
+void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
 {
   usbdata = 1;
   vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */

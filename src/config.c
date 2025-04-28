@@ -62,7 +62,9 @@ extern void sid_test(int sidno, char test, char wf);
 extern bool running_tests;
 
 /* GPIO externals */
-extern uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data);
+extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
+extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
 extern void reset_sid(void);
 extern void restart_bus(void);
 extern void restart_bus_clocks(void);

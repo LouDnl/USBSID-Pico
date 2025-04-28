@@ -40,7 +40,7 @@
 
 
 /* GPIO externals */
-extern uint8_t __not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint8_t __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 
 /* ASID externals */
 extern void process_sysex(uint8_t *buffer, int size);
