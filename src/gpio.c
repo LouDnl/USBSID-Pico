@@ -75,6 +75,7 @@ static uint8_t volume_state[4] = {0};
  */
 register uint32_t b asm( "r10" );
 volatile const uint32_t *BUSState = &sio_hw->gpio_in;
+volatile const uint32_t *IRQState = &pio0_hw->irq;
 
 void init_gpio(void)
 { /* GPIO defaults for PIO bus */
@@ -84,12 +85,12 @@ void init_gpio(void)
   gpio_init(CS1);
   gpio_init(CS2);
   gpio_init(RW);
-  gpio_put(CS1, 1);
-  gpio_put(CS2, 1);
-  gpio_put(RW, 0);
   gpio_set_dir(CS1, GPIO_OUT);
   gpio_set_dir(CS2, GPIO_OUT);
   gpio_set_dir(RW, GPIO_OUT);
+  gpio_put(CS1, 1);
+  gpio_put(CS2, 1);
+  gpio_put(RW, 1);
   /* GPIO defaults for audio switch */
   #if defined(HAS_AUDIOSWITCH)
   gpio_set_dir(AU_SW, GPIO_OUT);
@@ -181,9 +182,9 @@ void setup_piobus(void)
      (int)usbsid_config.clock_rate);
 
   { /* control bus */
-    offset_control = pio_add_program(bus_pio, &bus_control_program);
-    sm_control = 1;  /* PIO1 SM1 */
+    sm_control = 1;  /* PIO0 SM1 */
     pio_sm_claim(bus_pio, sm_control);
+    offset_control = pio_add_program(bus_pio, &bus_control_program);
     for (uint i = RW; i < CS2 + 1; ++i)
       pio_gpio_init(bus_pio, i);
     pio_sm_config c_control = bus_control_program_get_default_config(offset_control);
@@ -196,9 +197,9 @@ void setup_piobus(void)
   }
 
   { /* databus */
-    offset_data = pio_add_program(bus_pio, &data_bus_program);
-    sm_data = 2;  /* PIO1 SM2 */
+    sm_data = 2;  /* PIO0 SM2 */
     pio_sm_claim(bus_pio, sm_data);
+    offset_data = pio_add_program(bus_pio, &data_bus_program);
     for (uint i = D0; i < A5 + 1; ++i) {
       pio_gpio_init(bus_pio, i);
     }
@@ -212,7 +213,7 @@ void setup_piobus(void)
   }
 
   { /* delay counter */
-    sm_delay = 3;  /* PIO1 SM3 */
+    sm_delay = 3;  /* PIO0 SM3 */
     pio_sm_claim(bus_pio, sm_delay);
     offset_delay = pio_add_program(bus_pio, &delay_timer_program);
     pio_sm_config c_delay = delay_timer_program_get_default_config(offset_delay);
@@ -226,44 +227,57 @@ void setup_piobus(void)
 }
 
 void setup_dmachannels(void)
-{ /* NOTE: Do not manually assign DMA channels, this causes a Panic on the  PicoW */
+{ /* NOTE: Do not manually assign DMA channels, this causes a Panic on the PicoW */
   CFG("[DMA CHANNELS INIT] START\n");
 
+  /* NOTICE: DMA read address is disabled for now, it is causing confirmed desync on the rp2040 (rp2350 seems to works, but needs improving) */
+  /* NOTICE: DMA chaining on rp2350 causes desync with cycled writes, probably due to RP2350-E8 */
+  /* NOTE: Until I find a fix for the DMA chaining with the delay counter it's disabled */
+
+  dma_tx_control = dma_claim_unused_channel(true);
+  dma_tx_data = dma_claim_unused_channel(true);
+  dma_rx_data = dma_claim_unused_channel(true);
+  dma_tx_delay = dma_claim_unused_channel(true);
+
   { /* dma controlbus */
-    dma_tx_control = dma_claim_unused_channel(true);
     dma_channel_config tx_config_control = dma_channel_get_default_config(dma_tx_control);
     channel_config_set_transfer_data_size(&tx_config_control, DMA_SIZE_8);
-    channel_config_set_read_increment(&tx_config_control, true);
+    channel_config_set_read_increment(&tx_config_control, false);
     channel_config_set_write_increment(&tx_config_control, false);
-    channel_config_set_dreq(&tx_config_control, pio_get_dreq(bus_pio, sm_control, true));
+    channel_config_set_dreq(&tx_config_control, DREQ_PIO0_TX1);
+    //#if PICO_PIO_VERSION == 0  /* rp2040 only for now, see notice above */
+    //channel_config_set_chain_to(&tx_config_control, dma_tx_data); /* Chain to controlbus tx */
+    //#endif
     dma_channel_configure(dma_tx_control, &tx_config_control, &bus_pio->txf[sm_control], NULL, 1, false);
   }
 
   { /* dma tx databus */
-    dma_tx_data = dma_claim_unused_channel(true);
     dma_channel_config tx_config_data = dma_channel_get_default_config(dma_tx_data);
     channel_config_set_transfer_data_size(&tx_config_data, DMA_SIZE_32);
-    channel_config_set_read_increment(&tx_config_data, true);
+    channel_config_set_read_increment(&tx_config_data, false);
     channel_config_set_write_increment(&tx_config_data, false);
-    channel_config_set_dreq(&tx_config_data, pio_get_dreq(bus_pio, sm_data, true));
+    channel_config_set_dreq(&tx_config_data, DREQ_PIO0_TX2);
     dma_channel_configure(dma_tx_data, &tx_config_data, &bus_pio->txf[sm_data], NULL, 1, false);
   }
 
   { /* dma rx databus */
-    dma_rx_data = dma_claim_unused_channel(true);
-    dma_channel_config rx_config = dma_channel_get_default_config(dma_rx_data);
-    channel_config_set_transfer_data_size(&rx_config, DMA_SIZE_8);
-    channel_config_set_read_increment(&rx_config, false);
-    channel_config_set_write_increment(&rx_config, true);
-    channel_config_set_dreq(&rx_config, pio_get_dreq(bus_pio, sm_control, false));
-    dma_channel_configure(dma_rx_data, &rx_config, NULL, &bus_pio->rxf[sm_control], 1, false);
+    dma_channel_config rx_config_data = dma_channel_get_default_config(dma_rx_data);
+    channel_config_set_transfer_data_size(&rx_config_data, DMA_SIZE_8);
+    channel_config_set_read_increment(&rx_config_data, false);
+    channel_config_set_write_increment(&rx_config_data, false);
+    channel_config_set_dreq(&rx_config_data, DREQ_PIO0_RX1);
+    dma_channel_configure(dma_rx_data, &rx_config_data, NULL, &bus_pio->rxf[sm_control], 1, false);
   }
 
   { /* dma delaytimerbus */
-    dma_tx_delay = dma_claim_unused_channel(true);
     dma_channel_config tx_config_delay = dma_channel_get_default_config(dma_tx_delay);
-    channel_config_set_transfer_data_size(&tx_config_delay, DMA_SIZE_16 /* DMA_SIZE_32 */);
-    channel_config_set_dreq(&tx_config_delay, pio_get_dreq(bus_pio, sm_delay, true));
+    channel_config_set_transfer_data_size(&tx_config_delay, DMA_SIZE_16);
+    channel_config_set_read_increment(&tx_config_delay, false);
+    channel_config_set_write_increment(&tx_config_delay, false);
+    channel_config_set_dreq(&tx_config_delay, DREQ_PIO0_TX3);
+    //#if PICO_PIO_VERSION == 0  /* rp2040 only for now, see notice above */
+    //channel_config_set_chain_to(&tx_config_delay, dma_tx_control); /* Chain to controlbus tx */
+    //#endif
     dma_channel_configure(dma_tx_delay, &tx_config_delay, &bus_pio->txf[sm_delay], NULL, 1, false);
   }
   CFG("[DMA CHANNELS CLAIMED] C:%d TX:%d RX:%d D:%d\n", dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay);
@@ -282,7 +296,6 @@ void sync_pios(bool at_boot)
   pio_clkdiv_restart_sm_multi_mask(bus_pio, 0, 0b1111, 0);
   #endif
   if (!at_boot) {
-    pio_sm_clear_fifos(bus_pio, sm_clock);
     pio_sm_clear_fifos(bus_pio, sm_control);
     pio_sm_clear_fifos(bus_pio, sm_data);
     pio_sm_clear_fifos(bus_pio, sm_delay);
@@ -315,25 +328,29 @@ void restart_bus_clocks(void)
 }
 
 void stop_dma_channels(void)
-{
-  CFG("[STOP DMA CHANNELS]\n");
-  // Atomically abort channels
-  dma_hw->abort = (1 << dma_tx_delay) | (1 << dma_rx_data) | (1 << dma_tx_data) | (1 << dma_tx_control);
-  // Wait for all aborts to complete
-  while (dma_hw->abort) tight_loop_contents();
-  // Wait for channels to not be busy
-  while (dma_hw->ch[dma_tx_delay].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS) tight_loop_contents();
-  while (dma_hw->ch[dma_rx_data].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS) tight_loop_contents();
-  while (dma_hw->ch[dma_tx_data].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS) tight_loop_contents();
-  while (dma_hw->ch[dma_tx_control].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS) tight_loop_contents();
+{ // TODO: Fix and finish per RP2040-E13 and RP2350-E5
+  // CFG("[STOP DMA CHANNELS]\n");
+  /* Clear any Interrupt enable bits as per RP2040-E13 */
+  // TODO: FINISH
+  /* Atomically abort channels */
+  // dma_hw->abort = (1 << dma_tx_delay) | (1 << dma_rx_data) | (1 << dma_tx_data) | (1 << dma_tx_control);
+  /* Wait for all aborts to complete */
+  // while (dma_hw->abort) tight_loop_contents();
+  /* Check and clear any Interrupt enable bits as per RP2040-E13 */
+  // TODO: FINISH
+  /* Wait for channels to not be busy */
+  // while (dma_hw->ch[dma_tx_delay].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS) tight_loop_contents();
+  // while (dma_hw->ch[dma_rx_data].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS) tight_loop_contents();
+  // while (dma_hw->ch[dma_tx_data].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS) tight_loop_contents();
+  // while (dma_hw->ch[dma_tx_control].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS) tight_loop_contents();
   return;
 }
 
 void start_dma_channels(void)
-{
+{ /* NOTE: DO NOT USE, THIS STARTS A TRANSFER IN THE CURRENT CONFIG */
   /* Trigger -> start dma channels all at once */
-  CFG("[START DMA CHANNELS]\n");
-  dma_hw->multi_channel_trigger = (1 << dma_tx_delay) | (1 << dma_rx_data) | (1 << dma_tx_data) | (1 << dma_tx_control);
+  // CFG("[START DMA CHANNELS]\n");
+  // dma_hw->multi_channel_trigger = (1 << dma_tx_delay) | (1 << dma_rx_data) | (1 << dma_tx_data) | (1 << dma_tx_control);
   return;
 }
 
@@ -399,7 +416,7 @@ void init_sidclock(void)
     ((float)pico_hz / sidclock_frequency / 2),
     (int)usbsid_config.clock_rate);
   offset_clock = pio_add_program(bus_pio, &clock_program);
-  sm_clock = 0;  /* PIO1 SM0 */
+  sm_clock = 0;  /* PIO0 SM0 */
   pio_sm_claim(bus_pio, sm_clock);
   clock_program_init(bus_pio, sm_clock, offset_clock, PHI, sidclock_frequency);
   CFG("[SID CLK INIT] FINISHED\n");
@@ -527,32 +544,58 @@ uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uin
   return 0;
 }
 
-uint16_t __not_in_flash_func(delay_operation)(uint16_t cycles)
-{
+uint16_t __not_in_flash_func(cycled_delay_operation)(uint16_t cycles)
+{ /* This is a blocking function! */
+  if (cycles == 0) return 0; /* No point in waiting zero cycles */
   delay_word = cycles;
-  dma_channel_set_read_addr(dma_tx_delay, &delay_word, true);  /* Delay cycles DMA transfer */
-  dma_channel_wait_for_finish_blocking(dma_tx_delay);
-  pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ0));  /* Preset the statemachine IRQ to not wait for a 1 */
-  pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ1));  /* Preset the statemachine IRQ to not wait for a 1 */
-  return cycles;
+  pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ0));  /* Clear the statemachine IRQ before starting */
+  pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ1));  /* Clear the statemachine IRQ before starting */
+  dma_channel_set_read_addr(dma_tx_delay, &delay_word, false);
+  dma_hw->multi_channel_trigger = (1u << dma_tx_delay);  /* Delay cycle s DMA transfer */
+
+  for (;;) {  /* Keep mofo waiting yeah! */
+    if (((*IRQState & (1u << PIO_IRQ1)) >> PIO_IRQ1) != 1)
+      continue;
+    pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ0));  /* Clear the statemachine IRQ after finishing */
+    pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ1));  /* Clear the statemachine IRQ after finishing */
+    return cycles;
+  }
+
+  return 0;
 }
 
-void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, uint16_t cycles)
+uint8_t __not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles)
 {
-  GPIODBG("[WC]$%04x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16" $%02X:%02X(%u)\n",
-    data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word),
-    address, data, cycles);
   delay_word = cycles;
-  if (cycles >= 1) {  /* Minimum of 1 cycle as delay, otherwise unneeded overhead */
-    dma_channel_set_read_addr(dma_tx_delay, &delay_word, true);  /* Delay cycles DMA transfer */
-    if (address == 0xFF && data == 0xFF) {
-      dma_channel_wait_for_finish_blocking(dma_tx_delay);
-      return;
-    }
-  } else {
-    pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, PIO_IRQ0));  /* Preset the statemachine IRQ to not wait for a 1 */
-    pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, PIO_IRQ1));  /* Preset the statemachine IRQ to not wait for a 1 */
+  control_word = data_word = dir_mask = 0;
+  control_word = 0b111000;
+  dir_mask |= 0b1111111100000000;
+  control_word |= 1;
+  if (set_bus_bits(address, 0x0) != 1) {
+    return 0x00;
   }
+  data_word = (dir_mask << 16) | data_word;
+
+  dma_channel_set_read_addr(dma_tx_delay, &delay_word, false);
+  dma_channel_set_read_addr(dma_tx_control, &control_word, false);
+  dma_channel_set_read_addr(dma_tx_data, &data_word, false);
+  dma_channel_set_write_addr(dma_rx_data, &read_data, false);
+  dma_hw->multi_channel_trigger = (
+      1u << dma_tx_delay    /* Delay cycles DMA transfer */
+  //#if PICO_PIO_VERSION > 0  /* rp2040 only for now, see notice in setup_dmachannels */
+    | 1u << dma_tx_control  /* Control lines RW, CS1 & CS2 DMA transfer */
+    | 1u << dma_tx_data     /* Data & Address DMA transfer */
+  //#endif
+    | 1u << dma_rx_data     /* Read data DMA transfer */
+  );
+  dma_channel_wait_for_finish_blocking(dma_rx_data);  /* Wait for data */
+  sid_memory[(address & 0x7F)] = (read_data & 0xFF);
+  return (read_data & 0xFF);
+}
+
+void __not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles)
+{
+  delay_word = cycles;
   sid_memory[(address & 0x7F)] = data;
   vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
   control_word = 0b111000;
@@ -562,8 +605,16 @@ void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, ui
   }
   data_word = (dir_mask << 16) | data_word;
 
-  dma_channel_set_read_addr(dma_tx_data, &data_word, true); /* Data & Address DMA transfer */
-  dma_channel_set_read_addr(dma_tx_control, &control_word, true); /* Control lines RW, CS1 & CS2 DMA transfer */
+  dma_channel_set_read_addr(dma_tx_delay, &delay_word, false);
+  dma_channel_set_read_addr(dma_tx_control, &control_word, false);
+  dma_channel_set_read_addr(dma_tx_data, &data_word, false);
+  dma_hw->multi_channel_trigger = (
+      1u << dma_tx_delay    /* Delay cycles DMA transfer */
+  //#if PICO_PIO_VERSION > 0  /* rp2040 only for now, see notice in setup_dmachannels */
+    | 1u << dma_tx_control  /* Control lines RW, CS1 & CS2 DMA transfer */
+    | 1u << dma_tx_data     /* Data & Address DMA transfer */
+  //#endif
+  );
   /* DMA wait call
    * dma_tx_control ~ normal
    * dma_tx_data ~ not as good as control, maybe a bit more cracks
@@ -571,6 +622,10 @@ void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, ui
    * neither ~ broken play
    */
   dma_channel_wait_for_finish_blocking(dma_tx_control);
+
+  GPIODBG("[WC]$%04x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16" $%02X:%02X(%u %u)\n",
+    data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word),
+    address, data, cycles, delay_word);
   return;
 }
 

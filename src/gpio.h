@@ -51,6 +51,7 @@
 #include "hardware/dma.h"    /* DMA Controller API */
 #include "hardware/pwm.h"    /* Hardware Pulse Width Modulation (PWM) API */
 #include "hardware/irq.h"    /* Hardware interrupt handling */
+#include "hardware/structs/iobank0.h"
 
 /* PIO */
 #include "bus_control.pio.h" /* Busje komt zo! */
@@ -59,6 +60,17 @@
 #if defined(USE_RGB)
 #include "vu_rgb.pio.h"      /* Ik zie regenbogen! */
 #endif
+
+/* PIO & Statemachine usage
+ * PIO0
+ * SM0: SID clock
+ * SM1: Control bus
+ * SM2: Data bus
+ * SM3: Delay timer
+ * PIO1
+ * SM0: RGB LED control
+ * SM1: LED PWM control
+ */
 
 /* Uart */
 #define BAUD_RATE 115200
