@@ -52,11 +52,16 @@ static uint8_t control_word, read_data;
 static uint16_t delay_word;
 static uint32_t data_word, dir_mask;
 static float sidclock_frequency, busclock_frequency;
+
 #if defined(PICO_DEFAULT_LED_PIN)
 PIO led_pio = pio1;
 uint sm_pwmled, offset_pwmled;
+int dma_pwmled;
+int pwm_value = 0;
 #if defined(USE_RGB)  /* No RGB LED on _w Pico's */
-uint sm_vu_rgb, offset_vu_rgb;
+uint sm_rgbled, offset_rgbled;
+int dma_rgbled;
+uint32_t rgb_value;
 #endif
 #endif
 
@@ -99,7 +104,7 @@ void setup_vu(void)
   #if defined(PICO_DEFAULT_LED_PIN)  /* Cannot use VU on PicoW :( */
   { /* PWM led */
     offset_pwmled = pio_add_program(led_pio, &vu_program);
-    sm_pwmled = 1;  /* PIO2 SM2 */
+    sm_pwmled = 0;  /* PIO1 SM0 */
     pio_sm_claim(led_pio, sm_pwmled);
     pio_gpio_init(led_pio, BUILTIN_LED);
     pio_sm_set_consecutive_pindirs(led_pio, sm_pwmled, BUILTIN_LED, 1, true);
@@ -113,25 +118,45 @@ void setup_vu(void)
     pio_sm_set_enabled(led_pio, sm_pwmled, true);
   }
 
+  { /* dma pwmled */
+    dma_pwmled = dma_claim_unused_channel(true);
+    dma_channel_config c_pwmled = dma_channel_get_default_config(dma_pwmled);
+    channel_config_set_transfer_data_size(&c_pwmled, DMA_SIZE_32);
+    channel_config_set_read_increment(&c_pwmled, false);
+    channel_config_set_write_increment(&c_pwmled, false);
+    channel_config_set_dreq(&c_pwmled, DREQ_PIO1_TX0);
+    dma_channel_configure(dma_pwmled, &c_pwmled, &led_pio->txf[sm_pwmled], &pwm_value, 1, true);
+  }
+
   #if defined(USE_RGB)  /* No RGB LED on _w Pico's */
   { /* Init RGB */
     gpio_set_drive_strength(WS2812_PIN, GPIO_DRIVE_STRENGTH_2MA);
-    offset_vu_rgb = pio_add_program(led_pio, &vu_rgb_program);
-    sm_vu_rgb = 0;  /* PIO2 SM1 */
-    pio_sm_claim(led_pio, sm_vu_rgb);
+    offset_rgbled = pio_add_program(led_pio, &vu_rgb_program);
+    sm_rgbled = 1;  /* PIO1 SM1 */
+    pio_sm_claim(led_pio, sm_rgbled);
     pio_gpio_init(led_pio, WS2812_PIN);
-    pio_sm_set_consecutive_pindirs(led_pio, sm_vu_rgb, WS2812_PIN, 1, true);
-    pio_sm_config c_vu_rgb = vu_rgb_program_get_default_config(offset_vu_rgb);
-    sm_config_set_sideset_pins(&c_vu_rgb, WS2812_PIN);
+    pio_sm_set_consecutive_pindirs(led_pio, sm_rgbled, WS2812_PIN, 1, true);
+    pio_sm_config c_rgbled = vu_rgb_program_get_default_config(offset_rgbled);
+    sm_config_set_sideset_pins(&c_rgbled, WS2812_PIN);
     /* RGBW LED ? 32 : 24 */
-    sm_config_set_out_shift(&c_vu_rgb, false, true, 24);
-    sm_config_set_fifo_join(&c_vu_rgb, PIO_FIFO_JOIN_TX);
+    sm_config_set_out_shift(&c_rgbled, false, true, 24);
+    sm_config_set_fifo_join(&c_rgbled, PIO_FIFO_JOIN_TX);
     float freq = 800000;
     int cycles_per_bit = vu_rgb_T1 + vu_rgb_T2 + vu_rgb_T3;
     float div = clock_get_hz(clk_sys) / (freq * cycles_per_bit);
-    sm_config_set_clkdiv(&c_vu_rgb, div);
-    pio_sm_init(led_pio, sm_vu_rgb, offset_vu_rgb, &c_vu_rgb);
-    pio_sm_set_enabled(led_pio, sm_vu_rgb, true);
+    sm_config_set_clkdiv(&c_rgbled, div);
+    pio_sm_init(led_pio, sm_rgbled, offset_rgbled, &c_rgbled);
+    pio_sm_set_enabled(led_pio, sm_rgbled, true);
+  }
+
+  { /* dma RGBled */
+    dma_rgbled = dma_claim_unused_channel(true);
+    dma_channel_config c_rgbled = dma_channel_get_default_config(dma_rgbled);
+    channel_config_set_transfer_data_size(&c_rgbled, DMA_SIZE_32);
+    channel_config_set_read_increment(&c_rgbled, false);
+    channel_config_set_write_increment(&c_rgbled, false);
+    channel_config_set_dreq(&c_rgbled, DREQ_PIO1_TX1);
+    dma_channel_configure(dma_rgbled, &c_rgbled, &led_pio->txf[sm_rgbled], &rgb_value, 1, true);
   }
   #endif
   #elif defined(CYW43_WL_GPIO_LED_PIN)
