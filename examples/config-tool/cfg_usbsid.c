@@ -73,6 +73,7 @@ static Config usbsid_config = USBSID_DEFAULT_CONFIG_INIT;
 
 /* init local skpico variables */
 static uint8_t skpico_config[64] = {0xFF};
+static uint8_t skpico_version[36] = {0xFF};
 static uint8_t base_address = 0x0;
 static int sid_socket = 1;
 
@@ -364,7 +365,7 @@ int usbsid_init(void)
     libusb_bulk_transfer(devh, ep_in_addr, buffer, 0, &transferred, 1);
     /* fprintf(stdout, "usbsid_init: detected [rc]%d [usid_dev]%d\n", rc, usid_dev); */
 
-	return usid_dev;
+  return usid_dev;
 out:;
   if (devh != NULL)
     usbsid_close();
@@ -1050,6 +1051,38 @@ void skpico_read_config(int debug)
   //return;
 }
 
+void skpico_read_version(int debug)
+{
+  uint8_t skpico_version_result[SKPICO_VER_SIZE] = {0};
+  char skpico_version[SKPICO_VER_SIZE] = {0};
+  uint8_t skpicobuff[3] = {0, 0, 0};
+  int len;
+
+  char skpico_correction = 0x60;  /* { 0x70, 0x69, 0x63, 0x6F } */
+
+  skpico_config_mode(debug);
+  skpico_extend_config_mode(debug);
+
+  for (int i = 0; i < SKPICO_VER_SIZE; i++) {
+
+    skpicobuff[1] = (0x1E + base_address);
+    skpicobuff[2] = 0xE0 + i;
+    write_chars(skpicobuff, 3);
+    if (debug) printf("[%s][W]%02X $%02X:%02X\n", __func__, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
+
+    read_buffer[1] = (0x1D + base_address);
+    write_chars(read_buffer, 3);
+    len = read_chars(read_data, count_of(read_data));
+    if (debug) printf("[%s][R]%02X $%02X:%02X\n", __func__, read_buffer[0], read_buffer[1], read_data[0]);
+    skpico_version_result[i] = read_data[0];
+    if (i >= 2 && i <= 5) skpico_version_result[i] |= skpico_correction;
+  }
+
+  if (debug) print_cfg_buffer(skpico_version_result, count_of(skpico_version_result));
+  memcpy(&skpico_version[0], &skpico_version_result, count_of(skpico_version_result) - 1);
+  if (skpico_version[0] != 0) printf("[CONFIG] SIDKICK-pico version is: %.36s\n", skpico_version);
+}
+
 void skpico_write_config(int debug)
 {
   uint8_t skpicobuff[3] = {0};
@@ -1184,6 +1217,14 @@ void config_skpico(int argc, char **argv)
       sleep(2);
       printf("Read config\n");
       skpico_read_config(debug);
+      skpico_end_config_mode(debug);
+      write_command(RESET_SID);
+      return;
+    }
+    if (!strcmp(argv[param_count], "-rv") || !strcmp(argv[param_count], "--read-version")) {
+      param_count++;
+      printf("Read version\n");
+      skpico_read_version(debug);
       skpico_end_config_mode(debug);
       write_command(RESET_SID);
       return;
@@ -1891,7 +1932,9 @@ void config_usbsidpico(int argc, char **argv)
         filename = "USBSID-Pico-cfg.ini";
       }
       printf("Reading USBSID-Pico firmware version\n");
-      read_version(0);
+      read_version(USBSID_VERSION, 0);
+      // printf("Reading USBSID-Pico PCB version\n");
+      // read_version(US_PCB_VERSION, 0); // TODO: Needs ini file implementation
       printf("Reading config from USBSID-Pico\n");
       read_config();
       print_config();

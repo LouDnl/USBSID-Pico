@@ -253,10 +253,10 @@ void LIBUSB_CALL sid_out(struct libusb_transfer *transfer)
     if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
         rc = transfer->status;
         if (rc != LIBUSB_TRANSFER_CANCELLED) {
-		    fprintf(stderr, "Warning: transfer out interrupted with status %d, %s: %s\n", rc, libusb_error_name(rc), libusb_strerror(rc));
+        fprintf(stderr, "Warning: transfer out interrupted with status %d, %s: %s\n", rc, libusb_error_name(rc), libusb_strerror(rc));
             print_libusb_transfer(transfer);
         }
-		libusb_free_transfer(transfer);
+        libusb_free_transfer(transfer);
         return;
     }
 
@@ -290,7 +290,7 @@ void LIBUSB_CALL sid_in(struct libusb_transfer *transfer)
 
     if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
         rc = transfer->status;
-		if (rc != LIBUSB_TRANSFER_CANCELLED) {
+        if (rc != LIBUSB_TRANSFER_CANCELLED) {
             fprintf(stderr, "Warning: transfer in interrupted with status '%s'\n", libusb_error_name(rc));
             print_libusb_transfer(transfer);
         }
@@ -315,31 +315,31 @@ void LIBUSB_CALL sid_in(struct libusb_transfer *transfer)
 }
 
 void print_libusb_transfer(struct libusb_transfer *p_t)
-{	int i;
-	if ( NULL == p_t) {
-		printf("libusb_transfer is empty\n");
-	}
-	else {
-		printf("\r\n");
+{  int i;
+  if ( NULL == p_t) {
+    printf("libusb_transfer is empty\n");
+  }
+  else {
+    printf("\r\n");
         printf("libusb_transfer structure:\n");
-		printf("flags         =%x \n", p_t->flags);
-		printf("endpoint      =%x \n", p_t->endpoint);
-		printf("type          =%x \n", p_t->type);
-		printf("timeout       =%d \n", p_t->timeout);
-		printf("status        =%d '%s': '%s'\n", p_t->status, libusb_error_name(p_t->status), libusb_strerror(p_t->status));
-		// length, and buffer are commands sent to the device
-		printf("length        =%d \n", p_t->length);
-		printf("actual_length =%d \n", p_t->actual_length);
-		printf("user_data     =%p \n", p_t->user_data);
-		printf("buffer        =%p \n", p_t->buffer);
-		printf("buffer        =%x \n", *p_t->buffer);
+    printf("flags         =%x \n", p_t->flags);
+    printf("endpoint      =%x \n", p_t->endpoint);
+    printf("type          =%x \n", p_t->type);
+    printf("timeout       =%d \n", p_t->timeout);
+    printf("status        =%d '%s': '%s'\n", p_t->status, libusb_error_name(p_t->status), libusb_strerror(p_t->status));
+    // length, and buffer are commands sent to the device
+    printf("length        =%d \n", p_t->length);
+    printf("actual_length =%d \n", p_t->actual_length);
+    printf("user_data     =%p \n", p_t->user_data);
+    printf("buffer        =%p \n", p_t->buffer);
+    printf("buffer        =%x \n", *p_t->buffer);
 
-		for (i=0; i < p_t->length; i++){
-			printf("[%d: %x]", i, p_t->buffer[i]);
-		}
+    for (i=0; i < p_t->length; i++){
+      printf("[%d: %x]", i, p_t->buffer[i]);
+    }
         printf("\r\n");
-	}
-	return;
+  }
+  return;
 }
 
 uint16_t sid_address(uint16_t addr)

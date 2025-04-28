@@ -44,7 +44,7 @@
 #define MAGIC_SMOKE 19700101  /* DATEOFRELEASE */
 #endif
 #ifndef PROJECT_VERSION
-#define PROJECT_VERSION "0.4.1-BETA.20250406"  /* Must be the same as in CMakeLists.txt */
+#define PROJECT_VERSION "0.4.1-BETA.20250427"  /* Must be the same as in CMakeLists.txt */
 #endif
 #ifndef PCB_VERSION
 #define PCB_VERSION "1.0"
@@ -56,6 +56,10 @@
 
 #ifndef MIN_CYCLES
 #define MIN_CYCLES 10  /* 10 cycles for non cycled writes when in sequence */
+#endif
+
+#ifndef USE_CDC_CALLBACK
+#define USE_CDC_CALLBACK 1  /* Force CDC callback use over cdc_task */
 #endif
 
 /* USBSID command byte */
@@ -72,6 +76,8 @@ enum
   COMMAND      =   3,   /*       0b11 ~ 0xC0 */
   /* BYTE 0 - lower 6 bits for byte count */
   /* BYTE 0 - lower 5 bits for Commands */
+  CYCLED_READ  =   4,   /*      0b100 ~ 0x04 */
+  DELAY_CYCLES =   5,   /*      0b101 ~ 0x05 */
   PAUSE        =  10,   /*     0b1010 ~ 0x0A */
   UNPAUSE      =  11,   /*     0b1011 ~ 0x0B */
   MUTE         =  12,   /*     0b1100 ~ 0x0C */
@@ -83,10 +89,6 @@ enum
   CONFIG       =  18,   /*    0b10010 ~ 0x12 */
   RESET_MCU    =  19,   /*    0b10011 ~ 0x13 */
   BOOTLOADER   =  20,   /*    0b10100 ~ 0x14 */
-
-  /* INTERNAL BUS COMMANDS */
-  G_PAUSE      = 2,
-  G_CLEAR_BUS  = 3,
 
   /* WEBSUSB ADDITIONAL COMMANDS */
   WEBUSB_COMMAND  = 0xFF,
@@ -104,7 +106,7 @@ enum
 #define MIDI_CABLE 0
 
 /* USB data type */
-extern char dtype, ntype, cdc, asid, midi, wusb;
+extern char dtype, ntype, cdc, asid, midi, sysex, wusb;
 
 /* WebUSB globals */
 #define URL  "/usbsid.loudai.nl"

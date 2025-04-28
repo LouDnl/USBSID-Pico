@@ -86,7 +86,7 @@
  * - CFG_TUSB_MEM_ALIGN   : __attribute__ ((aligned(4)))
  */
 #ifndef CFG_TUSB_MEM_SECTION
-#define CFG_TUSB_MEM_SECTION
+#define CFG_TUSB_MEM_SECTION  __attribute__ ((section(".usb_ram")))
 #endif
 
 #ifndef CFG_TUSB_MEM_ALIGN
@@ -101,7 +101,7 @@
 #define CFG_TUD_ENDPOINT0_SIZE  64
 #endif
 
-#define CFG_TUD_TASK_QUEUE_SZ   64  /* WHAT DOES THIS BUTTON DO!? */
+#define CFG_TUD_TASK_QUEUE_SZ   100  /* WHAT DOES THIS BUTTON DO!? */
 
 //------------- CLASS -------------//
 #ifdef USB_PRINTF
@@ -115,15 +115,15 @@
 #define CFG_TUD_VENDOR           1
 
 // CDC Endpoint transfer buffer size, more is faster
-#define CFG_TUD_CDC_EP_BUFSIZE    (TUD_OPT_HIGH_SPEED ? 512 : 64)  // Even at 512KB only 64KB will be used
+#define CFG_TUD_CDC_EP_BUFSIZE    64  // Even at 512KB only 64KB will be used because of TUD_OPT_FULL_SPEED, Pico is only USB2.0
 
 // CDC FIFO size of TX and RX
-#define CFG_TUD_CDC_RX_BUFSIZE    (TUD_OPT_HIGH_SPEED ? 512 : 64)  // Even at 512KB only 64KB will be used
-#define CFG_TUD_CDC_TX_BUFSIZE    (TUD_OPT_HIGH_SPEED ? 512 : 64)  // Even at 512KB only 64KB will be used
+#define CFG_TUD_CDC_RX_BUFSIZE    64  // Even at 512KB only 64KB will be used because of TUD_OPT_FULL_SPEED, Pico is only USB2.0
+#define CFG_TUD_CDC_TX_BUFSIZE    64  // Even at 512KB only 64KB will be used because of TUD_OPT_FULL_SPEED, Pico is only USB2.0
 
 // MIDI FIFO size of TX and RX
-#define CFG_TUD_MIDI_RX_BUFSIZE   (TUD_OPT_HIGH_SPEED ? 512 : 64)  // Even at 512KB only 64KB will be used
-#define CFG_TUD_MIDI_TX_BUFSIZE   (TUD_OPT_HIGH_SPEED ? 512 : 64)  // Even at 512KB only 64KB will be used
+#define CFG_TUD_MIDI_RX_BUFSIZE   64  // Even at 512KB only 64KB will be used because of TUD_OPT_FULL_SPEED, Pico is only USB2.0
+#define CFG_TUD_MIDI_TX_BUFSIZE   64  // Even at 512KB only 64KB will be used because of TUD_OPT_FULL_SPEED, Pico is only USB2.0
 
 // Vendor FIFO size of TX and RX
 // If not configured vendor endpoints will not be buffered

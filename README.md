@@ -141,19 +141,19 @@ _<ins>**NOTE**: When flashing a new firmware version, all previously configured 
 A Raspberry Pi Pico board is incredibly easy to flash, as it comes with a built in bootloader for flashing new firmwares in the `uf2` format. 
 In order to flash a new firmware to your USBSID-Pico you will need to put the Pico into bootloader mode. This can be done in 2 ways:
 1. While the Pico is seated on the USBSID-Pico board and with the USB cable plugged into your computer and the Pico do the following:
-	- Press and hold the `BOOTSEL` button on the Pico.
-	- Press and release the `RST` button on the USBSID-Pico board.
-	- Now release the `BOOTSEL` button.
-	- A new drive should appear on your computer called `RPI-RP2`.
-	- Copy the correct `uf2` firmware file to this directory.
-	- After copying the Pico will reboot and your Pico is flashed.
+  - Press and hold the `BOOTSEL` button on the Pico.
+  - Press and release the `RST` button on the USBSID-Pico board.
+  - Now release the `BOOTSEL` button.
+  - A new drive should appear on your computer called `RPI-RP2`.
+  - Copy the correct `uf2` firmware file to this directory.
+  - After copying the Pico will reboot and your Pico is flashed.
 2. When flashing a Pico that is not seated on the board do the following:
-	- Plug in the USB cable to your Pico and not into your computer.
-	- While holding the `BOOTSEL` button on the Pico plugin the other end of the USB cable into your computer.
-	- Now release the `BOOTSEL` button.
-	- A new drive should appear on your computer called `RPI-RP2`.
-	- Copy the correct `uf2` firmware file to this directory.
-	- After copying the Pico will reboot and your Pico is flashed.
+  - Plug in the USB cable to your Pico and not into your computer.
+  - While holding the `BOOTSEL` button on the Pico plugin the other end of the USB cable into your computer.
+  - Now release the `BOOTSEL` button.
+  - A new drive should appear on your computer called `RPI-RP2`.
+  - Copy the correct `uf2` firmware file to this directory.
+  - After copying the Pico will reboot and your Pico is flashed.
 ### Firmware features
 The firmware is still in development so features might change, be added or removed.
 - By default both sockets are enabled and the configuration is set to 2 SID's.
@@ -253,8 +253,8 @@ Includes all features from v1.0 except the audio jumper
   - SID1 audio left & SID2 audio right
 - Optional EXT-IN pulldown resistor as filter bypass to reduce filter noise for Digiplay on 8580 SID's
 ### PCB Development
-* v1.3 release board<br>
-  __N/A__
+* v1.3b release board<br>
+  [<img src="images/v1.3b-top.png" width="30%">](images/v1.3b-top.png) 
 * v1.2 testboard<br>
   [<img src="images/v1.2-top.png" width="30%">](images/v1.2-top.png) 
 * v1.1 unfinished and skipped
@@ -267,13 +267,10 @@ Includes all features from v1.0 except the audio jumper
 
 # Examples
 ### USBSID-Pico in action
-While in development any videos and/or audio links are subject to be changed or updated.
-#### Audio recordings
-[Reed's Flamethrower](media/Reed-Flamethrower.mp3)
-#### MOS8580 chip
-| **Codeboys & Endians** | **No Limit** |
+Videos and/or audio links are subject to be changed or updated at any time.
+| **Van Halen's Jump<br>in Stereo!** | **Flamethrower** |
 |:-:|:-:|
-| [![MOS8580](https://img.youtube.com/vi/sSDsOih1Wbw/1.jpg)](https://www.youtube.com/watch?v=sSDsOih1Wbw)<br><small><sub>by Booze Design</sub></small> | [![MOS8580](https://img.youtube.com/vi/hJit04tWUaM/1.jpg)](https://www.youtube.com/watch?v=hJit04tWUaM)<br><small><sub>Quantum tracker demo</sub></small> |
+| [![Dual MOS8580](https://img.youtube.com/vi/lzvkWlDq2TM/1.jpg)](https://www.youtube.com/watch?v=lzvkWlDq2TM)<br><small><sub>by Nordischsound</sub></small> | [![MOS8580](https://img.youtube.com/vi/Mfbj21ntQXA/1.jpg)](https://www.youtube.com/watch?v=Mfbj21ntQXA)<br><small><sub>by Reed</sub></small> |
 
 Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-29KQ), [other socials](https://github.com/LouDnl) or the [SHOWCASE](SHOWCASE.md) page to see more examples.
 ### Software

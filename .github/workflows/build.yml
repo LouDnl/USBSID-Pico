@@ -15,11 +15,115 @@ on:
       - ".github/workflows/build.yml"
       - "CMakeLists.txt"
     # Only run on dev branch
-    branches: [dev]
+    branches: [master, dev]
   # Allows you to run this workflow manually from the Actions tab when needed
   workflow_dispatch:
 
 jobs:
+  cleanup_previous_builds: # Delete unfinished draft prereleases, and prereleases older than 30 days (but keep at least 10)
+    name: Cleanup Previous Builds
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/d')
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          retries: 3
+          script: |
+            // Get a list of all releases, sorted newest first
+            let releases =
+              (await github.paginate(
+                github.rest.repos.listReleases,
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo
+                }))
+                .sort((a,b) => b.created_at.localeCompare(a.created_at));
+
+            let releaseCount = 0;
+            let releasesToDelete = [];
+
+            // Initiate deletion of draft prereleases
+            for (const release of releases)
+            {
+              // Only cleanup prereleases
+              if (!release.prerelease)
+                continue;
+
+              // Failed builds leave drafts - delete them
+              if (release.draft)
+              {
+                console.log("Will delete draft prerelease: " + release.tag_name);
+                releasesToDelete.push(release.id);
+                continue;
+              }
+
+              // Keep at least 10, no matter how old
+              if (++releaseCount <= 10)
+                continue;
+
+              // We have more than 10 releases - delete those more than 30 days old
+              let daysAgo = Math.floor((new Date() - Date.parse(release.created_at)) / 1000 / 60 / 60 / 24);
+
+              if (daysAgo <= 30)
+                continue;
+
+              console.log("Will delete old prerelease: " + release.tag_name);
+              releasesToDelete.push(release.id);
+            }
+
+            if (releasesToDelete.length)
+            {
+              let promises = [];
+
+              for (const id of releasesToDelete)
+              {
+                promises.push(
+                  github.rest.repos.deleteRelease(
+                    {
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      release_id: id
+                    }));
+              }
+
+              console.log("Waiting for deletions to complete");
+              await Promise.all(promises);
+            }
+
+            console.log("Done.");
+
+  create_release:
+    name: Create Draft Release
+    needs: cleanup_previous_builds
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/d')
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_id: ${{ steps.create_release.outputs.release_id }}
+    steps:
+      - uses: actions/github-script@v7
+        id: create_release
+        env:
+          TAG_NAME: ${{ github.ref }}
+          RELEASE_NAME: ${{ github.ref }} snapshot
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          retries: 3
+          script: |
+            const { TAG_NAME, RELEASE_NAME } = process.env;
+            const createReleaseResponse = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: TAG_NAME.replace('refs/tags/', ''),
+              name: RELEASE_NAME.replace('refs/tags/', ''),
+              draft: true,
+              prerelease: true,
+              target_commitish: context.sha
+            });
+            core.setOutput('release_id', createReleaseResponse.data.id);
+            core.setOutput('upload_url', createReleaseResponse.data.upload_url);
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -183,3 +287,22 @@ jobs:
         with:
           name: usbsid${{matrix.pico_board}}-${{env.BRANCHNAME}}-autobuild-${{github.run_number}}-${{env.DATETIME}}
           path: ${{github.workspace}}/master/dist
+
+  publish_release:
+    name: Publish Release
+    needs: [create_release, build]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/d')
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          retries: 3
+          script: |
+            await github.rest.repos.updateRelease(
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: ${{ needs.create_release.outputs.release_id }},
+                draft: false
+              });

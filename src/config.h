@@ -95,16 +95,16 @@ typedef struct Config {
   uint32_t raster_rate;        /* internal use raster rate identifier ~ not configurable */
   struct
   {
-    uint8_t chiptype;          /* 0 = real, 1 = clone */
-    uint8_t clonetype;         /* 0 = disabled, 1 = SKPico, 2 = ARMSID, 3 = FPGASID, 4 = other */
+    uint8_t chiptype;          /* 0 = real, 1 = clone, 2 = unknown */
+    uint8_t clonetype;         /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
     uint8_t sid1type;          /* 0 = unknown, 1 = N/A, 2 = MOS8085, 3 = MOS6581, 4 = FMopl */
     uint8_t sid2type;          /* 0 = unknown, 1 = N/A, 2 = MOS8085, 3 = MOS6581, 4 = FMopl */
     bool    enabled : 1;       /* enable / disable this socket */
     bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
   } socketOne;                 /* 1 */
   struct {
-    uint8_t chiptype;          /* 0 = real, 1 = clone */
-    uint8_t clonetype;         /* 0 = disabled, 1 = SKPico, 2 = ARMSID, 3 = FPGASID, 4 = other */
+    uint8_t chiptype;          /* 0 = real, 1 = clone, 2 = unknown */
+    uint8_t clonetype;         /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
     uint8_t sid1type;          /* 0 = unknown, 1 = N/A, 2 = MOS8085, 3 = MOS6581, 4 = FMopl */
     uint8_t sid2type;          /* 0 = unknown, 1 = N/A, 2 = MOS8085, 3 = MOS6581, 4 = FMopl */
     bool    enabled : 1;       /* enable / disable this socket */
@@ -172,7 +172,7 @@ enum
   DUAL_SOCKET2     = 0x47,  /* Two SID's in socket Two, Socket One disabled */
 
   SET_CLOCK        = 0x50,  /* Change SID clock frequency by array id */
-  DETECT_SIDS      = 0x51,  /* Try to detect the SID types per socket */
+  DETECT_SIDS      = 0x51,  /* Try to detect the SID types per socket ~ routines see below */
   TEST_ALLSIDS     = 0x52,  /* Runs a very long test on all SID's */
   TEST_SID1        = 0x53,  /* Runs a very long test on SID 1 */
   TEST_SID2        = 0x54,  /* Runs a very long test on SID 2 */
@@ -181,6 +181,7 @@ enum
   GET_CLOCK        = 0x57,  /* Returns the clockrate as array id in byte 0 */
   LOCK_CLOCK       = 0x58,  /* Locks the clockrate from being changed, saved in config */
   STOP_TESTS       = 0x59,  /* Interrupt any running SID tests */
+  DETECT_CLONES    = 0x5A,  /* Detect clone SID types */
 
   LOAD_MIDI_STATE  = 0x60,
   SAVE_MIDI_STATE  = 0x61,
@@ -197,6 +198,12 @@ enum
 
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
 };
+
+/* SID detection routines
+ * routine 1: https://github.com/GideonZ/1541ultimate/blob/master/software/6502/sidcrt/player/advanced/detection.asm
+ * routine 2: https://codebase64.org/doku.php?id=base:detecting_sid_type_-_safe_method
+ * routine 3: https://codebase64.org/doku.php?id=base:detecting_sid_type
+ */
 
 
 #ifdef __cplusplus

@@ -29,7 +29,7 @@ cmake_minimum_required(VERSION 3.17)
 set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
-set(MAGIC_SMOKE "20250406")
+set(MAGIC_SMOKE "20250427")
 set(PROJECT_VERSION "0.4.1-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
 
 ### Want a cookie?
@@ -60,7 +60,7 @@ endif()
 # SKPico will stop functioning
 SET(DEBUG_SYMBOLS 0)   # 0 default, 1 debug symbols & debug build enabled
 SET(DEBUGGING 0)       # 0 default, 1~3 equals -g1~3
-SET(OPTIMIZATIONS 3)   # 3 default, 1 ~ -O1 for debugging
+SET(OPTIMIZATIONS 2)   # 2 default, 1 ~ -O1 for debugging, 3 causes desync with DMA read_address and chain_to!
 SET(TUSB_DEBUG 0)      # 0 default, 0~3 non verbose to very verbose
 
 ### Target board pico, pico_w, pico2
@@ -257,6 +257,7 @@ set(SOURCEFILES
   # ${CMAKE_CURRENT_LIST_DIR}/src/midi_patches.c
   # ${CMAKE_CURRENT_LIST_DIR}/src/midi_bankmsb0.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/sysex.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/mcu.c
   ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c

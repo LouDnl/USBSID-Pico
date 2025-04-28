@@ -44,9 +44,10 @@ uint8_t __not_in_flash("usbsid_buffer") read_buffer[MAX_BUFFER_SIZE] __attribute
 int usb_connected = 0, usbdata = 0;
 uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
 uint8_t *cdc_itf = 0, *wusb_itf = 0;
-char ntype = '0', dtype = '0', cdc = 'C', asid = 'A', midi = 'M', wusb = 'W';
+char ntype = '0', dtype = '0', cdc = 'C', asid = 'A', midi = 'M', sysex = 'S', wusb = 'W';
 bool web_serial_connected = false;
 double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
+int paused_state = 0, reset_state = 0;
 
 /* Init var pointers for external use */
 uint8_t (*write_buffer_p)[MAX_BUFFER_SIZE] = &write_buffer;
@@ -75,8 +76,9 @@ extern void reset_sid_registers(void);
 extern void enable_sid(bool unmute);
 extern void disable_sid(void);
 extern void clear_bus_all(void);
-extern uint8_t __not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data);
-extern void __not_in_flash_func(cycled_bus_operation)(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
+extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
+extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 
 /* Vu externals */
 extern uint16_t vu;
@@ -179,11 +181,12 @@ void webserial_write(uint8_t * itf, uint32_t n)
 
 /* BUFFER HANDLING */
 
-int __not_in_flash_func(do_buffer_tick)(int top, int step)
+int __no_inline_not_in_flash_func(do_buffer_tick)(int top, int step)
 {
   static int i = 1;
-  cycled_bus_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
+  cycled_write_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   WRITEDBG(dtype, i, top, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
+  IODBG("[I %d] [%c] $%02X:%02X (%u)\n", i, dtype, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   if (i+step >= top) {
     i = 1;
     return i;
@@ -192,7 +195,7 @@ int __not_in_flash_func(do_buffer_tick)(int top, int step)
   return 0;
 }
 
-void __not_in_flash_func(buffer_task)(int n_bytes, int step)
+void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
 {
   int state = 0;
   do {
@@ -202,19 +205,21 @@ void __not_in_flash_func(buffer_task)(int n_bytes, int step)
 }
 
 /* Process received usb data */
-void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
+void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
 {
   usbdata = 1;
   vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
   uint8_t command = ((sid_buffer[0] & PACKET_TYPE) >> 6);
   uint8_t subcommand = (sid_buffer[0] & COMMAND_MASK);
   uint8_t n_bytes = (sid_buffer[0] & BYTE_MASK);
+  while (reset_state == 1) { asm("nop"); };  /* Stall if in reset state */
 
   if (command == CYCLED_WRITE) {
     // n_bytes = (n_bytes == 0) ? 4 : n_bytes; /* if byte count is zero, this is a single write packet */
     if (n_bytes == 0) {
-      cycled_bus_operation(sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
+      cycled_write_operation(sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
       WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
+      IODBG("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
     } else {
       buffer_task(n_bytes, 4);
     }
@@ -223,8 +228,9 @@ void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
   if (command == WRITE) {
     // n_bytes = (n_bytes == 0) ? 2 : n_bytes; /* if byte count is zero, this is a single write packet */
     if (n_bytes == 0) {
-      bus_operation(0x10, sid_buffer[1], sid_buffer[2]);  /* Leave this on non cycled, errornous playback otherwise! */
+      cycled_write_operation(sid_buffer[1], sid_buffer[2], 0);
       WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], 0);
+      IODBG("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], 0);
     } else {
       buffer_task(n_bytes, 2);
     }
@@ -232,8 +238,7 @@ void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
   };
   if (command == READ) {  /* READING CAN ONLY HANDLE ONE AT A TIME, PERIOD. */
     IODBG("[I %d] [%c] $%02X:%02X\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2]);
-    write_buffer[0] = bus_operation((0x10 | READ), sid_buffer[1], sid_buffer[2]);  /* write the address to the SID and read the data back */
-    // write_buffer[0] = bus_operation((0x10 | READ), sid_buffer[1], 0x0);  /* write the address to the SID and read the data back */
+    write_buffer[0] = cycled_read_operation(sid_buffer[1], 0);  /* write the address to the SID and read the data back */
     switch (dtype) {  /* write the result to the USB client */
       case 'C':
         cdc_write(itf, BYTES_TO_SEND);
@@ -250,6 +255,25 @@ void __not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
   };
   if (command == COMMAND) {
     switch (subcommand) {
+      case CYCLED_READ:
+        IODBG("[I %d] [%c] $%02X %u\n", n_bytes, dtype, sid_buffer[1], (sid_buffer[2] << 8 | sid_buffer[3]));
+        write_buffer[0] = cycled_read_operation(sid_buffer[1], (sid_buffer[2] << 8 | sid_buffer[3]));
+        switch (dtype) {  /* write the result to the USB client */
+          case 'C':
+            cdc_write(itf, BYTES_TO_SEND);
+            break;
+          case 'W':
+            webserial_write(itf, BYTES_TO_SEND);
+            break;
+          default:
+            IODBG("[WRITE ERROR]%c\n", dtype);
+            break;
+        };
+        vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+        return;
+      case DELAY_CYCLES:
+        cycled_delay_operation((sid_buffer[1] << 8 | sid_buffer[2]));
+        return;
       case PAUSE:
         DBG("[PAUSE_SID]\n");
         pause_sid();
@@ -372,10 +396,11 @@ void tud_midi_rx_cb(uint8_t itf)
 /* USB CDC CLASS TASK & CALLBACKS */
 
 /* Read from host to device */
+#ifndef USE_CDC_CALLBACK
 void cdc_task(void)
 { /* Same as the callback routine */
   if (tud_cdc_n_connected(CDC_ITF)) {
-    if (tud_cdc_n_available(CDC_ITF)) {
+    if (tud_cdc_n_available(CDC_ITF) > 0) {
       cdc_itf = CDC_ITF;
       usbdata = 1, dtype = cdc;
       cdcread = tud_cdc_n_read(CDC_ITF, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
@@ -388,9 +413,11 @@ void cdc_task(void)
   }
   return;
 }
+#endif
 
 void tud_cdc_rx_cb(uint8_t itf)
 { /* No need to check available bytes for reading */
+#ifdef USE_CDC_CALLBACK
   if (itf == CDC_ITF) {
     cdc_itf = &itf;
     usbdata = 1, dtype = cdc;
@@ -400,6 +427,9 @@ void tud_cdc_rx_cb(uint8_t itf)
     process_buffer(cdc_itf, &cdcread);
     return;
   }
+#else
+  (void)itf;
+#endif
   return;
 }
 
@@ -449,6 +479,23 @@ void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 
 
 /* USB VENDOR CLASS CALLBACKS */
+
+#ifdef USE_VENDOR_BUFFER
+void vendor_task(void)
+{ /* Same as the callback routine */
+  /* If the fifo buffer is disabled, this function has no use */
+  if (web_serial_connected) {
+      wusb_itf = WUSB_ITF;
+      usbdata = 1, dtype = wusb;
+      webread = tud_vendor_n_read(WUSB_ITF, &read_buffer, MAX_BUFFER_SIZE);
+      tud_vendor_n_read_flush(*wusb_itf);
+      memcpy(sid_buffer, read_buffer, webread);
+      process_buffer(wusb_itf, &webread);
+    return;
+  }
+  return;
+}
+#endif
 
 /* Read from host to device */
 void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
@@ -712,7 +759,6 @@ int main()
   /* Init midi */
   midi_init();
   /* Enable SID chips */
-  // reset_sid_registers();  // Disable for now, this also enables the sid chips lol :)
   enable_sid(false);
 
   /* Release core 0 semaphore to signal boot finished */
@@ -721,10 +767,12 @@ int main()
   /* Loop IO tasks forever */
   while (1) {
     tud_task_ext(/* UINT32_MAX */0, false);  /* equals tud_task(); */
-    /* Additional tasks to support the callbacks
-     * for improved throughput! */
-    cdc_task();
-    /* No vendor task here, fifo is disabled! */
+#ifndef USE_CDC_CALLBACK
+    cdc_task();  /* Only use this if no callbacks */
+#endif
+#ifdef USE_VENDOR_BUFFER
+    vendor_task();  /* Only use this if buffering and fifo are enabled */
+#endif
   }
 
   /* Point of no return, this should never be reached */

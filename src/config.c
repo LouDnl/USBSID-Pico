@@ -52,10 +52,19 @@ extern queue_t sidtest_queue;
 
 /* SID externals */
 extern uint8_t detect_sid_version(uint8_t start_addr);
+extern uint8_t detect_sid_model(uint8_t start_addr);
+extern uint8_t detect_sid_version_skpico(uint8_t start_addr);
+extern uint8_t detect_sid_unsafe(uint8_t start_addr);
+uint8_t (*sid_detection[4])(uint8_t) = { detect_sid_model, detect_sid_version, detect_sid_version_skpico, detect_sid_unsafe };
+extern bool detect_fmopl(uint8_t base_address);
+extern void detect_clone_types(bool sockone, bool onedual, bool socktwo, bool twodual);
 extern void sid_test(int sidno, char test, char wf);
 extern bool running_tests;
 
 /* GPIO externals */
+extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
+extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
 extern void reset_sid(void);
 extern void restart_bus(void);
 extern void restart_bus_clocks(void);
@@ -111,7 +120,7 @@ bool first_boot = false;
 const char* project_version = PROJECT_VERSION;
 const char* pcb_version = PCB_VERSION;
 const char *sidtypes[5] = { "UNKNOWN", "N/A", "MOS8580", "MOS6581", "FMOpl" };
-const char *chiptypes[2] = { "Real", "Clone" };
+const char *chiptypes[3] = { "Real", "Clone", "Unknown" };
 const char *clonetypes[6] = { "Disabled", "Other", "SKPico", "ARMSID", "FPGASID", "RedipSID" };
 const char *int_ext[2] = { "Internal", "External" };
 const char *enabled[2] = { "Disabled", "Enabled" };
@@ -214,24 +223,27 @@ void print_cfg(const uint8_t *buf, size_t len)
   return;
 }
 
-void detect_sid_types(void)
+void detect_sid_types(int detection_routine)
 {
+  /* Check if routine number is within range */
+  detection_routine = (detection_routine > 4 ? 0 : detection_routine);
+
   int sid1 = 0, sid2 = 0, sid3 = 0, sid4 = 0;
 
   if (numsids >= 1) {
-    sid1 = detect_sid_version(0x00);
+    sid1 = sid_detection[detection_routine](0x00);
     CFG("[CONFIG] [READ SID1] [%02x %s]\n", sid1, sidtypes[sid1]);
   }
   if (numsids >= 2) {
-    sid2 = detect_sid_version(0x20);
+    sid2 = sid_detection[detection_routine](0x20);
     CFG("[CONFIG] [READ SID2] [%02x %s]\n", sid2, sidtypes[sid2]);
   }
   if (numsids >= 3) {
-    sid3 = detect_sid_version(0x40);
+    sid3 = sid_detection[detection_routine](0x40);
     CFG("[CONFIG] [READ SID3] [%02x %s]\n", sid3, sidtypes[sid3]);
   }
   if (numsids == 4) {
-    sid4 = detect_sid_version(0x60);
+    sid4 = sid_detection[detection_routine](0x60);
     CFG("[CONFIG] [READ SID4] [%02x %s]\n", sid4, sidtypes[sid4]);
   }
 
@@ -823,7 +835,27 @@ void handle_config_request(uint8_t * buffer)
       break;
     case DETECT_SIDS:       /* Detect SID types per socket */
       CFG("[CMD] DETECT_SIDS\n");
-      detect_sid_types();
+      uint detection_routine = buffer[1];
+      if (detection_routine > 3) detection_routine = 0;
+      detect_sid_types(detection_routine);
+      memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
+      read_config(&usbsid_config);  /* Read the config into the config buffer */
+      memcpy(write_buffer_p, config_array, 64);  /* Copy the first 64 bytes from the buffer into the write buffer */
+      switch (dtype) {
+        case 'C':
+          cdc_write(cdc_itf, 64);
+          break;
+        case 'W':
+          webserial_write(wusb_itf, 64);
+          break;
+      }
+      break;
+    case DETECT_CLONES:
+      CFG("[CMD] DETECT_CLONES\n");
+      detect_clone_types(usbsid_config.socketOne.enabled,
+                     usbsid_config.socketOne.dualsid,
+                     usbsid_config.socketTwo.enabled,
+                     usbsid_config.socketTwo.dualsid);
       memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
       read_config(&usbsid_config);  /* Read the config into the config buffer */
       memcpy(write_buffer_p, config_array, 64);  /* Copy the first 64 bytes from the buffer into the write buffer */
@@ -858,13 +890,13 @@ void handle_config_request(uint8_t * buffer)
         : buffer[0] == TEST_SID3 ? 2
         : buffer[0] == TEST_SID4 ? 3
         : 0);  /* Fallback to SID 0 */
-      int t = (buffer[1] == 1 ? '1'  /* All tests */
+      char t = (buffer[1] == 1 ? '1'  /* All tests */
         : buffer[1] == 2 ? '2'  /* All waveforms test */
         : buffer[1] == 3 ? '3'  /* Filter tests */
         : buffer[1] == 4 ? '4'  /* Envelope tests */
         : buffer[1] == 5 ? '5'  /* Modulation tests */
         : '1');  /* Fallback to all tests */
-      int wf = (buffer[2] == 0 ? 'A'  /* All */
+      char wf = (buffer[2] == 0 ? 'A'  /* All */
         : buffer[2] == 1 ? 'T'  /* Triangle */
         : buffer[2] == 2 ? 'S'  /* Sawtooth */
         : buffer[2] == 3 ? 'P'  /* Pulse */
@@ -897,18 +929,25 @@ void handle_config_request(uint8_t * buffer)
       break;
     case US_PCB_VERSION:
       CFG("[CMD] READ_PCB_VERSION\n");
-      memset(p_version_array, 0, count_of(p_version_array));
-      read_pcb_version();
-      memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
-      memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
-        switch (dtype) {
-          case 'C':
-            cdc_write(cdc_itf, MAX_BUFFER_SIZE);
-            break;
-          case 'W':
-            webserial_write(wusb_itf, MAX_BUFFER_SIZE);
-            break;
-        }
+      if (buffer[1] == 0) {  /* Large write 64 bytes */
+        memset(p_version_array, 0, count_of(p_version_array));
+        read_pcb_version();
+        memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
+        memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
+          switch (dtype) {
+            case 'C':
+              cdc_write(cdc_itf, MAX_BUFFER_SIZE);
+              break;
+            case 'W':
+              webserial_write(wusb_itf, MAX_BUFFER_SIZE);
+              break;
+          }
+      } else {  /* Small write single byte */
+        memset(write_buffer_p, 0, 64);
+        int pcbver = (strcmp(pcb_version, "1.3") == 0 ? 13 : 10);
+        write_buffer_p[0] = pcbver;
+        write_back_data(1);
+      }
       break;
     case RESTART_BUS:
       CFG("[CMD] RESTART_BUS\n");
@@ -933,7 +972,6 @@ void handle_config_request(uint8_t * buffer)
       CFG("A %x %x %d\n", (uint32_t)usbsid_config.magic, (uint32_t)MAGIC_SMOKE, usbsid_config.magic != MAGIC_SMOKE);
       CFG("A %d %d\n", (int)usbsid_config.magic, (int)MAGIC_SMOKE);
       CFG("A %d\n", usbsid_config.magic == MAGIC_SMOKE);
-
 
       CFG("[TEST_CONFIG_START]\n");
       CFG("[MAGIC_SMOKE ERROR?] config: %u header: %u cm_verification: %u\n", usbsid_config.magic, MAGIC_SMOKE, cm_verification);
@@ -970,7 +1008,7 @@ void print_config_settings(void)
   #endif
   CFG("[CONFIG] [PICO] LED_PWM = %d\n", LED_PWM);  // pio.h PICO_PIO_VERSION
   CFG("[CONFIG] PRINT SETTINGS START\n");
-  CFG("[CONFIG] [USBSID PCB VERSION] %s\n", PCB_VERSION);
+  CFG("[CONFIG] [USBSID PCB VERSION] %s\n", pcb_version);
   CFG("[CONFIG] [USBSID FIRMWARE VERSION] %s\n", project_version);
 
   CFG("[CONFIG] [CLOCK] %s @%d\n",
@@ -1358,12 +1396,14 @@ void detect_default_config(void)
     usbsid_config.default_config = 0;
     CFG("[CONFIG] DEFAULT CONFIG STATE SET TO %d\n", usbsid_config.default_config);
     first_boot = true;  /* Only at first boot the link popup will be sent */
+    detect_sid_types(0);  /* Detect SID types at default config once */
     save_config(&usbsid_config);
     CFG("[CONFIG] CONFIG SAVED\n");
   }
   CFG("[CONFIG] DETECT DEFAULT FINISHED\n");
   return;
 }
+
 int return_clockrate(void)
 {
   for (int i = 0; i < count_of(clockrates); i++) {
@@ -1394,15 +1434,15 @@ void apply_clockrate(int n_clock, bool suspend_sids)
         CFG("[CONFIG] [CFG C64]  %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
         /* Start clock set */
         // ISSUE: EVEN THOUGH THIS IS BETTER IT DOES NOT SOLVE THE CRACKLING/BUS ROT ISSUE!
-        restart_bus_clocks();
         stop_dma_channels();
+        restart_bus_clocks();
         start_dma_channels();
         sync_pios(false);
         if (suspend_sids) {
           CFG("[ENABLE SID WITH UNMUTE]\n");
           enable_sid(true);
         }
-        // ISSUE: WHEN THIS HAPPENS THE CRACKLING ON CYCLE EXACT TUNES IS IMMENSE!
+        // ISSUE: WHEN THE BUS IS RESTARTED THE CRACKLING ON CYCLE EXACT TUNES IS IMMENSE!
         // THIS IS AFTER PAL -> NTSC -> PAL
         // restart_bus();
         return;
