@@ -133,6 +133,7 @@ const char *mono_stereo[2] = { "Mono", "Stereo" };
   .default_config = 1, \
   .external_clock = false, \
   .clock_rate = DEFAULT, \
+  .refresh_rate = HZ_DEFAULT, \
   .raster_rate = R_DEFAULT, \
   .lock_clockrate = false, \
   .stereo_en = false, \
@@ -534,6 +535,7 @@ void handle_config_request(uint8_t * buffer)
         case  0:  /* clock_rate */
           /* will always be available to change the setting since it doesn't apply it */
           usbsid_config.clock_rate = clockrates[(int)buffer[2]];
+          usbsid_config.refresh_rate = refreshrates[(int)buffer[2]]; /* Experimental */
           usbsid_config.raster_rate = rasterrates[(int)buffer[2]]; /* Experimental */
           if (buffer[3] == 0 || buffer[3] == 1) { /* Verify correct data */
             usbsid_config.lock_clockrate = (bool)buffer[3];
@@ -1425,6 +1427,7 @@ void apply_clockrate(int n_clock, bool suspend_sids)
         }
         CFG("[CONFIG] [CLOCK FROM]%d [CLOCK TO]%d\n", usbsid_config.clock_rate, clockrates[n_clock]);
         usbsid_config.clock_rate = clockrates[n_clock];
+        usbsid_config.refresh_rate = refreshrates[n_clock]; /* Experimental */
         usbsid_config.raster_rate = rasterrates[n_clock]; /* Experimental */
         /* Cycled write buffer vars */
         sid_hz = usbsid_config.clock_rate;
@@ -1470,6 +1473,7 @@ void verify_clockrate(void)
       default:
         CFG("[CONFIG] [CLOCK ERROR] Detected unconventional clockrate (%ld) error in config, revert to default\n", usbsid_config.clock_rate);
         usbsid_config.clock_rate = clockrates[0];
+        usbsid_config.refresh_rate = refreshrates[0]; /* Experimental */
         usbsid_config.raster_rate = rasterrates[0]; /* Experimental */
         save_config(&usbsid_config);
         load_config(&usbsid_config);

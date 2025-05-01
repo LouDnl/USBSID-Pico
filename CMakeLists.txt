@@ -252,6 +252,7 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/usbsid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/config.c
   ${CMAKE_CURRENT_LIST_DIR}/src/gpio.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/buffer.c
   ${CMAKE_CURRENT_LIST_DIR}/src/vu.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi.c
   # ${CMAKE_CURRENT_LIST_DIR}/src/midi_patches.c

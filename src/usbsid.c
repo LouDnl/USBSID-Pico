@@ -80,6 +80,9 @@ extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t c
 extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
 extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 
+/* Buffer externals */
+extern void setup_buffer_handler(void);
+
 /* Vu externals */
 extern uint16_t vu;
 extern void init_vu(void);
@@ -100,6 +103,7 @@ extern void process_stream(uint8_t *buffer, size_t size);
 midi_machine midimachine;
 
 /* Queues */
+queue_t buffer_queue;
 queue_t sidtest_queue;
 queue_t logging_queue;
 
@@ -656,10 +660,14 @@ void core1_main(void)
   init_vu();
 
   /* Init queues */
+  queue_init(&buffer_queue, sizeof(buffer_queue_entry_t), 60);  /* 1 entry deep */
   queue_init(&sidtest_queue, sizeof(sidtest_queue_entry_t), 1);  /* 1 entry deep */
   #ifdef WRITE_DEBUG  /* Only init this queue when needed */
   queue_init(&logging_queue, sizeof(writelogging_queue_entry_t), 16);  /* 16 entries deep */
   #endif
+
+  /* Init buffer queue */
+  setup_buffer_handler();
 
   /* Release semaphore when core 1 is started */
   sem_release(&core1_init);
@@ -740,6 +748,7 @@ int main()
   sid_us = (1 / sid_mhz);
   CFG("[BOOT PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
   CFG("[BOOT C64]  %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
+  CFG("[BOOT C64 RATES] REFRESH_RATE %lu Cycles, RASTER_RATE %lu Cycles\n", usbsid_config.refresh_rate, usbsid_config.raster_rate);
 
   /* Release core 0 semaphore */
   sem_release(&core0_init);

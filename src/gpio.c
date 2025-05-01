@@ -106,7 +106,7 @@ void setup_vu(void)
   #if defined(PICO_DEFAULT_LED_PIN)  /* Cannot use VU on PicoW :( */
   { /* PWM led */
     offset_pwmled = pio_add_program(led_pio, &vu_program);
-    sm_pwmled = 0;  /* PIO1 SM0 */
+    sm_pwmled = 1;  /* PIO1 SM1 */
     pio_sm_claim(led_pio, sm_pwmled);
     pio_gpio_init(led_pio, BUILTIN_LED);
     pio_sm_set_consecutive_pindirs(led_pio, sm_pwmled, BUILTIN_LED, 1, true);
@@ -134,7 +134,7 @@ void setup_vu(void)
   { /* Init RGB */
     gpio_set_drive_strength(WS2812_PIN, GPIO_DRIVE_STRENGTH_2MA);
     offset_rgbled = pio_add_program(led_pio, &vu_rgb_program);
-    sm_rgbled = 1;  /* PIO1 SM1 */
+    sm_rgbled = 2;  /* PIO1 SM2 */
     pio_sm_claim(led_pio, sm_rgbled);
     pio_gpio_init(led_pio, WS2812_PIN);
     pio_sm_set_consecutive_pindirs(led_pio, sm_rgbled, WS2812_PIN, 1, true);

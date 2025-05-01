@@ -92,7 +92,8 @@ typedef struct Config {
   uint32_t magic;
   int default_config;
   uint32_t clock_rate;         /* clock speed identifier */
-  uint32_t raster_rate;        /* internal use raster rate identifier ~ not configurable */
+  uint16_t refresh_rate;       /* refresh rate identifier based on clockspeed ~ not configurable */
+  uint16_t raster_rate;        /* raster rate identifier based on clockspeed ~ not configurable */
   struct
   {
     uint8_t chiptype;          /* 0 = real, 1 = clone, 2 = unknown */

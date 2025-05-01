@@ -60,8 +60,9 @@
 .define PUBLIC PHI 22
 .define PUBLIC CONTROL 0  ; 0b000
 .define PUBLIC DATABUS 1  ; 0b001
+.define PUBLIC RASTER  2  ; 0b010
 
-; Bus control program ~ SM1
+; Bus control program ~ PIO0 SM1
 .program bus_control
 .wrap_target
     pull block               ; Pull data from TX fifo, block if no data
@@ -81,7 +82,7 @@ done:
     out pins 3               ; Set control to next 3 bits from TX fifo
 .wrap
 
-; Data and address bus program ~ SM2
+; Data and address bus program ~ PIO0 SM2
 ; pinstate stays the same until next write
 .program data_bus
 .wrap_target
@@ -94,7 +95,7 @@ done:
     wait 0 gpio PHI          ; Wait for clock to go low
 .wrap
 
-; Delay counter program ~ SM3
+; Delay counter program ~ PIO0 SM3
 .program delay_timer
 .wrap_target
     pull block               ; Pull data from FIFO, block if no data
@@ -105,4 +106,17 @@ delay:
     jmp x-- delay            ; Decrease X and restart count
     irq set CONTROL          ; Set IRQ and continue
     irq wait DATABUS         ; Set IRQ and wait for its release
+.wrap
+
+; Buffer raster cycle counter program ~ PIO1 SM0
+.program raster_buffer
+.wrap_target
+    pull noblock             ; Pull data from FIFO, if empty re-use previous data stored in X
+    mov x osr                ; Copy pulled data into OSR
+    out y 16                 ; Move data into scratch register Y
+delay:
+    wait 1 gpio PHI          ; Wait for clock to go high
+    wait 0 gpio PHI          ; Wait for clock to go low
+    jmp y-- delay            ; Decrease X and restart count
+    irq set RASTER           ; Set IRQ and continue, don't wait
 .wrap
