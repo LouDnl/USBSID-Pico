@@ -380,7 +380,6 @@ void write_chars(unsigned char * data, int size)
   if (libusb_bulk_transfer(devh, ep_out_addr, data, size, &actual_length, 0) < 0) {
     fprintf(stderr, "Error while sending char\n");
   }
-  //printf("[W]$%02X:%02X\n", data[1], data[2]);
 }
 
 int read_chars(unsigned char * data, int size)
