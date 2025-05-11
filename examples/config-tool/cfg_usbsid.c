@@ -1666,6 +1666,73 @@ void config_usbsidpico(int argc, char **argv)
       write_config_command(cmd, a, b, c, d);
       break;
     }
+    if (!strcmp(argv[param_count], "-command") || !strcmp(argv[param_count], "--arbitrary-command")) {
+      param_count++;  /* skip usbsid executable and -config self */
+      uint8_t cmd = 0, a = 0, b = 0, c = 0, d = 0, e = 0;
+      if (argc <= 2) {
+        printf("Unable to continue without required arguments, exiting...\n");
+        exit(0);
+      }
+      printf("Got %d args: ", argc);
+      if (argc >= 3) {
+        cmd = strtol(argv[param_count++], NULL, 16);
+        printf("%02x ", cmd);
+      }
+      if (argc >= 4) {
+        a = strtol(argv[param_count++], NULL, 16);
+        printf("%02x ", a);
+      }
+      if (argc >= 5) {
+        b = strtol(argv[param_count++], NULL, 16);
+        printf("%02x ",b);
+      }
+      if (argc >= 6) {
+        c = strtol(argv[param_count++], NULL, 16);
+        printf("%02x ", c);
+      }
+      if (argc >= 7) {
+        d = strtol(argv[param_count++], NULL, 16);
+        printf("%02x ", d);
+      }
+      if (argc >= 8) {
+        e = strtol(argv[param_count++], NULL, 16);
+        printf("%02x ", e);
+      }
+      printf("\n");
+
+      if (cmd <= 0xF0) {
+        printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", cmd, a, b, c, d);
+        uint8_t buf[5] = { cmd, a, b, c, d };
+        write_chars(buf, count_of(buf));
+        if ((cmd & 0xF0) == 0x40 || cmd == 0xC4) {
+          int len;
+          memset(read_data, 0, count_of(read_data));
+          len = read_chars(read_data, count_of(read_data));
+          printf("[R %u] %02X\n", len, read_data[0]);
+        }
+      } else if (cmd == 0xFF) {
+        printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", a, b, c, d, e);
+        uint8_t buf[5] = { a, b, c, d, e };
+        for (int i = 0; i < 50; i++)
+          write_chars(buf, count_of(buf));
+      } else if (cmd == 0xFE) {
+        printf("Sending: 0x%02x: 0x%02x (0x%02x & 0x%02x) * 31\n", 0x80, a, b, c);
+        uint8_t temp1[2] = {a, b};
+        uint8_t temp2[2] = {a, c};
+        uint8_t buf[63];
+        buf[0] = (0x0 | 63);
+        printf("[BUFFER] ");
+        for (int i = 1; i < 63; i+=4) {
+          memcpy(buf+i, temp1, 2);
+          memcpy(buf+(i+2), temp2, 2);
+          printf("$%02X:$%02X $%02X:$%02X ", buf[i], buf[i+1], buf[i+2], buf[i+3]);
+        }
+        printf("\n");
+        write_chars(buf, count_of(buf));
+      }
+
+      break;
+    }
     if (!strcmp(argv[param_count++], "-dsid") || !strcmp(argv[param_count], "--detect-sid-types")) {
       int detection_routine = 0;
       if (argc != param_count) {
