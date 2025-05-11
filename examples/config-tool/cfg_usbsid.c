@@ -339,7 +339,7 @@ int usbsid_init(void)
 
     rc = libusb_control_transfer(devh, 0x21, 0x22, ACM_CTRL_DTR | ACM_CTRL_RTS, 0, NULL, 0, 0);
     if (rc < 0) {
-        fprintf(stderr, "?Error configuring line state during control transfer: %d, %s: %s\n",
+        fprintf(stderr, "Error configuring line state during control transfer: %d, %s: %s\n",
             rc, libusb_error_name(rc), libusb_strerror(rc));
         goto out;
     }
