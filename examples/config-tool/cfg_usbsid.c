@@ -1649,13 +1649,19 @@ void config_usbsidpico(int argc, char **argv)
       break;
     }
     if (!strcmp(argv[param_count], "-config") || !strcmp(argv[param_count], "--config-command")) {
-      printf("Requires 5 positional config arguments!\n");
-      param_count++;
-      uint8_t cmd = strtol(argv[param_count++], NULL, 16);
-      uint8_t a = strtol(argv[param_count++], NULL, 16);
-      uint8_t b = strtol(argv[param_count++], NULL, 16);
-      uint8_t c = strtol(argv[param_count++], NULL, 16);
-      uint8_t d = strtol(argv[param_count++], NULL, 16);
+      printf("-config requires 5 additional config commands and cannot run with any other option!\n");
+      if (argc < 6) printf("You supplied %d command line arguments\n", argc);
+      param_count++;  /* skip usbsid executable and -config self */
+      uint8_t cmd = 0, a = 0, b = 0, c = 0, d = 0;
+      if (argc <= 2) {
+        printf("Unable to continue without required arguments, exiting...\n");
+        exit(0);
+      }
+      if (argc >= 3)  cmd = strtol(argv[param_count++], NULL, 16);
+      if (argc >= 4)  a = strtol(argv[param_count++], NULL, 16);
+      if (argc >= 5)  b = strtol(argv[param_count++], NULL, 16);
+      if (argc >= 6)  c = strtol(argv[param_count++], NULL, 16);
+      if (argc >= 7)  d = strtol(argv[param_count++], NULL, 16);
       printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", cmd, a, b, c, d);
       write_config_command(cmd, a, b, c, d);
       break;
