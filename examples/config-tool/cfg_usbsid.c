@@ -732,9 +732,10 @@ void print_config(void)
     return;
 }
 
-void sid_autodetect(void)
+void sid_autodetect(uint8_t detection_routine)
 {
   config_buffer[1] = 0x51;
+  config_buffer[2] = detection_routine;
   write_chars(config_buffer, count_of(config_buffer));
 
   int len;
@@ -1405,6 +1406,11 @@ void print_help(void)
   printf("  -rc,      --read-clock-speed  : Read and print USBSID-Pico SID clock speed\n");
   printf("  -rs,      --read-sock-config  : Read and print USBSID-Pico socket config settings only\n");
   printf("  -rn,      --read-num-sids     : Read and print USBSID-Pico configured number of SID's only\n");
+  printf("  -dsid N,  --detect-sid-types N: Send SID autodetect command to device, returns the config as with '-r' afterwards\n");
+  printf("                                  0: Cycle exact detection routine 1 (Real SIDs)\n");
+  printf("                                  1: Cycle exact detection routine 2 (Clones & Real SIDs)\n");
+  printf("                                  2: Detection routine (Clones)\n");
+  printf("                                  3: Unsafe detection routine\n");
   printf("  -dclone,  --detect-clone-types: Send clone autodetect command to device, returns the config as with '-r' afterwards\n");
   printf("  -w,       --write-config      : Write single config item to USBSID-Pico (will read the full config first!)\n");
   printf("  -a,       --apply-config      : Apply the current config settings (from USBSID-Pico memory) that you changed with '-w'\n");
@@ -1619,6 +1625,18 @@ void config_usbsidpico(int argc, char **argv)
       uint8_t d = strtol(argv[param_count++], NULL, 16);
       printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", cmd, a, b, c, d);
       write_config_command(cmd, a, b, c, d);
+      break;
+    }
+    if (!strcmp(argv[param_count++], "-dsid") || !strcmp(argv[param_count], "--detect-sid-types")) {
+      int detection_routine = 0;
+      if (argc != param_count) {
+        param_count++;
+        detection_routine = atoi(argv[param_count++]);
+      }
+      printf("Sending autodetect SID's command with routine '%u' to USBSID-Pico and reading config\n", detection_routine);
+      sid_autodetect(detection_routine);
+      printf("Printing config\n");
+      print_config();
       break;
     }
     if (!strcmp(argv[param_count], "-dclone") || !strcmp(argv[param_count], "--detect-clone-types")) {
