@@ -498,10 +498,10 @@ void handle_config_request(uint8_t * buffer)
     case READ_SOCKETCFG:
       CFG("[CMD] READ_SOCKETCFG\n");
       read_socket_config(&usbsid_config);
-      print_cfg(socket_config_array, count_of(socket_config_array));
+      print_cfg(socket_config_array, 10);
       memset(write_buffer_p, 0, 64);
-      memcpy(write_buffer_p, socket_config_array, count_of(socket_config_array));
-      write_back_data(64);
+      memcpy(write_buffer_p, socket_config_array, 10);
+      write_back_data(10);
       break;
     case READ_NUMSIDS:
       CFG("[CMD] READ_NUMSIDS\n");
