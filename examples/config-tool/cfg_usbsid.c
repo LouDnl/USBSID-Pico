@@ -1388,6 +1388,10 @@ void print_help(void)
   printf("  -boot,    --bootloader        : Reboot USBSID-Pico to the bootloader for firmware upload\n");
   printf("  -skpico   --sidkickpico       : Enter SIDKICK-pico config mode\n");
   printf("  -config   --config-command    : Send custom config command\n");
+  printf("--[TEST SIDS]--------------------------------------------------------------------------------------------------------\n");
+  printf("  -sidtest N                    : Run SID test routine on available SID's\n");
+  printf("                                  0: All, 1: 0x00, 2: 0x20, 3: 0x40, 4: 0x60\n");
+  printf("  -stoptests                    : Interrupt and stop any running tests\n");
   printf("--[DEFAULTS]---------------------------------------------------------------------------------------------------------\n");
   printf("  -defaults,--config-defaults   : Reset USBSID-Pico config to defaults\n");
   printf("--[PRESETS]---------------------------------------------------------------------------------------------------------\n");
@@ -1489,6 +1493,35 @@ void config_usbsidpico(int argc, char **argv)
     if (!strcmp(argv[param_count], "-debug") || !strcmp(argv[param_count], "--debug")) {
       debug = 1;
       continue;
+    }
+
+    if (!strcmp(argv[param_count], "-sidtest")) {
+      int testno = 0;
+      param_count++;
+      if (param_count == argc) {
+        printf("No sidnumber given, testing all available SID's!\n");
+      } else {
+        testno = atoi(argv[param_count++]);
+      }
+      const char * sidaddr[] = {"0x00","0x20","0x40","0x60"};
+      printf("Starting SID test for %s%s\n", (testno == 0 ? "all SID's" : "SID at address: "), (testno == 0 ? " " : sidaddr[testno-1]));
+      if (testno == 0)
+        write_config_command(0x52,0,0,0,0);
+      if (testno == 1)
+        write_config_command(0x53,0,0,0,0);
+      if (testno == 2)
+        write_config_command(0x54,0,0,0,0);
+      if (testno == 3)
+        write_config_command(0x55,0,0,0,0);
+      if (testno == 4)
+        write_config_command(0x56,0,0,0,0);
+      return;
+    }
+
+    if (!strcmp(argv[param_count], "-stoptests")) {
+      printf("Sending stop SID test command to USBSID-Pico\n");
+      write_config_command(0x59,0,0,0,0);
+      return;
     }
 
     if (!strcmp(argv[param_count], "-defaults") || !strcmp(argv[param_count], "--config-defaults")) {
