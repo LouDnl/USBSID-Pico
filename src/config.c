@@ -883,10 +883,7 @@ void handle_config_request(uint8_t * buffer)
       };
       break;
     /* ISSUE: This must be run on Core 1 so we can actually stop it! */
-    case TEST_SID1:
-    case TEST_SID2:
-    case TEST_SID3:
-    case TEST_SID4:
+    case TEST_SID1 ... TEST_SID4:
       int s = (buffer[0] == TEST_SID1 ? 0
         : buffer[0] == TEST_SID2 ? 1
         : buffer[0] == TEST_SID3 ? 2
