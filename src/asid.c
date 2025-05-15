@@ -60,6 +60,7 @@ extern uint16_t vu;
 extern queue_t buffer_queue;
 
 /* Some locals, rural and such */
+static bool default_order = false;
 bool write_ordered = false;
 struct asid_regpair_t {  /* thanks to thomasj */
   uint8_t index;
@@ -76,6 +77,7 @@ void reset_asid_to_writeorder(void)
     asid_to_writeorder[i].index = i;
     asid_to_writeorder[i].wait_us = 0;
   }
+  default_order = (default_order == false ? true : default_order);
 }
 
 /* Pling, plong, ploink!? */
@@ -321,7 +323,7 @@ void decode_asid_message(uint8_t* buffer, int size)
     case 0x4F:  /* Display characters */
       break;
     case 0x4E:  /* SID 1 */
-      // if (write_ordered)
+        if (!default_order) reset_asid_to_writeorder();  /* Set defaults once on first write */
         handle_writeordered_asid_message(0, &buffer[3]);
       // else handle_asid_message(0, &buffer[3]);
       break;
