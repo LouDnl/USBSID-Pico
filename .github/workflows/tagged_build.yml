@@ -155,6 +155,17 @@ jobs:
             }
       fail-fast: false
     steps:
+      - name: 🗒️ Set tag output
+        id: vars
+        run: |
+          echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+
+      - name: 🗒️ Check tag output
+        env:
+          RELEASE_VERSION: ${{ steps.vars.outputs.tag }}
+        run: |
+          echo $RELEASE_VERSION
+          echo ${{ steps.vars.outputs.tag }}
       - name: 🛠️ Arm GNU Toolchain (arm-none-eabi-gcc)
         uses: carlosperate/arm-none-eabi-gcc-action@v1
 
@@ -183,7 +194,7 @@ jobs:
           key: ${{runner.os}}-pico-sdk-${{env.PICO_SDK_REF}}
 
       - name: 📇 Checkout Pico-SDK
-        if: ${{steps.cache-pico-sdk.outputs.cache-hit != 'true' }}
+        if: ${{ steps.cache-pico-sdk.outputs.cache-hit != 'true' }}
         uses: actions/checkout@v4
         with:
           repository: raspberrypi/pico-sdk
@@ -256,7 +267,7 @@ jobs:
           unset PICO_BOARD
           cmake -S master -B ${{github.workspace}}/master/build_${{matrix.directory}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DPICO_PLATFORM=${{matrix.pico_platform}} -DPICO_BOARD=${{matrix.pico_board}} -Dpicotool_DIR=${{github.workspace}}/picotool/picotool $extra_arg
 
-      - name: 🏭 Build ${{matrix.name}}
+      - name: 🏭 Build ${{matrix.buildname}}
         run: |
           cmake --build ${{github.workspace}}/master/build_${{matrix.directory}} --config ${{env.BUILD_TYPE}} -j ${{env.BUILD_THREADS}}
 
@@ -269,7 +280,7 @@ jobs:
         run: |
           mkdir dist
           cp -av build_${{matrix.directory}}/*.uf2 dist/
-          zip -r usbsid${{matrix.pico_board}}-taggedbuild-${{github.run_number}}.zip dist/
+          zip -r usbsid${{matrix.pico_board}}-taggedbuild-${{ steps.vars.outputs.tag }}.zip dist/
 
       - name: Get current branch
         run: |
