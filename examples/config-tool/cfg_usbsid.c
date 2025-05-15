@@ -1733,9 +1733,9 @@ void config_usbsidpico(int argc, char **argv)
 
       break;
     }
-    if (!strcmp(argv[param_count++], "-dsid") || !strcmp(argv[param_count], "--detect-sid-types")) {
+    if (!strcmp(argv[param_count], "-dsid") || !strcmp(argv[param_count], "--detect-sid-types")) {
       int detection_routine = 0;
-      if (argc != param_count) {
+      if (argc != param_count+1) {
         param_count++;
         detection_routine = atoi(argv[param_count++]);
       }
