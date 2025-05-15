@@ -46,16 +46,10 @@ typedef struct {
 } sidtest_queue_entry_t;
 
 /* Buffer queue */
-struct buffer_entry_t {
+typedef struct {
     uint8_t reg;
     uint8_t val;
     uint8_t cycles;
-};
-
-// struct buffer_entry_t buffer_entries[28] = {};
-
-typedef struct {
-  struct buffer_entry_t buffer_entries[28];
 } buffer_queue_entry_t;
 
 

@@ -145,7 +145,7 @@ void handle_complete_asid_buffer(uint8_t sid, uint8_t* buffer, int size)
   }
 }
 
-/* And so does this */
+/* And this does the same */
 void handle_asid_message(uint8_t sid, uint8_t* buffer)
 { /* Assumes byte 0-2 are not included in the buffer */
   unsigned int reg = 0;
@@ -169,7 +169,7 @@ void handle_asid_message(uint8_t sid, uint8_t* buffer)
   }
 }
 
-/* But this one lost all control */
+/* But this one lost track of time */
 void handle_writeordered_asid_message(uint8_t sid, uint8_t* buffer)
 { /* Assumes byte 0-2 are not included in the buffer */
   int chip;
@@ -197,39 +197,37 @@ void handle_writeordered_asid_message(uint8_t sid, uint8_t* buffer)
         }
         writeOrder[chip][asid_to_writeorder[reg].index].reg = asid_sid_registers[mask * 7 + bit];
         writeOrder[chip][asid_to_writeorder[reg].index].data = register_value;
+        // TODO: FIX Pico2 writes
         /* Pico 2 requires at least 10 cycles between writes
          * or it will be too damn fast! So if wait_us is lower then 10 we use 10 cycles
          * and do this for other Pico's aswell */
         writeOrder[chip][asid_to_writeorder[reg].index].wait_us = asid_to_writeorder[reg].wait_us;
-          // (asid_to_writeorder[reg].wait_us < 10)
-          // ? 10
-          // : asid_to_writeorder[reg].wait_us;
-
+        /* DBG("[ASID1 %d] $%02X:%02X %u\n", asid_to_writeorder[reg].index, (writeOrder[chip][asid_to_writeorder[reg].index].reg |= sid), writeOrder[chip][asid_to_writeorder[reg].index].data, writeOrder[chip][asid_to_writeorder[reg].index].wait_us); */
         dtype = asid;  /* Set data type to asid again */
         reg++;
       }
     }
   }
 
-  buffer_queue_entry_t queue_entry;
-
   for (size_t pos = 0; pos < NO_SID_REGISTERS_ASID; pos++) {
+    buffer_queue_entry_t queue_entry;
     if (writeOrder[chip][pos].wait_us != 0xff) {
       /* Perform write including wait cycles */
       /* cycled_write_operation((writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us); */
-      queue_entry.buffer_entries[pos].reg = (writeOrder[chip][pos].reg |= sid);
-      queue_entry.buffer_entries[pos].val = writeOrder[chip][pos].data;
-      queue_entry.buffer_entries[pos].cycles = writeOrder[chip][pos].wait_us;
+      queue_entry.reg = (writeOrder[chip][pos].reg |= sid);
+      queue_entry.val = writeOrder[chip][pos].data;
+      queue_entry.cycles = writeOrder[chip][pos].wait_us;
+      queue_try_add(&buffer_queue, &queue_entry);
 
       WRITEDBG(dtype, pos, NO_SID_REGISTERS_ASID, (writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us);
-      // DBG("[ASID %d] $%02X:%02X %u\n", pos, (writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us);
+      /* DBG("[ASID2 %d] $%02X:%02X %u\n", pos, (writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us); */
     } else {
-        queue_entry.buffer_entries[pos].reg = 0;
-        queue_entry.buffer_entries[pos].val = 0;
-        queue_entry.buffer_entries[pos].cycles = 0xff;
+      queue_entry.reg = 0;
+      queue_entry.val = 0;
+      queue_entry.cycles = 0xff;
+      queue_try_add(&buffer_queue, &queue_entry);
     }
   }
-  queue_try_add(&buffer_queue, &queue_entry);
   for (size_t pos = 0; pos < NO_SID_REGISTERS_ASID; pos++) {
     writeOrder[chip][pos].wait_us = 0xff;  /* indicate not used */
   }
@@ -250,7 +248,7 @@ void handle_asid_writeorder_config(uint8_t* buffer)
   }
 }
 
-void handle_asid_envmessage(uint8_t* buffer)
+void handle_asid_envmessage(uint8_t* buffer) /* TODO: Update clock settings on the fly when env differs from config */
 { /* SID environment is only logged and not used for now */
   /* Incoming buffer skips first 3 bytes and
      starts at SETTINGS
@@ -325,22 +323,15 @@ void decode_asid_message(uint8_t* buffer, int size)
     case 0x4E:  /* SID 1 */
         if (!default_order) reset_asid_to_writeorder();  /* Set defaults once on first write */
         handle_writeordered_asid_message(0, &buffer[3]);
-      // else handle_asid_message(0, &buffer[3]);
       break;
     case 0x50:  /* SID 2 */
-      // if (write_ordered)
         handle_writeordered_asid_message(32, &buffer[3]);
-      // else handle_asid_message(32, &buffer[3]);
       break;
     case 0x51:  /* SID 3 */
-      // if (write_ordered)
         handle_writeordered_asid_message(64, &buffer[3]);
-      // else handle_asid_message(64, &buffer[3]);
       break;
     case 0x52:  /* SID 4 */
-      // if (write_ordered)
         handle_writeordered_asid_message(96, &buffer[3]);
-      // else handle_asid_message(96, &buffer[3]);
       break;
     case 0x60:  /* FMOpl */
       if (fmopl_enabled) {  /* Only if FMOpl is enabled, drop otherwise */

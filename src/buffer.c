@@ -28,6 +28,7 @@
 #include "config.h"
 #include "gpio.h"
 #include "logging.h"
+#include "asid.h"
 #include "sid.h"
 
 
@@ -49,23 +50,23 @@ uint64_t before, after;
 void __not_in_flash_func(buffer_irq_handler)(void)
 {
   pio_interrupt_clear(raster_pio, BUFFPIOIRQ);
-  // int buffer_count = queue_get_level(&buffer_queue);
-  // if (buffer_count >= 60/3) {
-    buffer_queue_entry_t b_entry;
-    if (queue_try_remove(&buffer_queue, &b_entry)) {
-      for (size_t qpos = 0; qpos < 28; qpos++) {
-        if (b_entry.buffer_entries[qpos].cycles != 0xff) {
+
+    for (size_t qpos = 0; qpos < 28; qpos++) {
+      buffer_queue_entry_t b_entry;
+      if (queue_try_remove(&buffer_queue, &b_entry)) {
+        if (b_entry.cycles != 0xff) {
           /* Perform write including wait cycles */
           cycled_write_operation(
-            b_entry.buffer_entries[qpos].reg,
-            b_entry.buffer_entries[qpos].val,
-            b_entry.buffer_entries[qpos].cycles
+            b_entry.reg,
+            b_entry.val,
+            (b_entry.cycles + 6) /* Add and extra 6 cycles minimum to each write for LDA(2) & STA(4) */
           );
+          // DBG("[QUEUE LEVEL] %04u\n", queue_get_level(&buffer_queue));
           // DBG("[BUFF %d] $%02X:%02X %u\n",
           //   qpos,
           //   b_entry.buffer_entries[qpos].reg,
           //   b_entry.buffer_entries[qpos].val,
-          //   b_entry.buffer_entries[qpos].cycles);
+          //   (b_entry.buffer_entries[qpos].cycles + 6));
         }
       }
     // }
@@ -92,8 +93,6 @@ void init_buffer_irq(void)
 
 void setup_buffer_handler(void)
 {
-  // before = to_us_since_boot(get_absolute_time());
-
   /* Init buffer PIO */
   init_buffer_pio();
 

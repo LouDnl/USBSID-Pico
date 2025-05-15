@@ -660,7 +660,7 @@ void core1_main(void)
   init_vu();
 
   /* Init queues */
-  queue_init(&buffer_queue, sizeof(buffer_queue_entry_t), 60);  /* 1 entry deep */
+  queue_init(&buffer_queue, sizeof(buffer_queue_entry_t), 1024);  /* 1024(3 each) entries deep */
   queue_init(&sidtest_queue, sizeof(sidtest_queue_entry_t), 1);  /* 1 entry deep */
   #ifdef WRITE_DEBUG  /* Only init this queue when needed */
   queue_init(&logging_queue, sizeof(writelogging_queue_entry_t), 16);  /* 16 entries deep */
