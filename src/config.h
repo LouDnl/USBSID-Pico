@@ -198,6 +198,8 @@ enum
   SET_AUDIO        = 0x89,  /* Set mono <-> stereo (v1.3+ boards only) */
 
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
+  TEST_FN2         = 0x9A,  /* TODO: Remove before v1 release */
+  TEST_FN3         = 0x9B,  /* TODO: Remove before v1 release */
 };
 
 /* SID detection routines

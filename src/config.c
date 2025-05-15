@@ -984,11 +984,43 @@ void handle_config_request(uint8_t * buffer)
       read_config(&test_config);
       print_cfg(config_array, count_of(config_array));
       CFG("[TEST_CONFIG_END]\n");
-
       // CFG("[USBSID_SID_MEMORY]\n");
       // print_cfg(sid_memory, (numsids * 0x20));
-      // uint8_t st = detect_sid_model(buffer[1]);
-      // CFG("[TEST FOUND] %u\n", st);
+    case TEST_FN2:
+      uint8_t st = 0xFF;
+      if (buffer[1] < 4) {
+        st = sid_detection[buffer[1]](buffer[2]);
+        CFG("[TEST FOUND] %u\n", st);
+      }
+      if (buffer[1] == 4) {
+        st = cycled_read_operation(buffer[2], buffer[3]);
+        CFG("[TEST FOUND] %02X\n", st);
+      }
+      if (buffer[1] == 5) {
+        uint16_t dcyc = 1000;
+        if (buffer[2] != 0 || buffer[3] != 0)
+          dcyc = (buffer[2] << 8) | buffer[3];
+        CFG("[CFG] DELAY TESTING FOR %ld US/CYCLES\n", dcyc);
+        uint64_t test_before = to_us_since_boot(get_absolute_time());
+        sleep_ms(dcyc/1000);
+        uint64_t test_after = to_us_since_boot(get_absolute_time());
+        CFG("[CFG] SLEEP_MS before: %lld after: %lld difference %lld\n", test_before, test_after, (test_after - test_before));
+        test_before = to_us_since_boot(get_absolute_time());
+        uint16_t waited_cycles = cycled_delay_operation(dcyc);
+        test_after = to_us_since_boot(get_absolute_time());
+        CFG("[CFG] DELAY_CYCLES %u = %.4fµs, ACTUAL: %uµs (including printf delay)\n", waited_cycles, (float)(waited_cycles * sid_us), (test_after - test_before));
+      }
+      if (buffer[1] == 6) {
+        detect_fmopl(buffer[2]);
+      }
+      break;
+    case TEST_FN3:
+      CFG("[SID MEMORY]\n");
+      for (uint i = 0; i < (4*0x20); i++) {
+        if (i!=0 && i%0x20 == 0) { CFG("\n");};
+        CFG("$%02X ", sid_memory[i]);
+      }
+      CFG("\n");
       break;
     default:
       break;
