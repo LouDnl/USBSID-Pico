@@ -364,7 +364,7 @@ void read_socket_config(Config* config)
 
   socket_config_array[8] = (int)config->socketTwo.act_as_one;
 
-  socket_config_array[9] = 0xFF; // Terminator byte
+  socket_config_array[9] = 0xFF;  /* Terminator byte */
 
   return;
 }
