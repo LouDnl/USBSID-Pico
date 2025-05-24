@@ -44,6 +44,7 @@
 
 /* Compile with:
  * gcc -g3 -L/usr/local/lib inih/ini.c cfg_usbsid.c -o cfg_usbsid $(pkg-config --libs --cflags libusb-1.0)
+ * gcc -g3 -L/usr/local/lib examples/config-tool/inih/ini.c examples/config-tool/cfg_usbsid.c -o examples/config-tool/cfg_usbsid $(pkg-config --libs --cflags libusb-1.0) -I./examples/config-tool/inih ; cp examples/config-tool/cfg_usbsid ~/.local/bin
  */
 
 /* ---------------------- */
@@ -173,7 +174,7 @@ static int import_ini(void* user, const char* section, const char* name, const c
     if (p != 666) ini_config->socketTwo.act_as_one = p;
   }
   if (MATCH("LED", "enabled")) {
-    p = value_position(value, enabled);
+    p = value_position(value, truefalse);
     if (p != 666) ini_config->LED.enabled = p;
   }
   if (MATCH("LED", "idle_breathe")) {
@@ -181,7 +182,7 @@ static int import_ini(void* user, const char* section, const char* name, const c
     if (p != 666) ini_config->LED.idle_breathe = p;
   }
   if (MATCH("RGBLED", "enabled")) {
-    p = value_position(value, enabled);
+    p = value_position(value, truefalse);
     if (p != 666) ini_config->RGBLED.enabled = p;
   }
   if (MATCH("RGBLED", "idle_breathe")) {
@@ -197,7 +198,7 @@ static int import_ini(void* user, const char* section, const char* name, const c
     if (p >= 1 && p <= 4) ini_config->RGBLED.sid_to_use = p;
   }
   if (MATCH("FMOPL", "enabled")) {
-    p = value_position(value, enabled);
+    p = value_position(value, truefalse);
     if (p != 666) ini_config->FMOpl.enabled = p;
   }
   if (MATCH("Audioswitch", "set_to")) {
