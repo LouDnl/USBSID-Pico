@@ -1,4 +1,4 @@
-![USBSID-Pico](images/pcbv1.0.jpg)<br>
+![USBSID-Pico](images/pcbv1.3.jpg)<br>
 ![USBSID-Pico](images/usbsid.png)![LouD](images/loud.png)
 # USBSID-Pico
 USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board for interfacing one or two MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer, phone, ASID supporting player or USB midi controller.  
@@ -184,31 +184,35 @@ You can build the firmware using the Pico SDK 2.1.1 and the included TinyUSB. Be
 After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py PICO_PLATFORM` where PICO_PLATFORM is either rp2040 or rp2350 depending on the board you are using.
 
 # Hardware
-### Where to buy
+## Where to buy
 #### Licensed resellers
 [Run Stop Re-Store](https://www.runstoprestore.nl) at [Retro8BITshop](https://www.retro8bitshop.com) is the first reseller to sell licensed USBSID-Pico boards.  
-Click [this link](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/) to go to their product page
+PCB revision v1.0 [product page](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/)  
+PCB revision v1.3 [product page](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/) (to be updated)
 #### PCBWay
-At a minimum of 5 bare or assembled boards it is also possible to purchase at [PCBWay here](https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html).  
+At a minimum of 5 bare or assembled boards it is also possible to purchase PCB's at PCBWay  
+[PCB revision v1.0](https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html)  
+[PCB revision v1.3](https://www.pcbway.com/project/shareproject/USBSID_Pico_v1_3_05f2b88e.html)  
 No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral link](https://pcbway.com/g/2458i7) to register, thanks!
 #### Me (when I have boards)
 If available you can purchase (semi) assembled boards minus Pico from me - send me a message on any of my socials.  
 
 ## Important PCB information
 ### PCB revision v1.0
-- [View jumper information (online)](PCBv1.0-INFO.adoc)
+- [View jumper information (online)](doc/PCBv1.0-INFO.adoc)
 - [View jumper information (PDF download)](doc/PCBv1.0-INFO.pdf)
 ### PCB revision v1.3
-- Coming soon!
+- [View jumper information (online)](doc/PCBv1.3-INFO.adoc)
+- [View jumper information (PDF download)](doc/PCBv1.3-INFO.pdf)
 
 ## Cases
 All USBSID-Pico community created cases are available in the [cases](cases/) directory, direct links below.  
 _Cases for PCB revision v1.0:_
-* [Cartridge case](cases/spotUP/USBSID-Pico_Case.zip) by @spotUP
-* [boxy case](repo/cases/schorsch3000/usbsidpico-case-box.tgz) by @schorsch3000
+* [Cartridge case](cases/v1.0/spotUP) by @spotUP
+* [boxy case](cases/v1.0/schorsch3000) by @schorsch3000
 
 _Cases for PCB revision v1.3:_
-* Updated cartridge case coming soon!
+* [spotUP Cartridge case revisited](cases/v1.3/spotUP-revisited) by @LouD
 
 ### Schematic and BOM
 If you want and are up to it you can solder your own PCB or create your own development board using the documents below
@@ -224,13 +228,12 @@ Includes all features from v1.0 except the audio jumper
 - Voltage is jumper controlled
 - SID socket placement is more spread out for:
   - easier filter capacitor access
-  - more room for FPGA SID
   - optional ZIF sockets
 - 3 voltage regulators for filtered voltages to the SIDS
   - 1x fixed 5 volts and 2x 9 volts or 12 volts
 - Better IO port layout
   - Unused GPIO pins for optional expansion boards
-  - IO5/8 pins for quad SID configuration
+  - IO5 pins for quad SID configuration
   - Uart pins
   - SID Ext in pins (requires closing the solder jumper on the bottom)
   - Ground pin
