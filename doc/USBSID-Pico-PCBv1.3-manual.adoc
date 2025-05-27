@@ -1,4 +1,8 @@
-= *PCB v1.3 Important information*
+= *USBSID-Pico PCB revision v1.3 manual*
+:author: LouD
+:description: This document contains important information about the PCB
+:url-repo: https://www.github.com/LouDnl/USBSID-Pico
+:document-date: {localdatetime}
 
 .Click image for larger view
 [#img-v13top,link=images/v1.3/v1.3b-top-marked.png]
@@ -40,3 +44,5 @@ The `SW` pin is an optional pin for adding a switch to control the mono / audio 
 .Click image for larger view
 [#img-v13bottom,link=images/v1.3/v1.3b-bottom.png]
 image::images/v1.3/v1.3b-bottom.png[title=PCB Bottom]
+
+Author: {author} - generated on {document-date}

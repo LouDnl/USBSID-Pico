@@ -191,19 +191,19 @@ PCB revision v1.0 [product page](https://www.retro8bitshop.com/product/usbsid-pi
 PCB revision v1.3 [product page](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/) (to be updated)
 #### PCBWay
 At a minimum of 5 bare or assembled boards it is also possible to purchase PCB's at PCBWay  
+No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral link](https://pcbway.com/g/2458i7) to register, thanks!  
 [PCB revision v1.0](https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html)  
-[PCB revision v1.3](https://www.pcbway.com/project/shareproject/USBSID_Pico_v1_3_05f2b88e.html)  
-No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral link](https://pcbway.com/g/2458i7) to register, thanks!
+[PCB revision v1.3](https://www.pcbway.com/project/shareproject/USBSID_Pico_v1_3_05f2b88e.html)
 #### Me (when I have boards)
 If available you can purchase (semi) assembled boards minus Pico from me - send me a message on any of my socials.  
 
 ## Important PCB information
-### PCB revision v1.0
-- [View jumper information (online)](doc/PCBv1.0-INFO.adoc)
-- [View jumper information (PDF download)](doc/PCBv1.0-INFO.pdf)
-### PCB revision v1.3
-- [View jumper information (online)](doc/PCBv1.3-INFO.adoc)
-- [View jumper information (PDF download)](doc/PCBv1.3-INFO.pdf)
+### PCB revision v1.0 manual
+- [View jumper information (online)](doc/USBSID-Pico-PCBv1.0-manual.adoc)
+- [View jumper information (PDF download)](doc/USBSID-Pico-PCBv1.0-manual.pdf)
+### PCB revision v1.3 manual
+- [View jumper information (online)](doc/USBSID-Pico-PCBv1.3-manual.adoc)
+- [View jumper information (PDF download)](doc/USBSID-Pico-PCBv1.3-manual.pdf)
 
 ## Cases
 All USBSID-Pico community created cases are available in the [cases](cases/) directory, direct links below.  

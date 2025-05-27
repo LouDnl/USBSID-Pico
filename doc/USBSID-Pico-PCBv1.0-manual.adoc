@@ -1,4 +1,8 @@
-= *PCB v1.0 Important information*
+= *USBSID-Pico PCB revision v1.0 manual*
+:author: LouD
+:description: This document contains important information about the PCB
+:url-repo: https://www.github.com/LouDnl/USBSID-Pico
+:document-date: {localdatetime}
 
 .Click image for larger view
 [#img-v1explained,link=images/v1.0/v1.0-explained.png]
@@ -28,7 +32,7 @@ image::images/v1.0/v1.0-explained.png[title=Explained]
   - TX on the right
   - RX on the left
 7. Optional 330k pulldown resistor hooked up to EXT-IN for 8580 filter bypass in socket 2 +
-    image:images/v1.0/SID2-extin-bypass-smaller.png[title=EXTIN bypass]
+  image:images/v1.0/SID2-extin-bypass-smaller.png[title=EXTIN bypass]
   - solder closed = enabled
 8. Optional 330k pulldown resistor hooked up to EXT-IN for 8580 filter bypass in socket 1 +
   image:images/v1.0/SID1-extin-bypass-smaller.png[title=EXTIN bypass]
@@ -53,3 +57,5 @@ image::images/v1.0/v1.0-explained.png[title=Explained]
   - Ground and S1 as labeled
 14. Reset button +
   image:images/v1.0/reset-button-smaller.png[title=Reset button]
+
+Author: {author} - generated on {document-date}
