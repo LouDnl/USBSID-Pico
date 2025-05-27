@@ -31,7 +31,9 @@
 !src
 !src/pio
 !doc
-!doc/**
+!doc/images
+!doc/images/v1.0
+!doc/images/v1.3
 !images
 !media
 !resources
