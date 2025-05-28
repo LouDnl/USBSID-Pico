@@ -7,26 +7,31 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
 * [Questions & Support](#questions-and-support)
 * [Project status](#project-status)
 * [Firmware](#firmware)
-  * [Firmware versions](doc/USBSID-Pico-firmware-manual.adoc)
+  * [Firmware types and naming](doc/USBSID-Pico-firmware-manual.adoc)
   * [How to flash new firmware](doc/USBSID-Pico-firmware-manual.adoc)
+  * [How to configure your board](doc/USBSID-Pico-firmware-manual.adoc)
   * [Known issues](#known-issues)
 * [Hardware](#hardware)
-  * [Important PCB information](#important-pcb-information)
+  * [PCB usage information](#pcb-usage-information)
+    * [PCB revision v1.0 manual](#pcb-revision-v10-manual)
+    * [PCB revision v1.3 manual](#pcb-revision-v13-manual)
   * [Where to buy](#where-to-buy)
   * [Cases](#cases)
   * [Schematic and BOM](#schematic-and-bom)
   * [PCB Features](#pcb-features)
   * [PCB Development](#pcb-development)
-* [PCB in action](#usbsid-pico-in-action)
-* [Software examples](#software)
+* [Software](#software)
+  * [Software manual](doc/USBSID-Pico-software-manual.adoc)
   * [Pre compiled Vice binaries](#precompiled-vice-binaries)
+* [PCB in action](#usbsid-pico-in-action)
 * [Acknowledgements](#acknowledgements)
 * [Disclaimer](#disclaimer)
 * [License](#license)
 * [Changelog](CHANGELOG.md)
 
 # Features
-![USBSID-Pico](images/pcbv0.2.png)
+![USBSID-Pico](images/pcbv1.3-neon.png)  
+See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for more information on how to use supported software!  
 #### SID Playing
 USBSID-Pico supports various ways of playing SID files.  
 Out-of-the box playing is supported by using [Deepsid by Chordian](https://deepsid.chordian.net)  
@@ -48,8 +53,9 @@ This means that no support is available here at this time, please visit the Disc
 
 # Questions and Support
 Any questions about or support with USBSID-Pico can be asked 
-* on [Discord](https://discord.gg/zG2rxXuT2g)
-* or in the [discussions](https://github.com/LouDnl/USBSID-Pico/discussions).
+* [Discord](https://discord.gg/zG2rxXuT2g)
+* [Github discussions](https://github.com/LouDnl/USBSID-Pico/discussions)
+* [USBSID manuals](doc/)
 
 # Project status
 Visit the [Project Page](https://github.com/users/LouDnl/projects/1) for an up-to-date list of things being worked on.
@@ -58,35 +64,40 @@ While in development any mentioned features, options, etc. are subject to change
 ### Code status
 |          | Master             | Dev                    |
 | -------  | :-----             | :-----                 |
-| Build    | [![release][1]][A] | [![build][2]][B]       |
-| Commit   | [![commit][3]][C]  | [![commit][4]][D]      |
+| Release  | [![release][1]][A] | [![tag][2]][B]       |
+| Build    | [![build][3]][C]   | [![build][4]][C]       |
+| Commit   | [![commit][5]][D]  | [![commit][6]][E]      |
 |          | **Other**          |
-| Latest   | [![tag][5]][E]     | [![release][6]][F]     |
-| Open     | [![issues][7]][G]  | [![discussions][8]][H] |
-| Info     | [![license][9]][I] | [![language][10]][J]   |
+| Latest   | [![tag][7]][F]     | [![release][8]][G]     |
+| Open     | [![issues][9]][H]  | [![discussions][10]][I] |
+| Info     | [![license][11]][J] | [![language][12]][K]   |
 
-[1]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/release.yml/badge.svg?branch=master
-[2]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/build.yml/badge.svg?branch=dev
-[3]: https://shields.io/github/last-commit/LouDnl/USBSID-Pico/master
-[4]: https://shields.io/github/last-commit/LouDnl/USBSID-Pico/dev
-[5]: https://shields.io/github/v/tag/LouDnl/USBSID-Pico?sort=semver
-[6]: https://shields.io/github/v/release/LouDnl/USBSID-Pico
-[7]: https://shields.io/github/issues/LouDnl/USBSID-Pico
-[8]: https://shields.io/github/discussions/LouDnl/USBSID-Pico
-[9]: https://shields.io/github/license/LouDnl/USBSID-Pico
-[10]: https://shields.io/github/languages/top/LouDnl/USBSID-Pico
+[1]: https://img.shields.io/github/v/release/LouDnl/USBSID-Pico
+[2]: https://img.shields.io/github/v/tag/LouDnl/USBSID-Pico
+[3]: https://img.shields.io/github/actions/workflow/status/LouDnl/USBSID-Pico/build.yml?branch=master
+[4]: https://img.shields.io/github/actions/workflow/status/LouDnl/USBSID-Pico/build.yml?branch=dev
+[5]: https://shields.io/github/last-commit/LouDnl/USBSID-Pico/master
+[6]: https://shields.io/github/last-commit/LouDnl/USBSID-Pico/dev
+[7]: https://shields.io/github/v/tag/LouDnl/USBSID-Pico?sort=semver
+[8]: https://shields.io/github/v/release/LouDnl/USBSID-Pico
+[9]: https://shields.io/github/issues/LouDnl/USBSID-Pico
+[10]: https://shields.io/github/discussions/LouDnl/USBSID-Pico
+[11]: https://shields.io/github/license/LouDnl/USBSID-Pico
+[12]: https://shields.io/github/languages/top/LouDnl/USBSID-Pico
 [A]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/release.yml
-[B]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/build.yml
-[C]: https://github.com/LouDnl/USBSID-Pico/commits/master/
-[D]: https://github.com/LouDnl/USBSID-Pico/commits/dev/
-[E]: https://github.com/LouDnl/USBSID-Pico/tags
-[F]: https://github.com/LouDnl/USBSID-Pico/releases
-[G]: https://github.com/LouDnl/USBSID-Pico/issues
-[H]: https://github.com/LouDnl/USBSID-Pico/discussions
-[I]: https://github.com/LouDnl/USBSID-Pico/blob/master/LICENSE
-[J]: https://github.com/LouDnl/USBSID-Pico
+[B]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/tagged_build.yml
+[C]: https://github.com/LouDnl/USBSID-Pico/actions/workflows/build.yml
+[D]: https://github.com/LouDnl/USBSID-Pico/commits/master/
+[E]: https://github.com/LouDnl/USBSID-Pico/commits/dev/
+[F]: https://github.com/LouDnl/USBSID-Pico/tags
+[G]: https://github.com/LouDnl/USBSID-Pico/releases
+[H]: https://github.com/LouDnl/USBSID-Pico/issues
+[I]: https://github.com/LouDnl/USBSID-Pico/discussions
+[J]: https://github.com/LouDnl/USBSID-Pico/blob/master/LICENSE
+[K]: https://github.com/LouDnl/USBSID-Pico
 
 ### Test and config your board
+Also see the [Firmware manual](doc/USBSID-Pico-firmware-manual.adoc) for information on how to set up your board!  
 You can configurate your board by using the commandline [config-tool](examples/config-tool) [binary](examples/config-tool/cfg_usbsid) (Linux only at the moment) provided in examples or use the web configurations, see below.  
 
 You can test your board with WebUSB and ASID here: [USBSID](https://usbsid.loudai.nl/?player=webusb).  
@@ -105,6 +116,7 @@ Android: USB Midi, ASID (in webbrowser) SID Play
 Amiga: PlaySID library
 
 ### Linux Udev rules
+Also see the [Software manual](doc/USBSID-Pico-software-manual.adoc) for more information on how to use supported software!  
 In the [examples/udev](repo/examples/udev-rules/69-usbsid-permissions.rules) directory you can find the udev rules that I use on Linux. This purely an example file that you can use and change to your own needs.  
 Steps required for this to work
 ```shell
@@ -119,6 +131,7 @@ Steps required for this to work
 ```
 
 ### Windows driver
+Also see the [Software manual](doc/USBSID-Pico-software-manual.adoc) for mroe information on how to use supported software!  
 Use [Zadig](https://zadig.akeo.ie/) to install the correct driver for USBSID-Pico.  
 <img src="images/zadig-list-all-devices.png" width="200px">
 <img src="images/zadig-install-driver.png" width="200px">  
@@ -127,7 +140,8 @@ Then configure check, configure and test your board on the [USBSID](https://usbs
 <img src="images/usbsid-config-checkversion.png" width="200px">  
 
 # Firmware
-See the [firmware changelog](CHANGELOG.md) for more information on what's changed and previous releases.
+See the [firmware changelog](CHANGELOG.md) for more information on what's changed and previous releases.  
+Also see the [Firmware manual](doc/USBSID-Pico-firmware-manual.adoc) for more information on how to set up your board!  
 ### Firmware features
 The firmware is still in development so features might change, be added or removed.
 - By default both sockets are enabled and the configuration is set to 2 SID's.
@@ -156,12 +170,6 @@ The firmware is still in development so features might change, be added or remov
 ### Building
 You can build the firmware using the Pico SDK 2.1.1 and the included TinyUSB. Be sure to clone the SDK with `--recurse-submodules`.  
 After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py PICO_PLATFORM` where PICO_PLATFORM is either rp2040 or rp2350 depending on the board you are using.
-### Firmware types
-Moved into [USBSID-Pico firmware manual](doc/USBSID-Pico-firmware-manual.adoc#firmware-types)  
-Also available as PDF download [USBSID-Pico firmware manual PDF download](doc/USBSID-Pico-firmware-manual.pdf) 
-### How to flash
-Moved into [USBSID-Pico firmware manual](doc/USBSID-Pico-firmware-manual.adoc#how-to-flash-your-pico)  
-Also available as PDF download [USBSID-Pico firmware manual PDF download](doc/USBSID-Pico-firmware-manual.pdf) 
 
 # Hardware
 ## Where to buy
@@ -260,6 +268,7 @@ Videos and/or audio links are subject to be changed or updated at any time.
 
 Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-29KQ), [other socials](https://github.com/LouDnl) or the [SHOWCASE](SHOWCASE.md) page to see more examples.
 ### Software
+Also see the [Software manual](doc/USBSID-Pico-software-manual.adoc) for information on how to use supported software!  
 _Available examples with USBSID-Pico support:_<br>
 [**USBSID-Pico driver**](https://github.com/LouDnl/USBSID-Pico-driver) repo is available @ https://github.com/LouDnl/USBSID-Pico-driver<br>
 [**HardSID USB / SidBlaster USB**](examples/hardsid-sidblaster) emulation driver example<br>
