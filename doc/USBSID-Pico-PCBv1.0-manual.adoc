@@ -6,9 +6,9 @@
 :toc:
 :toc-placement!:
 
-toc::[]
-
 Author: {author} - generated on {revdate}
+
+toc::[]
 [%always]
 <<<
 
@@ -105,19 +105,13 @@ Ground and S1 as labeled
 image:images/v1.0/reset-button-smaller.png[title=Reset button]
 
 == Disclaimer
-+++
-include::disclaimer.html[]
-+++
+include::disclaimer.adoc[]
 
 == License
 === Software License ~ GNUv2
-+++
-include::license-software.html[]
-+++
+include::license-software.adoc[]
 
 === Hardware License ~ Creative Commons
-+++
-include::license-hardware.html[]
-+++
+include::license-hardware.adoc[]
 
 Author: {author} - generated on {revdate}
