@@ -1,0 +1,3 @@
+All code written by me in this repository is licensed under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+Any code in this repository that is not written by me automatically falls under the licensing conditions by the authors of said code as mentioned in the source code header.
+For for more information about this license please read the LICENSE document in the root of the USBSID-Pico repository.

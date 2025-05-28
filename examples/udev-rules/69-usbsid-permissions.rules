@@ -1,3 +1,6 @@
+# Copy to /etc/udev/rules.d
+# Reload udev with:
+# sudo udevadm control --reload-rules && sudo udevadm trigger
 ACTION=="*", KERNEL=="ttyUSB[0-9]*",MODE="0777", GROUP:="plugdev", TAG+="uaccess"
 ACTION=="*", KERNEL=="ttyACM[0-9]*",MODE="0777", GROUP:="plugdev", TAG+="uaccess"
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="cafe", ATTRS{idProduct}=="4011", MODE="0777"

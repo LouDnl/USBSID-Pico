@@ -92,7 +92,8 @@ typedef struct Config {
   uint32_t magic;
   int default_config;
   uint32_t clock_rate;         /* clock speed identifier */
-  uint32_t raster_rate;        /* internal use raster rate identifier ~ not configurable */
+  uint16_t refresh_rate;       /* refresh rate identifier based on clockspeed ~ not configurable */
+  uint16_t raster_rate;        /* raster rate identifier based on clockspeed ~ not configurable */
   struct
   {
     uint8_t chiptype;          /* 0 = real, 1 = clone, 2 = unknown */
@@ -197,6 +198,8 @@ enum
   SET_AUDIO        = 0x89,  /* Set mono <-> stereo (v1.3+ boards only) */
 
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
+  TEST_FN2         = 0x9A,  /* TODO: Remove before v1 release */
+  TEST_FN3         = 0x9B,  /* TODO: Remove before v1 release */
 };
 
 /* SID detection routines

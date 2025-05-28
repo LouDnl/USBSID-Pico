@@ -1,0 +1,334 @@
+name: USBSID-Pico Tagged Build
+
+env:
+  BUILD_THREADS: 4
+  BUILD_TYPE: Release
+  # Pico-SDK version
+  PICO_SDK_REF: 2.1.1
+  PICO_EXTRAS_REF: sdk-2.1.1
+  PICOTOOL_REF: 2.1.1
+
+on:
+  push:
+    tags:
+      - "d[0-9a-z]+" # any tag name that looks like a a date 20250101 etc.
+    branches: [master, dev]
+  # Allows you to run this workflow manually from the Actions tab when needed
+  workflow_dispatch:
+
+jobs:
+  cleanup_previous_builds: # Delete unfinished draft prereleases, and prereleases older than 30 days (but keep at least 10)
+    name: Cleanup Previous Builds
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/d')
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          retries: 3
+          script: |
+            // Get a list of all releases, sorted newest first
+            let releases =
+              (await github.paginate(
+                github.rest.repos.listReleases,
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo
+                }))
+                .sort((a,b) => b.created_at.localeCompare(a.created_at));
+
+            let releaseCount = 0;
+            let releasesToDelete = [];
+
+            // Initiate deletion of draft prereleases
+            for (const release of releases)
+            {
+              // Only cleanup prereleases
+              if (!release.prerelease)
+                continue;
+
+              // Failed builds leave drafts - delete them
+              if (release.draft)
+              {
+                console.log("Will delete draft prerelease: " + release.tag_name);
+                releasesToDelete.push(release.id);
+                continue;
+              }
+
+              // Keep at least 10, no matter how old
+              if (++releaseCount <= 10)
+                continue;
+
+              // We have more than 10 releases - delete those more than 30 days old
+              let daysAgo = Math.floor((new Date() - Date.parse(release.created_at)) / 1000 / 60 / 60 / 24);
+
+              if (daysAgo <= 30)
+                continue;
+
+              console.log("Will delete old prerelease: " + release.tag_name);
+              releasesToDelete.push(release.id);
+            }
+
+            if (releasesToDelete.length)
+            {
+              let promises = [];
+
+              for (const id of releasesToDelete)
+              {
+                promises.push(
+                  github.rest.repos.deleteRelease(
+                    {
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      release_id: id
+                    }));
+              }
+
+              console.log("Waiting for deletions to complete");
+              await Promise.all(promises);
+            }
+
+            console.log("Done.");
+
+  create_release:
+    name: Create Draft Release
+    needs: cleanup_previous_builds
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/d')
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_id: ${{ steps.create_release.outputs.release_id }}
+    steps:
+      - uses: actions/github-script@v7
+        id: create_release
+        env:
+          TAG_NAME: ${{ github.ref }}
+          RELEASE_NAME: ${{ github.ref }} snapshot
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          retries: 3
+          script: |
+            const { TAG_NAME, RELEASE_NAME } = process.env;
+            const createReleaseResponse = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: TAG_NAME.replace('refs/tags/', ''),
+              name: RELEASE_NAME.replace('refs/tags/', ''),
+              draft: true,
+              prerelease: true,
+              target_commitish: context.sha
+            });
+            core.setOutput('release_id', createReleaseResponse.data.id);
+            core.setOutput('upload_url', createReleaseResponse.data.upload_url);
+
+  build:
+    name: Build
+    needs: create_release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/d')
+    strategy:
+      matrix:
+        include:
+          - {
+              buildname: Pico,
+              directory: pico,
+              pico_board: pico,
+              pico_platform: rp2040,
+            }
+          - {
+              buildname: Pico_W,
+              directory: picow,
+              pico_board: pico_w,
+              pico_platform: rp2040,
+            }
+          - {
+              buildname: Pico2,
+              directory: pico2,
+              pico_board: pico2,
+              pico_platform: rp2350-arm-s,
+            }
+          - {
+              buildname: Pico2_W,
+              directory: pico2w,
+              pico_board: pico2_w,
+              pico_platform: rp2350-arm-s,
+            }
+      fail-fast: false
+    steps:
+      - name: 🗒️ Set tag output
+        id: vars
+        run: |
+          echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+
+      - name: 🗒️ Check tag output
+        env:
+          RELEASE_VERSION: ${{ steps.vars.outputs.tag }}
+        run: |
+          echo $RELEASE_VERSION
+          echo ${{ steps.vars.outputs.tag }}
+      - name: 🛠️ Arm GNU Toolchain (arm-none-eabi-gcc)
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
+
+      - name: Install Act dependencies
+        if: ${{ env.ACT }}
+        run: |
+          apt-get update && apt-get install sudo -y
+
+      - name: Install dependencies
+        if: ${{ env.ACT }}
+        run: |
+          sudo apt-get update && sudo apt-get install curl build-essential cmake -y
+
+      - name: 🗒️ Check GCC Version
+        id: compiler-version
+        run: |
+          arm-none-eabi-gcc --version
+          ver=$(arm-none-eabi-gcc --version | head -1)
+          echo "CC_VERSION=$ver" >> $GITHUB_OUTPUT
+
+      - name: 💽 Cache Pico-SDK
+        id: cache-pico-sdk
+        uses: actions/cache@v4
+        with:
+          path: pico-sdk
+          key: ${{runner.os}}-pico-sdk-${{env.PICO_SDK_REF}}
+
+      - name: 📇 Checkout Pico-SDK
+        if: ${{ steps.cache-pico-sdk.outputs.cache-hit != 'true' }}
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-sdk
+          ref: ${{env.PICO_SDK_REF}}
+          path: pico-sdk
+          submodules: recursive
+
+      - name: 🔖 Add PICO_SDK_PATH to Environment
+        run: |
+          echo "PICO_SDK_PATH=${{github.workspace}}/pico-sdk" >> $GITHUB_ENV
+          cd pico-sdk/lib/tinyusb
+          python3 tools/get_deps.py ${{matrix.pico_platform}}
+
+      - name: 💽 Cache Pico-Extras
+        id: cache-pico-extras
+        uses: actions/cache@v4
+        with:
+          path: pico-extras
+          key: ${{runner.os}}-pico-extras-${{env.PICO_EXTRAS_REF}}
+
+      - name: 📇 Checkout Pico-Extras
+        if: ${{steps.cache-pico-extras.outputs.cache-hit != 'true' }}
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-extras
+          ref: ${{env.PICO_EXTRAS_REF}}
+          path: pico-extras
+          submodules: recursive
+
+      - name: 🔖 Add PICO_EXTRAS_PATH to Environment
+        run: |
+          echo "PICO_EXTRAS_PATH=${{github.workspace}}/pico-extras" >> $GITHUB_ENV
+          ls pico-extras/external -la
+
+      - name: 💽 Cache picotool
+        id: cache-picotool
+        uses: actions/cache@v4
+        with:
+          path: picotool
+          key: ${{runner.os}}-picotool-${{env.PICOTOOL_REF}}
+
+      - name: 📇 Checkout picotool
+        if: ${{steps.cache-picotool.outputs.cache-hit != 'true' }}
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/picotool
+          ref: ${{env.PICOTOOL_REF}}
+          path: picotool-src
+          submodules: recursive
+
+      - name: 🏭 Build picotool
+        if: ${{steps.cache-picotool.outputs.cache-hit != 'true' }}
+        run: |
+          cmake -S picotool-src -B picotool-src/build -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/picotool -DPICOTOOL_FLAT_INSTALL=1
+          cd picotool-src/build
+          make -j ${{env.BUILD_THREADS}} install
+
+      - name: 📇 Checkout project
+        uses: actions/checkout@v4
+        with:
+          path: master
+
+      - name: 🏭 Create build directory
+        run: |
+          mkdir -p ${{github.workspace}}/master/build_${{matrix.directory}}
+
+      - name: 🏭 Setup CMAKE
+        run: |
+          unset PICO_PLATFORM
+          unset PICO_BOARD
+          cmake -S master -B ${{github.workspace}}/master/build_${{matrix.directory}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DPICO_PLATFORM=${{matrix.pico_platform}} -DPICO_BOARD=${{matrix.pico_board}} -Dpicotool_DIR=${{github.workspace}}/picotool/picotool $extra_arg
+
+      - name: 🏭 Build ${{matrix.buildname}}
+        run: |
+          cmake --build ${{github.workspace}}/master/build_${{matrix.directory}} --config ${{env.BUILD_TYPE}} -j ${{env.BUILD_THREADS}}
+
+      - name: List build files
+        run: |
+          ls ${{github.workspace}}/master/build_${{matrix.directory}}/*.uf2 -la
+
+      - name: 💾 Gather Artifact Files
+        working-directory: ${{github.workspace}}/master
+        run: |
+          mkdir dist
+          cp -av build_${{matrix.directory}}/*.uf2 dist/
+          zip -r usbsid${{matrix.pico_board}}-taggedbuild-${{ steps.vars.outputs.tag }}.zip dist/
+
+      - name: Get current branch
+        run: |
+          echo "BRANCHNAME=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_ENV
+
+      - name: Get current datetime
+        run: |
+          echo "DATETIME=$(date +'%Y%m%dT%H%M%S')" >> $GITHUB_ENV
+
+      - name: 💾 Upload Artifacts
+        id: upload_artifacts
+        uses: actions/github-script@v7
+        env:
+          UPLOAD_URL: ${{ needs.create_release.outputs.upload_url }}
+          ASSET_PATH: ${{github.workspace}}/master/usbsid${{matrix.pico_board}}-taggedbuild-${{github.run_number}}.zip
+          ASSET_NAME: usbsid${{matrix.pico_board}}-taggedbuild-${{github.run_number}}.zip
+          ASSET_CONTENT_TYPE: application/zip
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          retries: 3
+          script: |
+            const fs = require('fs');
+            const { UPLOAD_URL, ASSET_PATH, ASSET_NAME, ASSET_CONTENT_TYPE } = process.env;
+            const uploadAssetResponse = await github.rest.repos.uploadReleaseAsset({
+              url: UPLOAD_URL,
+              headers: {
+                'content-type': ASSET_CONTENT_TYPE,
+                'content-length': fs.statSync(ASSET_PATH).size
+              },
+              name: ASSET_NAME,
+              data: fs.readFileSync(ASSET_PATH)
+            });
+
+  publish_release:
+    name: Publish Release
+    needs: [create_release, build]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/d')
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          retries: 3
+          script: |
+            await github.rest.repos.updateRelease(
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: ${{ needs.create_release.outputs.release_id }},
+                draft: false
+              });

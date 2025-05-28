@@ -44,6 +44,7 @@
 
 /* Compile with:
  * gcc -g3 -L/usr/local/lib inih/ini.c cfg_usbsid.c -o cfg_usbsid $(pkg-config --libs --cflags libusb-1.0)
+ * gcc -g3 -L/usr/local/lib examples/config-tool/inih/ini.c examples/config-tool/cfg_usbsid.c -o examples/config-tool/cfg_usbsid $(pkg-config --libs --cflags libusb-1.0) -I./examples/config-tool/inih ; cp examples/config-tool/cfg_usbsid ~/.local/bin
  */
 
 /* ---------------------- */
@@ -173,7 +174,7 @@ static int import_ini(void* user, const char* section, const char* name, const c
     if (p != 666) ini_config->socketTwo.act_as_one = p;
   }
   if (MATCH("LED", "enabled")) {
-    p = value_position(value, enabled);
+    p = value_position(value, truefalse);
     if (p != 666) ini_config->LED.enabled = p;
   }
   if (MATCH("LED", "idle_breathe")) {
@@ -181,7 +182,7 @@ static int import_ini(void* user, const char* section, const char* name, const c
     if (p != 666) ini_config->LED.idle_breathe = p;
   }
   if (MATCH("RGBLED", "enabled")) {
-    p = value_position(value, enabled);
+    p = value_position(value, truefalse);
     if (p != 666) ini_config->RGBLED.enabled = p;
   }
   if (MATCH("RGBLED", "idle_breathe")) {
@@ -197,7 +198,7 @@ static int import_ini(void* user, const char* section, const char* name, const c
     if (p >= 1 && p <= 4) ini_config->RGBLED.sid_to_use = p;
   }
   if (MATCH("FMOPL", "enabled")) {
-    p = value_position(value, enabled);
+    p = value_position(value, truefalse);
     if (p != 666) ini_config->FMOpl.enabled = p;
   }
   if (MATCH("Audioswitch", "set_to")) {
@@ -339,7 +340,7 @@ int usbsid_init(void)
 
     rc = libusb_control_transfer(devh, 0x21, 0x22, ACM_CTRL_DTR | ACM_CTRL_RTS, 0, NULL, 0, 0);
     if (rc < 0) {
-        fprintf(stderr, "?Error configuring line state during control transfer: %d, %s: %s\n",
+        fprintf(stderr, "Error configuring line state during control transfer: %d, %s: %s\n",
             rc, libusb_error_name(rc), libusb_strerror(rc));
         goto out;
     }
@@ -380,7 +381,6 @@ void write_chars(unsigned char * data, int size)
   if (libusb_bulk_transfer(devh, ep_out_addr, data, size, &actual_length, 0) < 0) {
     fprintf(stderr, "Error while sending char\n");
   }
-  //printf("[W]$%02X:%02X\n", data[1], data[2]);
 }
 
 int read_chars(unsigned char * data, int size)
@@ -733,14 +733,30 @@ void print_config(void)
     return;
 }
 
-void sid_autodetect(void)
+void sid_autodetect(uint8_t detection_routine)
 {
   config_buffer[1] = 0x51;
+  config_buffer[2] = detection_routine;
   write_chars(config_buffer, count_of(config_buffer));
 
   int len;
   len = read_chars(read_data_uber, count_of(read_data_uber));
   //if (len == 0) len = read_chars(read_data_uber, count_of(read_data_uber));
+  if (debug == 1) printf("Read %d bytes of data, byte 0 = %02X\n", len, read_data_uber[0]);
+  memcpy(&config[0], &read_data_uber[0], count_of(read_data_uber));
+
+  if (debug == 1) print_cfg_buffer(config, count_of(config));
+  set_cfg_from_buffer(config, count_of(config));
+  return;
+}
+
+void clone_autodetect(void)
+{
+  config_buffer[1] = 0x5A;
+  write_chars(config_buffer, count_of(config_buffer));
+
+  int len;
+  len = read_chars(read_data_uber, count_of(read_data_uber));
   if (debug == 1) printf("Read %d bytes of data, byte 0 = %02X\n", len, read_data_uber[0]);
   memcpy(&config[0], &read_data_uber[0], count_of(read_data_uber));
 
@@ -1373,6 +1389,10 @@ void print_help(void)
   printf("  -boot,    --bootloader        : Reboot USBSID-Pico to the bootloader for firmware upload\n");
   printf("  -skpico   --sidkickpico       : Enter SIDKICK-pico config mode\n");
   printf("  -config   --config-command    : Send custom config command\n");
+  printf("--[TEST SIDS]--------------------------------------------------------------------------------------------------------\n");
+  printf("  -sidtest N                    : Run SID test routine on available SID's\n");
+  printf("                                  0: All, 1: 0x00, 2: 0x20, 3: 0x40, 4: 0x60\n");
+  printf("  -stoptests                    : Interrupt and stop any running tests\n");
   printf("--[DEFAULTS]---------------------------------------------------------------------------------------------------------\n");
   printf("  -defaults,--config-defaults   : Reset USBSID-Pico config to defaults\n");
   printf("--[PRESETS]---------------------------------------------------------------------------------------------------------\n");
@@ -1391,7 +1411,12 @@ void print_help(void)
   printf("  -rc,      --read-clock-speed  : Read and print USBSID-Pico SID clock speed\n");
   printf("  -rs,      --read-sock-config  : Read and print USBSID-Pico socket config settings only\n");
   printf("  -rn,      --read-num-sids     : Read and print USBSID-Pico configured number of SID's only\n");
-  printf("  -detect,  --detect-sid-types  : Send SID autodetect command to device, returns the config as with '-r' afterwards\n");
+  printf("  -dsid N,  --detect-sid-types N: Send SID autodetect command to device, returns the config as with '-r' afterwards\n");
+  printf("                                  0: Cycle exact detection routine 1 (Real SIDs)\n");
+  printf("                                  1: Cycle exact detection routine 2 (Clones & Real SIDs)\n");
+  printf("                                  2: Detection routine (Clones)\n");
+  printf("                                  3: Unsafe detection routine\n");
+  printf("  -dclone,  --detect-clone-types: Send clone autodetect command to device, returns the config as with '-r' afterwards\n");
   printf("  -w,       --write-config      : Write single config item to USBSID-Pico (will read the full config first!)\n");
   printf("  -a,       --apply-config      : Apply the current config settings (from USBSID-Pico memory) that you changed with '-w'\n");
   printf("  -s,       --save-config       : Send the save config command to USBSID-Pico\n");
@@ -1469,6 +1494,35 @@ void config_usbsidpico(int argc, char **argv)
     if (!strcmp(argv[param_count], "-debug") || !strcmp(argv[param_count], "--debug")) {
       debug = 1;
       continue;
+    }
+
+    if (!strcmp(argv[param_count], "-sidtest")) {
+      int testno = 0;
+      param_count++;
+      if (param_count == argc) {
+        printf("No sidnumber given, testing all available SID's!\n");
+      } else {
+        testno = atoi(argv[param_count++]);
+      }
+      const char * sidaddr[] = {"0x00","0x20","0x40","0x60"};
+      printf("Starting SID test for %s%s\n", (testno == 0 ? "all SID's" : "SID at address: "), (testno == 0 ? " " : sidaddr[testno-1]));
+      if (testno == 0)
+        write_config_command(0x52,0,0,0,0);
+      if (testno == 1)
+        write_config_command(0x53,0,0,0,0);
+      if (testno == 2)
+        write_config_command(0x54,0,0,0,0);
+      if (testno == 3)
+        write_config_command(0x55,0,0,0,0);
+      if (testno == 4)
+        write_config_command(0x56,0,0,0,0);
+      return;
+    }
+
+    if (!strcmp(argv[param_count], "-stoptests")) {
+      printf("Sending stop SID test command to USBSID-Pico\n");
+      write_config_command(0x59,0,0,0,0);
+      return;
     }
 
     if (!strcmp(argv[param_count], "-defaults") || !strcmp(argv[param_count], "--config-defaults")) {
@@ -1596,20 +1650,105 @@ void config_usbsidpico(int argc, char **argv)
       break;
     }
     if (!strcmp(argv[param_count], "-config") || !strcmp(argv[param_count], "--config-command")) {
-      printf("Requires 5 positional config arguments!\n");
-      param_count++;
-      uint8_t cmd = strtol(argv[param_count++], NULL, 16);
-      uint8_t a = strtol(argv[param_count++], NULL, 16);
-      uint8_t b = strtol(argv[param_count++], NULL, 16);
-      uint8_t c = strtol(argv[param_count++], NULL, 16);
-      uint8_t d = strtol(argv[param_count++], NULL, 16);
+      printf("-config requires 5 additional config commands and cannot run with any other option!\n");
+      if (argc < 6) printf("You supplied %d command line arguments\n", argc);
+      param_count++;  /* skip usbsid executable and -config self */
+      uint8_t cmd = 0, a = 0, b = 0, c = 0, d = 0;
+      if (argc <= 2) {
+        printf("Unable to continue without required arguments, exiting...\n");
+        exit(0);
+      }
+      if (argc >= 3)  cmd = strtol(argv[param_count++], NULL, 16);
+      if (argc >= 4)  a = strtol(argv[param_count++], NULL, 16);
+      if (argc >= 5)  b = strtol(argv[param_count++], NULL, 16);
+      if (argc >= 6)  c = strtol(argv[param_count++], NULL, 16);
+      if (argc >= 7)  d = strtol(argv[param_count++], NULL, 16);
       printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", cmd, a, b, c, d);
       write_config_command(cmd, a, b, c, d);
       break;
     }
-    if (!strcmp(argv[param_count], "-detect") || !strcmp(argv[param_count], "--detect-sid-types")) {
-      printf("Sending autodetect SID's command to USBSID-Pico and reading config\n");
-      sid_autodetect();
+    if (!strcmp(argv[param_count], "-command") || !strcmp(argv[param_count], "--arbitrary-command")) {
+      param_count++;  /* skip usbsid executable and -config self */
+      uint8_t cmd = 0, a = 0, b = 0, c = 0, d = 0, e = 0;
+      if (argc <= 2) {
+        printf("Unable to continue without required arguments, exiting...\n");
+        exit(0);
+      }
+      printf("Got %d args: ", argc);
+      if (argc >= 3) {
+        cmd = strtol(argv[param_count++], NULL, 16);
+        printf("%02x ", cmd);
+      }
+      if (argc >= 4) {
+        a = strtol(argv[param_count++], NULL, 16);
+        printf("%02x ", a);
+      }
+      if (argc >= 5) {
+        b = strtol(argv[param_count++], NULL, 16);
+        printf("%02x ",b);
+      }
+      if (argc >= 6) {
+        c = strtol(argv[param_count++], NULL, 16);
+        printf("%02x ", c);
+      }
+      if (argc >= 7) {
+        d = strtol(argv[param_count++], NULL, 16);
+        printf("%02x ", d);
+      }
+      if (argc >= 8) {
+        e = strtol(argv[param_count++], NULL, 16);
+        printf("%02x ", e);
+      }
+      printf("\n");
+
+      if (cmd <= 0xF0) {
+        printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", cmd, a, b, c, d);
+        uint8_t buf[5] = { cmd, a, b, c, d };
+        write_chars(buf, count_of(buf));
+        if ((cmd & 0xF0) == 0x40 || cmd == 0xC4) {
+          int len;
+          memset(read_data, 0, count_of(read_data));
+          len = read_chars(read_data, count_of(read_data));
+          printf("[R %u] %02X\n", len, read_data[0]);
+        }
+      } else if (cmd == 0xFF) {
+        printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", a, b, c, d, e);
+        uint8_t buf[5] = { a, b, c, d, e };
+        for (int i = 0; i < 50; i++)
+          write_chars(buf, count_of(buf));
+      } else if (cmd == 0xFE) {
+        printf("Sending: 0x%02x: 0x%02x (0x%02x & 0x%02x) * 31\n", 0x80, a, b, c);
+        uint8_t temp1[2] = {a, b};
+        uint8_t temp2[2] = {a, c};
+        uint8_t buf[63];
+        buf[0] = (0x0 | 63);
+        printf("[BUFFER] ");
+        for (int i = 1; i < 63; i+=4) {
+          memcpy(buf+i, temp1, 2);
+          memcpy(buf+(i+2), temp2, 2);
+          printf("$%02X:$%02X $%02X:$%02X ", buf[i], buf[i+1], buf[i+2], buf[i+3]);
+        }
+        printf("\n");
+        write_chars(buf, count_of(buf));
+      }
+
+      break;
+    }
+    if (!strcmp(argv[param_count], "-dsid") || !strcmp(argv[param_count], "--detect-sid-types")) {
+      int detection_routine = 0;
+      if (argc != param_count+1) {
+        param_count++;
+        detection_routine = atoi(argv[param_count++]);
+      }
+      printf("Sending autodetect SID's command with routine '%u' to USBSID-Pico and reading config\n", detection_routine);
+      sid_autodetect(detection_routine);
+      printf("Printing config\n");
+      print_config();
+      break;
+    }
+    if (!strcmp(argv[param_count], "-dclone") || !strcmp(argv[param_count], "--detect-clone-types")) {
+      printf("Sending autodetect clone command to USBSID-Pico and reading config\n");
+      clone_autodetect();
       printf("Printing config\n");
       print_config();
       break;

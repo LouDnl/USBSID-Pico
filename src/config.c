@@ -133,6 +133,7 @@ const char *mono_stereo[2] = { "Mono", "Stereo" };
   .default_config = 1, \
   .external_clock = false, \
   .clock_rate = DEFAULT, \
+  .refresh_rate = HZ_DEFAULT, \
   .raster_rate = R_DEFAULT, \
   .lock_clockrate = false, \
   .stereo_en = false, \
@@ -363,7 +364,7 @@ void read_socket_config(Config* config)
 
   socket_config_array[8] = (int)config->socketTwo.act_as_one;
 
-  socket_config_array[9] = 0xFF; // Terminator byte
+  socket_config_array[9] = 0xFF;  /* Terminator byte */
 
   return;
 }
@@ -497,10 +498,10 @@ void handle_config_request(uint8_t * buffer)
     case READ_SOCKETCFG:
       CFG("[CMD] READ_SOCKETCFG\n");
       read_socket_config(&usbsid_config);
-      print_cfg(socket_config_array, count_of(socket_config_array));
+      print_cfg(socket_config_array, 10);
       memset(write_buffer_p, 0, 64);
-      memcpy(write_buffer_p, socket_config_array, count_of(socket_config_array));
-      write_back_data(64);
+      memcpy(write_buffer_p, socket_config_array, 10);
+      write_back_data(10);
       break;
     case READ_NUMSIDS:
       CFG("[CMD] READ_NUMSIDS\n");
@@ -534,6 +535,7 @@ void handle_config_request(uint8_t * buffer)
         case  0:  /* clock_rate */
           /* will always be available to change the setting since it doesn't apply it */
           usbsid_config.clock_rate = clockrates[(int)buffer[2]];
+          usbsid_config.refresh_rate = refreshrates[(int)buffer[2]]; /* Experimental */
           usbsid_config.raster_rate = rasterrates[(int)buffer[2]]; /* Experimental */
           if (buffer[3] == 0 || buffer[3] == 1) { /* Verify correct data */
             usbsid_config.lock_clockrate = (bool)buffer[3];
@@ -881,10 +883,7 @@ void handle_config_request(uint8_t * buffer)
       };
       break;
     /* ISSUE: This must be run on Core 1 so we can actually stop it! */
-    case TEST_SID1:
-    case TEST_SID2:
-    case TEST_SID3:
-    case TEST_SID4:
+    case TEST_SID1 ... TEST_SID4:
       int s = (buffer[0] == TEST_SID1 ? 0
         : buffer[0] == TEST_SID2 ? 1
         : buffer[0] == TEST_SID3 ? 2
@@ -985,11 +984,43 @@ void handle_config_request(uint8_t * buffer)
       read_config(&test_config);
       print_cfg(config_array, count_of(config_array));
       CFG("[TEST_CONFIG_END]\n");
-
       // CFG("[USBSID_SID_MEMORY]\n");
       // print_cfg(sid_memory, (numsids * 0x20));
-      // uint8_t st = detect_sid_model(buffer[1]);
-      // CFG("[TEST FOUND] %u\n", st);
+    case TEST_FN2:
+      uint8_t st = 0xFF;
+      if (buffer[1] < 4) {
+        st = sid_detection[buffer[1]](buffer[2]);
+        CFG("[TEST FOUND] %u\n", st);
+      }
+      if (buffer[1] == 4) {
+        st = cycled_read_operation(buffer[2], buffer[3]);
+        CFG("[TEST FOUND] %02X\n", st);
+      }
+      if (buffer[1] == 5) {
+        uint16_t dcyc = 1000;
+        if (buffer[2] != 0 || buffer[3] != 0)
+          dcyc = (buffer[2] << 8) | buffer[3];
+        CFG("[CFG] DELAY TESTING FOR %ld US/CYCLES\n", dcyc);
+        uint64_t test_before = to_us_since_boot(get_absolute_time());
+        sleep_ms(dcyc/1000);
+        uint64_t test_after = to_us_since_boot(get_absolute_time());
+        CFG("[CFG] SLEEP_MS before: %lld after: %lld difference %lld\n", test_before, test_after, (test_after - test_before));
+        test_before = to_us_since_boot(get_absolute_time());
+        uint16_t waited_cycles = cycled_delay_operation(dcyc);
+        test_after = to_us_since_boot(get_absolute_time());
+        CFG("[CFG] DELAY_CYCLES %u = %.4fµs, ACTUAL: %uµs (including printf delay)\n", waited_cycles, (float)(waited_cycles * sid_us), (test_after - test_before));
+      }
+      if (buffer[1] == 6) {
+        detect_fmopl(buffer[2]);
+      }
+      break;
+    case TEST_FN3:
+      CFG("[SID MEMORY]\n");
+      for (uint i = 0; i < (4*0x20); i++) {
+        if (i!=0 && i%0x20 == 0) { CFG("\n");};
+        CFG("$%02X ", sid_memory[i]);
+      }
+      CFG("\n");
       break;
     default:
       break;
@@ -1425,6 +1456,7 @@ void apply_clockrate(int n_clock, bool suspend_sids)
         }
         CFG("[CONFIG] [CLOCK FROM]%d [CLOCK TO]%d\n", usbsid_config.clock_rate, clockrates[n_clock]);
         usbsid_config.clock_rate = clockrates[n_clock];
+        usbsid_config.refresh_rate = refreshrates[n_clock]; /* Experimental */
         usbsid_config.raster_rate = rasterrates[n_clock]; /* Experimental */
         /* Cycled write buffer vars */
         sid_hz = usbsid_config.clock_rate;
@@ -1470,6 +1502,7 @@ void verify_clockrate(void)
       default:
         CFG("[CONFIG] [CLOCK ERROR] Detected unconventional clockrate (%ld) error in config, revert to default\n", usbsid_config.clock_rate);
         usbsid_config.clock_rate = clockrates[0];
+        usbsid_config.refresh_rate = refreshrates[0]; /* Experimental */
         usbsid_config.raster_rate = rasterrates[0]; /* Experimental */
         save_config(&usbsid_config);
         load_config(&usbsid_config);

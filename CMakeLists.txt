@@ -29,7 +29,7 @@ cmake_minimum_required(VERSION 3.17)
 set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
-set(MAGIC_SMOKE "20250427")
+string(TIMESTAMP MAGIC_SMOKE "%Y%m%d")
 set(PROJECT_VERSION "0.4.1-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
 
 ### Want a cookie?
@@ -252,6 +252,7 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/usbsid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/config.c
   ${CMAKE_CURRENT_LIST_DIR}/src/gpio.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/buffer.c
   ${CMAKE_CURRENT_LIST_DIR}/src/vu.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi.c
   # ${CMAKE_CURRENT_LIST_DIR}/src/midi_patches.c

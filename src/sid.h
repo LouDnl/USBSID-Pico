@@ -34,6 +34,7 @@
 
 /* Default includes */
 #include <stdint.h>
+#include "pico/util/queue.h"
 
 /* Queues */
 typedef struct {
@@ -43,6 +44,13 @@ typedef struct {
   char t;
   char wf;
 } sidtest_queue_entry_t;
+
+/* Buffer queue */
+typedef struct {
+    uint8_t reg;
+    uint8_t val;
+    uint8_t cycles;
+} buffer_queue_entry_t;
 
 
 /* Rasterrates (cycles) in microseconds
@@ -104,8 +112,17 @@ static const enum config_clockrates clockrates[] = { DEFAULT, PAL, NTSC, DREAN, 
 typedef enum {
   HZ_DEFAULT = 20000,  /* 50Hz ~ 20000 == 20us */
   HZ_50      = 19950,  /* 50Hz ~ 20000 == 20us / 50.125Hz ~ 19.950124688279us exact */
-  HZ_60      = 16715   /* 60Hz ~ 16667 == 16.67us / 59.826Hz ~ 16.715140574332 exact */
+  HZ_60      = 16715,  /* 60Hz ~ 16667 == 16.67us / 59.826Hz ~ 16.715140574332 exact */
 } hertz_values;
+
+enum refresh_rates
+{
+  HZDFLT = HZ_DEFAULT,
+  HZ50   = HZ_50,
+  HZ60   = HZ_60,
+};
+
+static const enum refresh_rates refreshrates[]  = { HZDFLT, HZ50, HZ60, HZ60, HZ60 };
 
 /* Rasterrates (cycles) in microseconds */
 enum raster_rates
