@@ -1,7 +1,7 @@
 ![USBSID-Pico](images/pcbv1.3.jpg)<br>
 ![USBSID-Pico](images/usbsid.png)![LouD](images/loud.png)
 # USBSID-Pico
-USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board for interfacing one or two MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer, phone, ASID supporting player or USB midi controller.  
+USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board for interfacing one or two MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer, phone, ASID supporting player or USB midi controller.  
 
 * [Features](#features)
 * [Questions & Support](#questions-and-support)
@@ -10,11 +10,13 @@ USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board for
   * [Firmware versions](#firmware-versions)
   * [How to flash new firmware](#how-to-flash)
   * [Known issues](#known-issues)
-* [Important PCB information](#important-pcb-information)
 * [Hardware](#hardware)
+  * [Important PCB information](#important-pcb-information)
   * [Where to buy](#where-to-buy)
   * [Cases](#cases)
   * [Schematic and BOM](#schematic-and-bom)
+  * [PCB Features](#pcb-features)
+  * [PCB Development](#pcb-development)
 * [PCB in action](#usbsid-pico-in-action)
 * [Software examples](#software)
   * [Pre compiled Vice binaries](#precompiled-vice-binaries)
@@ -24,7 +26,6 @@ USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board for
 * [Changelog](CHANGELOG.md)
 
 # Features
-Information about and explanation of features are _Coming Soon™_  
 ![USBSID-Pico](images/pcbv0.2.png)
 #### SID Playing
 USBSID-Pico supports various ways of playing SID files.  
@@ -34,7 +35,7 @@ by selecting `ASID (MIDI)` as player in the pulldown menu.
 Out-of-the box playing is also supported by using [C64jukebox by Kenchis](https://haendel.ddns.net:8443/static/c64jukebox.vue), note that this is still in BETA.  
 [SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux & Windows with up to 4 SIDs supported (Windows version is buggy).  
 Unofficial support is added to a fork of [Vice](https://github.com/LouDnl/Vice-USBSID), up to 3 SIDs are supported in vsid and up to 4 in x64sc.  
-Unofficial support is added to a fork of [sidplayfp]() which requires a fork of [libsidplayfp]().  
+Unofficial support is added to a fork of [sidplayfp](https://github.com/LouDnl/sidplayfp-usbsid) which requires a fork of [libsidplayfp](https://github.com/LouDnl/libsidplayfp-usbsid).  
 Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouDnl/RetroDebugger), up to 4 SIDs are supported.
 ##### Amiga
 [erique](https://github.com/erique) and [koobo](https://github.com/koobo) have added support to [playsid](https://github.com/erique/playsid.library)
@@ -84,8 +85,9 @@ While in development any mentioned features, options, etc. are subject to change
 [H]: https://github.com/LouDnl/USBSID-Pico/discussions
 [I]: https://github.com/LouDnl/USBSID-Pico/blob/master/LICENSE
 [J]: https://github.com/LouDnl/USBSID-Pico
+
 ### Test and config your board
-You can configurate your board by using the commandline [config-tool](examples/config-tool) [binary](examples/config-tool/cfg_usbsid) (Linux only at the moment) provided in examples  
+You can configurate your board by using the commandline [config-tool](examples/config-tool) [binary](examples/config-tool/cfg_usbsid) (Linux only at the moment) provided in examples or use the web configurations, see below.  
 
 You can test your board with WebUSB and ASID here: [USBSID](https://usbsid.loudai.nl/?player=webusb).  
 If needed you can change your USBSID configuration after selecting WebUSB and clicking on `Open config`.  
@@ -100,17 +102,18 @@ _In development_
 Linux: Vice, RetroDebugger, SidBerry, SidplayFp, JSidplay2, USB Midi, ASID (in webbrowser) SID Play  
 Windows: Vice, SidBerry, USB Midi, ASID (in webbrowser) SID Play  
 Android: USB Midi, ASID (in webbrowser) SID Play
+Amiga: PlaySID library
 
 ### Linux Udev rules
 In the [examples/udev](repo/examples/udev-rules/69-usbsid-permissions.rules) directory you can find the udev rules that I use on Linux. This purely an example file that you can use and change to your own needs.  
 Steps required for this to work
-```bash
+```shell
   # Check if you are in the plugdev group
   groups  # should show the plugdev group
   # Copy the udev ules file to the correct directory
   sudo cp 69-usbsid-permissions.rules /etc/udev/rules.d
   # Now reload the udev rules
-  udevadm control --reload-rules && udevadm trigger
+  sudo udevadm control --reload-rules && sudo udevadm trigger
   # Not working? Try reloading the service
   sudo systemctl restart udev
 ```
@@ -127,7 +130,8 @@ Then configure check, configure and test your board on the [USBSID](https://usbs
 See the [firmware changelog](CHANGELOG.md) for more information on what's changed and previous releases.
 ### Firmware versions
 Check your PCB revision, this is under the MOS logo and next to __USBSID-Pico__ on your PCB.  
-Firmware filenames containing `v1.0` are for PCB revision __v1.0__ and filenames containing `v1.3` are for PCB revision __v1.3__. Don't worry if you use the incorrect version, this causes no harm.  
+Firmware filenames containing `v1.0` are for PCB revision __v1.0__ and filenames containing `v1.3` are for PCB revision __v1.3__.  
+Don't worry if you use the incorrect version, this causes no harm.  
 <sub>(The X.X in each filename equals for the PCB revision)</sub>  
 
 `usbsidpico-v1.X.uf2` for Pico1 regular green rp2040 Pico boards.  
@@ -135,7 +139,7 @@ Firmware filenames containing `v1.0` are for PCB revision __v1.0__ and filenames
 `usbsidpico_w-v1.X.uf2` for PicoW regular green rp2040 PicoW boards.  
 `usbsidpico2-v1.X.uf2` for Pico2 regular green rp2350 Pico2 boards.  
 `usbsidpico2_w-v1.X.uf2` for Pico2W regular green rp2350 Pico2W boards.  
-**WARNING!** Do _NOT_ use the RGB firmware for any of the (non black) rp2040 or rp2350 Pico boards that do not contain an RGB LED.
+**WARNING!** Do _NOT_ use the **RGB** firmware for any of the (non black) rp2040 or rp2350 Pico boards that do not contain an RGB LED.
 ### How to flash
 _<ins>**NOTE**: When flashing a new firmware version, all previously configured settings will be reset to default. Use the commandline configtool to save your current settings to a `ini` file if you want to save them!</ins>_  
 A Raspberry Pi Pico board is incredibly easy to flash, as it comes with a built in bootloader for flashing new firmwares in the `uf2` format. 
@@ -197,13 +201,14 @@ No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral
 #### Me (when I have boards)
 If available you can purchase (semi) assembled boards minus Pico from me - send me a message on any of my socials.  
 
-## Important PCB information
+## PCB usage information
+Your USBSID-Pico PCB has several hardware features like jumpers and pins that require your attention. Click on the viewing method
 ### PCB revision v1.0 manual
-- [View jumper information (online)](doc/USBSID-Pico-PCBv1.0-manual.adoc)
-- [View jumper information (PDF download)](doc/USBSID-Pico-PCBv1.0-manual.pdf)
+- [Open online PCB v1.0 manual](doc/USBSID-Pico-PCBv1.0-manual.adoc)
+- [Download PCB v1.0 PDF manual](doc/USBSID-Pico-PCBv1.0-manual.pdf)
 ### PCB revision v1.3 manual
-- [View jumper information (online)](doc/USBSID-Pico-PCBv1.3-manual.adoc)
-- [View jumper information (PDF download)](doc/USBSID-Pico-PCBv1.3-manual.pdf)
+- [Open online PCB v1.3 manual](doc/USBSID-Pico-PCBv1.3-manual.adoc)
+- [Download PCB v1.3 PDF manual](doc/USBSID-Pico-PCBv1.3-manual.pdf)
 
 ## Cases
 All USBSID-Pico community created cases are available in the [cases](cases/) directory, direct links below.  
@@ -216,11 +221,13 @@ _Cases for PCB revision v1.3:_
 
 ### Schematic and BOM
 If you want and are up to it you can solder your own PCB or create your own development board using the documents below
-#### v1.0
-[v1.0 schematic](resources/v1.0-schematic.pdf) and [v1.0 interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/resources/v1.0-ibom.html)
-#### v1.3
+#### revision v1.3
 [v1.3 schematic](resources/v1.3-schematic.pdf) and [v1.3 interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/resources/v1.3-ibom.html)
-### PCB Features ~ v1.3
+#### revision v1.0
+[v1.0 schematic](resources/v1.0-schematic.pdf) and [v1.0 interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/resources/v1.0-ibom.html)
+
+### PCB Features
+#### revision v1.3
 Includes all features from v1.0 except the audio jumper
 - IO controlled Stereo/Mono switch, can be set in config or toggled during play
 - Supports mixed voltage!
@@ -229,7 +236,7 @@ Includes all features from v1.0 except the audio jumper
 - SID socket placement is more spread out for:
   - easier filter capacitor access
   - optional ZIF sockets
-- 3 voltage regulators for filtered voltages to the SIDS
+- Three separate voltage regulators for filtered voltages to the SIDS
   - 1x fixed 5 volts and 2x 9 volts or 12 volts
 - Better IO port layout
   - Unused GPIO pins for optional expansion boards
@@ -238,7 +245,7 @@ Includes all features from v1.0 except the audio jumper
   - SID Ext in pins (requires closing the solder jumper on the bottom)
   - Ground pin
   - New soldermask art ;)
-### PCB Features ~ v1.0
+### revision v1.0
 - Supports all MOS SID chips e.g. MOS6581, MOS6582 & MOS8580
 - Supports SID chip replacements e.g. [SIDKick-Pico](https://github.com/frntc/SIDKick-pico), [SwinSID](https://github.com/dmantione/swinsid), ARMSID (untested), FPGASID (untested)
 - 1 MHz oscillator (external optional, enabled via jumper pad)
@@ -304,11 +311,12 @@ Some of those projects are - in no particular order:
 * [Cynthcart by PaulSlocum](https://github.com/PaulSlocum/cynthcart)
 
 # Disclaimer
-I do this stuff in my free time for my enjoyment. Since I like to share my joy in creating this with everyone I try my best to provide a working PCB and Firmware. I am in no way an electronics engineer and can give __no guarantee__ that this stuff does not break or damage your hardware, computer, phone, or whatever you try to hook it up to. Be sure to take great care when inserting any real MOS SID chips into the board. While everything has been tested with real chips, this is in no way a guarantee that nothing could go wrong. Use of this board and firmware at your own risk! I am in no way responsible for your damaged hardware. That being said, have fun!
+I do this stuff in my free time for my enjoyment. Since I like to share my joy in creating this with everyone I try my best to provide a working PCB and Firmware. I am in no way an electronics engineer and can give __no guarantees__ that this stuff does not break or damage your hardware, computer, phone, or whatever you try to hook it up to. Be sure to take great care when inserting any real MOS SID chips into the board. While everything has been tested with real chips, this is in no way a guarantee that nothing could go wrong. Use of this board and firmware at your own risk! I am in no way responsible for your damaged hardware. That being said, have fun!
 
 # License
 ### Software License ~ GNUv2
-All code written by me in this repository islicensed under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+All code written by me in this repository is licensed under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
 Any code in this repository that is not written by me automatically falls under the licensing conditions by the authors of said code as mentioned in the source code header.
+For for more information about this license please read the LICENSE document in the root of the USBSID-Pico repository.
 ### Hardware License ~ Creative Commons
 <p xmlns:cc="http://creativecommons.org/ns#" xmlns:dct="http://purl.org/dc/terms/"><a property="dct:title" rel="cc:attributionURL" href="https://github.com/LouDnl/USBSID-Pico">USBSID-Pico PCB</a> by <a rel="cc:attributionURL dct:creator" property="cc:attributionName" href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/?ref=chooser-v1" target="_blank" rel="license noopener noreferrer" style="display:inline-block;">Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International<img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/cc.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/by.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/nc.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/nd.svg?ref=chooser-v1" alt=""></a></p>

@@ -20,6 +20,33 @@ image::images/v1.3/v1.3b-top-marked.png[title=PCB top overview]
 [%always]
 <<<
 
+== RaspberryPi Pico placement orientation
+In the PCB overview image at the top of this document there are 2 markings that designate toward what direction the Pico boards needs to be placed. +
+The `USB` marking and arrow point in the direction towards where the Pico USB port needs to be. +
+The `Pin 1` marking and arrow points towards where pin 1 of the Pico board needs to be.
+
+== Optional Pico placements
+The USBSID-Pico v1.3 PCB has the option for you to solder your Pico directly to the PCB using the Pico's castelated edges. +
+This creates more space and can be useful if you want to use a SID clone like FPGASID in socket 1.
+[.float-group]
+--
+[.left]
+image:images/v1.3/not-used.png[Title=Not used,role=left]
+The Pico debug pins are not connected and not used, you do not have to solder these pins.
+--
+
+== Optional header placement
+If you would like to use a (semi)closed case like the spotUP case but want to keep access to the filter and power jumpers, +
+it's possible to solder the jumper headers on the bottom side of the PCB for easy access. +
+There is a bottom case STL available that has special openings for this like in the photo below. +
+image:images/v1.3/pcb-bottom.png[Title=Jumpers on the bottom,240]
+
+== SID placement orientation
+In the PCB overview image at the top of this document each SID socket has `Pin 1` marked with text and an arrow. +
+Please use your full attention when placing your SID chips on the board so they in the correct orientation. +
+_Incorrect placement orientation will result in frying your precious SID chip unicorn and creating a nice keychain!_
+*_I am not responsible for your broken SID chips!_*
+
 == 1. Socket SID type / voltage selection jumper
 image:images/v1.3/voltage-jumpers-1.jpg[Title=Voltage jumpers,240]
 image:images/v1.3/voltage-jumpers-2.jpg[Title=Voltage jumpers,240] +
@@ -136,5 +163,21 @@ Last but not least, the digital audio switch IC. Switching from mono (both SID c
 .Click image for larger view
 [#img-v13bottom,link=images/v1.3/v1.3b-bottom.png]
 image::images/v1.3/v1.3b-bottom.png[title=PCB bottom overview]
+
+== Disclaimer
++++
+include::disclaimer.html[]
++++
+
+== License
+=== Software License ~ GNUv2
++++
+include::license-software.html[]
++++
+
+=== Hardware License ~ Creative Commons
++++
+include::license-hardware.html[]
++++
 
 Author: {author} - generated on {revdate}
