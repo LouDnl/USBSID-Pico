@@ -7,8 +7,8 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
 * [Questions & Support](#questions-and-support)
 * [Project status](#project-status)
 * [Firmware](#firmware)
-  * [Firmware versions](#firmware-versions)
-  * [How to flash new firmware](#how-to-flash)
+  * [Firmware versions](doc/USBSID-Pico-firmware-manual.adoc)
+  * [How to flash new firmware](doc/USBSID-Pico-firmware-manual.adoc)
   * [Known issues](#known-issues)
 * [Hardware](#hardware)
   * [Important PCB information](#important-pcb-information)
@@ -128,36 +128,6 @@ Then configure check, configure and test your board on the [USBSID](https://usbs
 
 # Firmware
 See the [firmware changelog](CHANGELOG.md) for more information on what's changed and previous releases.
-### Firmware versions
-Check your PCB revision, this is under the MOS logo and next to __USBSID-Pico__ on your PCB.  
-Firmware filenames containing `v1.0` are for PCB revision __v1.0__ and filenames containing `v1.3` are for PCB revision __v1.3__.  
-Don't worry if you use the incorrect version, this causes no harm.  
-<sub>(The X.X in each filename equals for the PCB revision)</sub>  
-
-`usbsidpico-v1.X.uf2` for Pico1 regular green rp2040 Pico boards.  
-`usbsidpico-rgb-v1.X.uf2` for Pico1 black clone rp2040 Pico boards with RGB LED onboard.  
-`usbsidpico_w-v1.X.uf2` for PicoW regular green rp2040 PicoW boards.  
-`usbsidpico2-v1.X.uf2` for Pico2 regular green rp2350 Pico2 boards.  
-`usbsidpico2_w-v1.X.uf2` for Pico2W regular green rp2350 Pico2W boards.  
-**WARNING!** Do _NOT_ use the **RGB** firmware for any of the (non black) rp2040 or rp2350 Pico boards that do not contain an RGB LED.
-### How to flash
-_<ins>**NOTE**: When flashing a new firmware version, all previously configured settings will be reset to default. Use the commandline configtool to save your current settings to a `ini` file if you want to save them!</ins>_  
-A Raspberry Pi Pico board is incredibly easy to flash, as it comes with a built in bootloader for flashing new firmwares in the `uf2` format. 
-In order to flash a new firmware to your USBSID-Pico you will need to put the Pico into bootloader mode. This can be done in 2 ways:
-1. While the Pico is seated on the USBSID-Pico board and with the USB cable plugged into your computer and the Pico do the following:
-  - Press and hold the `BOOTSEL` button on the Pico.
-  - Press and release the `RST` button on the USBSID-Pico board.
-  - Now release the `BOOTSEL` button.
-  - A new drive should appear on your computer called `RPI-RP2`.
-  - Copy the correct `uf2` firmware file to this directory.
-  - After copying the Pico will reboot and your Pico is flashed.
-2. When flashing a Pico that is not seated on the board do the following:
-  - Plug in the USB cable to your Pico and not into your computer.
-  - While holding the `BOOTSEL` button on the Pico plugin the other end of the USB cable into your computer.
-  - Now release the `BOOTSEL` button.
-  - A new drive should appear on your computer called `RPI-RP2`.
-  - Copy the correct `uf2` firmware file to this directory.
-  - After copying the Pico will reboot and your Pico is flashed.
 ### Firmware features
 The firmware is still in development so features might change, be added or removed.
 - By default both sockets are enabled and the configuration is set to 2 SID's.
@@ -186,6 +156,12 @@ The firmware is still in development so features might change, be added or remov
 ### Building
 You can build the firmware using the Pico SDK 2.1.1 and the included TinyUSB. Be sure to clone the SDK with `--recurse-submodules`.  
 After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py PICO_PLATFORM` where PICO_PLATFORM is either rp2040 or rp2350 depending on the board you are using.
+### Firmware types
+Moved into [USBSID-Pico firmware manual](doc/USBSID-Pico-firmware-manual.adoc#firmware-types)  
+Also available as PDF download [USBSID-Pico firmware manual PDF download](doc/USBSID-Pico-firmware-manual.pdf) 
+### How to flash
+Moved into [USBSID-Pico firmware manual](doc/USBSID-Pico-firmware-manual.adoc#how-to-flash-your-pico)  
+Also available as PDF download [USBSID-Pico firmware manual PDF download](doc/USBSID-Pico-firmware-manual.pdf) 
 
 # Hardware
 ## Where to buy
