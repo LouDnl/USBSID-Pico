@@ -7,9 +7,9 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
 * [Questions & Support](#questions-and-support)
 * [Project status](#project-status)
 * [Firmware](#firmware)
-  * [Firmware types and naming](doc/USBSID-Pico-firmware-manual.adoc)
-  * [How to flash new firmware](doc/USBSID-Pico-firmware-manual.adoc)
-  * [How to configure your board](doc/USBSID-Pico-firmware-manual.adoc)
+  * [Firmware types and naming](doc/USBSID-Pico-firmware-manual.adoc) [(PDF)](doc/USBSID-Pico-firmware-manual.pdf)
+  * [How to flash new firmware](doc/USBSID-Pico-firmware-manual.adoc) [(PDF)](doc/USBSID-Pico-firmware-manual.pdf)
+  * [How to configure your board](doc/USBSID-Pico-firmware-manual.adoc) [(PDF)](doc/USBSID-Pico-firmware-manual.pdf)
   * [Known issues](#known-issues)
 * [Hardware](#hardware)
   * [PCB usage information](#pcb-usage-information)
@@ -21,7 +21,7 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
   * [PCB Features](#pcb-features)
   * [PCB Development](#pcb-development)
 * [Software](#software)
-  * [Software manual](doc/USBSID-Pico-software-manual.adoc)
+  * [Software manual](doc/USBSID-Pico-software-manual.adoc) [PDF](doc/USBSID-Pico-software-manual.pdf)
   * [Pre compiled Vice binaries](#precompiled-vice-binaries)
 * [PCB in action](#usbsid-pico-in-action)
 * [Acknowledgements](#acknowledgements)
@@ -212,23 +212,32 @@ If you want and are up to it you can solder your own PCB or create your own deve
 
 ### PCB Features
 #### revision v1.3
-Includes all features from v1.0 except the audio jumper
-- IO controlled Stereo/Mono switch, can be set in config or toggled during play
-- Supports mixed voltage!
-  e.g. you can use one MOS6581 (12v) together with one MOS6582 (9v) or MOS8580 (9v)
-- Voltage is jumper controlled
+- Supports all MOS SID chips e.g. MOS6581, MOS6582 & MOS8580
+- Supports SID chip replacements e.g. [SIDKick-Pico](https://github.com/frntc/SIDKick-pico), [ARMSID](https://www.nobomi.cz/8bit/armsid/index_en.php) & [FPGASID](https://www.fpgasid.de), [SwinSID](https://github.com/dmantione/swinsid).
+- USBSID-Pico will by default generate a 1 MHz square wave using pio
+  - other clock speeds are configurable
+- IO controlled Stereo/Mono switch, can be set in config or toggled during play with supported players
+  - SID1 audio left
+  - SID2 audio right
+- Powered via USB
+  - Three separate voltage regulators for filtered voltages to the SIDS
+  - 1x fixed 5 volts and 2x 9 volts or 12 volts
+  - 5v stepup for clean 5v VCC to both SID chips
+  - Supports mixed voltage! e.g. you can use one MOS6581 (12v) together with one MOS6582 (9v) or MOS8580 (9v)
+  - 12v/9v jumper for each SID socket, defautls to 12v ~ inspired by SIDBlaster-Nano design
+- Audio out filter as in the C64 schematics
+  - With optional 6581 resistor, solder the 6581 jumper pad in each audio circuit for this.
+- Optional EXT-IN pulldown resistor as filter bypass to reduce filter noise for Digiplay on 8580 SID's
 - SID socket placement is more spread out for:
   - easier filter capacitor access
   - optional ZIF sockets
-- Three separate voltage regulators for filtered voltages to the SIDS
-  - 1x fixed 5 volts and 2x 9 volts or 12 volts
 - Better IO port layout
-  - Unused GPIO pins for optional expansion boards
+  - Unused GPIO pins for optional future expansion boards
   - IO5 pins for quad SID configuration
   - Uart pins
   - SID Ext in pins (requires closing the solder jumper on the bottom)
   - Ground pin
-  - New soldermask art ;)
+- New soldermask art ;)
 ### revision v1.0
 - Supports all MOS SID chips e.g. MOS6581, MOS6582 & MOS8580
 - Supports SID chip replacements e.g. [SIDKick-Pico](https://github.com/frntc/SIDKick-pico), [SwinSID](https://github.com/dmantione/swinsid), ARMSID (untested), FPGASID (untested)
