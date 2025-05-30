@@ -80,9 +80,6 @@ extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t c
 extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
 extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 
-/* Buffer externals */
-extern void setup_buffer_handler(void);
-
 /* Vu externals */
 extern uint16_t vu;
 extern void init_vu(void);
@@ -98,6 +95,9 @@ extern bool running_tests;
 /* Midi externals */
 extern void midi_init(void);
 extern void process_stream(uint8_t *buffer, size_t size);
+
+/* ASID externals */
+extern void asid_init(void);
 
 /* Midi init */
 midi_machine midimachine;
@@ -660,14 +660,10 @@ void core1_main(void)
   init_vu();
 
   /* Init queues */
-  queue_init(&buffer_queue, sizeof(buffer_queue_entry_t), 1024);  /* 1024(3 each) entries deep */
   queue_init(&sidtest_queue, sizeof(sidtest_queue_entry_t), 1);  /* 1 entry deep */
   #ifdef WRITE_DEBUG  /* Only init this queue when needed */
   queue_init(&logging_queue, sizeof(writelogging_queue_entry_t), 16);  /* 16 entries deep */
   #endif
-
-  /* Init buffer queue */
-  setup_buffer_handler();
 
   /* Release semaphore when core 1 is started */
   sem_release(&core1_init);
@@ -767,6 +763,8 @@ int main()
   setup_dmachannels();
   /* Init midi */
   midi_init();
+  /* Init ASID */
+  asid_init();
   /* Enable SID chips */
   enable_sid(false);
 

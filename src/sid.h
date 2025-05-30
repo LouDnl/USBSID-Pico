@@ -45,13 +45,6 @@ typedef struct {
   char wf;
 } sidtest_queue_entry_t;
 
-/* Buffer queue */
-typedef struct {
-    uint8_t reg;
-    uint8_t val;
-    uint8_t cycles;
-} buffer_queue_entry_t;
-
 
 /* Rasterrates (cycles) in microseconds
  * Source: https://www.c64-wiki.com/wiki/raster_time
