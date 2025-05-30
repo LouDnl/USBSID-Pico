@@ -170,8 +170,8 @@ typedef struct Config {
     bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
     uint8_t chiptype;          /* 0 = real, 1 = clone, 2 = unknown */
     uint8_t clonetype;         /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
-    uint8_t sid1type;          /* 0 = unknown, 1 = n/a, 2 = MOS8085, 3 = MOS6581 */
-    uint8_t sid2type;          /* 0 = unknown, 1 = FMopl, 2 = MOS8085, 3 = MOS6581 */
+    uint8_t sid1type;          /* 0 = unknown, 1 = n/a, 2 = MOS8580, 3 = MOS6581 */
+    uint8_t sid2type;          /* 0 = unknown, 1 = FMopl, 2 = MOS8580, 3 = MOS6581 */
   } socketOne;                 /* 1 */
   struct {
     bool    enabled : 1;       /* enable / disable this socket */
@@ -179,8 +179,8 @@ typedef struct Config {
     bool    act_as_one : 1;    /* act as socket 1 */
     uint8_t chiptype;          /* 0 = real, 1 = clone, 2 = unknown */
     uint8_t clonetype;         /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
-    uint8_t sid1type;          /* 0 = unknown, 1 = n/a, 2 = MOS8085, 3 = MOS6581 */
-    uint8_t sid2type;          /* 0 = unknown, 1 = FMopl, 2 = MOS8085, 3 = MOS6581 */
+    uint8_t sid1type;          /* 0 = unknown, 1 = n/a, 2 = MOS8580, 3 = MOS6581 */
+    uint8_t sid2type;          /* 0 = unknown, 1 = FMopl, 2 = MOS8580, 3 = MOS6581 */
   } socketTwo;                 /* 2 */
   struct {
     bool enabled : 1;
