@@ -103,7 +103,6 @@ extern void asid_init(void);
 midi_machine midimachine;
 
 /* Queues */
-queue_t buffer_queue;
 queue_t sidtest_queue;
 queue_t logging_queue;
 
