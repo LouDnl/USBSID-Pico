@@ -143,7 +143,7 @@ const char *mono_stereo[2] = { "Mono", "Stereo" };
     .chiptype = 0x0,  /* real */ \
     .clonetype = 0x0, /* disabled */ \
     .sid1type = 0x0,  /* unknown */ \
-    .sid2type = 0x0,  /* unknown */ \
+    .sid2type = 0x1,  /* n/a */ \
   }, \
   .socketTwo = { \
     .enabled = true, \
@@ -152,7 +152,7 @@ const char *mono_stereo[2] = { "Mono", "Stereo" };
     .chiptype = 0x0,  /* real */ \
     .clonetype = 0x0, /* disabled */ \
     .sid1type = 0x0,  /* unknown */ \
-    .sid2type = 0x0,  /* unknown */ \
+    .sid2type = 0x1,  /* n/a */ \
   }, \
   .LED = { \
     .enabled = true, \
