@@ -238,7 +238,7 @@ If you want and are up to it you can solder your own PCB or create your own deve
   - SID Ext in pins (requires closing the solder jumper on the bottom)
   - Ground pin
 - New soldermask art ;)
-### revision v1.0
+#### revision v1.0
 - Supports all MOS SID chips e.g. MOS6581, MOS6582 & MOS8580
 - Supports SID chip replacements e.g. [SIDKick-Pico](https://github.com/frntc/SIDKick-pico), [SwinSID](https://github.com/dmantione/swinsid), ARMSID (untested), FPGASID (untested)
 - 1 MHz oscillator (external optional, enabled via jumper pad)
