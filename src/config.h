@@ -91,6 +91,7 @@
 typedef struct Config {
   uint32_t magic;
   int default_config;
+  uint8_t config_saveid;
   uint32_t clock_rate;         /* clock speed identifier */
   uint16_t refresh_rate;       /* refresh rate identifier based on clockspeed ~ not configurable */
   uint16_t raster_rate;        /* raster rate identifier based on clockspeed ~ not configurable */

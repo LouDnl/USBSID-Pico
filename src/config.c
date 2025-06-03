@@ -94,19 +94,34 @@ void apply_clockrate(int n_clock, bool suspend_sids);
 /* Init config vars
  * Based on: https://community.element14.com/products/raspberry-pi/b/blog/posts/raspberry-pico-c-sdk-reserve-a-flash-memory-block-for-persistent-storage
  */
-extern uint32_t ADDR_PERSISTENT[];  /* .section_persistent from the linker script */
+
+ /* .section_persistent from the linker script, 4 bytes aligned */
+extern uint32_t ADDR_PERSISTENT[];
+/* Base address */
 #define ADDR_PERSISTENT_BASE_ADDR (ADDR_PERSISTENT)
-#define FLASH_PERSISTENT_OFFSET ((uint32_t)ADDR_PERSISTENT_BASE_ADDR - XIP_BASE)  /* rp2040: 0x0x1FF000, rp2350: 0x3FF000 */
+/* rp2040: 0x0x1FF000, rp2350: 0x3FF000 */
+#define FLASH_PERSISTENT_OFFSET ((uint32_t)ADDR_PERSISTENT_BASE_ADDR - XIP_BASE)
+/* Storage size in flash memory */
 #define FLASH_PERSISTENT_SIZE (PICO_FLASH_SIZE_BYTES - FLASH_PERSISTENT_OFFSET)
+/* Default config offset in flash memory */
 #define FLASH_CONFIG_OFFSET (FLASH_PERSISTENT_OFFSET + ((FLASH_PERSISTENT_SIZE / 4) * 3))
-#define CONFIG_SIZE (FLASH_SECTOR_SIZE / 16)  /* 256 Bytes ~ FLASH_PAGE_SIZE */
+/* Max config size = 256 Bytes == FLASH_PAGE_SIZE (FLASH_SECTOR_SIZE / 16 config saves) */
+#define CONFIG_SIZE (FLASH_SECTOR_SIZE / 16)
 
 /* Init local vars */
-static uint8_t config_array[FLASH_PAGE_SIZE]; /* 256 MIN ~ FLASH_PAGE_SIZE & 4096 MAX ~ FLASH_SECTOR_SIZE  */
-static uint8_t socket_config_array[10]; /* 10 bytes is enough for now */
+
+/* 0x15 (16) max before starting at 0 flash sector erase */
+uint8_t config_saveid = 0;
+/* 256 Bytes MAX == FLASH_PAGE_SIZE (Max storage size is 4096 bytes == FLASH_SECTOR_SIZE) */
+static uint8_t config_array[FLASH_PAGE_SIZE];
+/* 10 bytes is enough for now */
+static uint8_t socket_config_array[10];
+/* 64 byte array for copying the config version into */
 static uint8_t p_version_array[MAX_BUFFER_SIZE];
-static uint32_t cm_verification; /* Config magic verification storage */
-static int sidtype[4]; /* Max 4 sids {S1, S2, S3, S4} defaults to 'unknown' */
+/* Config magic verification storage */
+static uint32_t cm_verification;
+/* Max 4 sids {S1, S2, S3, S4} defaults to 'unknown' */
+static int sidtype[4];
 
 /* Init vars */
 int sock_one = 0, sock_two = 0, sids_one = 0, sids_two = 0, numsids = 0, act_as_one = 0;
@@ -131,6 +146,7 @@ const char *mono_stereo[2] = { "Mono", "Stereo" };
 #define USBSID_DEFAULT_CONFIG_INIT { \
   .magic = MAGIC_SMOKE, \
   .default_config = 1, \
+  .config_saveid = 0, \
   .external_clock = false, \
   .clock_rate = DEFAULT, \
   .refresh_rate = HZ_DEFAULT, \
@@ -194,6 +210,7 @@ void print_cfg_addr(void)
 [CONFIG] [FLASH_PERSISTENT_OFFSET]0x%X (%u)\n\
 [CONFIG] [FLASH_PERSISTENT_SIZE]0x%X (%u)\n\
 [CONFIG] [FLASH_CONFIG_OFFSET]0x%X (%u)\n\
+[CONFIG] [XIP_BASE + FLASH_CONFIG_OFFSET]0x%X (%u)\n\
 [CONFIG] [CONFIG_SIZE]0x%X (%u)\n\
 [CONFIG] [SIZEOF_CONFIG]0x%X (%u)\n",
     XIP_BASE, XIP_BASE, PICO_FLASH_SIZE_BYTES, PICO_FLASH_SIZE_BYTES,
@@ -201,6 +218,7 @@ void print_cfg_addr(void)
     ADDR_PERSISTENT_BASE_ADDR, ADDR_PERSISTENT_BASE_ADDR,
     FLASH_PERSISTENT_OFFSET, FLASH_PERSISTENT_OFFSET, FLASH_PERSISTENT_SIZE, FLASH_PERSISTENT_SIZE,
     FLASH_CONFIG_OFFSET, FLASH_CONFIG_OFFSET,
+    (XIP_BASE + FLASH_CONFIG_OFFSET), (XIP_BASE + FLASH_CONFIG_OFFSET),
     CONFIG_SIZE, CONFIG_SIZE, sizeof(Config), sizeof(Config));
 }
 
@@ -387,51 +405,95 @@ void read_pcb_version(void)
 
 void __no_inline_not_in_flash_func(default_config)(Config* config)
 {
+  config_saveid = config->config_saveid;  /* Preserve config saveid */
   memcpy(config, &usbsid_default_config, sizeof(Config));
+  config->config_saveid = config_saveid;  /* Copy saveid back into the default config */
   return;
 }
 
 void __no_inline_not_in_flash_func(load_config)(Config* config)
 {
-  CFG("[CONFIG] LOAD CONFIG START\n");
+  CFG("[LOAD CONFIG START]\n");
   print_cfg_addr();
-  CFG("[CONFIG] COPY CONFIG:\n[CONFIG] [FROM]0x%X\n[CONFIG] [TO]0x%X\n[CONFIG] [SIZE]%u\n",
-    (XIP_BASE + FLASH_CONFIG_OFFSET), (uint)config, sizeof(Config));
-  CFG("[CONFIG] COPY CONFIG ADDRESSES:\n[CONFIG] [&usbsid_config]0x%X\n[CONFIG] [config]0x%X\n[CONFIG] [&config]0x%X\n",
-    (uint)&usbsid_config, (uint)config, (uint)&config);
+  int savelocationid = 0;  /* counter for finding the current save location */
+AGAIN:
+  Config temp_config;
   /* NOTICE: Do not do any logging here after memcpy or the Pico will freeze! */
-  memcpy(config, (void *)(XIP_BASE + FLASH_CONFIG_OFFSET), sizeof(Config));
+  memcpy(&temp_config, (void *)(XIP_BASE + (FLASH_CONFIG_OFFSET + (FLASH_PAGE_SIZE * savelocationid))), sizeof(Config));
   stdio_flush();
-  cm_verification = config->magic;  /* Store the current magic for later */
+  CFG("[CONFIG] LOAD CONFIG FROM SAVE POSITION %d (SAVED CONFIG ID: %d)\n", savelocationid, temp_config.config_saveid);
+  if ((temp_config.config_saveid >= 0) && (temp_config.config_saveid <= 0xF) /* Max 16 saves */
+    && temp_config.config_saveid == savelocationid) { /* Found previously saved config */
+    savelocationid++;  /* Increase id and try again */
+    goto AGAIN;
+  } else { /* They are not equal, that means this config is not a save location yet or corrupted, load the previous config */
+    CFG("[CONFIG] FOUND LATEST CONFIG AT SAVE POSITION %d (%d)\n", (savelocationid-1), temp_config.config_saveid);
+    savelocationid--;
+    memcpy(config, (void *)(XIP_BASE + (FLASH_CONFIG_OFFSET + (FLASH_PAGE_SIZE * savelocationid))), sizeof(Config));
+    stdio_flush();
+  }
+  config_saveid = config->config_saveid;  /* copy saveid into variable */
+  CFG("[CONFIG] LOADED FROM SAVE POSITION: %d\n", config->config_saveid);
+
+  CFG("[CONFIG] COPIED CONFIG:\n[CONFIG] [FROM]0x%X\n[CONFIG] [TO]0x%X\n[CONFIG] [SIZE]%u\n",
+    (FLASH_CONFIG_OFFSET + (FLASH_PAGE_SIZE * savelocationid)), (uint)config, sizeof(Config));
+  CFG("[CONFIG] COPIED CONFIG ADDRESSES:\n[CONFIG] [&usbsid_config]0x%X\n[CONFIG] [config]0x%X\n[CONFIG] [&config]0x%X\n",
+    (uint)&usbsid_config, (uint)config, (uint)&config);
+
+
+  cm_verification = config->magic;   /* Store the current magic for later */
   if (config->magic != MAGIC_SMOKE) {  /* Verify the magic */
       CFG("[CONFIG] [MAGIC ERROR] config->magic: %u != MAGIC_SMOKE: %u\n", config->magic, MAGIC_SMOKE);
       CFG("[CONFIG] RESET TO DEFAULT CONFIG!\n");
       default_config(config);
-      return;
   }
+
+  CFG("[LOAD CONFIG END]\n");
   return;
 }
 
-void __no_inline_not_in_flash_func(save_config_lowlevel)(void* config_data)
-{
+void __no_inline_not_in_flash_func(write_config_lowlevel)(void* config_data)
+{ /* No logging in this function to avoid errors */
   uint32_t ints = save_and_disable_interrupts();
-  flash_range_erase(FLASH_CONFIG_OFFSET, FLASH_SECTOR_SIZE);  /* 4096 Bytes (sector aligend) erase as per SDK manual */
-  flash_range_program(FLASH_CONFIG_OFFSET, (uint8_t*)config_data, FLASH_PAGE_SIZE);  /* 256 Bytes (page aligned) write as per SDK manual */
+  /* FLASH_SECTOR_SIZE = 4096 Bytes (sector aligend) erase as per SDK manual and
+     only erase if saveid is zero to keep the number of flash erases low */
+  if (config_saveid == 0x0) flash_range_erase(FLASH_CONFIG_OFFSET, FLASH_SECTOR_SIZE);
+  /* FLASH_PAGE_SIZE = 256 Bytes (page aligned) write as per SDK manual */
+  flash_range_program((FLASH_CONFIG_OFFSET + (FLASH_PAGE_SIZE * config_saveid)), (uint8_t*)config_data, FLASH_PAGE_SIZE);
   restore_interrupts(ints);
   return;
 }
 
-void __no_inline_not_in_flash_func(save_config)(const Config* config)
+void __no_inline_not_in_flash_func(write_config)(const Config* config)
 {
-  CFG("[CONFIG] SAVE CONFIG START\n"); /* TODO: Test if this doesn't cause a lockup */
   uint8_t config_data[CONFIG_SIZE] = {0};
   static_assert(sizeof(Config) < CONFIG_SIZE, "[CONFIG] SAVE ERROR: Config struct doesn't fit inside CONFIG_SIZE");
   memcpy(config_data, config, sizeof(Config));
-  int err = flash_safe_execute(save_config_lowlevel, config_data, 100);
+  int err = flash_safe_execute(write_config_lowlevel, config_data, 100);
   if (err) {
     CFG("[CONFIG] SAVE ERROR: %d\n", err);
   }
   sleep_ms(100);
+  return;
+}
+
+void __no_inline_not_in_flash_func(save_config)(Config* config)
+{
+  CFG("[CONFIG] SAVE CONFIG START\n");
+  /* Verify config saveid and increase */
+  int noerr = (config->config_saveid == config_saveid);
+  if (noerr) {
+    /* Only increase id's if both are equal */
+    config_saveid++;
+    config_saveid = config->config_saveid = (config_saveid <= 0xF ? config_saveid : 0);
+    CFG("[CONFIG] SAVING CONFIG WITH ID %d AT 0x%X (%u)\n", config_saveid,
+      (FLASH_CONFIG_OFFSET + (FLASH_PAGE_SIZE * config_saveid)), (FLASH_CONFIG_OFFSET + (FLASH_PAGE_SIZE * config_saveid)));
+  } else {
+    CFG("[ERROR] CONFIG SAVE ID's are not equal %d != %d. UNABLE TO SAVE CONFIG!!\n", config->config_saveid, config_saveid);
+    return;
+  }
+  write_config(config);
+  CFG("[CONFIG] SAVE CONFIG END\n");
   return;
 }
 
@@ -1013,6 +1075,11 @@ void handle_config_request(uint8_t * buffer)
       if (buffer[1] == 6) {
         detect_fmopl(buffer[2]);
       }
+      if (buffer[1] == 7) {
+        CFG("[CONFIG] SAVE ID BEFORE: %d (%d)\n", config_saveid, usbsid_config.config_saveid);
+        config_saveid = usbsid_config.config_saveid = 0;  /* reset saveid */
+        CFG("[CONFIG] SAVE ID AFTER: %d (%d)\n", config_saveid, usbsid_config.config_saveid);
+      }
       break;
     case TEST_FN3:
       CFG("[SID MEMORY]\n");
@@ -1028,105 +1095,119 @@ void handle_config_request(uint8_t * buffer)
   return;
 }
 
+void print_pico_features(void)
+{
+  CFG("[START PRINT PICO DEFAULT FEATURES]\n");
+
+  CFG("PICO_PIO_VERSION = %d\n", PICO_PIO_VERSION);  /* pio.h */
+  #if defined(PICO_DEFAULT_LED_PIN)
+  CFG("PICO_DEFAULT_LED_PIN = %d\n", PICO_DEFAULT_LED_PIN);  /* pico*.h */
+  #elif defined(CYW43_WL_GPIO_LED_PIN)
+  CFG("CYW43_WL_GPIO_LED_PIN = %d\n", CYW43_WL_GPIO_LED_PIN);  /* pico*.h */
+  #endif
+  CFG("LED_PWM = %d\n", LED_PWM);  /* config.h */
+
+  CFG("[END PRINT PICO DEFAULT FEATURES]\n");
+}
+
 void print_config_settings(void)
 {
-  /* Debug logging */
-  CFG("[CONFIG] [PICO] PICO_PIO_VERSION = %d\n", PICO_PIO_VERSION);  // pio.h PICO_PIO_VERSION
-  #if defined(PICO_DEFAULT_LED_PIN)
-  CFG("[CONFIG] [PICO] PICO_DEFAULT_LED_PIN = %d\n", PICO_DEFAULT_LED_PIN);  // pio.h PICO_PIO_VERSION
-  #elif defined(CYW43_WL_GPIO_LED_PIN)
-  CFG("[CONFIG] [PICO] CYW43_WL_GPIO_LED_PIN = %d\n", CYW43_WL_GPIO_LED_PIN);  // pio.h PICO_PIO_VERSION
-  #endif
-  CFG("[CONFIG] [PICO] LED_PWM = %d\n", LED_PWM);  // pio.h PICO_PIO_VERSION
-  CFG("[CONFIG] PRINT SETTINGS START\n");
-  CFG("[CONFIG] [USBSID PCB VERSION] %s\n", pcb_version);
-  CFG("[CONFIG] [USBSID FIRMWARE VERSION] %s\n", project_version);
+  CFG("[START PRINT CONFIG SETTINGS]\n");
 
-  CFG("[CONFIG] [CLOCK] %s @%d\n",
+  CFG("[USBSID PCB VERSION] %s\n", pcb_version);
+  CFG("[USBSID FIRMWARE VERSION] %s\n", project_version);
+
+  CFG("[CLOCK] %s @%d\n",
     int_ext[(int)usbsid_config.external_clock],
     (int)usbsid_config.clock_rate);
-  CFG("[CONFIG] [CLOCK RATE LOCKED] %s\n",
+  CFG("[CLOCK RATE LOCKED] %s\n",
     true_false[(int)usbsid_config.lock_clockrate]);
-  CFG("[CONFIG] [RASTER RATE] @%d\n",
+  CFG("[RASTER RATE] @%d\n",
     (int)usbsid_config.raster_rate);
 
-  CFG("[CONFIG] [SOCKET ONE] %s as %s\n",
+  CFG("[SOCKET ONE] %s as %s\n",
     enabled[(int)usbsid_config.socketOne.enabled],
     ((int)usbsid_config.socketOne.dualsid == 1 ? single_dual[0] : single_dual[1]));
-  CFG("[CONFIG] [SOCKET ONE] CHIP TYPE: %s, CLONE TYPE: %s\n",
+  CFG("[SOCKET ONE] CHIP TYPE: %s, CLONE TYPE: %s\n",
     chiptypes[usbsid_config.socketOne.chiptype],
     clonetypes[usbsid_config.socketOne.clonetype]);
-  CFG("[CONFIG] [SOCKET ONE] SID 1 TYPE: %s, SID 2 TYPE: %s\n",
+  CFG("[SOCKET ONE] SID 1 TYPE: %s, SID 2 TYPE: %s\n",
     sidtypes[usbsid_config.socketOne.sid1type],
     sidtypes[usbsid_config.socketOne.sid2type]);
-  CFG("[CONFIG] [SOCKET TWO] %s as %s\n",
+  CFG("[SOCKET TWO] %s as %s\n",
     enabled[(int)usbsid_config.socketTwo.enabled],
     ((int)usbsid_config.socketTwo.dualsid == 1 ? single_dual[0] : single_dual[1]));
-  CFG("[CONFIG] [SOCKET TWO] CHIP TYPE: %s, CLONE TYPE: %s\n",
+  CFG("[SOCKET TWO] CHIP TYPE: %s, CLONE TYPE: %s\n",
     chiptypes[usbsid_config.socketTwo.chiptype],
     clonetypes[usbsid_config.socketTwo.clonetype]);
-  CFG("[CONFIG] [SOCKET TWO] SID 1 TYPE: %s, SID 2 TYPE: %s\n",
+  CFG("[SOCKET TWO] SID 1 TYPE: %s, SID 2 TYPE: %s\n",
     sidtypes[usbsid_config.socketTwo.sid1type],
     sidtypes[usbsid_config.socketTwo.sid2type]);
-  CFG("[CONFIG] [SOCKET TWO AS ONE] %s\n",
+  CFG("[SOCKET TWO AS ONE] %s\n",
     true_false[(int)usbsid_config.socketTwo.act_as_one]);
 
-  CFG("[CONFIG] [LED] %s, Idle breathe? %s\n",
+  CFG("[LED] %s, Idle breathe? %s\n",
     enabled[(int)usbsid_config.LED.enabled],
     true_false[(int)usbsid_config.LED.idle_breathe]);
-  CFG("[CONFIG] [RGBLED] %s, Idle breathe? %s\n",
+  CFG("[RGBLED] %s, Idle breathe? %s\n",
     enabled[(int)usbsid_config.RGBLED.enabled],
     true_false[(int)usbsid_config.RGBLED.idle_breathe]);
-  CFG("[CONFIG] [RGBLED SIDTOUSE] %d\n",
+  CFG("[RGBLED SIDTOUSE] %d\n",
     (int)usbsid_config.RGBLED.sid_to_use);
-  CFG("[CONFIG] [RGBLED BRIGHTNESS] %d\n",
+  CFG("[RGBLED BRIGHTNESS] %d\n",
     (int)usbsid_config.RGBLED.brightness);
 
-  CFG("[CONFIG] [CDC] %s\n",
+  CFG("[CDC] %s\n",
     enabled[(int)usbsid_config.Cdc.enabled]);
-  CFG("[CONFIG] [WebUSB] %s\n",
+  CFG("[WebUSB] %s\n",
     enabled[(int)usbsid_config.WebUSB.enabled]);
-  CFG("[CONFIG] [Asid] %s\n",
+  CFG("[Asid] %s\n",
     enabled[(int)usbsid_config.Asid.enabled]);
-  CFG("[CONFIG] [Midi] %s\n",
+  CFG("[Midi] %s\n",
     enabled[(int)usbsid_config.Midi.enabled]);
 
-  CFG("[CONFIG] [FMOpl] %s\n",
+  CFG("[FMOpl] %s\n",
     enabled[(int)usbsid_config.FMOpl.enabled]);
-  CFG("[CONFIG] [FMOpl] SIDno %d\n",
+  CFG("[FMOpl] SIDno %d\n",
     usbsid_config.FMOpl.sidno);
 
   #if defined(HAS_AUDIOSWITCH)
-  CFG("[CONFIG] [AUDIO_SWITCH] %s\n",
+  CFG("[AUDIO_SWITCH] %s\n",
     mono_stereo[(int)usbsid_config.stereo_en]);
   #endif
 
-  CFG("[CONFIG] PRINT SETTINGS END\n");
-
+  CFG("[END PRINT CONFIG SETTINGS]\n");
   return;
 }
 
 void print_socket_config(void)
 {
-  CFG("[CONFIG] SOCK_ONE EN: %s SOCK_TWO EN: %s\n[CONFIG] ACT_AS_ONE: %s\n[CONFIG] NO SIDS\n[CONFIG] SOCK_ONE #%d\n[CONFIG] SOCK_TWO #%d\n[CONFIG] TOTAL #%d\n",
+  CFG("[START PRINT SOCKET CONFIG]\n");
+
+  CFG("SOCK_ONE EN: %s SOCK_TWO EN: %s\nACT_AS_ONE: %s\nNO SIDS\nSOCK_ONE #%d\nSOCK_TWO #%d\nTOTAL #%d\n",
     true_false[sock_one], true_false[sock_two], true_false[act_as_one],
     sids_one, sids_two, numsids);
 
+  CFG("[END PRINT SOCKET CONFIG]\n");
   return;
 }
 
 void print_bus_config(void)
 {
-  CFG("[CONFIG] BUS\n[CONFIG] ONE:   %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n[CONFIG] TWO:   %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n[CONFIG] THREE: %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n[CONFIG] FOUR:  %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n",
+  CFG("[START PRINT BUS CONFIG]\n");
+
+  CFG("BUS\nONE:   %02x 0b"PRINTF_BINARY_PATTERN_INT8"\nTWO:   %02x 0b"PRINTF_BINARY_PATTERN_INT8"\nTHREE: %02x 0b"PRINTF_BINARY_PATTERN_INT8"\nFOUR:  %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n",
     one, PRINTF_BYTE_TO_BINARY_INT8(one),
     two, PRINTF_BYTE_TO_BINARY_INT8(two),
     three, PRINTF_BYTE_TO_BINARY_INT8(three),
     four, PRINTF_BYTE_TO_BINARY_INT8(four));
-  CFG("[CONFIG] ADDRESS MASKS\n");
-  CFG("[CONFIG] MASK_ONE:   0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", one_mask, PRINTF_BYTE_TO_BINARY_INT8(one_mask));
-  CFG("[CONFIG] MASK_TWO:   0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", two_mask, PRINTF_BYTE_TO_BINARY_INT8(two_mask));
-  CFG("[CONFIG] MASK_THREE: 0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", three_mask, PRINTF_BYTE_TO_BINARY_INT8(three_mask));
-  CFG("[CONFIG] MASK_FOUR:  0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", four_mask, PRINTF_BYTE_TO_BINARY_INT8(four_mask));
+  CFG("ADDRESS MASKS\n");
+  CFG("MASK_ONE:   0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", one_mask, PRINTF_BYTE_TO_BINARY_INT8(one_mask));
+  CFG("MASK_TWO:   0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", two_mask, PRINTF_BYTE_TO_BINARY_INT8(two_mask));
+  CFG("MASK_THREE: 0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", three_mask, PRINTF_BYTE_TO_BINARY_INT8(three_mask));
+  CFG("MASK_FOUR:  0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", four_mask, PRINTF_BYTE_TO_BINARY_INT8(four_mask));
+
+  CFG("[END PRINT BUS CONFIG]\n");
   return;
 }
 
@@ -1371,17 +1452,21 @@ void apply_led_config(void)
 
 void apply_config(bool at_boot)
 {
-  CFG("[CONFIG APPLY] START\n");
-
+  CFG("\n");  /* new line before the actual apply is printed */
+  CFG("[START CONFIG APPLY]\n");
   verify_socket_settings();
+
   CFG("[CONFIG] Applying socket settings\n");
   apply_socket_config();
+
   if (usbsid_config.FMOpl.enabled) {
     CFG("[CONFIG] Applying optional FMOpl settings\n");
     apply_fmopl_config();
   };
+
   CFG("[CONFIG] Applying bus settings\n");
   apply_bus_config();
+
   if (!at_boot) {
     CFG("[CONFIG] Applying bus clock settings\n");
     stop_dma_channels();
@@ -1389,6 +1474,7 @@ void apply_config(bool at_boot)
     sync_pios(false);
     start_dma_channels();
   }
+
   if (RGB_ENABLED) {
     CFG("[CONFIG] Applying RGBLED SID\n");
     apply_led_config();
@@ -1396,10 +1482,21 @@ void apply_config(bool at_boot)
   } else {
     CFG("[CONFIG] RGBLED not available\n");
   }
+  CFG("[END CONFIG APPLY]\n");
 
+  CFG("\n");  /* new line before the actual pico features are printed */
+  print_pico_features();
+
+  CFG("\n");  /* new line before the actual settings are printed */
   print_config_settings();
+
+  CFG("\n");  /* new line before the actual socket settings are printed */
   print_socket_config();
+
+  CFG("\n");  /* new line before the actual bus config is printed */
   print_bus_config();
+
+  CFG("\n");  /* new line after printing is finished */
   return;
 }
 
