@@ -426,8 +426,8 @@ AGAIN:
     && temp_config.config_saveid == savelocationid) { /* Found previously saved config */
     savelocationid++;  /* Increase id and try again */
     goto AGAIN;
-  } else { /* They are not equal, that means this config is not a save location yet or corrupted, load the previous config */
-    CFG("[CONFIG] FOUND LATEST CONFIG AT SAVE POSITION %d (%d)\n", (savelocationid-1), temp_config.config_saveid);
+  } else { /* They are not equal, that means this config is an empty save location or corrupted, load the previous config */
+    CFG("[CONFIG] FOUND LATEST CONFIG AT SAVE POSITION %d (255 == empty slot)\n", (savelocationid-1));
     savelocationid--;
     memcpy(config, (void *)(XIP_BASE + (FLASH_CONFIG_OFFSET + (FLASH_PAGE_SIZE * savelocationid))), sizeof(Config));
     stdio_flush();
