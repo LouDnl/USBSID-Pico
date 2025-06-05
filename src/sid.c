@@ -368,24 +368,31 @@ bool detect_fpgasid(uint8_t base_address)
 void detect_clone_types(bool sockone, bool onedual, bool socktwo, bool twodual)
 { /* TODO: Add other clone type detection routines */
   uint8_t base_address = 0x00;
-  if (sockone && detect_skpico(base_address)) {
-    usbsid_config.socketOne.chiptype  = 1;  /* Clone */
-    usbsid_config.socketOne.clonetype = 2;  /* SKpico */
-  } else {
-    usbsid_config.socketOne.chiptype  = 2;  /* Unknown */
-    usbsid_config.socketOne.clonetype = 1;  /* Other */
+  int chip = 0, result = 0;
+  if (sockone) {
+    if (detect_skpico(base_address))  { chip = 1; result = 2; goto done_one; }  /* Clone, SKpico */
+    if (detect_fpgasid(base_address)) { chip = 1; result = 4; goto done_one; }  /* Clone, FPGASID */
+    chip = 2;    /* Unknown */
+    result = 1;  /* Other */
+done_one:
+    usbsid_config.socketOne.chiptype  = chip;
+    usbsid_config.socketOne.clonetype = result;
   }
   if (!onedual)
     base_address = 0x20;
   if (onedual)
     base_address = 0x40;
-  if(socktwo && (base_address > 0x00) && detect_skpico(base_address)) {
+  chip = 0, result = 0;
+  if(socktwo && (base_address > 0x00)) {
+    if (detect_skpico(base_address))  { chip = 1; result = 2; goto done_two; }  /* Clone, SKpico */
+    if (detect_fpgasid(base_address)) { chip = 1; result = 4; goto done_two; }  /* Clone, FPGASID */
+    chip = 2;    /* Unknown */
+    result = 1;  /* Other */
+done_two:
     usbsid_config.socketTwo.chiptype  = 1;  /* Clone */
     usbsid_config.socketTwo.clonetype = 2;  /* SKpico */
-  } else {
-    usbsid_config.socketTwo.chiptype  = 2;  /* Unknown */
-    usbsid_config.socketTwo.clonetype = 1;  /* Other */
   }
+  return;
 }
 
 bool detect_fmopl(uint8_t base_address)
