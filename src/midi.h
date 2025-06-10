@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef _MIDI_H_
-#define _MIDI_H_
+#ifndef _USBSID_MIDI_H_
+#define _USBSID_MIDI_H_
 #pragma once
 
 #ifdef __cplusplus
@@ -188,4 +188,4 @@ enum {
   }
 #endif
 
-#endif /* _MIDI_H_ */
+#endif /* _USBSID_MIDI_H_ */

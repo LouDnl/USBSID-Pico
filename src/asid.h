@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef _ASID_H_
-#define _ASID_H_
+#ifndef _USBSID_ASID_H_
+#define _USBSID_ASID_H_
 #pragma once
 
 #ifdef __cplusplus
@@ -93,4 +93,4 @@ static const uint8_t asid_sid_registers[NO_SID_REGISTERS_ASID] =
   }
 #endif
 
-#endif /* _ASID_H_ */
+#endif /* _USBSID_ASID_H_ */

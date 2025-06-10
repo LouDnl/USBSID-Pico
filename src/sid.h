@@ -348,4 +348,4 @@ static const char notes[12][2] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#
   }
 #endif
 
-#endif /* _SID_H_ */
+#endif /* _USBSID_SID_H_ */

@@ -23,8 +23,8 @@
  *
  */
 
-#ifndef _USBSIDGLOBALS_H_
-#define _USBSIDGLOBALS_H_
+#ifndef _USBSID_GLOBALS_H_
+#define _USBSID_GLOBALS_H_
 #pragma once
 
 #ifdef __cplusplus
@@ -122,4 +122,4 @@ extern uint8_t const desc_ms_os_20[];
   }
 #endif
 
-#endif /* _USBSIDGLOBALS_H_ */
+#endif /* _USBSID_GLOBALS_H_ */

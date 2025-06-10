@@ -23,8 +23,8 @@
  *
  */
 
-#ifndef _USBSIDGPIO_H_
-#define _USBSIDGPIO_H_
+#ifndef _USBSID_GPIO_H_
+#define _USBSID_GPIO_H_
 #pragma once
 
 #ifdef __cplusplus
@@ -145,4 +145,4 @@
   }
 #endif
 
-#endif /* _USBSIDGPIO_H_ */
+#endif /* _USBSID_GPIO_H_ */
