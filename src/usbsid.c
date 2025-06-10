@@ -33,9 +33,10 @@
 
 
 /* Init external vars */
+extern int flagged;  /* doubletap check */
 static semaphore_t core0_init, core1_init;
 
-/* Init vars ~ Do not change order to keep memory alignment! */
+/* Declare variables ~ Do not change order to keep memory alignment! */
 uint8_t __not_in_flash("usbsid_buffer") config_buffer[5];
 uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));
 uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE] __attribute__((aligned(2 * MAX_BUFFER_SIZE)));
@@ -48,18 +49,21 @@ char ntype = '0', dtype = '0', cdc = 'C', asid = 'A', midi = 'M', sysex = 'S', w
 bool web_serial_connected = false;
 double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
 int paused_state = 0, reset_state = 0;
+bool auto_config = false;
 
 /* Init var pointers for external use */
 uint8_t (*write_buffer_p)[MAX_BUFFER_SIZE] = &write_buffer;
 
 /* Config externals */
-Config usbsid_config;
-extern int sock_one, sock_two, sids_one, sids_two, numsids, act_as_one;
+extern Config usbsid_config;
+extern RuntimeCFG cfg;
+extern int sock_one, sock_two, sids_one, sids_two, numsids, mirrored;
 extern bool first_boot;
 extern void load_config(Config * config);
 extern void handle_config_request(uint8_t * buffer);
 extern void apply_config(bool at_boot);
-extern void detect_default_config(void);
+extern void save_config_ext(void);
+extern void detect_default_config();
 
 /* GPIO externals */
 extern void init_gpio(void);
@@ -89,8 +93,11 @@ extern void led_runner(void);
 extern void mcu_reset(void);
 extern void mcu_jump_to_bootloader(void);
 
-/* SID externals */
+/* SID tests externals */
 extern bool running_tests;
+
+/* SID detection externals */
+extern void auto_detect_routine(bool auto_config, bool with_delay);
 
 /* Midi externals */
 extern void midi_init(void);
@@ -122,24 +129,26 @@ static const tusb_desc_webusb_url_t desc_url =
 void reset_reason(void)
 {
 #if PICO_RP2040
+  DBG("[RESET] Button double tapped? %d\n", flagged);
   io_rw_32 *rr = (io_rw_32 *) (VREG_AND_CHIP_RESET_BASE + VREG_AND_CHIP_RESET_CHIP_RESET_OFFSET);
   if (*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_POR_BITS)
     DBG("[RESET] Caused by power-on reset or brownout detection\n");
   if (*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_RUN_BITS)
     DBG("[RESET] Caused by RUN pin trigger ~ manual or ISA RESET signal\n");
-  if(*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_PSM_RESTART_BITS)
+  if (*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_PSM_RESTART_BITS)
     DBG("[RESET] Caused by debug port\n");
 #elif PICO_RP2350
-  io_rw_32 *rr = (io_rw_32 *) (POWMAN_BASE + POWMAN_CHIP_RESET_OFFSET);
-  if(*rr & POWMAN_CHIP_RESET_HAD_DP_RESET_REQ_BITS)
+  /* io_rw_32 *rr = (io_rw_32 *) (POWMAN_BASE + POWMAN_CHIP_RESET_OFFSET); */
+  DBG("[RESET] Button double tapped? %d %X\n", flagged, powman_hw->chip_reset);
+  if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_DP_RESET_REQ_BITS)
     DBG("[RESET] Caused by arm debugger\n");
-  if(*rr & POWMAN_CHIP_RESET_HAD_RESCUE_BITS)
+  if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_RESCUE_BITS)
     DBG("[RESET] Caused by rescure reset from arm debugger\n");
-  if (*rr & POWMAN_CHIP_RESET_HAD_RUN_LOW_BITS)
+  if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_RUN_LOW_BITS)
     DBG("[RESET] Caused by RUN pin trigger ~ manual or ISA RESET signal\n");
-  if (*rr & POWMAN_CHIP_RESET_HAD_BOR_BITS)
+  if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_BOR_BITS)
     DBG("[RESET] Caused by brownout detection\n");
-  if (*rr & POWMAN_CHIP_RESET_HAD_POR_BITS)
+  if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_POR_BITS)
     DBG("[RESET] Caused by power-on reset\n");
 #endif
   return;
@@ -716,6 +725,9 @@ int main()
   /* Log reset reason */
   reset_reason();
 
+  /* Clear flagged */
+  if (flagged) { auto_config = true; flagged = 0; }  /* BUG: NOT WORKING ON RP2350 */
+
   /* Workaround to make sure flash_safe_execute is executed
    * before everything else if a default config is detected
    * This just ping pongs bootup around with Core 1
@@ -731,9 +743,6 @@ int main()
   load_config(&usbsid_config);
   /* Apply saved config to used vars */
   apply_config(true);
-  /* Check for default config bit
-   * NOTE: This cannot be run from Core 1! */
-  detect_default_config();
 
   /* Log boot CPU and C64 clock speeds */
   cpu_mhz = (clock_get_hz(clk_sys) / 1000 / 1000);
@@ -741,10 +750,11 @@ int main()
   sid_hz = usbsid_config.clock_rate;
   sid_mhz = (sid_hz / 1000 / 1000);
   sid_us = (1 / sid_mhz);
-  CFG("[BOOT PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
-  CFG("[BOOT C64]  %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
-  CFG("[BOOT C64 RATES] REFRESH_RATE %lu Cycles, RASTER_RATE %lu Cycles\n", usbsid_config.refresh_rate, usbsid_config.raster_rate);
-
+  if (!auto_config) {
+    CFG("[BOOT PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
+    CFG("[BOOT C64]  %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
+    CFG("[BOOT C64 RATES] REFRESH_RATE %lu Cycles, RASTER_RATE %lu Cycles\n", usbsid_config.refresh_rate, usbsid_config.raster_rate);
+  }
   /* Release core 0 semaphore */
   sem_release(&core0_init);
   /* Wait for core one to finish startup */
@@ -766,6 +776,16 @@ int main()
   asid_init();
   /* Enable SID chips */
   enable_sid(false);
+
+  /* Check for default config bit
+   * NOTE: This cannot be run from Core 1! */
+  if (!auto_config) detect_default_config();
+  if (auto_config) {  /* ISSUE: NOT WORKING ON RP2350 */
+    auto_detect_routine(auto_config, true);  /* Double tap! */
+    save_config_ext();
+    auto_config = false;
+    mcu_reset();
+  }
 
   /* Release core 0 semaphore to signal boot finished */
   sem_release(&core0_init);
