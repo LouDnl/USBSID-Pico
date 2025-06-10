@@ -44,11 +44,8 @@
 
 
 /* Config externals */
-extern Config usbsid_config;
-extern int fmopl_sid;
-extern bool fmopl_enabled;
+extern RuntimeCFG cfg;
 extern const char *sidtypes[5];
-extern int numsids;
 
 /* GPIO externals */
 extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
@@ -106,7 +103,7 @@ void handle_asid_fmoplmessage(uint8_t* buffer)
       field <<= 1;
     }
   }
-  uint8_t addr = ((fmopl_sid << 5) - 0x20);
+  uint8_t addr = ((cfg.fmopl_sid << 5) - 0x20);
   for (uint8_t reg = 0; reg < asid_fm_register_index; reg++) {
     dtype = asid;  /* Set data type to asid */
     /* Pico 2 requires at least 10 cycles between writes
@@ -334,7 +331,7 @@ void decode_asid_message(uint8_t* buffer, int size)
       else handle_writeordered_asid_message(96, &buffer[3]);
       break;
     case 0x60:  /* FMOpl */
-      if (fmopl_enabled) {  /* Only if FMOpl is enabled, drop otherwise */
+      if (cfg.fmopl_enabled) {  /* Only if FMOpl is enabled, drop otherwise */
         midimachine.fmopl = 1;
         handle_asid_fmoplmessage(&buffer[3]);  /* Skip first 3 bytes */
       };
