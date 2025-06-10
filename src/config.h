@@ -46,6 +46,9 @@
 #include "hardware/flash.h"
 #include "hardware/sync.h"
 
+/* Required for default config */
+#include "sid.h"
+
 /* Flash information
  *
  * USBSID-Pico flash layout:
@@ -87,36 +90,63 @@
 #define RGB_ENABLED false
 #endif
 
+
+/* SID detection routines
+ * routine 1: https://github.com/GideonZ/1541ultimate/blob/master/software/6502/sidcrt/player/advanced/detection.asm
+ * routine 2: https://codebase64.org/doku.php?id=base:detecting_sid_type_-_safe_method
+ * routine 3: https://codebase64.org/doku.php?id=base:detecting_sid_type
+ */
+
+/* Init config vars
+ * Based on: https://community.element14.com/products/raspberry-pi/b/blog/posts/raspberry-pico-c-sdk-reserve-a-flash-memory-block-for-persistent-storage
+ */
+
+ /* .section_persistent from the linker script, 4 bytes aligned */
+extern uint32_t ADDR_PERSISTENT[];
+/* Base address */
+#define ADDR_PERSISTENT_BASE_ADDR (ADDR_PERSISTENT)
+/* rp2040: 0x0x1FF000, rp2350: 0x3FF000 */
+#define FLASH_PERSISTENT_OFFSET ((uint32_t)ADDR_PERSISTENT_BASE_ADDR - XIP_BASE)
+/* Storage size in flash memory */
+#define FLASH_PERSISTENT_SIZE (PICO_FLASH_SIZE_BYTES - FLASH_PERSISTENT_OFFSET)
+/* Default config offset in flash memory */
+#define FLASH_CONFIG_OFFSET (FLASH_PERSISTENT_OFFSET + ((FLASH_PERSISTENT_SIZE / 4) * 3))
+/* Max config size = 256 Bytes == FLASH_PAGE_SIZE (FLASH_SECTOR_SIZE / 16 config saves) */
+#define CONFIG_SIZE (FLASH_SECTOR_SIZE / 16)
+
+
 /* USBSID-Pico config struct */
+typedef struct SIDChip {
+  uint8_t id;        /* ID for this SID 0 ~ 4, 255 = disabled */
+  uint8_t addr;      /* Starting address to use for this SID, 255 = disabled */
+  uint8_t type;      /* 0 = unknown, 1 = N/A, 2 = MOS8580, 3 = MOS6581, 4 = FMopl */
+} SIDChip;
+
+typedef struct Socket {
+  uint8_t chiptype;          /* 0 = real, 1 = clone, 2 = unknown */
+  uint8_t clonetype;         /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
+  SIDChip sid1;
+  SIDChip sid2;
+  bool    enabled : 1;       /* enable / disable this socket */
+  bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
+} Socket;
+
 typedef struct Config {
+  /* First three items must stay in the same order! */
   uint32_t magic;
   int default_config;
   uint8_t config_saveid;
+  /* Don't care from here */
   uint32_t clock_rate;         /* clock speed identifier */
   uint16_t refresh_rate;       /* refresh rate identifier based on clockspeed ~ not configurable */
   uint16_t raster_rate;        /* raster rate identifier based on clockspeed ~ not configurable */
-  struct
-  {
-    uint8_t chiptype;          /* 0 = real, 1 = clone, 2 = unknown */
-    uint8_t clonetype;         /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
-    uint8_t sid1type;          /* 0 = unknown, 1 = N/A, 2 = MOS8580, 3 = MOS6581, 4 = FMopl */
-    uint8_t sid2type;          /* 0 = unknown, 1 = N/A, 2 = MOS8580, 3 = MOS6581, 4 = FMopl */
-    bool    enabled : 1;       /* enable / disable this socket */
-    bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
-  } socketOne;                 /* 1 */
-  struct {
-    uint8_t chiptype;          /* 0 = real, 1 = clone, 2 = unknown */
-    uint8_t clonetype;         /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
-    uint8_t sid1type;          /* 0 = unknown, 1 = N/A, 2 = MOS8580, 3 = MOS6581, 4 = FMopl */
-    uint8_t sid2type;          /* 0 = unknown, 1 = N/A, 2 = MOS8580, 3 = MOS6581, 4 = FMopl */
-    bool    enabled : 1;       /* enable / disable this socket */
-    bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
-    bool    act_as_one : 1;    /* act as socket 1 */
-  } socketTwo;                 /* 2 */
+  Socket   socketOne;          /* 1 */
+  Socket   socketTwo;          /* 2 */
+  bool     mirrored : 1;       /* act as socket 1 */
   struct {
     bool enabled : 1;
     bool idle_breathe : 1;
-  } LED;                       /* 3 */
+  } LED;                        /* 3 */
   struct {
     uint8_t brightness;
     int     sid_to_use;         /* 0/-1 = off, 1...4 = sid 1 ... sid 4 */
@@ -145,7 +175,124 @@ typedef struct Config {
   bool stereo_en : 1;           /* audio switch is off (mono) or on (stereo) ~ (PCB v1.3+ only) */
 } Config;
 
-extern Config usbsid_config;  /* Make Config struct global */
+#define USBSID_DEFAULT_CONFIG_INIT { \
+  .magic = MAGIC_SMOKE, \
+  .default_config = 1, \
+  .config_saveid = 0, \
+  .external_clock = false, \
+  .clock_rate = DEFAULT, \
+  .refresh_rate = HZ_DEFAULT, \
+  .raster_rate = R_DEFAULT, \
+  .lock_clockrate = false, \
+  .stereo_en = false, \
+  .mirrored = false, \
+  .socketOne = { \
+    .enabled = true, \
+    .dualsid = false, \
+    .chiptype = 0x0,  /* real */ \
+    .clonetype = 0x0, /* disabled */ \
+    .sid1 = { \
+      .id = 0, \
+      .addr = 0x00, \
+      .type = 0,  /* unknown */ \
+    }, \
+    .sid2 = { \
+      .id = -1, \
+      .addr = 0xFF, \
+      .type = 0,  /* n/a */ \
+    }, \
+  }, \
+  .socketTwo = { \
+    .enabled = true, \
+    .dualsid = false, \
+    .chiptype = 0x0,  /* real */ \
+    .clonetype = 0x0, /* disabled */ \
+    .sid1 = { \
+      .id = 1, \
+      .addr = 0x20, \
+      .type = 0,  /* unknown */ \
+    }, \
+    .sid2 = { \
+      .id = -1, \
+      .addr = 0xFF, \
+      .type = 0,  /* n/a */ \
+    }, \
+  }, \
+  .LED = { \
+    .enabled = true, \
+    .idle_breathe = LED_PWM \
+  }, \
+  .RGBLED = { \
+    .enabled = RGB_ENABLED, \
+    .idle_breathe = RGB_ENABLED, \
+    .brightness = (RGB_ENABLED ? 0x7F : 0),  /* Half of max brightness or disabled if no RGB LED */ \
+    .sid_to_use = (RGB_ENABLED ? 1 : -1), \
+  }, \
+  .Cdc = { \
+    .enabled = true \
+  }, \
+  .WebUSB = { \
+    .enabled = true \
+  }, \
+  .Asid = { \
+    .enabled = true \
+  }, \
+  .Midi = { \
+    .enabled = true \
+  }, \
+  .FMOpl = { \
+    .enabled = false, \
+    .sidno = 0, \
+  }, \
+} \
+
+static const Config usbsid_default_config = USBSID_DEFAULT_CONFIG_INIT;
+
+typedef struct RuntimeCFG {
+
+  /* Number of SID's available */
+  uint8_t sids_one;    /* config_socket.c:apply_socket_config() */
+  uint8_t sids_two;    /* config_socket.c:apply_socket_config() */
+  uint8_t numsids;     /* config_socket.c:apply_socket_config() */
+
+  /* Chip & SID type access */
+  uint8_t chip_one;    /* config_socket.c:apply_socket_config() */
+  uint8_t chip_two;    /* config_socket.c:apply_socket_config() */
+  uint8_t fmopl_sid;   /* config_socket.c:apply_fmopl_config() */
+
+  /* RW, CS1, CS2 mask */
+  uint8_t one;         /* config_bus.c:apply_bus_config() */
+  uint8_t two;         /* config_bus.c:apply_bus_config() */
+  uint8_t three;       /* config_bus.c:apply_bus_config() */
+  uint8_t four;        /* config_bus.c:apply_bus_config() */
+
+  /* Address mask */
+  uint8_t one_mask;    /* config_bus.c:apply_bus_config() */
+  uint8_t two_mask;    /* config_bus.c:apply_bus_config() */
+  uint8_t three_mask;  /* config_bus.c:apply_bus_config() */
+  uint8_t four_mask;   /* config_bus.c:apply_bus_config() */
+
+  /* Max 4 sids {S1, S2, S3, S4} defaults to 'unknown' */
+  uint8_t sidtype[4];  /* config_bus.c:apply_bus_config() -> used for RGB LED verification */
+  /* contains the configured sid order to physical sid order relation */
+  uint8_t ids[4];      /* config_bus.c:apply_bus_config() */
+  /* contains the physical sid order */
+  uint8_t sidid[4];    /* config_bus.c:apply_bus_config() */
+  /* contains the sid address in configured sid order */
+  uint8_t sidaddr[4];  /* config_bus.c:apply_bus_config() */ // NOTE: UNUSED, FOR FUTURE USE
+  /* Contains the */
+  uint8_t sidmask[4];  /* config_bus.c:apply_bus_config() */
+  uint8_t addrmask[4]; /* config_bus.c:apply_bus_config() */
+
+  /* Check values */
+  bool sock_one : 1;       /* config_socket.c:apply_socket_config() */
+  bool sock_two : 1;       /* config_socket.c:apply_socket_config() */
+  bool sock_one_dual : 1;  /* config_socket.c:apply_socket_config() */
+  bool sock_two_dual : 1;  /* config_socket.c:apply_socket_config() */
+  bool mirrored : 1;       /* config_socket.c:apply_socket_config() */
+  bool fmopl_enabled : 1;  /* config_socket.c:apply_fmopl_config() */
+
+} RuntimeCFG;
 
 /* Config command byte */
 enum
@@ -184,6 +331,7 @@ enum
   LOCK_CLOCK       = 0x58,  /* Locks the clockrate from being changed, saved in config */
   STOP_TESTS       = 0x59,  /* Interrupt any running SID tests */
   DETECT_CLONES    = 0x5A,  /* Detect clone SID types */
+  AUTO_DETECT      = 0x5B,  /* Run auto detection routine (fallback/workaround for rp2350 bug) */
 
   LOAD_MIDI_STATE  = 0x60,
   SAVE_MIDI_STATE  = 0x61,
@@ -202,12 +350,6 @@ enum
   TEST_FN2         = 0x9A,  /* TODO: Remove before v1 release */
   TEST_FN3         = 0x9B,  /* TODO: Remove before v1 release */
 };
-
-/* SID detection routines
- * routine 1: https://github.com/GideonZ/1541ultimate/blob/master/software/6502/sidcrt/player/advanced/detection.asm
- * routine 2: https://codebase64.org/doku.php?id=base:detecting_sid_type_-_safe_method
- * routine 3: https://codebase64.org/doku.php?id=base:detecting_sid_type
- */
 
 
 #ifdef __cplusplus
