@@ -735,7 +735,7 @@ void print_config(void)
 
 void sid_autodetect(uint8_t detection_routine)
 {
-  config_buffer[1] = 0x51;
+  config_buffer[1] = DETECT_SIDS;
   config_buffer[2] = detection_routine;
   write_chars(config_buffer, count_of(config_buffer));
 
@@ -752,8 +752,25 @@ void sid_autodetect(uint8_t detection_routine)
 
 void clone_autodetect(void)
 {
-  config_buffer[1] = 0x5A;
+  config_buffer[1] = DETECT_CLONES;
   write_chars(config_buffer, count_of(config_buffer));
+
+  int len;
+  len = read_chars(read_data_uber, count_of(read_data_uber));
+  if (debug == 1) printf("Read %d bytes of data, byte 0 = %02X\n", len, read_data_uber[0]);
+  memcpy(&config[0], &read_data_uber[0], count_of(read_data_uber));
+
+  if (debug == 1) print_cfg_buffer(config, count_of(config));
+  set_cfg_from_buffer(config, count_of(config));
+  return;
+}
+
+void run_autodetection(bool reboot)
+{
+  config_buffer[1] = AUTO_DETECT;
+  if (reboot) config_buffer[2] = 0x1;
+  write_chars(config_buffer, count_of(config_buffer));
+  if (reboot) return;
 
   int len;
   len = read_chars(read_data_uber, count_of(read_data_uber));
@@ -1395,6 +1412,7 @@ void print_help(void)
   printf("  -stoptests                    : Interrupt and stop any running tests\n");
   printf("--[DEFAULTS]---------------------------------------------------------------------------------------------------------\n");
   printf("  -defaults,--config-defaults   : Reset USBSID-Pico config to defaults\n");
+  printf("                                  Add optional positional argument `1` to reboot USBSID-Pico afterwards\n");
   printf("--[PRESETS]---------------------------------------------------------------------------------------------------------\n");
   printf("  (add '-q' before any of the preset commands for a quick change and apply the config without saving and rebooting)\n");
   printf("  -single,  --single-sid        : Socket 1 enabled @ single SID, Socket 2 disabled\n");
@@ -1417,6 +1435,7 @@ void print_help(void)
   printf("                                  2: Detection routine (Clones)\n");
   printf("                                  3: Unsafe detection routine\n");
   printf("  -dclone,  --detect-clone-types: Send clone autodetect command to device, returns the config as with '-r' afterwards\n");
+  printf("  -auto,    ----auto-detect-all : Send run autodetection routine command to device and reboot\n");
   printf("  -w,       --write-config      : Write single config item to USBSID-Pico (will read the full config first!)\n");
   printf("  -a,       --apply-config      : Apply the current config settings (from USBSID-Pico memory) that you changed with '-w'\n");
   printf("  -s,       --save-config       : Send the save config command to USBSID-Pico\n");
@@ -1527,7 +1546,12 @@ void config_usbsidpico(int argc, char **argv)
 
     if (!strcmp(argv[param_count], "-defaults") || !strcmp(argv[param_count], "--config-defaults")) {
       printf("Reset USBSID-Pico config to defaults\n");
-      write_config_command(RESET_CONFIG, 0, 0 ,0 ,0);
+      if (argc >= param_count) {
+        param_count++;
+        write_config_command(RESET_CONFIG, atoi(argv[param_count]), 0 ,0 ,0);
+      } else {
+        write_config_command(RESET_CONFIG, 0, 0 ,0 ,0);
+      }
       goto exit;
     }
     if (!strcmp(argv[param_count], "-q")) {
@@ -1751,6 +1775,13 @@ void config_usbsidpico(int argc, char **argv)
       clone_autodetect();
       printf("Printing config\n");
       print_config();
+      break;
+    }
+    if (!strcmp(argv[param_count], "-auto") || !strcmp(argv[param_count], "--auto-detect-all")) {
+      printf("Sending start autodetection and reboot command to USBSID-Pico\n");
+      run_autodetection(true);
+      /* printf("Printing config\n"); */
+      /* print_config(); */
       break;
     }
 

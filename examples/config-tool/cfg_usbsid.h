@@ -96,6 +96,8 @@ enum
   GET_CLOCK        = 0x57,  /* Returns the clockrate as array id in byte 0 */
   LOCK_CLOCK       = 0x58,  /* Locks the clockrate from being changed, saved in config */
   STOP_TESTS       = 0x59,  /* Interrupt any running SID tests */
+  DETECT_CLONES    = 0x5A,  /* Detect clone SID types */
+  AUTO_DETECT      = 0x5B,  /* Run auto detection routine (fallback/workaround for rp2350 bug) */
 
   LOAD_MIDI_STATE  = 0x60,
   SAVE_MIDI_STATE  = 0x61,
