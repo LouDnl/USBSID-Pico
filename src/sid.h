@@ -23,8 +23,8 @@
  *
  */
 
-#ifndef _SID_H_
-#define _SID_H_
+#ifndef _USBSID_SID_H_
+#define _USBSID_SID_H_
 #pragma once
 
 #ifdef __cplusplus
@@ -196,24 +196,47 @@ enum {
 
 enum {
   /* sid_states ~  SID registers */
+  /* TODO: THESE NEED TO GO BUT ARE USED IN sid_routines.c  */
+  NOTELO =  0,
+  NOTEHI =  1,
+  PWMLO  =  2,
+  PWMHI  =  3,
+  CONTR  =  4,
+  ATTDEC =  5,
+  SUSREL =  6,
   /* VOICE 1 */
-  NOTELO = 0,
-  NOTEHI = 1,
-  PWMLO  = 2,
-  PWMHI  = 3,
-  CONTR  = 4,
-  ATTDEC = 5,
-  SUSREL = 6,
+  V1_NOTELO =  0,
+  V1_NOTEHI =  1,
+  V1_PWMLO  =  2,
+  V1_PWMHI  =  3,
+  V1_CONTR  =  4,
+  V1_ATTDEC =  5,
+  V1_SUSREL =  6,
   /* VOICE 2 = + 7 */
+  V2_NOTELO =  7,
+  V2_NOTEHI =  8,
+  V2_PWMLO  =  9,
+  V2_PWMHI  = 10,
+  V2_CONTR  = 11,
+  V2_ATTDEC = 12,
+  V2_SUSREL = 13,
   /* VOICE 3 = + 14 */
-  FC_LO  = 21,
-  FC_HI  = 22,
-  RESFLT = 23,
-  MODVOL = 24,
-  POTX   = 25,
-  POTY   = 26,
-  V3_OSC = 27,
-  V3_ENV = 28
+  V3_NOTELO = 14,
+  V3_NOTEHI = 15,
+  V3_PWMLO  = 16,
+  V3_PWMHI  = 17,
+  V3_CONTR  = 18,
+  V3_ATTDEC = 19,
+  V3_SUSREL = 20,
+  /* Control */
+  FC_LO     = 21,
+  FC_HI     = 22,
+  RESFLT    = 23,
+  MODVOL    = 24,
+  POTX      = 25, /* readonly */
+  POTY      = 26, /* readonly */
+  V3_OSC    = 27, /* readonly */
+  V3_ENV    = 28  /* readonly */
 };
 
 /* HEX DEC Attack(Time/Cycle) Decay(Time/Cycle) */
@@ -343,6 +366,12 @@ static const uint32_t musical_scale_values[] =
 /* 12 musical note notations */
 static const char notes[12][2] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "H"};
 
+/*  */
+
+typedef struct SID {
+ uint8_t addr;
+ uint8_t registers[31];
+} SID;
 
 #ifdef __cplusplus
   }
