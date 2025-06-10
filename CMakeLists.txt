@@ -29,8 +29,8 @@ cmake_minimum_required(VERSION 3.17)
 set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
-string(TIMESTAMP MAGIC_SMOKE "%Y%m%d")
-set(PROJECT_VERSION "0.4.1-BETA.${MAGIC_SMOKE}")  # Must be the same as in config.h
+string(TIMESTAMP MAGIC_SMOKE "%Y%m%d")  # Auto generate dated version
+set(PROJECT_VERSION "0.4.1-BETA.${MAGIC_SMOKE}")  # Generate compile version
 
 ### Want a cookie?
 # NOTICE: ENABLING THESE DEBUGGING DEFINITIONS WILL HAVE SIGNIFICANT IMPACT AND WILL DELAY PLAYING!
@@ -87,7 +87,7 @@ else()
 endif()
 
 
-### Version validation
+### Header validation check
 if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/src/globals.h)
   file(STRINGS ${CMAKE_CURRENT_LIST_DIR}/src/globals.h VALIDATION_FILE)
   set(VALIDATION_SUCCESS False)
@@ -95,20 +95,27 @@ if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/src/globals.h)
   while(VALIDATION_FILE)
     list(POP_FRONT VALIDATION_FILE LINE)
     if (LINE MATCHES ${VALIDATION_LINE})
-      string(REGEX REPLACE "^${VALIDATION_LINE} " "" VERSION ${LINE})
-      if(${VERSION} MATCHES ${PROJECT_VERSION})
+      string(REGEX MATCH "^#define PROJECT_VERSION" VALIDATED ${LINE})
+      if(${VALIDATED} MATCHES ${VALIDATION_LINE})
         set(REDUCTION_SUCCESS True)
-        message("VALIDATED header version ${VERSION}\nMATCHES project version \"${PROJECT_VERSION}\"")
+        message("VALIDATED header line '${VALIDATION_LINE}'")
         set(USBSID_MANUFACTURER "${PROJECT_MANUFACTURER} (v${PROJECT_VERSION})")
         add_compile_definitions(USBSID_MANUFACTURER="${USBSID_MANUFACTURER}")
+        ### CMake shenanigens
+        set(PJVER ${PROJECT_VERSION})
+        add_compile_definitions(PROJECT_VERSION="${PJVER}")
         break()
       else()
-      message("ERROR header version ${VERSION} does not match project version \"${PROJECT_VERSION}\"")
+        message("ERROR header validation line is present but incorrect")
         set(REDUCTION_SUCCESS False)
         return()
       endif()
     endif()
   endwhile()
+  if(NOT REDUCTION_SUCCESS)
+    message("ERROR header validation fallback line not present")
+    return()
+  endif()
 else()
   message("ERROR globals.h missing")
   return()
