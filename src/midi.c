@@ -46,8 +46,9 @@ extern uint8_t __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t add
 extern void process_sysex(uint8_t *buffer, int size);
 
 /* Config externals */
-extern Config usbsid_config;
-extern int numsids;
+// extern Config usbsid_config;
+// extern int cfg.numsids;
+extern RuntimeCFG cfg;
 
 /* Init vars */
 uint8_t addr, val;
@@ -175,7 +176,7 @@ void bank_null(int channel, int sidno, int program)
 
 void bank_zero_sidsetter_dualregister(int channel, int val, int hi, int lo, int himask, int lomask, int hishift)
 { /* For provided hi and lo registers of each active SID */
-  for (int sid = 0; sid < numsids; sid++) {
+  for (int sid = 0; sid < cfg.numsids; sid++) {
     /* Dual Hi */
     midimachine.channel_states[channel][sid][hi] = ((val & himask) >> hishift);
     write(channel, sid, hi);  /* HI REG */
@@ -197,7 +198,7 @@ void bank_one_sidsetter_dualregister(int channel, int sidno, int val, int hi, in
 
 void bank_zero_voicesetter_dualregister(int channel, int val, int hi, int lo, int himask, int lomask, int hishift)
 { /* For provided hi and lo registers of each voice of each active SID */
-  for (int sid = 0; sid < numsids; sid ++) {
+  for (int sid = 0; sid < cfg.numsids; sid ++) {
     for (int i = 0; i < 3; i++) {
       /* Dual Hi */
       midimachine.channel_states[channel][sid][(i * 7) + hi] = ((val & himask) >> hishift);
@@ -221,7 +222,7 @@ void bank_one_voicesetter_dualregister(int channel, int sidno, int voiceno, int 
 
 void bank_zero_sidsetter_singleregister(int channel, int val, int reg, int mask)
 { /* For provided register of each voice of each active SID with provided mask */
-  for (int sid = 0; sid < numsids; sid ++) {
+  for (int sid = 0; sid < cfg.numsids; sid ++) {
     uint8_t keep_state;
     keep_state = midimachine.channel_states[channel][sid][reg];
     keep_state &= mask;
@@ -253,7 +254,7 @@ void bank_one_voicesetter_singleregister(int channel, int sidno, int voiceno, in
 
 void bank_zero_voicetoggle(int channel, int val, int reg, uint8_t toggle)
 { /* For provided register of each voice of each active SID for provided toggle bit */
-  for (int sid = 0; sid < numsids; sid++) {
+  for (int sid = 0; sid < cfg.numsids; sid++) {
     for (int i = 0; i < 3; i++) {
       uint8_t keep_state;
       keep_state = midimachine.channel_states[channel][sid][(i * 7) + reg];
@@ -275,7 +276,7 @@ void bank_one_voicetoggle(int channel, int sidno, int voiceno, int val, int reg,
 
 // void bank_zero_sidsetter_single(int channel, int val, int reg, int mask)
 // {
-//   for (int sid = 0; sid < numsids; sid++) {
+//   for (int sid = 0; sid < cfg.numsids; sid++) {
 //     midimachine.channel_states[channel][sid][reg] = val;
 //     write(channel, sid, reg);
 //   }
@@ -289,7 +290,7 @@ void bank_one_voicetoggle(int channel, int sidno, int voiceno, int val, int reg,
 
 // void bank_zero_voicesetter_single(int channel, int val, int hi, int lo, int himask, int lomask, int hishift)
 // {
-//   // for (int sid = 0; sid < numsids; sid ++) {  /* For each active SID */
+//   // for (int sid = 0; sid < cfg.numsids; sid ++) {  /* For each active SID */
 //   //   for (int i = 0; i < 3; i++) {  /* For each voice per SID */
 //   //     /* Dual Hi */
 //   //     midimachine.channel_states[channel][sid][(i * 7) + hi] = ((val & himask) >> hishift);
@@ -314,7 +315,7 @@ void bank_one_voicetoggle(int channel, int sidno, int voiceno, int val, int reg,
 // void bank_zero_voicesetter_toggle_single_withkeep(int channel, int val, int reg, uint8_t toggle)
 // {
 //   // (void)mask;
-//   for (int sid = 0; sid < numsids; sid ++) {  /* For each active SID */
+//   for (int sid = 0; sid < cfg.numsids; sid ++) {  /* For each active SID */
 //     for (int i = 0; i < 3; i++) {  /* For each voice per SID */
 //       // midimachine.channel_states[channel][sid][reg * i] =
 //       // ((midimachine.channel_states[channel][sid][reg] & R_NIBBLE) ^ toggle);
@@ -396,7 +397,7 @@ void bank_zero_off(int channel, int sidno, uint8_t note)
 
   // if (midimachine.channelkey_states[channel][sidno][N_KEYS] < 0) midimachine.channelkey_states[channel][sidno][N_KEYS] = 0;
 
-  for (int i = 0; i < ((numsids * 3) - 1); i++) {
+  for (int i = 0; i < ((cfg.numsids * 3) - 1); i++) {
     // if (voices[i] == buffer[1]) {
     if (voices[i] == note) {
       voice = i;
@@ -409,7 +410,7 @@ void bank_zero_off(int channel, int sidno, uint8_t note)
   if (midimachine.channelkey_states[channel][sidno][N_KEYS] != 0) midimachine.channelkey_states[channel][sidno][N_KEYS]--;
   write_gate(channel, sidno, (vt[voice] * 7));
   voices[voice] = 0;
-  for (int i = 0; i < ((numsids * 3) - 1); i++) {
+  for (int i = 0; i < ((cfg.numsids * 3) - 1); i++) {
     if (voices[i] == 0) {
       voice = i;
       break;
@@ -449,8 +450,8 @@ void bank_zero_on(int channel, int sidno, uint8_t note, uint8_t Flo, uint8_t Fhi
   write_gate(channel, sidno, (vt[voice] * 7));
   // prevvoice = voice;
   // if (voice < 3) voice++;
-  if (voice < ((numsids * 3) - 1)) voice++;
-  if (voice > ((numsids * 3) - 1)) voice = 0;
+  if (voice < ((cfg.numsids * 3) - 1)) voice++;
+  if (voice > ((cfg.numsids * 3) - 1)) voice = 0;
 }
 
 void bank_one_off(int channel, int sidno, int voiceno, uint8_t note)
@@ -512,12 +513,12 @@ void process_midi(uint8_t *buffer, int size)
     ? midimachine.channelkey_states[channel][sidno][N_KEYS] = 0
     : midimachine.channelkey_states[channel][sidno][N_KEYS];
   int voicecount = 0;
-  for (int i = 0; i < ((numsids * 3) - 1); i++) {
+  for (int i = 0; i < ((cfg.numsids * 3) - 1); i++) {
     if (voices[i] == 0) {
       voicecount += 1; ;
     }
   }
-  if (voicecount == ((numsids * 3) - 1) && midimachine.channelkey_states[channel][sidno][N_KEYS] != 0) midimachine.channelkey_states[channel][sidno][N_KEYS] = 0;
+  if (voicecount == ((cfg.numsids * 3) - 1) && midimachine.channelkey_states[channel][sidno][N_KEYS] != 0) midimachine.channelkey_states[channel][sidno][N_KEYS] = 0;
 // TODO:
 // Add clock sync
 // Any other missing links
@@ -581,7 +582,7 @@ void process_midi(uint8_t *buffer, int size)
               out = map(buffer[2], 0, MIDI_CC_MAX, 0, 2047);
               if (bank == 0) bank_zero_sidsetter_dualregister(channel, out, FC_HI, FC_LO, F_MASK_HI, F_MASK_LO, SHIFT_3); /* writes all available sids */
               if (bank == 1) bank_one_sidsetter_dualregister(channel, sidno, out, FC_HI, FC_LO, F_MASK_HI, F_MASK_LO, SHIFT_3); /* writes a single sid */
-              // for (int sid = 0; sid < numsids; sid ++) {
+              // for (int sid = 0; sid < cfg.numsids; sid ++) {
               //   val = (out & 0x7);
               //   midimachine.channel_states[channel][sid][FC_LO] = val;
               //   val = (out & 0x7F8) >> 3;
@@ -595,7 +596,7 @@ void process_midi(uint8_t *buffer, int size)
               if (bank == 0) bank_zero_sidsetter_singleregister(channel, (out << 4), RESFLT, R_NIBBLE);
               if (bank == 1) bank_one_sidsetter_singleregister(channel, sidno, (out << 4), RESFLT, R_NIBBLE);
               // mask = R_NIBBLE;  /* Inverted */
-              // for (int sid = 0; sid < numsids; sid ++) {
+              // for (int sid = 0; sid < cfg.numsids; sid ++) {
               //   midimachine.channel_states[channel][sid][RESFLT] = (out << 4) | (midimachine.channel_states[channel][sid][RESFLT] & mask);
               //   write(channel, sid, RESFLT);
               // }
@@ -604,7 +605,7 @@ void process_midi(uint8_t *buffer, int size)
               out = map_to_onoff(buffer[2]);
               if (bank == 0) bank_zero_voicetoggle(channel, out, MODVOL, BIT_7);
               if (bank == 1) bank_one_voicetoggle(channel, sidno, voiceno, out, MODVOL, BIT_7);
-              // for (int sid = 0; sid < numsids; sid ++) {
+              // for (int sid = 0; sid < cfg.numsids; sid ++) {
               //   keep_state = midimachine.channel_states[channel][sid][MODVOL];
               //   val = out == 1 ? keep_state |= 0x80 : keep_state ^ 0x80;
               //   midimachine.channel_states[channel][sid][MODVOL] = val;
@@ -636,7 +637,7 @@ void process_midi(uint8_t *buffer, int size)
               //   : 0; // <<- fallback
               if (bank == 0) bank_zero_voicetoggle(channel, out, RESFLT, BIT_3);
               if (bank == 1) bank_one_voicetoggle(channel, sidno, voiceno, out, RESFLT, BIT_3);
-              // for (int sid = 0; sid < numsids; sid++) {
+              // for (int sid = 0; sid < cfg.numsids; sid++) {
               //   fltres_state = midimachine.channel_states[channel][sid][RESFLT];
               //   val = out == 1 ? fltres_state |= fltchannel : fltres_state ^ fltchannel;
               //   midimachine.channel_states[channel][sid][RESFLT] = val;
@@ -648,7 +649,7 @@ void process_midi(uint8_t *buffer, int size)
               out = map_to_onoff(buffer[2]);
               if (bank == 0) bank_zero_voicetoggle(channel, out, MODVOL, BIT_6);
               if (bank == 1) bank_one_voicetoggle(channel, sidno, voiceno, out, MODVOL, BIT_6);
-              // for (int sid = 0; sid < numsids; sid ++) {
+              // for (int sid = 0; sid < cfg.numsids; sid ++) {
               //   keep_state = midimachine.channel_states[channel][sid][MODVOL];
               //   val = out == 1 ? keep_state |= 0x40 : keep_state ^ 0x40;
               //   midimachine.channel_states[channel][sid][MODVOL] = val;
@@ -660,7 +661,7 @@ void process_midi(uint8_t *buffer, int size)
               out = map_to_onoff(buffer[2]);
               if (bank == 0) bank_zero_voicetoggle(channel, out, MODVOL, BIT_5);
               if (bank == 1) bank_one_voicetoggle(channel, sidno, voiceno, out, MODVOL, BIT_5);
-              // for (int sid = 0; sid < numsids; sid ++) {
+              // for (int sid = 0; sid < cfg.numsids; sid ++) {
               //   keep_state = midimachine.channel_states[channel][sid][MODVOL];
               //   val = out == 1 ? keep_state |= 0x20 : keep_state ^ 0x20;
               //   midimachine.channel_states[channel][sid][MODVOL] = val;
@@ -672,7 +673,7 @@ void process_midi(uint8_t *buffer, int size)
               out = map_to_onoff(buffer[2]);
               if (bank == 0) bank_zero_voicetoggle(channel, out, MODVOL, BIT_4);
               if (bank == 1) bank_one_voicetoggle(channel, sidno, voiceno, out, MODVOL, BIT_4);
-              // for (int sid = 0; sid < numsids; sid ++) {
+              // for (int sid = 0; sid < cfg.numsids; sid ++) {
               //   keep_state = midimachine.channel_states[channel][sid][MODVOL];
               //   val = out == 1 ? keep_state |= 0x10 : keep_state ^ 0x10;
               //   midimachine.channel_states[channel][sid][MODVOL] = val;
@@ -729,7 +730,7 @@ void process_midi(uint8_t *buffer, int size)
               out = map_to_onoff(buffer[2]);
               if (bank == 0) bank_zero_voicetoggle(channel, out, CONTR, BIT_2);
               if (bank == 1) bank_one_voicetoggle(channel, sidno, voiceno, out, CONTR, BIT_2);
-              // for (int sid = 0; sid < numsids; sid ++) {
+              // for (int sid = 0; sid < cfg.numsids; sid ++) {
               //   midimachine.channel_states[channel][sid][CONTR] = ((midimachine.channel_states[channel][sid][CONTR] & R_NIBBLE) ^ 0x4);
               //   midimachine.channel_states[channel][sid][CONTR + 7] = ((midimachine.channel_states[channel][sid][CONTR + 7] & R_NIBBLE) ^ 0x4);
               //   midimachine.channel_states[channel][sid][CONTR + 14] = ((midimachine.channel_states[channel][sid][CONTR + 14] & R_NIBBLE) ^ 0x4);
@@ -741,7 +742,7 @@ void process_midi(uint8_t *buffer, int size)
               out = map_to_onoff(buffer[2]);
               if (bank == 0) bank_zero_voicetoggle(channel, out, CONTR, BIT_1);
               if (bank == 1) bank_one_voicetoggle(channel, sidno, voiceno, out, CONTR, BIT_1);
-              // for (int sid = 0; sid < numsids; sid ++) {
+              // for (int sid = 0; sid < cfg.numsids; sid ++) {
               //   midimachine.channel_states[channel][sid][CONTR] = ((midimachine.channel_states[channel][sid][CONTR] & R_NIBBLE) ^ 0x2);
               //   midimachine.channel_states[channel][sid][CONTR + 7] = ((midimachine.channel_states[channel][sid][CONTR + 7] & R_NIBBLE) ^ 0x2);
               //   midimachine.channel_states[channel][sid][CONTR + 14] = ((midimachine.channel_states[channel][sid][CONTR + 14] & R_NIBBLE) ^ 0x2);
@@ -762,7 +763,7 @@ void process_midi(uint8_t *buffer, int size)
               out = map(buffer[2], 0, MIDI_CC_MAX, 0, 15);
               bank_one_voicesetter_singleregister(channel, sidno, voiceno, (out << 4), ATTDEC, R_NIBBLE);
               // mask = R_NIBBLE; /* Inverted */
-              // for (int sid = 0; sid < numsids; sid ++) {
+              // for (int sid = 0; sid < cfg.numsids; sid ++) {
               //   for (int i = 0; i < 3; i++) {
               //     midimachine.channel_states[channel][sid][(i * 7) + ATTDEC] = (out << 4) | (midimachine.channel_states[channel][sid][(i * 7) + ATTDEC] & mask);
               //   }
@@ -775,7 +776,7 @@ void process_midi(uint8_t *buffer, int size)
               bank_one_voicesetter_singleregister(channel, sidno, voiceno, out, ATTDEC, L_NIBBLE);
               // out = map(in, 0, 127, 0, 15);
               // mask = L_NIBBLE;  /* Inverted */
-              // for (int sid = 0; sid < numsids; sid ++) {
+              // for (int sid = 0; sid < cfg.numsids; sid ++) {
               //   for (int i = 0; i < 3; i++) {
               //     midimachine.channel_states[channel][sid][(i * 7) + ATTDEC] = (midimachine.channel_states[channel][sid][(i * 7) + ATTDEC] & mask) | out;
               //   }
@@ -787,7 +788,7 @@ void process_midi(uint8_t *buffer, int size)
               out = map(buffer[2], 0, MIDI_CC_MAX, 0, 15);
               bank_one_voicesetter_singleregister(channel, sidno, voiceno, (out << 4), SUSREL, R_NIBBLE);
               // mask = R_NIBBLE;  /* Inverted */
-              // for (int sid = 0; sid < numsids; sid ++) {
+              // for (int sid = 0; sid < cfg.numsids; sid ++) {
               //   for (int i = 0; i < 3; i++) {
               //     midimachine.channel_states[channel][sid][(i * 7) + SUSREL] = (out << 4) | (midimachine.channel_states[channel][sid][(i * 7) + SUSREL] & mask);
               //   }
@@ -799,7 +800,7 @@ void process_midi(uint8_t *buffer, int size)
               out = map(buffer[2], 0, MIDI_CC_MAX, 0, 15);
               bank_one_voicesetter_singleregister(channel, sidno, voiceno, out, SUSREL, L_NIBBLE);
               // mask = L_NIBBLE;  /* Inverted */
-              // for (int sid = 0; sid < numsids; sid ++) {
+              // for (int sid = 0; sid < cfg.numsids; sid ++) {
               //   for (int i = 0; i < 3; i++) {
               //     midimachine.channel_states[channel][sid][(i * 7) + SUSREL] = (midimachine.channel_states[channel][sid][(i * 7) + SUSREL] & mask) | out;
               //   }
@@ -823,7 +824,7 @@ void process_midi(uint8_t *buffer, int size)
         case 0:  /* Bank 0 ~ Polyfonic stacking */
           switch (program) {
             case 0:  /* Noise */
-              for (int sid = 0; sid < numsids; sid ++) {
+              for (int sid = 0; sid < cfg.numsids; sid ++) {
                 for (int i = 0; i < 3; i++) {
                   midimachine.channel_states[channel][sid][(i * 7) + CONTR] = ((midimachine.channel_states[channel][sid][(i * 7) + CONTR] & R_NIBBLE) | 0x80);
                 }
@@ -831,7 +832,7 @@ void process_midi(uint8_t *buffer, int size)
               }
               break;
             case 1:  /* Pulse */
-              for (int sid = 0; sid < numsids; sid ++) {
+              for (int sid = 0; sid < cfg.numsids; sid ++) {
                 for (int i = 0; i < 3; i++) {
                 midimachine.channel_states[channel][sid][(i * 7) + CONTR] = ((midimachine.channel_states[channel][sid][(i * 7) + CONTR] & R_NIBBLE) | 0x40);
                 }
@@ -839,7 +840,7 @@ void process_midi(uint8_t *buffer, int size)
                }
               break;
             case 2:  /* Sawtooth */
-              for (int sid = 0; sid < numsids; sid ++) {
+              for (int sid = 0; sid < cfg.numsids; sid ++) {
                 for (int i = 0; i < 3; i++) {
                   midimachine.channel_states[channel][sid][(i * 7) + CONTR] = ((midimachine.channel_states[channel][sid][(i * 7) + CONTR] & R_NIBBLE) | 0x20);
                 }
@@ -847,7 +848,7 @@ void process_midi(uint8_t *buffer, int size)
               }
               break;
             case 3:  /* Triangle */
-              for (int sid = 0; sid < numsids; sid ++) {
+              for (int sid = 0; sid < cfg.numsids; sid ++) {
                 for (int i = 0; i < 3; i++) {
                   midimachine.channel_states[channel][sid][(i * 7) + CONTR] = ((midimachine.channel_states[channel][sid][(i * 7) + CONTR] & R_NIBBLE) | 0x10);
                 }
@@ -877,7 +878,7 @@ void process_midi(uint8_t *buffer, int size)
           }
           break;
         case 9:  /* Patches */
-          for (int n = 1; n <= numsids; n++) {
+          for (int n = 1; n <= cfg.numsids; n++) {
             bank_null(channel, (n - 1), program);
           }
         default:
