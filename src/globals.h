@@ -35,6 +35,11 @@
 /* Default includes */
 #include <stdint.h>
 #include <stdlib.h>
+/* Default Pico includes */
+#include "pico/stdlib.h"
+#if PICO_RP2350
+#include "hardware/structs/powman.h"
+#endif
 
 #include "macros.h"
 
@@ -44,7 +49,7 @@
 #define MAGIC_SMOKE 19700101  /* DATEOFRELEASE */
 #endif
 #ifndef PROJECT_VERSION
-#define PROJECT_VERSION "0.4.1-BETA.20250605"  /* Must be the same as in CMakeLists.txt */
+#define PROJECT_VERSION "0.0.0-ALPHA.19700101"
 #endif
 #ifndef PCB_VERSION
 #define PCB_VERSION "1.0"
@@ -55,12 +60,31 @@
 #endif
 
 #ifndef MIN_CYCLES
-#define MIN_CYCLES 10  /* 10 cycles for non cycled writes when in sequence */
+#define MIN_CYCLES 6  /* 10 cycles for non cycled writes when in sequence */
 #endif
 
 #ifndef USE_CDC_CALLBACK
 #define USE_CDC_CALLBACK 1  /* Force CDC callback use over cdc_task */
 #endif
+
+/* Global USB definitions */
+#define CDC_ITF 0
+#define MIDI_ITF 0
+#define WUSB_ITF 0
+#define MIDI_CABLE 0
+
+/* USB data type */
+extern char dtype, ntype, cdc, asid, midi, sysex, wusb;
+
+/* WebUSB globals */
+#define URL  "/usbsid.loudai.nl"
+enum
+{
+  VENDOR_REQUEST_WEBUSB = 1,
+  VENDOR_REQUEST_MICROSOFT = 2,
+  VENDOR_REQUEST_USBSID = 3  /* Unofficial hack */
+};
+extern uint8_t const desc_ms_os_20[];
 
 /* USBSID command byte */
 enum
@@ -98,24 +122,6 @@ enum
   WEBUSB_FMOPLSID = 0x3A,
   WEBUSB_TOGGLEAU = 0x3B,
 };
-
-/* Global USB definitions */
-#define CDC_ITF 0
-#define MIDI_ITF 0
-#define WUSB_ITF 0
-#define MIDI_CABLE 0
-
-/* USB data type */
-extern char dtype, ntype, cdc, asid, midi, sysex, wusb;
-
-/* WebUSB globals */
-#define URL  "/usbsid.loudai.nl"
-enum
-{
-  VENDOR_REQUEST_WEBUSB = 1,
-  VENDOR_REQUEST_MICROSOFT = 2
-};
-extern uint8_t const desc_ms_os_20[];
 
 
 #ifdef __cplusplus
