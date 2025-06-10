@@ -45,7 +45,7 @@
 
 /* Config externals */
 extern RuntimeCFG cfg;
-extern const char *sidtypes[5];
+extern char *sidtypes[5];
 
 /* GPIO externals */
 extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
