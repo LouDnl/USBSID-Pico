@@ -281,7 +281,7 @@ void read_fpgasid_configuration(uint8_t base_address)
   uint16_t fpgasid_id = (idHi << 8 | idLo);
   if (fpgasid_id != 0xF51D) {
     CFG("[SID] ERROR: 0x%04X != 0xF51D FPGASID NOT FOUND @ 0x%02X\n", fpgasid_id, base_address);
-    return true;
+    return;
   }
 
   /* Start diag config read */
