@@ -36,7 +36,7 @@
 #include "logging.h"
 
 
-/* USBSID externals */
+/* USBSID */
 extern void init_sidclock(void);
 extern void deinit_sidclock(void);
 extern void cdc_write(uint8_t * itf, uint32_t n);
@@ -49,19 +49,18 @@ extern double cpu_mhz, cpu_us;
 extern double sid_hz, sid_mhz, sid_us;
 extern uint8_t sid_memory[];
 extern queue_t sidtest_queue;
+extern bool auto_config;
 
-/* SID externals */
-extern uint8_t detect_sid_version(uint8_t start_addr);
-extern uint8_t detect_sid_model(uint8_t start_addr);
-extern uint8_t detect_sid_version_skpico(uint8_t start_addr);
-extern uint8_t detect_sid_unsafe(uint8_t start_addr);
-uint8_t (*sid_detection[4])(uint8_t) = { detect_sid_model, detect_sid_version, detect_sid_version_skpico, detect_sid_unsafe };
+/* SID */
+extern uint8_t (*sid_detection[4])(uint8_t);
 extern bool detect_fmopl(uint8_t base_address);
-extern void detect_clone_types(bool sockone, bool onedual, bool socktwo, bool twodual);
+extern void detect_sid_types(int detection_routine);
+extern uint8_t detect_clone_type(Socket * cfg_ptr);
+extern void auto_detect_routine(bool auto_config, bool with_delay);
 extern void sid_test(int sidno, char test, char wf);
 extern bool running_tests;
 
-/* GPIO externals */
+/* GPIO */
 extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
 extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
@@ -77,41 +76,61 @@ extern void mute_sid(void);
 extern void reset_sid_registers(void);
 extern void toggle_audio_switch(void);
 extern void set_audio_switch(bool state);
+extern void read_fpgasid_configuration(uint8_t base_address);
 
-/* Midi externals */
+/* Midi */
 extern void midi_bus_operation(uint8_t a, uint8_t b);
 
-/* MCU externals */
+/* MCU */
 extern void mcu_reset(void);
 
+/* Config bus */
+extern void apply_bus_config(bool quiet);
+extern void apply_bus_config_OLD(void); // TODO: REMOVE ME!!
+extern void apply_fmopl_config(bool quiet);
+
+/* Config socket */
+extern void verify_socket_settings(void);
+extern void apply_socket_config(bool quiet);
+extern void set_sid_addr_id(int socket, int sid, uint8_t addr); // TODO: REMOVE ME!!
+extern void set_sid_id_addr(int socket, int sid, int id); // TODO: REMOVE ME!!
+extern void set_socket_config(uint8_t cmd, bool s1en, bool s1dual, uint8_t s1chip, bool s2en, bool s2dual, uint8_t s2chip, bool mirror);
+extern uint8_t sidaddr_default[4];
+
+/* Config logging */
+extern void print_cfg(const uint8_t *buf, size_t len);
+extern void print_cfg_addr(void);
+extern void print_pico_features(void);
+extern void print_config_settings(void);
+extern void print_socket_config(void);
+extern void print_bus_config(void);
+void (*config_print[5])(void) = { print_cfg_addr, print_pico_features, print_config_settings, print_socket_config, print_bus_config };
+extern char *sidtypes[5];
+extern char *chiptypes[2];
+extern char *clonetypes[6];
+extern char *int_ext[2];
+extern char *enabled[2];
+extern char *true_false[2];
+extern char *single_dual[2];
+extern char *mono_stereo[2];
+
 /* Pre declarations */
-int verify_fmopl_sidno(void);
 void apply_config(bool at_boot);
-void apply_socket_change(void);
+void save_load_apply_config(bool at_boot);
+void save_config_ext(void);
 int return_clockrate(void);
 void apply_clockrate(int n_clock, bool suspend_sids);
 
-/* Init config vars
- * Based on: https://community.element14.com/products/raspberry-pi/b/blog/posts/raspberry-pico-c-sdk-reserve-a-flash-memory-block-for-persistent-storage
- */
+/* Declare variables */
+Config usbsid_config;
+RuntimeCFG cfg;
+bool first_boot = false;
+const char *project_version = PROJECT_VERSION;
+const char *pcb_version = PCB_VERSION;
 
- /* .section_persistent from the linker script, 4 bytes aligned */
-extern uint32_t ADDR_PERSISTENT[];
-/* Base address */
-#define ADDR_PERSISTENT_BASE_ADDR (ADDR_PERSISTENT)
-/* rp2040: 0x0x1FF000, rp2350: 0x3FF000 */
-#define FLASH_PERSISTENT_OFFSET ((uint32_t)ADDR_PERSISTENT_BASE_ADDR - XIP_BASE)
-/* Storage size in flash memory */
-#define FLASH_PERSISTENT_SIZE (PICO_FLASH_SIZE_BYTES - FLASH_PERSISTENT_OFFSET)
-/* Default config offset in flash memory */
-#define FLASH_CONFIG_OFFSET (FLASH_PERSISTENT_OFFSET + ((FLASH_PERSISTENT_SIZE / 4) * 3))
-/* Max config size = 256 Bytes == FLASH_PAGE_SIZE (FLASH_SECTOR_SIZE / 16 config saves) */
-#define CONFIG_SIZE (FLASH_SECTOR_SIZE / 16)
-
-/* Init local vars */
-
+/* Declare local variables */
 /* 0x15 (16) max before starting at 0 flash sector erase */
-uint8_t config_saveid = 0;
+static uint8_t config_saveid = 0;
 /* 256 Bytes MAX == FLASH_PAGE_SIZE (Max storage size is 4096 bytes == FLASH_SECTOR_SIZE) */
 static uint8_t config_array[FLASH_PAGE_SIZE];
 /* 10 bytes is enough for now */
@@ -120,206 +139,7 @@ static uint8_t socket_config_array[10];
 static uint8_t p_version_array[MAX_BUFFER_SIZE];
 /* Config magic verification storage */
 static uint32_t cm_verification;
-/* Max 4 sids {S1, S2, S3, S4} defaults to 'unknown' */
-static int sidtype[4];
 
-/* Init vars */
-int sock_one = 0, sock_two = 0, sids_one = 0, sids_two = 0, numsids = 0, act_as_one = 0;
-int fmopl_sid = 0;
-bool fmopl_enabled = false;
-uint8_t one = 0, two = 0, three = 0, four = 0;
-uint8_t one_mask = 0, two_mask = 0, three_mask = 0, four_mask = 0;
-bool first_boot = false;
-
-/* Init string constants for logging */
-const char* project_version = PROJECT_VERSION;
-const char* pcb_version = PCB_VERSION;
-const char *sidtypes[5] = { "UNKNOWN", "N/A", "MOS8580", "MOS6581", "FMOpl" };
-const char *chiptypes[3] = { "Real", "Clone", "Unknown" };
-const char *clonetypes[6] = { "Disabled", "Other", "SKPico", "ARMSID", "FPGASID", "RedipSID" };
-const char *int_ext[2] = { "Internal", "External" };
-const char *enabled[2] = { "Disabled", "Enabled" };
-const char *true_false[2] = { "False", "True" };
-const char *single_dual[2] = { "Dual SID", "Single SID" };
-const char *mono_stereo[2] = { "Mono", "Stereo" };
-
-#define USBSID_DEFAULT_CONFIG_INIT { \
-  .magic = MAGIC_SMOKE, \
-  .default_config = 1, \
-  .config_saveid = 0, \
-  .external_clock = false, \
-  .clock_rate = DEFAULT, \
-  .refresh_rate = HZ_DEFAULT, \
-  .raster_rate = R_DEFAULT, \
-  .lock_clockrate = false, \
-  .stereo_en = false, \
-  .socketOne = { \
-    .enabled = true, \
-    .dualsid = false, \
-    .chiptype = 0x0,  /* real */ \
-    .clonetype = 0x0, /* disabled */ \
-    .sid1type = 0x0,  /* unknown */ \
-    .sid2type = 0x1,  /* n/a */ \
-  }, \
-  .socketTwo = { \
-    .enabled = true, \
-    .dualsid = false, \
-    .act_as_one = false, \
-    .chiptype = 0x0,  /* real */ \
-    .clonetype = 0x0, /* disabled */ \
-    .sid1type = 0x0,  /* unknown */ \
-    .sid2type = 0x1,  /* n/a */ \
-  }, \
-  .LED = { \
-    .enabled = true, \
-    .idle_breathe = LED_PWM \
-  }, \
-  .RGBLED = { \
-    .enabled = RGB_ENABLED, \
-    .idle_breathe = RGB_ENABLED, \
-    .brightness = (RGB_ENABLED ? 0x7F : 0),  /* Half of max brightness or disabled if no RGB LED */ \
-    .sid_to_use = (RGB_ENABLED ? 1 : -1), \
-  }, \
-  .Cdc = { \
-    .enabled = true \
-  }, \
-  .WebUSB = { \
-    .enabled = true \
-  }, \
-  .Asid = { \
-    .enabled = true \
-  }, \
-  .Midi = { \
-    .enabled = true \
-  }, \
-  .FMOpl = { \
-    .enabled = false, \
-    .sidno = 0, \
-  }, \
-} \
-
-static const Config usbsid_default_config = USBSID_DEFAULT_CONFIG_INIT;
-
-void print_cfg_addr(void)
-{
-  CFG("[CONFIG] [XIP_BASE]0x%X (%u)\n\
-[CONFIG] [PICO_FLASH_SIZE_BYTES]0x%X (%u)\n\
-[CONFIG] [FLASH_PAGE_SIZE]0x%X (%u)\n\
-[CONFIG] [FLASH_SECTOR_SIZE]0x%X (%u)\n\
-[CONFIG] [ADDR_PERSISTENT_BASE_ADDR]0x%X (%u)\n\
-[CONFIG] [FLASH_PERSISTENT_OFFSET]0x%X (%u)\n\
-[CONFIG] [FLASH_PERSISTENT_SIZE]0x%X (%u)\n\
-[CONFIG] [FLASH_CONFIG_OFFSET]0x%X (%u)\n\
-[CONFIG] [XIP_BASE + FLASH_CONFIG_OFFSET]0x%X (%u)\n\
-[CONFIG] [CONFIG_SIZE]0x%X (%u)\n\
-[CONFIG] [SIZEOF_CONFIG]0x%X (%u)\n",
-    XIP_BASE, XIP_BASE, PICO_FLASH_SIZE_BYTES, PICO_FLASH_SIZE_BYTES,
-    FLASH_PAGE_SIZE, FLASH_PAGE_SIZE, FLASH_SECTOR_SIZE, FLASH_SECTOR_SIZE,
-    ADDR_PERSISTENT_BASE_ADDR, ADDR_PERSISTENT_BASE_ADDR,
-    FLASH_PERSISTENT_OFFSET, FLASH_PERSISTENT_OFFSET, FLASH_PERSISTENT_SIZE, FLASH_PERSISTENT_SIZE,
-    FLASH_CONFIG_OFFSET, FLASH_CONFIG_OFFSET,
-    (XIP_BASE + FLASH_CONFIG_OFFSET), (XIP_BASE + FLASH_CONFIG_OFFSET),
-    CONFIG_SIZE, CONFIG_SIZE, sizeof(Config), sizeof(Config));
-}
-
-void print_cfg(const uint8_t *buf, size_t len)
-{
-  CFG("[PRINT CFG START]\n");
-  for (size_t i = 0; i < len; ++i) {
-    if (i == 0)
-      CFG("[R%03d] ", i);
-    CFG("%02x", buf[i]);
-    if (i == (len - 1)) {
-      CFG("\n");
-    } else if ((i != 0) && (i % 16 == 15)) {
-      CFG("\n[R%03d] ", i);
-    } else {
-      CFG(" ");
-    }
-  }
-  CFG("[PRINT CFG END]\n");
-
-  return;
-}
-
-void detect_sid_types(int detection_routine)
-{
-  /* Check if routine number is within range */
-  detection_routine = (detection_routine > 4 ? 0 : detection_routine);
-
-  int sid1 = 0, sid2 = 0, sid3 = 0, sid4 = 0;
-
-  if (numsids >= 1) {
-    sid1 = sid_detection[detection_routine](0x00);
-    CFG("[CONFIG] [READ SID1] [%02x %s]\n", sid1, sidtypes[sid1]);
-  }
-  if (numsids >= 2) {
-    sid2 = sid_detection[detection_routine](0x20);
-    CFG("[CONFIG] [READ SID2] [%02x %s]\n", sid2, sidtypes[sid2]);
-  }
-  if (numsids >= 3) {
-    sid3 = sid_detection[detection_routine](0x40);
-    CFG("[CONFIG] [READ SID3] [%02x %s]\n", sid3, sidtypes[sid3]);
-  }
-  if (numsids == 4) {
-    sid4 = sid_detection[detection_routine](0x60);
-    CFG("[CONFIG] [READ SID4] [%02x %s]\n", sid4, sidtypes[sid4]);
-  }
-
-  if (usbsid_config.socketOne.enabled && usbsid_config.socketTwo.enabled) {
-    if (usbsid_config.socketOne.dualsid && usbsid_config.socketTwo.dualsid) {
-      usbsid_config.socketOne.sid1type = sid1;
-      usbsid_config.socketOne.sid2type = sid2;
-      usbsid_config.socketTwo.sid1type = sid3;
-      usbsid_config.socketTwo.sid2type = sid4;
-    }
-    if (!usbsid_config.socketOne.dualsid && usbsid_config.socketTwo.dualsid) {
-      usbsid_config.socketOne.sid1type = sid1;
-      usbsid_config.socketOne.sid2type = 1;
-      usbsid_config.socketTwo.sid1type = sid2;
-      usbsid_config.socketTwo.sid2type = sid3;
-    }
-    if (usbsid_config.socketOne.dualsid && !usbsid_config.socketTwo.dualsid) {
-      usbsid_config.socketOne.sid1type = sid1;
-      usbsid_config.socketOne.sid2type = sid2;
-      usbsid_config.socketTwo.sid1type = sid3;
-      usbsid_config.socketTwo.sid2type = 1;
-    }
-    if (!usbsid_config.socketOne.dualsid && !usbsid_config.socketTwo.dualsid) {
-      usbsid_config.socketOne.sid1type = sid1;
-      usbsid_config.socketOne.sid2type = 1;
-      usbsid_config.socketTwo.sid1type = sid2;
-      usbsid_config.socketTwo.sid2type = 1;
-    }
-  } else if (usbsid_config.socketOne.enabled && !usbsid_config.socketTwo.enabled) {
-    usbsid_config.socketTwo.sid1type = 1;
-    usbsid_config.socketTwo.sid2type = 1;
-    if (usbsid_config.socketOne.dualsid) {
-      usbsid_config.socketOne.sid1type = sid1;
-      usbsid_config.socketOne.sid2type = sid2;
-    } else if (!usbsid_config.socketOne.dualsid) {
-      usbsid_config.socketOne.sid1type = sid1;
-      usbsid_config.socketOne.sid2type = 1;
-    }
-  } else if (!usbsid_config.socketOne.enabled && usbsid_config.socketTwo.enabled) {
-    usbsid_config.socketOne.sid1type = 1;
-    usbsid_config.socketOne.sid2type = 1;
-    if (usbsid_config.socketTwo.dualsid) {
-      usbsid_config.socketTwo.sid1type = sid1;
-      usbsid_config.socketTwo.sid2type = sid2;
-    } else if (!usbsid_config.socketTwo.dualsid) {
-      usbsid_config.socketTwo.sid1type = sid1;
-      usbsid_config.socketTwo.sid2type = 1;
-    }
-  }
-
-  CFG("[CONFIG] SOCKET ONE SID1 TYPE: %s\n", sidtypes[usbsid_config.socketOne.sid1type]);
-  CFG("[CONFIG] SOCKET ONE SID2 TYPE: %s\n", sidtypes[usbsid_config.socketOne.sid2type]);
-  CFG("[CONFIG] SOCKET TWO SID1 TYPE: %s\n", sidtypes[usbsid_config.socketTwo.sid1type]);
-  CFG("[CONFIG] SOCKET TWO SID2 TYPE: %s\n", sidtypes[usbsid_config.socketTwo.sid2type]);
-
-  return;
-}
 
 void read_config(Config* config)
 {
@@ -338,15 +158,15 @@ void read_config(Config* config)
   config_array[11] = (int)config->socketOne.dualsid;
   config_array[12] = config->socketOne.chiptype;
   config_array[13] = config->socketOne.clonetype;
-  config_array[14] = config->socketOne.sid1type;
-  config_array[15] = config->socketOne.sid2type;
+  config_array[14] = config->socketOne.sid1.type;
+  config_array[15] = config->socketOne.sid2.type;
   config_array[20] = (int)config->socketTwo.enabled;
   config_array[21] = (int)config->socketTwo.dualsid;
-  config_array[22] = (int)config->socketTwo.act_as_one;
+  config_array[22] = (int)config->mirrored;
   config_array[23] = config->socketTwo.chiptype;
   config_array[24] = config->socketTwo.clonetype;
-  config_array[25] = config->socketTwo.sid1type;
-  config_array[26] = config->socketTwo.sid2type;
+  config_array[25] = config->socketTwo.sid1.type;
+  config_array[26] = config->socketTwo.sid2.type;
   config_array[30] = (int)config->LED.enabled;
   config_array[31] = (int)config->LED.idle_breathe;
   config_array[40] = (int)config->RGBLED.enabled;
@@ -374,13 +194,13 @@ void read_socket_config(Config* config)
 
   socket_config_array[2] = ((int)config->socketOne.enabled << 4) | (int)config->socketOne.dualsid;
   socket_config_array[3] = (config->socketOne.chiptype << 4) | config->socketOne.clonetype;
-  socket_config_array[4] = (config->socketOne.sid1type << 4) | config->socketOne.sid2type;
+  socket_config_array[4] = (config->socketOne.sid1.type << 4) | config->socketOne.sid2.type;
 
   socket_config_array[5] = ((int)config->socketTwo.enabled << 4) | (int)config->socketTwo.dualsid;
   socket_config_array[6] = (config->socketTwo.chiptype << 4) | config->socketTwo.clonetype;
-  socket_config_array[7] = (config->socketTwo.sid1type << 4) | config->socketTwo.sid2type;
+  socket_config_array[7] = (config->socketTwo.sid1.type << 4) | config->socketTwo.sid2.type;
 
-  socket_config_array[8] = (int)config->socketTwo.act_as_one;
+  socket_config_array[8] = (int)config->mirrored;
 
   socket_config_array[9] = 0xFF;  /* Terminator byte */
 
@@ -413,8 +233,9 @@ void __no_inline_not_in_flash_func(default_config)(Config* config)
 
 void __no_inline_not_in_flash_func(load_config)(Config* config)
 {
-  CFG("[LOAD CONFIG START]\n");
   print_cfg_addr();
+  CFG("\n");
+  CFG("[START LOAD CONFIG]\n");
   int savelocationid = 0;  /* counter for finding the current save location */
 AGAIN:
   Config temp_config;
@@ -448,7 +269,7 @@ AGAIN:
       default_config(config);
   }
 
-  CFG("[LOAD CONFIG END]\n");
+  CFG("[END LOAD CONFIG]\n");
   return;
 }
 
@@ -510,25 +331,6 @@ void write_back_data(size_t buffersize)
   return;
 }
 
-void set_socket_config(uint8_t cmd, bool s1en, bool s1dual, uint8_t s1chip, bool s2en, bool s2dual, uint8_t s2chip, bool as_one)
-{
-  usbsid_config.socketOne.enabled = s1en;
-  usbsid_config.socketOne.dualsid = s1dual;
-  usbsid_config.socketOne.chiptype = s1chip;  /* Chiptype must be clone for dualsid to work! */
-  usbsid_config.socketTwo.enabled = s2en;
-  usbsid_config.socketTwo.dualsid = s2dual;
-  usbsid_config.socketTwo.chiptype = s2chip;  /* Chiptype must be clone for dualsid to work! */
-  usbsid_config.socketTwo.act_as_one = as_one;
-  if (cmd == 0) {
-    save_config(&usbsid_config);
-    load_config(&usbsid_config);
-    apply_config(false);
-  } else if (cmd == 1) {
-    apply_socket_change();
-  }
-  return;
-}
-
 void handle_config_request(uint8_t * buffer)
 { /* Incoming Config data buffer
    *
@@ -568,13 +370,13 @@ void handle_config_request(uint8_t * buffer)
     case READ_NUMSIDS:
       CFG("[CMD] READ_NUMSIDS\n");
       memset(write_buffer_p, 0, 64);
-      write_buffer_p[0] = (uint8_t)numsids;
+      write_buffer_p[0] = (uint8_t)cfg.numsids;
       write_back_data(1);
       break;
     case READ_FMOPLSID:
       CFG("[CMD] READ_FMOPLSID\n");
       memset(write_buffer_p, 0, 64);
-      write_buffer_p[0] = (uint8_t)fmopl_sid;
+      write_buffer_p[0] = (uint8_t)cfg.fmopl_sid;
       write_back_data(1);
       break;
     case APPLY_CONFIG:
@@ -625,14 +427,14 @@ void handle_config_request(uint8_t * buffer)
                   usbsid_config.socketOne.clonetype = buffer[3];
                 }
                 break;
-              case 4: /* sid1type */
+              case 4: /* sid1.type */
                 if (buffer[3] <= 4) {
-                  usbsid_config.socketOne.sid1type = buffer[3];
+                  usbsid_config.socketOne.sid1.type = buffer[3];
                 }
                 break;
-              case 5: /* sid2type */
+              case 5: /* sid2.type */
                 if (buffer[3] <= 4) {
-                  usbsid_config.socketOne.sid2type = buffer[3];
+                  usbsid_config.socketOne.sid2.type = buffer[3];
                 }
                 break;
           };
@@ -659,19 +461,19 @@ void handle_config_request(uint8_t * buffer)
                 usbsid_config.socketTwo.clonetype = buffer[3];
               }
               break;
-            case 4: /* sid1type */
+            case 4: /* sid1.type */
               if (buffer[3] <= 4) {
-                usbsid_config.socketTwo.sid1type = buffer[3];
+                usbsid_config.socketTwo.sid1.type = buffer[3];
               }
               break;
-            case 5: /* sid2type */
+            case 5: /* sid2.type */
               if (buffer[3] <= 4) {
-                usbsid_config.socketTwo.sid2type = buffer[3];
+                usbsid_config.socketTwo.sid2.type = buffer[3];
               }
               break;
-            case 6: /* act_as_one */
+            case 6: /* mirrored */
               if (buffer[3] <= 1) { /* 1 or 0 */
-                usbsid_config.socketTwo.act_as_one = (buffer[3] == 1) ? true : false;
+                usbsid_config.mirrored = (buffer[3] == 1) ? true : false;
               };
               break;
           };
@@ -743,7 +545,7 @@ void handle_config_request(uint8_t * buffer)
           break;
         case  9:  /* FMOpl */
           usbsid_config.FMOpl.enabled = (bool)buffer[2];
-          usbsid_config.FMOpl.sidno = verify_fmopl_sidno();
+          apply_fmopl_config(false);
           break;
         case 10:  /* Audio switch */
           usbsid_config.stereo_en =
@@ -758,21 +560,26 @@ void handle_config_request(uint8_t * buffer)
     case SAVE_CONFIG:
       CFG("[CMD] SAVE_CONFIG and RESET_MCU\n");
       save_config(&usbsid_config);
-      load_config(&usbsid_config);
+      /* load_config(&usbsid_config); */
       mcu_reset();
       break;
     case SAVE_NORESET:
       CFG("[CMD] SAVE_CONFIG no RESET\n");
-      save_config(&usbsid_config);
-      load_config(&usbsid_config);
-      apply_config(false);
+      save_load_apply_config(false);
+      /* save_config(&usbsid_config); */
+      /* load_config(&usbsid_config); */
+      /* apply_config(false); */
       break;
     case RESET_CONFIG:
       CFG("[CMD] RESET_CONFIG\n");
       default_config(&usbsid_config);
       save_config(&usbsid_config);
-      load_config(&usbsid_config);
-      apply_config(false);
+      if (buffer[1] != 0) {
+        mcu_reset();
+      } else {
+        load_config(&usbsid_config);
+        apply_config(false);
+      }
       break;
     case WRITE_CONFIG:
       /* TODO: FINISH */
@@ -811,45 +618,45 @@ void handle_config_request(uint8_t * buffer)
       set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, true, true, 1, false);
       break;
     case LOAD_MIDI_STATE:   /* Load from config into midimachine and apply to SIDs */
-      CFG("[LOAD_MIDI_STATE]\n");
-      for (int i = 0; i < 4; i++) {
-        CFG("[SID %d]", (i + 1));
-        for (int j = 0; j < 32; j++) {
-          /* ISSUE: this only loads 1 channel state and should actually save all channel states */
-          midimachine.channel_states[curr_midi_channel][i][j] = usbsid_config.Midi.sid_states[i][j];
-          midimachine.channelkey_states[curr_midi_channel][i][i] = 0;  /* Make sure extras is always initialized @ zero */
-          CFG(" %02x", midimachine.channel_states[curr_midi_channel][i][j]);
-          midi_bus_operation((0x20 * i) | j, midimachine.channel_states[curr_midi_channel][i][j]);
-        }
-        CFG("\n");
-      }
+      // CFG("[CMD] LOAD_MIDI_STATE\n");
+      // for (int i = 0; i < 4; i++) {
+      //   CFG("[SID %d]", (i + 1));
+      //   for (int j = 0; j < 32; j++) {
+      //     /* ISSUE: this only loads 1 channel state and should actually save all channel states */
+      //     midimachine.channel_states[curr_midi_channel][i][j] = usbsid_config.Midi.sid_states[i][j];
+      //     midimachine.channelkey_states[curr_midi_channel][i][i] = 0;  /* Make sure extras is always initialized @ zero */
+      //     CFG(" %02x", midimachine.channel_states[curr_midi_channel][i][j]);
+      //     midi_bus_operation((0x20 * i) | j, midimachine.channel_states[curr_midi_channel][i][j]);
+      //   }
+      //   CFG("\n");
+      // }
       break;
     case SAVE_MIDI_STATE:   /* Save from midimachine into config and save to flash */
-      CFG("[SAVE_MIDI_STATE]\n");
-      for (int i = 0; i < 4; i++) {
-        CFG("[SID %d]", (i + 1));
-        for (int j = 0; j < 32; j++) {
-          /* ISSUE: this only loads 1 channel state and should actually save all channel states */
-          usbsid_config.Midi.sid_states[i][j] = midimachine.channel_states[curr_midi_channel][i][j];
-          CFG(" %02x", usbsid_config.Midi.sid_states[i][j]);
-        }
-        CFG("\n");
-      }
-      save_config(&usbsid_config);
+      // CFG("[CMD] SAVE_MIDI_STATE\n");
+      // for (int i = 0; i < 4; i++) {
+      //   CFG("[SID %d]", (i + 1));
+      //   for (int j = 0; j < 32; j++) {
+      //     /* ISSUE: this only loads 1 channel state and should actually save all channel states */
+      //     usbsid_config.Midi.sid_states[i][j] = midimachine.channel_states[curr_midi_channel][i][j];
+      //     CFG(" %02x", usbsid_config.Midi.sid_states[i][j]);
+      //   }
+      //   CFG("\n");
+      // }
+      // save_config(&usbsid_config);
       break;
     case RESET_MIDI_STATE:  /* Reset all settings to zero */
-      CFG("[RESET_MIDI_STATE]\n");
-      for (int i = 0; i < 4; i++) {
-        CFG("[SID %d]", (i + 1));
-        for (int j = 0; j < 32; j++) {
-          // BUG: this only resets 1 channel state
-          usbsid_config.Midi.sid_states[i][j] = midimachine.channel_states[curr_midi_channel][i][j] = 0;
-          CFG(" %02x", usbsid_config.Midi.sid_states[i][j]);
-          midi_bus_operation((0x20 * i) | j, midimachine.channel_states[curr_midi_channel][i][j]);
-        }
-        CFG("\n");
-      }
-      save_config(&usbsid_config);
+      // CFG("[CMD] RESET_MIDI_STATE\n");
+      // for (int i = 0; i < 4; i++) {
+      //   CFG("[SID %d]", (i + 1));
+      //   for (int j = 0; j < 32; j++) {
+      //     // BUG: this only resets 1 channel state
+      //     usbsid_config.Midi.sid_states[i][j] = midimachine.channel_states[curr_midi_channel][i][j] = 0;
+      //     CFG(" %02x", usbsid_config.Midi.sid_states[i][j]);
+      //     midi_bus_operation((0x20 * i) | j, midimachine.channel_states[curr_midi_channel][i][j]);
+      //   }
+      //   CFG("\n");
+      // }
+      // save_config(&usbsid_config);
       /* mcu_reset(); */
       break;
     case SET_CLOCK:         /* Change SID clock frequency by array id */
@@ -898,10 +705,10 @@ void handle_config_request(uint8_t * buffer)
       }
       break;
     case DETECT_SIDS:       /* Detect SID types per socket */
-      CFG("[CMD] DETECT_SIDS\n");
+      CFG("[CMD] DETECT_SIDS (ALL)\n");
       uint detection_routine = buffer[1];
       if (detection_routine > 3) detection_routine = 0;
-      detect_sid_types(detection_routine);
+      // detect_sid_types(detection_routine); // BUG: FIX!
       memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
       read_config(&usbsid_config);  /* Read the config into the config buffer */
       memcpy(write_buffer_p, config_array, 64);  /* Copy the first 64 bytes from the buffer into the write buffer */
@@ -916,10 +723,8 @@ void handle_config_request(uint8_t * buffer)
       break;
     case DETECT_CLONES:
       CFG("[CMD] DETECT_CLONES\n");
-      detect_clone_types(usbsid_config.socketOne.enabled,
-                     usbsid_config.socketOne.dualsid,
-                     usbsid_config.socketTwo.enabled,
-                     usbsid_config.socketTwo.dualsid);
+      detect_clone_type(&usbsid_config.socketOne);
+      detect_clone_type(&usbsid_config.socketTwo);
       memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
       read_config(&usbsid_config);  /* Read the config into the config buffer */
       memcpy(write_buffer_p, config_array, 64);  /* Copy the first 64 bytes from the buffer into the write buffer */
@@ -932,10 +737,20 @@ void handle_config_request(uint8_t * buffer)
           break;
       }
       break;
+    case AUTO_DETECT:
+      CFG("[CMD] AUTO_DETECT\n");
+      auto_detect_routine(true, true);  /* Double tap! */
+      if (buffer[1] == 1) { /* Save and reboot */
+        save_config_ext();
+        mcu_reset(); /* Point of no return */
+      } else {
+        save_load_apply_config(true);
+      }
+      break;
     case TEST_ALLSIDS:  /* ISSUE: This must be run on Core 1 so we can actually stop it! */
       CFG("[CMD] TEST_ALLSIDS\n");
       running_tests = true;
-      for (int s = 0; s < numsids; s++) {
+      for (int s = 0; s < cfg.numsids; s++) {
         CFG("[START TEST SID %d]\n", s);
         if (running_tests) {
           sidtest_queue_entry_t s_entry = {sid_test, s, '1', 'A'};
@@ -1080,6 +895,18 @@ void handle_config_request(uint8_t * buffer)
         config_saveid = usbsid_config.config_saveid = 0;  /* reset saveid */
         CFG("[CONFIG] SAVE ID AFTER: %d (%d)\n", config_saveid, usbsid_config.config_saveid);
       }
+      if (buffer[1] == 8)  {
+        read_fpgasid_configuration(buffer[2]);
+      }
+      if (buffer[1] == 9)  {
+        config_print[buffer[2]]();
+      }
+      if (buffer[1] == 0xA)  {
+        apply_bus_config_OLD();
+      }
+      if (buffer[1] == 0xB) {
+        set_sid_id_addr(buffer[2], buffer[3], buffer[4]);
+      }
       break;
     case TEST_FN3:
       CFG("[SID MEMORY]\n");
@@ -1095,343 +922,12 @@ void handle_config_request(uint8_t * buffer)
   return;
 }
 
-void print_pico_features(void)
-{
-  CFG("[START PRINT PICO DEFAULT FEATURES]\n");
-
-  CFG("PICO_PIO_VERSION = %d\n", PICO_PIO_VERSION);  /* pio.h */
-  #if defined(PICO_DEFAULT_LED_PIN)
-  CFG("PICO_DEFAULT_LED_PIN = %d\n", PICO_DEFAULT_LED_PIN);  /* pico*.h */
-  #elif defined(CYW43_WL_GPIO_LED_PIN)
-  CFG("CYW43_WL_GPIO_LED_PIN = %d\n", CYW43_WL_GPIO_LED_PIN);  /* pico*.h */
-  #endif
-  CFG("LED_PWM = %d\n", LED_PWM);  /* config.h */
-
-  CFG("[END PRINT PICO DEFAULT FEATURES]\n");
-}
-
-void print_config_settings(void)
-{
-  CFG("[START PRINT CONFIG SETTINGS]\n");
-
-  CFG("[USBSID PCB VERSION] %s\n", pcb_version);
-  CFG("[USBSID FIRMWARE VERSION] %s\n", project_version);
-
-  CFG("[CLOCK] %s @%d\n",
-    int_ext[(int)usbsid_config.external_clock],
-    (int)usbsid_config.clock_rate);
-  CFG("[CLOCK RATE LOCKED] %s\n",
-    true_false[(int)usbsid_config.lock_clockrate]);
-  CFG("[RASTER RATE] @%d\n",
-    (int)usbsid_config.raster_rate);
-
-  CFG("[SOCKET ONE] %s as %s\n",
-    enabled[(int)usbsid_config.socketOne.enabled],
-    ((int)usbsid_config.socketOne.dualsid == 1 ? single_dual[0] : single_dual[1]));
-  CFG("[SOCKET ONE] CHIP TYPE: %s, CLONE TYPE: %s\n",
-    chiptypes[usbsid_config.socketOne.chiptype],
-    clonetypes[usbsid_config.socketOne.clonetype]);
-  CFG("[SOCKET ONE] SID 1 TYPE: %s, SID 2 TYPE: %s\n",
-    sidtypes[usbsid_config.socketOne.sid1type],
-    sidtypes[usbsid_config.socketOne.sid2type]);
-  CFG("[SOCKET TWO] %s as %s\n",
-    enabled[(int)usbsid_config.socketTwo.enabled],
-    ((int)usbsid_config.socketTwo.dualsid == 1 ? single_dual[0] : single_dual[1]));
-  CFG("[SOCKET TWO] CHIP TYPE: %s, CLONE TYPE: %s\n",
-    chiptypes[usbsid_config.socketTwo.chiptype],
-    clonetypes[usbsid_config.socketTwo.clonetype]);
-  CFG("[SOCKET TWO] SID 1 TYPE: %s, SID 2 TYPE: %s\n",
-    sidtypes[usbsid_config.socketTwo.sid1type],
-    sidtypes[usbsid_config.socketTwo.sid2type]);
-  CFG("[SOCKET TWO AS ONE] %s\n",
-    true_false[(int)usbsid_config.socketTwo.act_as_one]);
-
-  CFG("[LED] %s, Idle breathe? %s\n",
-    enabled[(int)usbsid_config.LED.enabled],
-    true_false[(int)usbsid_config.LED.idle_breathe]);
-  CFG("[RGBLED] %s, Idle breathe? %s\n",
-    enabled[(int)usbsid_config.RGBLED.enabled],
-    true_false[(int)usbsid_config.RGBLED.idle_breathe]);
-  CFG("[RGBLED SIDTOUSE] %d\n",
-    (int)usbsid_config.RGBLED.sid_to_use);
-  CFG("[RGBLED BRIGHTNESS] %d\n",
-    (int)usbsid_config.RGBLED.brightness);
-
-  CFG("[CDC] %s\n",
-    enabled[(int)usbsid_config.Cdc.enabled]);
-  CFG("[WebUSB] %s\n",
-    enabled[(int)usbsid_config.WebUSB.enabled]);
-  CFG("[Asid] %s\n",
-    enabled[(int)usbsid_config.Asid.enabled]);
-  CFG("[Midi] %s\n",
-    enabled[(int)usbsid_config.Midi.enabled]);
-
-  CFG("[FMOpl] %s\n",
-    enabled[(int)usbsid_config.FMOpl.enabled]);
-  CFG("[FMOpl] SIDno %d\n",
-    usbsid_config.FMOpl.sidno);
-
-  #if defined(HAS_AUDIOSWITCH)
-  CFG("[AUDIO_SWITCH] %s\n",
-    mono_stereo[(int)usbsid_config.stereo_en]);
-  #endif
-
-  CFG("[END PRINT CONFIG SETTINGS]\n");
-  return;
-}
-
-void print_socket_config(void)
-{
-  CFG("[START PRINT SOCKET CONFIG]\n");
-
-  CFG("SOCK_ONE EN: %s SOCK_TWO EN: %s\nACT_AS_ONE: %s\nNO SIDS\nSOCK_ONE #%d\nSOCK_TWO #%d\nTOTAL #%d\n",
-    true_false[sock_one], true_false[sock_two], true_false[act_as_one],
-    sids_one, sids_two, numsids);
-
-  CFG("[END PRINT SOCKET CONFIG]\n");
-  return;
-}
-
-void print_bus_config(void)
-{
-  CFG("[START PRINT BUS CONFIG]\n");
-
-  CFG("BUS\nONE:   %02x 0b"PRINTF_BINARY_PATTERN_INT8"\nTWO:   %02x 0b"PRINTF_BINARY_PATTERN_INT8"\nTHREE: %02x 0b"PRINTF_BINARY_PATTERN_INT8"\nFOUR:  %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n",
-    one, PRINTF_BYTE_TO_BINARY_INT8(one),
-    two, PRINTF_BYTE_TO_BINARY_INT8(two),
-    three, PRINTF_BYTE_TO_BINARY_INT8(three),
-    four, PRINTF_BYTE_TO_BINARY_INT8(four));
-  CFG("ADDRESS MASKS\n");
-  CFG("MASK_ONE:   0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", one_mask, PRINTF_BYTE_TO_BINARY_INT8(one_mask));
-  CFG("MASK_TWO:   0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", two_mask, PRINTF_BYTE_TO_BINARY_INT8(two_mask));
-  CFG("MASK_THREE: 0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", three_mask, PRINTF_BYTE_TO_BINARY_INT8(three_mask));
-  CFG("MASK_FOUR:  0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", four_mask, PRINTF_BYTE_TO_BINARY_INT8(four_mask));
-
-  CFG("[END PRINT BUS CONFIG]\n");
-  return;
-}
-
-int verify_fmopl_sidno(void)
-{
-  int fmoplsidno = -1;
-  if (usbsid_config.FMOpl.enabled) {
-    if (usbsid_config.socketOne.enabled) {
-      if ((usbsid_config.socketOne.chiptype == 1) && (sids_one >= 1)) {
-        if (usbsid_config.socketOne.sid1type == 4) {
-          fmoplsidno = 1;
-          return fmoplsidno;
-        } else if ((usbsid_config.socketOne.sid2type == 4) && (sids_one == 2)) {
-          fmoplsidno = 2;
-          return fmoplsidno;
-        }
-      }
-    }
-    if (usbsid_config.socketTwo.enabled) {// && (fmoplsidno == -1)) {
-      if ((usbsid_config.socketTwo.chiptype == 1) && (sids_two >= 1)) {
-        if (usbsid_config.socketTwo.sid1type == 4) {
-          fmoplsidno = (sids_one == 0)
-          ? 1 : (sids_one == 1)
-          ? 2 : (sids_one == 2)
-          ? 3 : 0;
-          return fmoplsidno;
-        } else if (usbsid_config.socketTwo.sid2type == 4 && (sids_two == 2)) {
-          fmoplsidno = (sids_one == 0)
-          ? 2 : (sids_one == 1)
-          ? 3 : (sids_one == 2)
-          ? 4 : 0;
-          return fmoplsidno;
-        }
-      }
-    }
-  }
-  return fmoplsidno;
-}
-
-void verify_socket_settings(void)
-{
-  /* Pre applying default socket settings if needed */
-  if (usbsid_config.socketOne.enabled == true) {
-    if (usbsid_config.socketOne.dualsid == true) {
-      if (usbsid_config.socketOne.chiptype != 1) {
-        usbsid_config.socketOne.chiptype = 1;  /* chiptype cannot be real with dualsid */
-      }
-      if (usbsid_config.socketOne.clonetype == 0) {
-        usbsid_config.socketOne.clonetype = 1;  /* clonetype cannot be disabled with dualsid */
-      }
-    } else {
-      if (usbsid_config.socketOne.chiptype == 1) {
-        if (usbsid_config.socketOne.clonetype == 0) {
-          usbsid_config.socketOne.clonetype = 1;  /* clonetype cannot be disabled when chiptype is clone */
-        }
-      } else {
-        usbsid_config.socketOne.clonetype = 0;  /* clonetype cannot be anything else when chiptype is real */
-      }
-    }
-  }
-  /* Pre applying default socket settings if needed */
-  if (usbsid_config.socketTwo.enabled == true) {
-    if (usbsid_config.socketTwo.dualsid == true) {
-      if (usbsid_config.socketTwo.chiptype != 1) {
-        usbsid_config.socketTwo.chiptype = 1;  /* chiptype cannot be real with dualsid */
-      }
-      if (usbsid_config.socketTwo.clonetype == 0) {
-        usbsid_config.socketTwo.clonetype = 1;  /* clonetype cannot be disabled with dualsid */
-      }
-    } else {
-      if (usbsid_config.socketTwo.chiptype == 1) {
-        if (usbsid_config.socketTwo.clonetype == 0) {
-          usbsid_config.socketTwo.clonetype = 1;  /* clonetype cannot be disabled when chiptype is clone */
-        }
-      } else {
-        usbsid_config.socketTwo.clonetype = 0;  /* clonetype cannot be anything else when chiptype is real */
-      }
-    }
-  }
-
-  return;
-}
-
-void apply_fmopl_config(void)
-{
-  /* FMOpl */
-  int fmoplsid = verify_fmopl_sidno();
-  if (fmoplsid != -1) {
-    fmopl_enabled = usbsid_config.FMOpl.enabled;
-    usbsid_config.FMOpl.sidno = fmopl_sid = fmoplsid;
-  } else {
-    fmopl_enabled = usbsid_config.FMOpl.enabled = false;
-    usbsid_config.FMOpl.sidno = fmopl_sid = -1;
-  }
-}
-
-void apply_socket_config(void)
-{
-  act_as_one = usbsid_config.socketTwo.act_as_one;
-
-  sock_one = usbsid_config.socketOne.enabled;
-  sock_two = usbsid_config.socketTwo.enabled;
-
-  sids_one = (sock_one == true) ? (usbsid_config.socketOne.dualsid == true) ? 2 : 1 : 0;
-  sids_two = (sock_two == true) ? (usbsid_config.socketTwo.dualsid == true) ? 2 : 1 : 0;
-  numsids = (sids_one + sids_two);
-
-  return;
-}
-
-void apply_bus_config(void)
-{  /* TODO: REWORK! */
-  /* Apply defaults */
-  sidtype[0] = usbsid_config.socketOne.sid1type;  /* SID1 */
-  sidtype[1] = usbsid_config.socketOne.sid2type;  /* SID2 */
-  sidtype[2] = usbsid_config.socketTwo.sid1type;  /* SID3 */
-  sidtype[3] = usbsid_config.socketTwo.sid2type;  /* SID4 */
-  /* one == 0x00, two == 0x20, three == 0x40, four == 0x60 */
-  if (act_as_one) {                    /* act-as-one enabled overrules all settings */
-    one = two = 0;                     /* CS1 low, CS2 low */
-    three = four = 0;                  /* CS1 low, CS2 low */
-    one_mask = two_mask = three_mask = four_mask = 0x1F;
-    /* No changes to sidtypes */
-  } else {
-    if (sock_one && !sock_two) {       /* SocketOne enabled, SocketTwo disabled */
-      one = 0b100;                     /* CS1 low, CS2 high */
-      two = (sids_one == 2) ? 0b100    /* CS1 low, CS2 high */
-        : 0b110;                       /* CS1 high, CS2 high */
-      three = four = 0b110;            /* CS1 high, CS2 high */
-      one_mask = 0x1F;
-      two_mask = (sids_one == 2) ? 0x3F : 0x0;
-      three_mask = 0x0;
-      four_mask = 0x0;
-      /* Apply differences */
-      sidtype[1] = (sids_one == 2)  /* SID2 */
-        ? usbsid_config.socketOne.sid2type : 1;
-      sidtype[2] = 1;  /* SID3 */
-      sidtype[3] = 1;  /* SID4 */
-    }
-    if (!sock_one && sock_two) {       /* SocketOne disabled, SocketTwo enabled */
-      one = 0b010;                     /* CS1 high, CS2 low */
-      two = (sids_two == 2) ? 0b010    /* CS1 high, CS2 low */
-        : 0b110;                       /* CS1 high, CS2 high */
-      three = four = 0b110;            /* CS1 high, CS2 high */
-      one_mask = 0x1F;
-      two_mask = (sids_two == 2) ? 0x3F : 0x0;
-      three_mask = 0x0;
-      four_mask = 0x0;
-      /* Apply differences */
-      sidtype[0] = usbsid_config.socketTwo.sid1type;  /* SID1 */
-      sidtype[1] = (sids_two == 2)  /* SID2 */
-        ? usbsid_config.socketTwo.sid2type : 1;
-      sidtype[2] = 1;  /* SID3 */
-      sidtype[3] = 1;  /* SID4 */
-    }
-    if (sock_one && sock_two) {        /* SocketOne enabled, SocketTwo enabled */
-      /* TODO: Compact if else spiderweb */
-      if (sids_one == 1 && sids_two == 1) {
-        one   = 0b100;
-        two   = 0b010;
-        three = 0b110;
-        four  = 0b110;
-        one_mask = 0x1F;
-        two_mask = 0x1F;
-        three_mask = 0x0;
-        four_mask = 0x0;
-        /* Apply differences */
-        sidtype[0] = usbsid_config.socketOne.sid1type;  /* SID1 */
-        sidtype[1] = usbsid_config.socketTwo.sid1type;  /* SID2 */
-        sidtype[2] = 1;  /* SID3 */
-        sidtype[3] = 1;  /* SID4 */
-      }
-      if (sids_one == 2 && sids_two == 1) {
-        one   = 0b100;
-        two   = 0b100;
-        three = 0b010;
-        four  = 0b110;
-        one_mask = 0x1F;
-        two_mask = 0x3F;
-        three_mask = 0x1F;
-        four_mask = 0x0;
-        /* Apply differences */
-        sidtype[0] = usbsid_config.socketOne.sid1type;  /* SID1 */
-        sidtype[1] = usbsid_config.socketOne.sid2type;  /* SID2 */
-        sidtype[2] = usbsid_config.socketTwo.sid1type;  /* SID3 */
-        sidtype[3] = 1;  /* SID4 */
-      }
-      if (sids_one == 1 && sids_two == 2) {
-        one   = 0b100;
-        two   = 0b010;
-        three = 0b010;
-        four  = 0b110;
-        one_mask = 0x1F;
-        two_mask = 0x1F;
-        three_mask = 0x3F;
-        four_mask = 0x0;
-        /* Apply differences */
-        sidtype[0] = usbsid_config.socketOne.sid1type;  /* SID1 */
-        sidtype[1] = usbsid_config.socketTwo.sid2type;  /* SID2 */
-        sidtype[2] = usbsid_config.socketTwo.sid2type;  /* SID3 */
-        sidtype[3] = 1;  /* SID4 */
-      }
-      if (sids_one == 2 && sids_two == 2) {
-        one   = 0b100;
-        two   = 0b100;
-        three = 0b010;
-        four  = 0b010;
-        one_mask = 0x1F;
-        two_mask = 0x3F;
-        three_mask = 0x1F;
-        four_mask = 0x3F;
-        /* No changes to sidtypes */
-      }
-    }
-  }
-  return;
-}
-
 void apply_led_config(void)
 { /* if SID to use is higher then the number of sids, use first available SID */
   int sid = -1;
   int stou = (usbsid_config.RGBLED.sid_to_use - 1);
   for (int s = 0; s < 4; s++) {
-    if (sidtype[s] == 2 || sidtype[s] == 3) {
+    if (cfg.sidtype[s] == 2 || cfg.sidtype[s] == 3) {
       sid = (s + 1);
       break;
     }
@@ -1439,9 +935,9 @@ void apply_led_config(void)
   CFG("[CONFIG] RGBLED REQUESTED: %d\n", usbsid_config.RGBLED.sid_to_use);
   /* check if requested sidno is actually configured  */
   usbsid_config.RGBLED.sid_to_use
-    = (stou > numsids)
-    || (sidtype[stou] != 2)
-    || (sidtype[stou] != 3)
+    = (stou > cfg.numsids)
+    || (cfg.sidtype[stou] != 2)
+    || (cfg.sidtype[stou] != 3)
     ? (sid != -1)  /* If not still -1 */
     ? sid  /* use the first SID that is either 8580 or 6581 */
     : 1    /* else default to SID 1 */
@@ -1452,20 +948,15 @@ void apply_led_config(void)
 
 void apply_config(bool at_boot)
 {
-  CFG("\n");  /* new line before the actual apply is printed */
+  CFG("\n");
   CFG("[START CONFIG APPLY]\n");
+  CFG("[CONFIG] Verifying socket settings\n");
   verify_socket_settings();
 
-  CFG("[CONFIG] Applying socket settings\n");
-  apply_socket_config();
 
-  if (usbsid_config.FMOpl.enabled) {
-    CFG("[CONFIG] Applying optional FMOpl settings\n");
-    apply_fmopl_config();
-  };
-
-  CFG("[CONFIG] Applying bus settings\n");
-  apply_bus_config();
+  apply_socket_config(false);
+  apply_bus_config(false);
+  apply_fmopl_config(false);
 
   if (!at_boot) {
     CFG("[CONFIG] Applying bus clock settings\n");
@@ -1478,35 +969,38 @@ void apply_config(bool at_boot)
   if (RGB_ENABLED) {
     CFG("[CONFIG] Applying RGBLED SID\n");
     apply_led_config();
-    CFG("[CONFIG APPLY] FINISHED\n");
   } else {
     CFG("[CONFIG] RGBLED not available\n");
   }
   CFG("[END CONFIG APPLY]\n");
 
-  CFG("\n");  /* new line before the actual pico features are printed */
+  /* Don't print anything on auto config run */
+  if (auto_config) return;
+
+  /* Print config at end of apply */
   print_pico_features();
-
-  CFG("\n");  /* new line before the actual settings are printed */
   print_config_settings();
-
-  CFG("\n");  /* new line before the actual socket settings are printed */
   print_socket_config();
-
-  CFG("\n");  /* new line before the actual bus config is printed */
   print_bus_config();
 
-  CFG("\n");  /* new line after printing is finished */
+  CFG("\n");
+
   return;
 }
 
-void apply_socket_change(void)
+void save_load_apply_config(bool at_boot)
 {
-  verify_socket_settings();
-  CFG("[CONFIG] Applying socket settings\n");
-  apply_socket_config();
-  CFG("[CONFIG] Applying bus settings\n");
-  apply_bus_config();
+  CFG("\n");
+  save_config(&usbsid_config);
+  load_config(&usbsid_config);
+  apply_config(at_boot);
+  return;
+}
+
+void save_config_ext(void)
+{ /* For saving the config outside of config.c */
+  CFG("\n");
+  save_config(&usbsid_config);
   return;
 }
 
@@ -1524,7 +1018,7 @@ void detect_default_config(void)
     usbsid_config.default_config = 0;
     CFG("[CONFIG] DEFAULT CONFIG STATE SET TO %d\n", usbsid_config.default_config);
     first_boot = true;  /* Only at first boot the link popup will be sent */
-    detect_sid_types(0);  /* Detect SID types at default config once */
+    auto_detect_routine(false, true); /* default auto detect routine based on default config */
     save_config(&usbsid_config);
     CFG("[CONFIG] CONFIG SAVED\n");
   }
