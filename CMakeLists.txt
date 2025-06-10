@@ -256,8 +256,12 @@ endif()
 
 ### Source files to compile
 set(SOURCEFILES
+  ${CMAKE_CURRENT_LIST_DIR}/src/usbsid_doubletap.c
   ${CMAKE_CURRENT_LIST_DIR}/src/usbsid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/config.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/config_bus.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/config_socket.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/config_logging.c
   ${CMAKE_CURRENT_LIST_DIR}/src/gpio.c
   ${CMAKE_CURRENT_LIST_DIR}/src/vu.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi.c
@@ -266,6 +270,8 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sysex.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/sid_detection.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/sid_tests.c
   ${CMAKE_CURRENT_LIST_DIR}/src/mcu.c
   ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c
 )
