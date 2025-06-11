@@ -773,19 +773,32 @@ void reset_sid_registers(void)
 void toggle_audio_switch(void)
 { /* Toggle the SPST switch stereo <-> mono */
   #if defined(HAS_AUDIOSWITCH)
-  static int audio_state = 0b1;
-  audio_state ^= 1;
-  CFG("[CONFIG] TOGGLE AUDIO SWITCH TO: %d\n", audio_state);
-  tPIN(AU_SW);  /* toggle mono <-> stereo */
+  if (!usbsid_config.lock_audio_sw) {
+    b = *BUSState; /* read complete bus */
+    int audio_state = (b & bPIN(AU_SW)) >> AU_SW; /* Pinpoint current audio switch state */
+    audio_state ^= 1;
+    CFG("[CONFIG] TOGGLE AUDIO SWITCH TO: %d (%s)\n", audio_state, mono_stereo[audio_state]);
+    tPIN(AU_SW);  /* toggle mono <-> stereo */
+  } else {
+    CFG("[CONFIG] Audio switch is locked at %d (%s), toggle not applied\n",
+      (int)usbsid_config.stereo_en, mono_stereo[(int)usbsid_config.stereo_en]);
+    return;
+  }
   #endif
 }
 
 void set_audio_switch(bool state)
 { /* Set the SPST switch */
   #if defined(HAS_AUDIOSWITCH)
-  CFG("[CONFIG] SET AUDIO SWITCH TO: %d (%s)\n", state, mono_stereo[state]);
-  if (state) {
-    sPIN(AU_SW);      /* set   mono <-> stereo pin */
-  } else cPIN(AU_SW);  /* clear mono <-> stereo pin */
+  if (!usbsid_config.lock_audio_sw) {
+    CFG("[CONFIG] SET AUDIO SWITCH TO: %d (%s)\n", state, mono_stereo[state]);
+    if (state) {
+      sPIN(AU_SW);      /* set   mono <-> stereo pin */
+    } else cPIN(AU_SW);  /* clear mono <-> stereo pin */
+  } else {
+    CFG("[CONFIG] Audio switch is locked at %d (%s), requested change to %d (%s) ignored\n",
+      (int)usbsid_config.stereo_en, mono_stereo[(int)usbsid_config.stereo_en], state, mono_stereo[state]);
+    return;
+  }
   #endif
 }

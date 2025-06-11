@@ -184,6 +184,7 @@ void read_config(Config* config)
   config_array[55] = (int)config->FMOpl.enabled;
   config_array[56] = config->FMOpl.sidno;
   config_array[57] = config->stereo_en;
+  config_array[58] = config->lock_audio_sw;
   config_array[63] = 0xFF;  /* Terminator byte */
 
   return;
@@ -557,6 +558,12 @@ void handle_config_request(uint8_t * buffer)
           ? (bool)buffer[2]
           : true;  /* Default to 1 ~ stereo if incorrect value */
           break;
+        case 11:  /* Lock audio switch */
+          usbsid_config.lock_audio_sw =
+          (buffer[2] == 0 || buffer[2] == 1)
+          ? (bool)buffer[2]
+          : false;  /* Default to unlocked incorrect value */
+          break;
         default:
           break;
       };
@@ -564,15 +571,12 @@ void handle_config_request(uint8_t * buffer)
     case SAVE_CONFIG:
       CFG("[CMD] SAVE_CONFIG and RESET_MCU\n");
       save_config(&usbsid_config);
-      /* load_config(&usbsid_config); */
+      load_config(&usbsid_config);
       mcu_reset();
       break;
     case SAVE_NORESET:
       CFG("[CMD] SAVE_CONFIG no RESET\n");
       save_load_apply_config(false);
-      /* save_config(&usbsid_config); */
-      /* load_config(&usbsid_config); */
-      /* apply_config(false); */
       break;
     case RESET_CONFIG:
       CFG("[CMD] RESET_CONFIG\n");
@@ -685,9 +689,7 @@ void handle_config_request(uint8_t * buffer)
       }
       if (buffer[2] == 1) {  /* Save and apply if set to a 1 */
         CFG("[LOCK_CLOCK] SAVE_CONFIG\n");
-        save_config(&usbsid_config);
-        load_config(&usbsid_config);
-        apply_config(false);
+        save_load_apply_config(false);
       }
       break;
     case TOGGLE_AUDIO:      /* Toggle the audio state regardless of config setting */
@@ -696,16 +698,31 @@ void handle_config_request(uint8_t * buffer)
       break;
     case SET_AUDIO:         /* Set the audio state from buffer setting (saves config if provided) */
       CFG("[CMD] SET_AUDIO\n");
-      usbsid_config.stereo_en =
+      if (!usbsid_config.lock_audio_sw) {
+        usbsid_config.stereo_en =
+          (buffer[1] == 0 || buffer[1] == 1)
+          ? (bool)buffer[1]
+          : true;  /* Default to 1 ~ stereo if incorrect value */
+        set_audio_switch(usbsid_config.stereo_en);
+        if (buffer[2] == 1) {  /* Save and apply if set to a 1 */
+          CFG("[SET_AUDIO] SAVE_CONFIG\n");
+          save_load_apply_config(false);
+        }
+      } else {
+        CFG("[CONFIG] Audio switch is locked at %d (%s), requested change to %d (%s)\n",
+          (int)usbsid_config.stereo_en, mono_stereo[(int)usbsid_config.stereo_en], buffer[1], mono_stereo[buffer[1]]);
+        return;
+      }
+      break;
+    case LOCK_AUDIO:
+      CFG("[CMD] LOCK_AUDIO\n");
+      usbsid_config.lock_audio_sw =
         (buffer[1] == 0 || buffer[1] == 1)
         ? (bool)buffer[1]
-        : true;  /* Default to 1 ~ stereo if incorrect value */
-      set_audio_switch(usbsid_config.stereo_en);
+        : false;  /* Default to false if incorrect value ~ don't lock */
       if (buffer[2] == 1) {  /* Save and apply if set to a 1 */
         CFG("[SET_AUDIO] SAVE_CONFIG\n");
-        save_config(&usbsid_config);
-        load_config(&usbsid_config);
-        apply_config(false);
+        save_load_apply_config(false);
       }
       break;
     case DETECT_SIDS:       /* Detect SID types per socket */

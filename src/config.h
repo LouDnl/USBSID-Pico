@@ -166,6 +166,7 @@ typedef struct Config {
   bool external_clock : 1;      /* enable / disable external oscillator */
   bool lock_clockrate : 1;      /* lock the set clockspeed from being changed */
   bool stereo_en : 1;           /* audio switch is off (mono) or on (stereo) ~ (PCB v1.3+ only) */
+  bool lock_audio_sw : 1;       /* lock the audio switch into it's current stateand prevent it from being changed ~ (PCB v1.3+ only) */
 } Config;
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
@@ -178,6 +179,7 @@ typedef struct Config {
   .raster_rate = R_DEFAULT, \
   .lock_clockrate = false, \
   .stereo_en = false, \
+  .lock_audio_sw = false, \
   .mirrored = false, \
   .socketOne = { \
     .enabled = true, \
@@ -338,6 +340,7 @@ enum
   SYNC_PIOS        = 0x87,  /* Sync PIO clocks */
   TOGGLE_AUDIO     = 0x88,  /* Toggle mono <-> stereo (v1.3+ boards only) */
   SET_AUDIO        = 0x89,  /* Set mono <-> stereo (v1.3+ boards only) */
+  LOCK_AUDIO       = 0x90,  /* Locks the audio switch into it's current state (v1.3+ boards only) */
 
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
   TEST_FN2         = 0x9A,  /* TODO: Remove before v1 release */

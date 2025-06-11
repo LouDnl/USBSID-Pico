@@ -205,6 +205,10 @@ static int import_ini(void* user, const char* section, const char* name, const c
     p = value_position(value, mono_stereo);
     if (p != 666) ini_config->stereo_en = p;
   }
+  if (MATCH("Audioswitch", "lock_audio_switch")) {
+    p = value_position(value, truefalse);
+    if (p != 666) ini_config->lock_audio_sw = p;
+  }
   if (debug == 1) {
     printf("SECTION: %s NAME: %s VALUE: %s\n", section, name, value);
   }
@@ -282,6 +286,8 @@ void write_config_ini(Config * config, char * filename)
     fprintf(f, "[Audioswitch]\n");
     fprintf(f, "; Possible options: %s, %s\n", mono_stereo[0], mono_stereo[1]);
     fprintf(f, "set_to = %s\n", mono_stereo[config->stereo_en]);
+    fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
+    fprintf(f, "lock_audio_switch = %s\n", truefalse[config->lock_audio_sw]);
     fprintf(f, "\n");
     fclose(f);
   };
@@ -469,6 +475,7 @@ void write_config(Config * config)
 
   /* Audio switch (works on PCB v1.3+ only) */
   write_config_command(SET_CONFIG,0xA,config->stereo_en,0,0);
+  write_config_command(SET_CONFIG,0xB,config->lock_audio_sw,0,0);
 
   printf("Sending save config command\n");
   save_config(0);
@@ -635,6 +642,9 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
       case 57:
         usbsid_config.stereo_en = buff[i];
         break;
+      case 58:
+        usbsid_config.lock_audio_sw = buff[i];
+        break;
       default:
         break;
     }
@@ -730,6 +740,8 @@ void print_config(void)
     usbsid_config.FMOpl.sidno);
   printf("[CONFIG] [AUDIO_SWITCH] %s\n",
     mono_stereo[(int)usbsid_config.stereo_en]);
+  printf("[CONFIG] [AUDIO_SWITCH_LOCKED] %s\n",
+    truefalse[(int)usbsid_config.lock_audio_sw]);
     return;
 }
 
@@ -1448,6 +1460,7 @@ void print_help(void)
   printf("  -tau,     --toggle-audio      : Toggle the mono/stereo audio switch (PCB v1.3+ only!)\n");
   printf("  -sau,     --set-audio N       : Set and save the mono/stereo audio switch (PCB v1.3+ only!)\n");
   printf("                                  0: %s, 1:%s\n", mono_stereo[0], mono_stereo[1]);
+  printf("  -lau N,   --lock-audio N      : Lock and the audio switch in it's current state until reboot: True (1) False (0)\n");
   printf("--[INI FILE CONFIGURATION]------------------------------------------------------------------------------------------\n");
   printf("  -default, --default-ini       : Generate an ini file with default USBSID-Pico config named `USBSID-Pico-cfg.ini`\n");
   printf("  -export F,--export-config F   : Read config from USBSID-Pico and export it to provided ini file or default in\n");
@@ -1472,6 +1485,7 @@ void print_help(void)
   printf("   (Requires a socket set to Clone chip and chiptype to FMOpl)\n");
   printf("  -au ,     --audio-switch N    : Set the mono/stereo audio switch (PCB v1.3+ only!)\n");
   printf("                                  0: %s, 1:%s\n", mono_stereo[0], mono_stereo[1]);
+  printf("  -la N,    --lockaudio N       : Lock the audio switch from being changed: True (1) False (0)\n");
   printf("  -sock N,  --socket N          : Configure socket N ~ 1 or 2\n");
   printf("  The following options additionally require '-sock N'\n");
   printf("  Note that you can only configure 1 socket at a time!\n");
@@ -1673,6 +1687,17 @@ void config_usbsidpico(int argc, char **argv)
       write_config_command(SET_AUDIO, sw, 0x1, 0x0, 0x0);
       break;
     }
+    if (!strcmp(argv[param_count], "-lau") || !strcmp(argv[param_count], "--lock-audio")) {
+      param_count++;
+      int lock = atoi(argv[param_count]);
+      if(lock > 1) {
+        printf("%d is not a correct lock audio switch option!\n", lock);
+        goto exit;
+      }
+      printf("Lock audio switch from being changed set to '%s'\n", truefalse[lock]);
+      write_config_command(LOCK_AUDIO, lock, 0x0, 0x0, 0x0);
+      break;
+    }
     if (!strcmp(argv[param_count], "-config") || !strcmp(argv[param_count], "--config-command")) {
       printf("-config requires 5 additional config commands and cannot run with any other option!\n");
       if (argc < 6) printf("You supplied %d command line arguments\n", argc);
@@ -1819,6 +1844,13 @@ void config_usbsidpico(int argc, char **argv)
           int sw = atoi(argv[pc]);
           printf("Set mono/stereo audio switch from '%s' to '%s'\n", mono_stereo[usbsid_config.stereo_en], mono_stereo[sw]);
           write_config_command(SET_CONFIG, 0xA, sw, 0x0, 0x0);
+          continue;
+        }
+        if (!strcmp(argv[pc], "-la") || !strcmp(argv[pc], "--lockaudio")) {
+          pc++;
+          int sw = atoi(argv[pc]);
+          printf("Set lock mono/stereo audio switch from '%s' to '%s'\n", truefalse[usbsid_config.lock_audio_sw], truefalse[sw]);
+          write_config_command(SET_CONFIG, 0xB, sw, 0x0, 0x0);
           continue;
         }
         if (!strcmp(argv[pc], "-fm") || !strcmp(argv[pc], "--fmopl-enabled")) {

@@ -191,6 +191,8 @@ void print_config_settings(void)
   #if defined(HAS_AUDIOSWITCH)
   CFG("[AUDIO_SWITCH] %s\n",
     mono_stereo[(int)usbsid_config.stereo_en]);
+  CFG("[AUDIO_SWITCH_LOCKED] %s\n",
+    true_false[(int)usbsid_config.lock_audio_sw]);
   #endif
 
   CFG("[END PRINT CONFIG SETTINGS]\n");
