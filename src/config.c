@@ -60,6 +60,10 @@ extern void auto_detect_routine(bool auto_config, bool with_delay);
 extern void sid_test(int sidno, char test, char wf);
 extern bool running_tests;
 
+/* SID clone config */
+extern void read_fpgasid_configuration(uint8_t base_address);
+extern void read_skpico_configuration(uint8_t base_address);
+
 /* GPIO */
 extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
 extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
@@ -76,7 +80,7 @@ extern void mute_sid(void);
 extern void reset_sid_registers(void);
 extern void toggle_audio_switch(void);
 extern void set_audio_switch(bool state);
-extern void read_fpgasid_configuration(uint8_t base_address);
+
 
 /* Midi */
 extern void midi_bus_operation(uint8_t a, uint8_t b);

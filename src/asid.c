@@ -43,16 +43,16 @@
 #include "logging.h"
 
 
-/* Config externals */
+/* Config */
 extern RuntimeCFG cfg;
 extern char *sidtypes[5];
 
-/* GPIO externals */
+/* GPIO */
 extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 extern void pause_sid(void);
 extern void reset_sid(void);
 
-/* Vu externals */
+/* Vu */
 extern uint16_t vu;
 
 /* Some locals, rural and such */
@@ -63,6 +63,7 @@ struct asid_regpair_t {  /* thanks to thomasj */
   uint8_t wait_us;
 };
 struct asid_regpair_t asid_to_writeorder[NO_SID_REGISTERS_ASID] = {};  /* thanks to thomasj ~ SF2 Driver 11 no waits */
+
 
 void reset_asid_to_writeorder(void)
 {

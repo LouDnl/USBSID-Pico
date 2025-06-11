@@ -49,6 +49,18 @@
 /* Required for default config */
 #include "sid.h"
 
+
+#ifdef PICO_DEFAULT_LED_PIN
+#define LED_PWM true
+#else
+#define LED_PWM false
+#endif
+#ifdef USE_RGB
+#define RGB_ENABLED true
+#else
+#define RGB_ENABLED false
+#endif
+
 /* Flash information
  *
  * USBSID-Pico flash layout:
@@ -76,25 +88,6 @@
  * FLASH_PAGE_SIZE   ~ (1u << 8)  = 0x100   == 256B
  * FLASH_SECTOR_SIZE ~ (1u << 12) = 0x1000  == 4096B
  * FLASH_BLOCK_SIZE  ~ (1u << 16) = 0x10000 == 65536B
- */
-
-
-#ifdef PICO_DEFAULT_LED_PIN
-#define LED_PWM true
-#else
-#define LED_PWM false
-#endif
-#ifdef USE_RGB
-#define RGB_ENABLED true
-#else
-#define RGB_ENABLED false
-#endif
-
-
-/* SID detection routines
- * routine 1: https://github.com/GideonZ/1541ultimate/blob/master/software/6502/sidcrt/player/advanced/detection.asm
- * routine 2: https://codebase64.org/doku.php?id=base:detecting_sid_type_-_safe_method
- * routine 3: https://codebase64.org/doku.php?id=base:detecting_sid_type
  */
 
 /* Init config vars

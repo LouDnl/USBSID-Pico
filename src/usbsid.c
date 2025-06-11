@@ -32,16 +32,15 @@
 #include "logging.h"
 
 
-/* Init external vars */
+/* Double Tap */
 extern int flagged;  /* doubletap check */
-static semaphore_t core0_init, core1_init;
 
 /* Declare variables ~ Do not change order to keep memory alignment! */
 uint8_t __not_in_flash("usbsid_buffer") config_buffer[5];
-uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));
-uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE] __attribute__((aligned(2 * MAX_BUFFER_SIZE)));
-uint8_t __not_in_flash("usbsid_buffer") sid_buffer[MAX_BUFFER_SIZE] __attribute__((aligned(2 * MAX_BUFFER_SIZE)));
-uint8_t __not_in_flash("usbsid_buffer") read_buffer[MAX_BUFFER_SIZE] __attribute__((aligned(2 * MAX_BUFFER_SIZE)));
+uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __aligned(2 * (0x20 * 4));
+uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
+uint8_t __not_in_flash("usbsid_buffer") sid_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
+uint8_t __not_in_flash("usbsid_buffer") read_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
 int usb_connected = 0, usbdata = 0;
 uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
 uint8_t *cdc_itf = 0, *wusb_itf = 0;
@@ -54,18 +53,17 @@ bool auto_config = false;
 /* Init var pointers for external use */
 uint8_t (*write_buffer_p)[MAX_BUFFER_SIZE] = &write_buffer;
 
-/* Config externals */
-extern Config usbsid_config;
-extern RuntimeCFG cfg;
-extern int sock_one, sock_two, sids_one, sids_two, numsids, mirrored;
-extern bool first_boot;
+/* Config */
 extern void load_config(Config * config);
 extern void handle_config_request(uint8_t * buffer);
 extern void apply_config(bool at_boot);
 extern void save_config_ext(void);
 extern void detect_default_config();
+extern Config usbsid_config;
+extern RuntimeCFG cfg;
+extern bool first_boot;
 
-/* GPIO externals */
+/* GPIO */
 extern void init_gpio(void);
 extern void setup_sidclock(void);
 extern void setup_piobus(void);
@@ -84,26 +82,26 @@ extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t c
 extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
 extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 
-/* Vu externals */
+/* Vu */
 extern uint16_t vu;
 extern void init_vu(void);
 extern void led_runner(void);
 
-/* MCU externals */
+/* MCU */
 extern void mcu_reset(void);
 extern void mcu_jump_to_bootloader(void);
 
-/* SID tests externals */
+/* SID tests */
 extern bool running_tests;
 
-/* SID detection externals */
+/* SID detection */
 extern void auto_detect_routine(bool auto_config, bool with_delay);
 
-/* Midi externals */
+/* Midi */
 extern void midi_init(void);
 extern void process_stream(uint8_t *buffer, size_t size);
 
-/* ASID externals */
+/* ASID */
 extern void asid_init(void);
 
 /* Midi init */
@@ -112,6 +110,9 @@ midi_machine midimachine;
 /* Queues */
 queue_t sidtest_queue;
 queue_t logging_queue;
+
+/* Declare local variables */
+static semaphore_t core0_init, core1_init;
 
 /* WebUSB Description URL */
 static const tusb_desc_webusb_url_t desc_url =
@@ -217,7 +218,7 @@ void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
 }
 
 /* Process received usb data */
-void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
+void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, __unused uint32_t * n) /* TODO: Remove unused flag for config command sequences */
 {
   usbdata = 1;
   vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
@@ -322,7 +323,7 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
         break;
       case CONFIG:
         DBG("[CONFIG]\n");
-        memcpy(config_buffer, (sid_buffer + 1), 5);
+        memcpy(config_buffer, (sid_buffer + 1), 5); /* TODO: Remove limitation for incoming command sequences */
         handle_config_request(config_buffer);
         memset(config_buffer, 0, count_of(config_buffer));
         break;

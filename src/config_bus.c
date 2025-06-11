@@ -37,7 +37,7 @@
 #include "macros.h"
 
 
-/* Config externals */
+/* Config */
 extern Config usbsid_config;
 extern RuntimeCFG cfg;
 

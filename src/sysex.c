@@ -39,13 +39,13 @@
  #include "logging.h"
 
 
-/* Vu externals */
+/* Vu */
 extern uint16_t vu;
 
-/* ASID externals */
+/* ASID */
 extern void decode_asid_message(uint8_t* buffer, int size);
 
-/* Config externals */
+/* Config */
 void handle_config_request(uint8_t * buffer);
 
 /* Custom commands */

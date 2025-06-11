@@ -30,19 +30,26 @@
 #include "sid.h"
 
 
-/* Init external vars */
+/* USBSID */
+extern uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));
+extern int paused_state, reset_state;
+
+/* Config */
+extern void verify_clockrate(void);
 extern Config usbsid_config;
 extern RuntimeCFG cfg;
 extern const char* pcb_version;
-extern uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));
-extern void verify_clockrate(void);
+
+/* Config logging */
 extern char *mono_stereo[2];
 
-/* Vu externals */
+/* Vu */
 extern uint16_t vu;
 
 /* Declare variables */
 PIO bus_pio = pio0;
+
+/* Declare local variables */
 static uint sm_control, offset_control;
 static uint sm_data, offset_data;
 static uint sm_clock, offset_clock;
@@ -52,6 +59,7 @@ static uint8_t control_word, read_data;
 static uint16_t delay_word;
 static uint32_t data_word, dir_mask;
 static float sidclock_frequency, busclock_frequency;
+static uint8_t volume_state[4] = {0};
 
 #if defined(PICO_DEFAULT_LED_PIN)
 PIO led_pio = pio1;
@@ -65,17 +73,15 @@ uint32_t rgb_value;
 #endif
 #endif
 
-extern int paused_state, reset_state;
-static uint8_t volume_state[4] = {0};
-
 /* Read GPIO macro
  *
- * The following 2 lines (var naming changed) are copied from SKPico code by frenetic
+ * The following 3 lines are partly copied  from and inspired by SKPico code by frenetic
  * see: https://github.com/frntc/SIDKick-pico
  */
 register uint32_t b asm( "r10" );
 volatile const uint32_t *BUSState = &sio_hw->gpio_in;
 volatile const uint32_t *IRQState = &pio0_hw->irq;
+
 
 void init_gpio(void)
 { /* GPIO defaults for PIO bus */

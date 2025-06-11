@@ -42,7 +42,7 @@ extern RuntimeCFG cfg;
 extern char *project_version;
 extern char *pcb_version;
 
-/* Init string constants for logging */
+/* String constants for logging */
 const char *sidtypes[5] = { "UNKNOWN", "N/A", "MOS8580", "MOS6581", "FMOpl" };
 const char *chiptypes[2] = { "Real", "Clone" };
 const char *clonetypes[6] = { "Disabled", "Other", "SKPico", "ARMSID", "FPGASID", "RedipSID" };

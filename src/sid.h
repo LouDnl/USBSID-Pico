@@ -36,6 +36,7 @@
 #include <stdint.h>
 #include "pico/util/queue.h"
 
+
 /* Queues */
 typedef struct {
   // void sid_test(int sidno, char test, char wf)
@@ -44,7 +45,6 @@ typedef struct {
   char t;
   char wf;
 } sidtest_queue_entry_t;
-
 
 /* Rasterrates (cycles) in microseconds
  * Source: https://www.c64-wiki.com/wiki/raster_time
@@ -366,12 +366,13 @@ static const uint32_t musical_scale_values[] =
 /* 12 musical note notations */
 static const char notes[12][2] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "H"};
 
-/*  */
+/* TODO */
 
 typedef struct SID {
  uint8_t addr;
  uint8_t registers[31];
 } SID;
+
 
 #ifdef __cplusplus
   }

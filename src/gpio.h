@@ -31,6 +31,7 @@
   extern "C" {
 #endif
 
+
 /* Default includes */
 #include <stdint.h>
 #include <stdio.h>
@@ -60,6 +61,7 @@
 #if defined(USE_RGB)
 #include "vu_rgb.pio.h"      /* Ik zie regenbogen! */
 #endif
+
 
 /* PIO & Statemachine usage
  * PIO0

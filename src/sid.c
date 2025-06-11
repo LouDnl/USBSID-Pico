@@ -30,7 +30,7 @@
 #include "logging.h"
 
 
-/* Config externals */
+/* Config */
 extern Config usbsid_config;
 
 /* Declare variables */

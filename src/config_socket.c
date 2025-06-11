@@ -49,7 +49,7 @@ extern uint8_t sidaddr_default[4];
 void apply_socket_change(bool quiet);
 
 
-/* Called from apply_config apply_socket_change and */
+/* Called from config.c:apply_config, config.c:apply_socket_change and set_socket_config */
 void verify_socket_settings(void)
 {
   /* Pre applying default SocketOne settings if needed */
@@ -95,7 +95,7 @@ void verify_socket_settings(void)
 }
 
 void verify_chipdetection_results(bool quiet)
-{ /* Is only run from auto_detect_routine after detection in auto_config mode */
+{ /* Is run only from sid_detection.c:auto_detect_routine after detection in auto_config mode */
   if (!quiet) CFG("[SID] VERIFY SOCKET DETECTION RESULTS\n");
   /* Socket One */
   if (usbsid_config.socketOne.sid1.type != 0 && usbsid_config.socketOne.sid2.type == 1) {
@@ -129,7 +129,7 @@ void verify_chipdetection_results(bool quiet)
 }
 
 void verify_sid_addr(bool quiet)
-{ /* Is only run from auto_detect_routine after detection in auto_config mode */
+{ /* Is run only from sid_detection.c:auto_detect_routine after detection in auto_config mode */
   if (!quiet) CFG("[SID] REASSIGN SID ADDRESS AND ID BY SOCKET CONFIG\n");
   /* Socket One */
   if (usbsid_config.socketOne.enabled) {
@@ -196,7 +196,7 @@ void verify_sid_addr(bool quiet)
 }
 
 static void autoset_sid_default_address(void)
-{ // NOTICE: UNTESTED AND UNUSED
+{ /* NOTE: DO NOT USE, UNTESTED AND UNUSED */
   int id = usbsid_config.socketOne.sid1.id;
   usbsid_config.socketOne.sid1.addr = (id != 255 ? sidaddr_default[id] : 0xFF);
   id = usbsid_config.socketOne.sid2.id;
@@ -210,7 +210,7 @@ static void autoset_sid_default_address(void)
 }
 
 static void autoset_sid_id(void)
-{ // NOTICE: UNTESTED AND UNUSED
+{ /* NOTE: DO NOT USE, UNTESTED AND UNUSED */
   /* Set SID id's based on above config */
   cfg.sidid[0] = (cfg.sock_one ? 0 : -1);
   cfg.sidid[1] = ((cfg.sock_one && cfg.sock_one_dual) ? 1 : -1);
@@ -232,7 +232,7 @@ static void autoset_sid_id(void)
 }
 
 static uint8_t address_to_id(uint8_t addr)
-{ // NOTICE: UNTESTED AND UNUSED
+{ /* NOTE: DO NOT USE, UNTESTED AND UNUSED */
   switch (addr) {
     case 0x00:
       return 0;
@@ -249,7 +249,7 @@ static uint8_t address_to_id(uint8_t addr)
 }
 
 static void set_sid_addr_id(int socket, int sid, uint8_t addr)
-{ // NOTICE: UNTESTED AND UNUSED
+{ /* NOTE: DO NOT USE, UNTESTED AND UNUSED */
 
   switch (socket) {
     case 1:
@@ -311,9 +311,9 @@ void set_sid_id_addr(int socket, int sid, int id)
   return;
 }
 
-/* Called from apply_config apply_socket_change and */
-int verify_fmopl_sidno(void)  // TODO: THIS USES CONFIG AND RUNTIMECFG CROSSED, THIS MUST BE CONFIG ONLY
-{
+/* Called from apply_config apply_socket_change */
+int verify_fmopl_sidno(void)
+{ /* TODO: THIS USES CONFIG AND RUNTIMECFG CROSSED, THIS MUST BE CONFIG ONLY */
   int fmoplsidno = -1;
   // if (usbsid_config.FMOpl.enabled) {
   if (usbsid_config.socketOne.enabled) {
@@ -384,34 +384,11 @@ void set_socket_config(uint8_t cmd, bool s1en, bool s1dual, uint8_t s1chip, bool
       usbsid_config.socketOne.sid2.type = (usbsid_config.socketOne.sid2.type == 1 ? 0 : usbsid_config.socketOne.sid2.type);
   }
   usbsid_config.mirrored = mirror;
+
   verify_socket_settings();
   verify_chipdetection_results(true);
   verify_sid_addr(true);
-  /* Set SID id's based on above config */
-  // cfg.sidid[0] = (s1en ? 0 : -1);
-  // cfg.sidid[1] = ((s1en && s1dual) ? 1 : -1);
-  // cfg.sidid[2] = (mirror ? 0
-  //   : (s2en && s1en && s1dual) ? 2
-  //   : (s2en && !s1en) ? 0
-  //   : (s2en && s1en && !s1dual) ? 1
-  //   : -1);
-  // cfg.sidid[3] = ((s2en && s2dual && s1en && s1dual) ? 3
-  //   : (s2en && s2dual && !s1en) ? 1
-  //   : (s2en && s2dual && s1en && !s1dual) ? 2
-  //   : -1);
-  // usbsid_config.socketOne.sid1.id = cfg.sidid[0];
-  // usbsid_config.socketOne.sid2.id = cfg.sidid[1];
-  // usbsid_config.socketTwo.sid1.id = cfg.sidid[2];
-  // usbsid_config.socketTwo.sid2.id = cfg.sidid[3];
-  // /* Set SID addresses based on above config */
-  // int id = usbsid_config.socketOne.sid1.id;
-  // usbsid_config.socketOne.sid1.addr = (id == 255 ? id : sidaddr_default[id]);
-  // id = usbsid_config.socketOne.sid2.id;
-  // usbsid_config.socketOne.sid2.addr = (id == 255 ? id : sidaddr_default[id]);
-  // id = usbsid_config.socketTwo.sid1.id;
-  // usbsid_config.socketTwo.sid1.addr = (id == 255 ? id : sidaddr_default[id]);
-  // id = usbsid_config.socketTwo.sid2.id;
-  // usbsid_config.socketTwo.sid2.addr = (id == 255 ? id : sidaddr_default[id]);
+
   if (cmd == 0) {
     save_load_apply_config(false);
   } else if (cmd == 1) {
@@ -420,7 +397,7 @@ void set_socket_config(uint8_t cmd, bool s1en, bool s1dual, uint8_t s1chip, bool
   return;
 }
 
-void apply_socket_config(bool quiet) // TODO: REWORK AND COMPRESS?
+void apply_socket_config(bool quiet)
 {
   if (!quiet) CFG("[CONFIG] Applying socket settings\n");
   cfg.mirrored = usbsid_config.mirrored;
