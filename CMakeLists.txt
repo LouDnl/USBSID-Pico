@@ -270,6 +270,7 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sysex.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/sid_cloneconfig.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid_detection.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid_tests.c
   ${CMAKE_CURRENT_LIST_DIR}/src/mcu.c

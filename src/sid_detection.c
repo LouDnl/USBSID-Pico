@@ -28,14 +28,15 @@
 #include "usbsid.h"
 #include "sid.h"
 #include "logging.h"
+#include "sid_fpgasid.h"
 
 
-/* GPIO externals */
+/* GPIO */
 extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
 extern void clear_bus(int sidno);
 
-/* Config externals */
+/* Config */
 extern Config usbsid_config;
 extern RuntimeCFG cfg;
 extern char *sidtypes[5];
@@ -51,6 +52,13 @@ uint8_t detect_sid_version(uint8_t start_addr);
 uint8_t detect_sid_model(uint8_t start_addr);
 uint8_t detect_sid_version_skpico(uint8_t start_addr);
 uint8_t detect_sid_unsafe(uint8_t start_addr);
+
+/* SID detection routines
+ * routine 1: https://github.com/GideonZ/1541ultimate/blob/master/software/6502/sidcrt/player/advanced/detection.asm
+ * routine 2: https://codebase64.org/doku.php?id=base:detecting_sid_type_-_safe_method
+ * routine 3: Same as routine 2 but adapted for SKPico
+ * routine 4: https://codebase64.org/doku.php?id=base:detecting_sid_type
+ */
 uint8_t (*sid_detection[4])(uint8_t) = { detect_sid_model, detect_sid_version, detect_sid_version_skpico, detect_sid_unsafe };
 
 
@@ -216,139 +224,6 @@ bool detect_skpico(uint8_t base_address)
   return false;
 }
 
-void print_fpgasid_sidconfig(int slot, int sidno, uint8_t * configarray)
-{
-  const char * slots[] = { "A", "B" };
-  const char * extinsource[] = { "analog input", "disabled", "other SID", "digifix (8580)" };
-  const char * readback[] = { "bitrotation 6581", "always read value", "always read $00", "bitrotation 8580" };
-  const char * regdelay[] = { "6581", "8580" };
-  const char * mixedwave[] = { "6581", "8580" };
-  const char * crunchydac[] = { "on (6581)", "off (8580)" };
-  const char * filtermode[] = { "6581", "8580" };
-  const char * outputmode[] = { "dual output over SID1 & SID2 channels -> stereo", "dual output over SID1 channel -> mono mix" };
-  const char * sid2addr[] = { "$D400 ", "$DE00 ", "$D500 ", "$D420 ", "" };
-  int extin = ((configarray[2] & 0b11000000) >> 6);
-  int readb = ((configarray[2] & 0b110000) >> 4);
-  int regd = ((configarray[2] & 0b1000) >> 3);
-  int mixw = ((configarray[2] & 0b100) >> 2);
-  int crunch = ((configarray[2] & 0b10) >> 1);
-  int fltr = (configarray[2] & 0b1);
-  int outp = ((configarray[1] & 0b1000) >> 3);
-  int addr1 = (((configarray[1] & 0b100) >> 2) == 1 ? 1 : 4);
-  int addr2 = (((configarray[1] & 0b10) >> 1) == 1 ? 2 : 4);
-  int addr3 = ((configarray[1] & 0b1) == 1 ? 3 : 4);
-  int addr = ((addr1 + addr2 + addr3) == 0 ? 12 : 4);
-
-  CFG("\n");
-  CFG("[FPGASID CURRENT CONFIG SLOT%s SID %d]\n", slots[slot], sidno);
-  if (sidno == 1) {
-    CFG("OUTPUT MODE: %s\n", outputmode[outp]);
-    CFG("SID2 ADDRESSES: %s%s%s%s\n", sid2addr[addr], sid2addr[addr1], sid2addr[addr2], sid2addr[addr3]);
-  }
-  CFG("SOURCE EXTIN: %s\n", extinsource[extin]);
-  CFG("WRITEREGS READBACK: %s\n", readback[readb]);
-  CFG("REG DELAY: %s\n", regdelay[regd]);
-  CFG("MIXED WAVE: %s\n", mixedwave[mixw]);
-  CFG("CRUNCHY DAC: %s\n", crunchydac[crunch]);
-  CFG("FILTER MODE: %s\n", filtermode[fltr]);
-  CFG("DIGIFIX VALUE: %02X\n", configarray[0]);
-}
-
-void read_fpgasid_configuration(uint8_t base_address)
-{
-
-  if (((base_address >= 0x0 && base_address < 0x40) && (usbsid_config.socketOne.clonetype != 4))
-    || ((base_address >= 0x40 && base_address < 0x80) && (usbsid_config.socketTwo.clonetype != 4))) {
-      CFG("[SID] ERROR INCORRECT ADDRESS (0x%02x) AND CLONETYPE (%d %d)\n",
-         base_address, usbsid_config.socketOne.clonetype, usbsid_config.socketTwo.clonetype);
-    return; /* Do nothing if no FPGASID configured */
-  }
-  uint8_t idHi, idLo, cpld, fpga, pca, select_pins, idxa, idxb, flta, fltb;
-  float frequency = 0.0;
-  uint8_t unique_id[8];
-  uint8_t sid_one_a[3];
-  uint8_t sid_two_a[3];
-  uint8_t sid_one_b[3];
-  uint8_t sid_two_b[3];
-  CFG("[SID] READING CONFIGURATION FROM FPGASID @ 0x%02X\n", base_address);
-  /* Enable diag mode */
-  cycled_write_operation((0x19 + base_address), 0xEE, 6);  /* Write magic cookie Hi */
-  cycled_write_operation((0x1A + base_address), 0xAB, 6);  /* Write magic cookie Lo */
-
-  /* Double check that we are actually data from an FPGASID */
-  idLo = cycled_read_operation((0x0 + base_address), 4);      /* Read identify Hi */
-  idHi = cycled_read_operation((0x1 + base_address), 4);      /* Read identify Lo */
-  uint16_t fpgasid_id = (idHi << 8 | idLo);
-  if (fpgasid_id != 0xF51D) {
-    CFG("[SID] ERROR: 0x%04X != 0xF51D FPGASID NOT FOUND @ 0x%02X\n", fpgasid_id, base_address);
-    return;
-  }
-
-  /* Start diag config read */
-  cpld = cycled_read_operation((0x02 + base_address), 4);  /* Read clpd revision */
-  fpga = cycled_read_operation((0x03 + base_address), 4);  /* Read fpga revision */
-  pca  = cycled_read_operation((0x0D + base_address), 4);  /* Read pca revision */
-  select_pins  = cycled_read_operation((0x0D + base_address), 4);  /* Read select pins */
-  for (int i = 0; i < 8; i++) {
-    unique_id[i] = cycled_read_operation(((0x04 + base_address) + i), 4);  /* Read unique identifier */
-  }
-  idxa = cycled_read_operation((0x1B + base_address), 4);  /* Read config index A revision */
-  idxb = cycled_read_operation((0x1C + base_address), 4);  /* Read config index B revision */
-  flta = cycled_read_operation((0x1D + base_address), 4);  /* Read filterbias A revision */
-  fltb = cycled_read_operation((0x1E + base_address), 4);  /* Read filterbias B revision */
-  /* 0 digifix, 1 stereo, 2 mode */
-  for (int i = 0; i < 3; i++) {
-    sid_one_a[i] = cycled_read_operation(((0x0F + base_address) + i), 4);  /* Read SID1 A config */
-  }
-  for (int i = 0; i < 3; i++) {
-    sid_two_a[i] = cycled_read_operation(((0x12 + base_address) + i), 4);  /* Read SID2 A config */
-  }
-  for (int i = 0; i < 3; i++) {
-    sid_one_b[i] = cycled_read_operation(((0x15 + base_address) + i), 4);  /* Read SID1 B config */
-  }
-  for (int i = 0; i < 3; i++) {
-    sid_two_b[i] = cycled_read_operation(((0x18 + base_address) + i), 4);  /* Read SID2 B config */
-  }
-  for (int i = 0; i < 10; i++) {
-    frequency += cycled_read_operation((0x0C + base_address), 4);  /* Read Ø2 frequency */
-  }
-  frequency /= 10;   // 10 reads
-  frequency *= 12.5; // kHz
-  frequency /= 1000; // to uS
-
-  /* Exit diag mode */
-  cycled_write_operation((0x19 + base_address), 0x0, 6);   /* Clear magic cookie Hi */
-  cycled_write_operation((0x1A + base_address), 0x0, 6);   /* Clear magic cookie Lo */
-
-  CFG("\n");
-  CFG("[FPGASID DIAGNOSTIC RESULT]\n");
-  CFG("ID: %04X (FPGASID)\n", fpgasid_id);
-  CFG("CPLD REVISION: %02X\n", cpld);
-  CFG("FPGA REVISION: %02X\n", fpga);
-  CFG("PCA REVISION: %02X\n", pca);
-  CFG("UNIQUE IDENTIFIER: %02X%02X%02X%02X%02X%02X%02X%02X\n",
-     unique_id[0], unique_id[1], unique_id[2], unique_id[3], unique_id[4], unique_id[5], unique_id[6], unique_id[7]);
-  CFG("CLOCK FREQUENCY READS: %.3f uS\n", frequency);
-  CFG("SELECT PINS: %02X\n", select_pins);
-  CFG("INDEX CFG A: %02X\n", idxa);
-  CFG("SID 1 A: %02X%02X%02X\n", sid_one_a[0], sid_one_a[1], sid_one_a[2]);
-  CFG("SID 2 A: %02X%02X%02X\n", sid_two_a[0], sid_two_a[1], sid_two_a[2]);
-  CFG("FILTERBIAS A SID1/SID2: %02X\n", flta);
-  CFG("INDEX CFG B: %02X\n", idxb);
-  CFG("SID 1 B: %02X%02X%02X\n", sid_one_b[0], sid_one_b[1], sid_one_b[2]);
-  CFG("SID 2 B: %02X%02X%02X\n", sid_two_b[0], sid_two_b[1], sid_two_b[2]);
-  CFG("FILTERBIAS B SID1/SID2: %02X\n", fltb);
-
-  print_fpgasid_sidconfig(0, 1, sid_one_a);
-  print_fpgasid_sidconfig(0, 2, sid_two_a);
-  print_fpgasid_sidconfig(1, 1, sid_one_b);
-  print_fpgasid_sidconfig(1, 2, sid_two_b);
-
-  CFG("\n");
-
-  return;
-}
-
 bool detect_fpgasid(uint8_t base_address)
 {
   CFG("[SID] CHECKING FOR FPGASID @ 0x%02X\n", base_address);
@@ -365,7 +240,7 @@ bool detect_fpgasid(uint8_t base_address)
   cycled_write_operation((0x1A + base_address), 0x0, 6);       /* Clear magic cookie Lo */
   uint16_t fpgasid_id = (idHi << 8 | idLo);
   CFG("[SID] READ IDENTIFY 0x%04X (0x%02X,0x%02X) @ 0x%02X\n", fpgasid_id, idHi, idLo, base_address);
-  if (fpgasid_id == 0xF51D) {
+  if (fpgasid_id == FPGASID_IDENTIFIER) {
     CFG("[SID] Found FPGASID @ 0x%02X\n", base_address);
     return true;
   }

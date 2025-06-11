@@ -903,10 +903,10 @@ void handle_config_request(uint8_t * buffer)
         read_fpgasid_configuration(buffer[2]);
       }
       if (buffer[1] == 9)  {
-        config_print[buffer[2]]();
+        read_skpico_configuration(buffer[2]);
       }
       if (buffer[1] == 0xA)  {
-        apply_bus_config_OLD();
+        config_print[buffer[2]]();
       }
       if (buffer[1] == 0xB) {
         set_sid_id_addr(buffer[2], buffer[3], buffer[4]);
