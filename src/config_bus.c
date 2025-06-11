@@ -222,7 +222,7 @@ void apply_bus_config(bool quiet) // ISSUE: FINISH
   }
 
   /* Mirrored is easy */
-  if (cfg.mirrored) {  /* mirrored (act-as-one) enabled overrules all other socket settings */
+  if (cfg.mirrored) {  /* Mirrored (act-as-one) overrules everything at runtime :) */
 
     cfg.one = cfg.two = cfg.three = cfg.four = 0;  /* CS1 & CS2 low */
     cfg.one_mask = cfg.two_mask = cfg.three_mask = cfg.four_mask = 0x1F;  /* Map everything to SID1 */

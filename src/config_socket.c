@@ -410,10 +410,14 @@ void apply_socket_config(bool quiet)
   cfg.sock_two_dual = usbsid_config.socketTwo.dualsid;
   cfg.chip_two = usbsid_config.socketTwo.chiptype;  /* Chiptype must be clone for dualsid to work! */
 
-  cfg.sids_one = (cfg.sock_one == true) ? (cfg.sock_one_dual == true) ? 2 : 1 : 0;
-  cfg.sids_two = (cfg.sock_two == true) ? (cfg.sock_two_dual == true) ? 2 : 1 : 0;
-  cfg.numsids = (cfg.sids_one + cfg.sids_two);
-
+  if (!cfg.mirrored) {
+    cfg.sids_one = (cfg.sock_one == true) ? (cfg.sock_one_dual == true) ? 2 : 1 : 0;
+    cfg.sids_two = (cfg.sock_two == true) ? (cfg.sock_two_dual == true) ? 2 : 1 : 0;
+    cfg.numsids = (cfg.sids_one + cfg.sids_two);
+  } else {
+    /* Mirrored (act-as-one) overrules everything at runtime :) */
+    cfg.sids_one = cfg.sids_two = cfg.numsids = 1;
+  }
   return;
 }
 
