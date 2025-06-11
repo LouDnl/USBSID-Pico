@@ -28,7 +28,9 @@
 #include "usbsid.h"
 #include "sid.h"
 #include "logging.h"
-#include "sid_fpgasid.h"
+
+
+#define FPGASID_ID 0xF51D
 
 
 /* GPIO */
@@ -240,7 +242,7 @@ bool detect_fpgasid(uint8_t base_address)
   cycled_write_operation((0x1A + base_address), 0x0, 6);       /* Clear magic cookie Lo */
   uint16_t fpgasid_id = (idHi << 8 | idLo);
   CFG("[SID] READ IDENTIFY 0x%04X (0x%02X,0x%02X) @ 0x%02X\n", fpgasid_id, idHi, idLo, base_address);
-  if (fpgasid_id == FPGASID_IDENTIFIER) {
+  if (fpgasid_id == FPGASID_ID) {
     CFG("[SID] Found FPGASID @ 0x%02X\n", base_address);
     return true;
   }
