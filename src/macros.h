@@ -23,8 +23,8 @@
  *
  */
 
-#ifndef _MACROS_H_
-#define _MACROS_H_
+#ifndef _USBSID_MACROS_H_
+#define _USBSID_MACROS_H_
 #pragma once
 
 #ifdef __cplusplus
@@ -96,4 +96,4 @@
  }
 #endif
 
-#endif /* _MACROS_H_ */
+#endif /* _USBSID_MACROS_H_ */

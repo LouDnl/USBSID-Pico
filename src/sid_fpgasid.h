@@ -3,7 +3,7 @@
  * for interfacing one or two MOS SID chips and/or hardware SID emulators over
  * (WEB)USB with your computer, phone or ASID supporting player
  *
- * sid.c
+ * sid_fpgasid.h
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
@@ -23,22 +23,29 @@
  *
  */
 
-#include "globals.h"
-#include "config.h"
-#include "usbsid.h"
-#include "sid.h"
-#include "logging.h"
+#ifndef _USBSID_SID_FPGASID_H_
+#define _USBSID_SID_FPGASID_H_
+#pragma once
+
+#ifdef __cplusplus
+  extern "C" {
+#endif
 
 
-/* Config */
-extern Config usbsid_config;
+#define FPGASID_IDENTIFIER 0xF51D
 
-/* Declare variables */
-struct SID Chip[USBSID_MAX_SIDS];
+static const char * slots[2] = { "A", "B" };
+static const char * extinsource[4] = { "analog input", "disabled", "other SID", "digifix (8580)" };
+static const char * readback[4] = { "bitrotation 6581", "always read value", "always read $00", "bitrotation 8580" };
+static const char * regdelay[2] = { "6581", "8580" };
+static const char * mixedwave[2] = { "6581", "8580" };
+static const char * crunchydac[2] = { "on (6581)", "off (8580)" };
+static const char * filtermode[2] = { "6581", "8580" };
+static const char * outputmode[2] = { "dual output over SID1 & SID2 channels -> stereo", "dual output over SID1 channel -> mono mix" };
+static const char * sid2addr[5] = { "$D400 ", "$DE00 ", "$D500 ", "$D420 ", "" };
 
+#ifdef __cplusplus
+  }
+#endif
 
-void init_sid_chips(void)
-{
-  Chip[usbsid_config.socketOne.sid1.id].addr = usbsid_config.socketOne.sid1.addr;
-  memset(Chip[usbsid_config.socketOne.sid1.id].registers, 0, 31);
-}
+#endif /* _USBSID_SID_FPGASID_H_ */

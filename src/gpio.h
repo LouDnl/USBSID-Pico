@@ -23,13 +23,14 @@
  *
  */
 
-#ifndef _USBSIDGPIO_H_
-#define _USBSIDGPIO_H_
+#ifndef _USBSID_GPIO_H_
+#define _USBSID_GPIO_H_
 #pragma once
 
 #ifdef __cplusplus
   extern "C" {
 #endif
+
 
 /* Default includes */
 #include <stdint.h>
@@ -60,6 +61,7 @@
 #if defined(USE_RGB)
 #include "vu_rgb.pio.h"      /* Ik zie regenbogen! */
 #endif
+
 
 /* PIO & Statemachine usage
  * PIO0
@@ -145,4 +147,4 @@
   }
 #endif
 
-#endif /* _USBSIDGPIO_H_ */
+#endif /* _USBSID_GPIO_H_ */

@@ -39,7 +39,7 @@
 #include "globals.h"
 
 
-/* MCU externals */
+/* MCU */
 extern uint64_t mcu_get_unique_id(void);
 
 /* USB Constants */

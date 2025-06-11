@@ -30,20 +30,26 @@
 #include "sid.h"
 
 
-/* Init external vars */
-extern Config usbsid_config;
-extern const char* pcb_version;
+/* USBSID */
 extern uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));
-extern void verify_clockrate(void);
-extern int sock_one, sock_two, sids_one, sids_two, numsids, act_as_one;
-extern uint8_t one, two, three, four;
-extern uint8_t one_mask, two_mask, three_mask, four_mask;
+extern int paused_state, reset_state;
 
-/* Vu externals */
+/* Config */
+extern void verify_clockrate(void);
+extern Config usbsid_config;
+extern RuntimeCFG cfg;
+extern const char* pcb_version;
+
+/* Config logging */
+extern char *mono_stereo[2];
+
+/* Vu */
 extern uint16_t vu;
 
-/* Init vars */
+/* Declare variables */
 PIO bus_pio = pio0;
+
+/* Declare local variables */
 static uint sm_control, offset_control;
 static uint sm_data, offset_data;
 static uint sm_clock, offset_clock;
@@ -53,6 +59,7 @@ static uint8_t control_word, read_data;
 static uint16_t delay_word;
 static uint32_t data_word, dir_mask;
 static float sidclock_frequency, busclock_frequency;
+static uint8_t volume_state[4] = {0};
 
 #if defined(PICO_DEFAULT_LED_PIN)
 PIO led_pio = pio1;
@@ -66,17 +73,15 @@ uint32_t rgb_value;
 #endif
 #endif
 
-extern int paused_state, reset_state;
-static uint8_t volume_state[4] = {0};
-
 /* Read GPIO macro
  *
- * The following 2 lines (var naming changed) are copied from SKPico code by frenetic
+ * The following 3 lines are partly copied  from and inspired by SKPico code by frenetic
  * see: https://github.com/frntc/SIDKick-pico
  */
 register uint32_t b asm( "r10" );
 volatile const uint32_t *BUSState = &sio_hw->gpio_in;
 volatile const uint32_t *IRQState = &pio0_hw->irq;
+
 
 void init_gpio(void)
 { /* GPIO defaults for PIO bus */
@@ -462,32 +467,62 @@ static int __not_in_flash_func(set_bus_bits)(uint8_t address, uint8_t data)
   /* CFG("[BUS BITS]$%02X:%02X ", address, data); */
   switch (address) {
     case 0x00 ... 0x1F:
-      if (one == 0b110 || one == 0b111) return 0;
-      data_word = (address & one_mask) << 8 | data;
-      control_word |= one;
+      if (cfg.one == 0b110 || cfg.one == 0b111) return 0;
+      data_word = (cfg.one_mask == 0x3f ? ((address & 0x1F) + 0x20) : (address & 0x1F)) << 8 | data;
+      control_word |= cfg.one;
       break;
     case 0x20 ... 0x3F:
-      if (two == 0b110 || two == 0b111) return 0;
-      data_word = (address & two_mask) << 8 | data;
-      control_word |= two;
+      if (cfg.two == 0b110 || cfg.two == 0b111) return 0;
+      data_word = (cfg.two_mask == 0x3f ? ((address & 0x1F) + 0x20) : address & 0x1F) << 8 | data;
+      control_word |= cfg.two;
       break;
     case 0x40 ... 0x5F:
-      if (three == 0b110 || three == 0b111) return 0;
+      if (cfg.three == 0b110 || cfg.three == 0b111) return 0;
       /* Workaround for addresses in this range, mask doesn't work properly */
-      address &= three_mask;
-      data_word = (three_mask == 0x3f ? (address + 0x20) : address) << 8 | data;
-      control_word |= three;
+      data_word = (cfg.three_mask == 0x3f ? ((address & 0x1F) + 0x20) : (address & 0x1F)) << 8 | data;
+      control_word |= cfg.three;
       break;
     case 0x60 ... 0x7F:
-      if (four == 0b110 || four == 0b111) return 0;
-      data_word = (address & four_mask) << 8 | data;
-      control_word |= four;
+      if (cfg.four == 0b110 || cfg.four == 0b111) return 0;
+      data_word = (cfg.four_mask == 0x3f ? ((address & 0x1F) + 0x20) : (address & 0x1F)) << 8 | data;
+      control_word |= cfg.four;
       break;
   }
-  /* CFG("$%04x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\n",
-    data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word)); */
+  // CFG("$%02X:%02X $%04X 0b"PRINTF_BINARY_PATTERN_INT32" $%04X 0b"PRINTF_BINARY_PATTERN_INT16"\n",
+  //   address, data, data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word));
   return 1;
 }
+// static int __not_in_flash_func(set_bus_bits)(uint8_t address, uint8_t data)
+// {
+//   /* CFG("[BUS BITS]$%02X:%02X ", address, data); */
+//   switch (address) {
+//     case 0x00 ... 0x1F:
+//       if (cfg.one == 0b110 || cfg.one == 0b111) return 0;
+//       data_word = (address & cfg.one_mask) << 8 | data;
+//       control_word |= cfg.one;
+//       break;
+//     case 0x20 ... 0x3F:
+//       if (cfg.two == 0b110 || cfg.two == 0b111) return 0;
+//       data_word = (address & cfg.two_mask) << 8 | data;
+//       control_word |= cfg.two;
+//       break;
+//     case 0x40 ... 0x5F:
+//       if (cfg.three == 0b110 || cfg.three == 0b111) return 0;
+//       /* Workaround for addresses in this range, mask doesn't work properly */
+//       address &= cfg.three_mask;
+//       data_word = (cfg.three_mask == 0x3f ? (address + 0x20) : address) << 8 | data;
+//       control_word |= cfg.three;
+//       break;
+//     case 0x60 ... 0x7F:
+//       if (cfg.four == 0b110 || cfg.four == 0b111) return 0;
+//       data_word = (address & cfg.four_mask) << 8 | data;
+//       control_word |= cfg.four;
+//       break;
+//   }
+//   /* CFG("$%04x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\n",
+//     data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word)); */
+//   return 1;
+// }
 
 uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data)
 { /* WARNING: DEPRECATED AND NO LONGER WORKS */
@@ -628,7 +663,7 @@ void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint
 void unmute_sid(void)
 {
   DBG("[UNMUTE]\n");
-  for (int i = 0; i < numsids; i++) {
+  for (int i = 0; i < cfg.numsids; i++) {
     uint8_t addr = ((0x20 * i) + 0x18);
     if ((volume_state[i] & 0xF) == 0) volume_state[i] = (volume_state[i] & 0xF0) | 0x0E;
     sid_memory[addr] = volume_state[i];
@@ -641,7 +676,7 @@ void unmute_sid(void)
 void mute_sid(void)
 {
   DBG("[MUTE]\n");
-  for (int i = 0; i < numsids; i++) {
+  for (int i = 0; i < cfg.numsids; i++) {
     uint8_t addr = ((0x20 * i) + 0x18);
     volume_state[i] = sid_memory[addr];
     cycled_write_operation(addr, (volume_state[i] & 0xF0), 0);  /* Volume to 0 */
@@ -676,7 +711,7 @@ void clear_bus(int sidno)
 
 void clear_bus_all(void)
 {
-  for (int sid = 0; sid < numsids; sid++) {
+  for (int sid = 0; sid < cfg.numsids; sid++) {
     clear_bus(sid);
   }
   return;
@@ -708,8 +743,7 @@ void reset_sid(void)
   memset(volume_state, 0, 4);
   memset(sid_memory, 0, count_of(sid_memory));
   gpio_put(RES, 0);
-  if (usbsid_config.socketOne.chiptype == 0 ||
-      usbsid_config.socketTwo.chiptype == 0) {
+  if (cfg.chip_one == 0 || cfg.chip_two == 0) {
     cycled_delay_operation(10);  /* 10x PHI(02) cycles as per datasheet for REAL SIDs only */
   }
   gpio_put(RES, 1);
@@ -729,7 +763,7 @@ void reset_sid_registers(void)
 { /* NOTICE: CAUSES ISSUES IF USED RIGHT BEFORE PLAYING */
   reset_state = 1;
   paused_state = 0;
-  for (int sid = 0; sid < numsids; sid++) {
+  for (int sid = 0; sid < cfg.numsids; sid++) {
     clear_sid_registers(sid);
   }
   reset_state = 0;
@@ -739,19 +773,32 @@ void reset_sid_registers(void)
 void toggle_audio_switch(void)
 { /* Toggle the SPST switch stereo <-> mono */
   #if defined(HAS_AUDIOSWITCH)
-  static int audio_state = 0b1;
-  audio_state ^= 1;
-  CFG("[CONFIG] TOGGLE AUDIO SWITCH TO: %d\n", audio_state);
-  tPIN(AU_SW);  /* toggle mono <-> stereo */
+  if (!usbsid_config.lock_audio_sw) {
+    b = *BUSState; /* read complete bus */
+    int audio_state = (b & bPIN(AU_SW)) >> AU_SW; /* Pinpoint current audio switch state */
+    audio_state ^= 1;
+    CFG("[CONFIG] TOGGLE AUDIO SWITCH TO: %d (%s)\n", audio_state, mono_stereo[audio_state]);
+    tPIN(AU_SW);  /* toggle mono <-> stereo */
+  } else {
+    CFG("[CONFIG] Audio switch is locked at %d (%s), toggle not applied\n",
+      (int)usbsid_config.stereo_en, mono_stereo[(int)usbsid_config.stereo_en]);
+    return;
+  }
   #endif
 }
 
 void set_audio_switch(bool state)
 { /* Set the SPST switch */
   #if defined(HAS_AUDIOSWITCH)
-  CFG("[CONFIG] SET AUDIO SWITCH TO: %d\n", state);
-  if (state) {
-    sPIN(AU_SW);      /* set   mono <-> stereo pin */
-  } else cPIN(AU_SW);  /* clear mono <-> stereo pin */
+  if (!usbsid_config.lock_audio_sw) {
+    CFG("[CONFIG] SET AUDIO SWITCH TO: %d (%s)\n", state, mono_stereo[state]);
+    if (state) {
+      sPIN(AU_SW);      /* set   mono <-> stereo pin */
+    } else cPIN(AU_SW);  /* clear mono <-> stereo pin */
+  } else {
+    CFG("[CONFIG] Audio switch is locked at %d (%s), requested change to %d (%s) ignored\n",
+      (int)usbsid_config.stereo_en, mono_stereo[(int)usbsid_config.stereo_en], state, mono_stereo[state]);
+    return;
+  }
   #endif
 }

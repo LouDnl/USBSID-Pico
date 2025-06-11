@@ -96,6 +96,8 @@ enum
   GET_CLOCK        = 0x57,  /* Returns the clockrate as array id in byte 0 */
   LOCK_CLOCK       = 0x58,  /* Locks the clockrate from being changed, saved in config */
   STOP_TESTS       = 0x59,  /* Interrupt any running SID tests */
+  DETECT_CLONES    = 0x5A,  /* Detect clone SID types */
+  AUTO_DETECT      = 0x5B,  /* Run auto detection routine (fallback/workaround for rp2350 bug) */
 
   LOAD_MIDI_STATE  = 0x60,
   SAVE_MIDI_STATE  = 0x61,
@@ -109,6 +111,7 @@ enum
   SYNC_PIOS        = 0x87,  /* Sync PIO clocks */
   TOGGLE_AUDIO     = 0x88,  /* Toggle mono <-> stereo (v1.2+ boards only) */
   SET_AUDIO        = 0x89,  /* Set mono <-> stereo (v1.2+ boards only) */
+  LOCK_AUDIO       = 0x90,  /* Locks the audio switch into it's current state (v1.3+ boards only) */
 };
 
 /* Clock cycles per second
@@ -170,8 +173,8 @@ typedef struct Config {
     bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
     uint8_t chiptype;          /* 0 = real, 1 = clone, 2 = unknown */
     uint8_t clonetype;         /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
-    uint8_t sid1type;          /* 0 = unknown, 1 = n/a, 2 = MOS8085, 3 = MOS6581 */
-    uint8_t sid2type;          /* 0 = unknown, 1 = FMopl, 2 = MOS8085, 3 = MOS6581 */
+    uint8_t sid1type;          /* 0 = unknown, 1 = n/a, 2 = MOS8580, 3 = MOS6581 */
+    uint8_t sid2type;          /* 0 = unknown, 1 = FMopl, 2 = MOS8580, 3 = MOS6581 */
   } socketOne;                 /* 1 */
   struct {
     bool    enabled : 1;       /* enable / disable this socket */
@@ -179,8 +182,8 @@ typedef struct Config {
     bool    act_as_one : 1;    /* act as socket 1 */
     uint8_t chiptype;          /* 0 = real, 1 = clone, 2 = unknown */
     uint8_t clonetype;         /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
-    uint8_t sid1type;          /* 0 = unknown, 1 = n/a, 2 = MOS8085, 3 = MOS6581 */
-    uint8_t sid2type;          /* 0 = unknown, 1 = FMopl, 2 = MOS8085, 3 = MOS6581 */
+    uint8_t sid1type;          /* 0 = unknown, 1 = n/a, 2 = MOS8580, 3 = MOS6581 */
+    uint8_t sid2type;          /* 0 = unknown, 1 = FMopl, 2 = MOS8580, 3 = MOS6581 */
   } socketTwo;                 /* 2 */
   struct {
     bool enabled : 1;
@@ -210,6 +213,7 @@ typedef struct Config {
     int sidno;                  /* 0 = disabled, saves the sidno of the sid set to FMOpl */
   } FMOpl;                      /* 9 */
   bool stereo_en : 1;           /* audio switch is off (mono) or on (stereo) ~ (HW v1.3+ only) */
+  bool lock_audio_sw : 1;       /* lock the audio switch into it's current stateand prevent it from being changed ~ (PCB v1.3+ only) */
 } Config;
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
@@ -217,6 +221,7 @@ typedef struct Config {
   .clock_rate = DEFAULT, \
   .lock_clockrate = false, \
   .stereo_en = true,  /* PCB v1.3+ only */ \
+  .lock_audio_sw = false,  /* PCB v1.3+ only */ \
   .socketOne = { \
     .enabled = true, \
     .dualsid = false, \

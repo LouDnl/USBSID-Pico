@@ -278,9 +278,9 @@ jobs:
       - name: 💾 Gather Artifact Files
         working-directory: ${{github.workspace}}/master
         run: |
-          mkdir dist
-          cp -av build_${{matrix.directory}}/*.uf2 dist/
-          zip -r usbsid${{matrix.pico_board}}-taggedbuild-${{ steps.vars.outputs.tag }}.zip dist/
+          mkdir usbsid${{matrix.pico_board}}
+          cp -av build_${{matrix.directory}}/*.uf2 usbsid${{matrix.pico_board}}/
+          zip -r usbsid${{matrix.pico_board}}-taggedbuild-${{ steps.vars.outputs.tag }}.zip usbsid${{matrix.pico_board}}/
 
       - name: Get current branch
         run: |
@@ -295,8 +295,8 @@ jobs:
         uses: actions/github-script@v7
         env:
           UPLOAD_URL: ${{ needs.create_release.outputs.upload_url }}
-          ASSET_PATH: ${{github.workspace}}/master/usbsid${{matrix.pico_board}}-taggedbuild-${{github.run_number}}.zip
-          ASSET_NAME: usbsid${{matrix.pico_board}}-taggedbuild-${{github.run_number}}.zip
+          ASSET_PATH: ${{github.workspace}}/master/usbsid${{matrix.pico_board}}-taggedbuild-${{ steps.vars.outputs.tag }}.zip
+          ASSET_NAME: usbsid${{matrix.pico_board}}-taggedbuild-${{ steps.vars.outputs.tag }}.zip
           ASSET_CONTENT_TYPE: application/zip
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}

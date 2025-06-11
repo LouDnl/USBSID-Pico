@@ -3,6 +3,14 @@
 # USBSID-Pico
 USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board for interfacing one or two MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer, phone, ASID supporting player or USB midi controller.  
 
+# This is USBSID-Pico! :)
+
+| **“Raster Bar” (8-bit)** | **Van Halen's Jump<br>dual SID in Stereo!** | **Flamethrower** | **Multiverse 100%<br>in Stereo!** |
+|:-:|:-:|:-:|:-:|
+| [![MOS6581](https://img.youtube.com/vi/nh0SxO1y6I0/1.jpg)](https://www.youtube.com/watch?v=nh0SxO1y6I0)<br><small><sub>by LukHash</sub></small> | [![Dual MOS8580](https://img.youtube.com/vi/lzvkWlDq2TM/1.jpg)](https://www.youtube.com/watch?v=lzvkWlDq2TM)<br><small><sub>by Nordischsound</sub></small> | [![MOS8580](https://img.youtube.com/vi/Mfbj21ntQXA/1.jpg)](https://www.youtube.com/watch?v=Mfbj21ntQXA)<br><small><sub>by Reed</sub></small> | [![Dual MOS8580](https://img.youtube.com/vi/Rr-oq5jBeDg/1.jpg)](https://www.youtube.com/watch?v=Rr-oq5jBeDg)<br><small><sub>by Nah-Kolor</sub></small> |
+
+# Index
+
 * [Features](#features)
 * [Questions & Support](#questions-and-support)
 * [Project status](#project-status)
@@ -23,7 +31,6 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
 * [Software](#software)
   * [Software manual](doc/USBSID-Pico-software-manual.adoc) [PDF](doc/USBSID-Pico-software-manual.pdf)
   * [Pre compiled Vice binaries](#precompiled-vice-binaries)
-* [PCB in action](#usbsid-pico-in-action)
 * [Acknowledgements](#acknowledgements)
 * [Disclaimer](#disclaimer)
 * [License](#license)
@@ -238,7 +245,7 @@ If you want and are up to it you can solder your own PCB or create your own deve
   - SID Ext in pins (requires closing the solder jumper on the bottom)
   - Ground pin
 - New soldermask art ;)
-### revision v1.0
+#### revision v1.0
 - Supports all MOS SID chips e.g. MOS6581, MOS6582 & MOS8580
 - Supports SID chip replacements e.g. [SIDKick-Pico](https://github.com/frntc/SIDKick-pico), [SwinSID](https://github.com/dmantione/swinsid), ARMSID (untested), FPGASID (untested)
 - 1 MHz oscillator (external optional, enabled via jumper pad)
@@ -269,13 +276,7 @@ If you want and are up to it you can solder your own PCB or create your own deve
   [<img src="images/v0.1-top.png" width="30%">](images/v0.1-top.png) 
 
 # Examples
-### USBSID-Pico in action
-Videos and/or audio links are subject to be changed or updated at any time.
-| **Van Halen's Jump<br>in Stereo!** | **Flamethrower** |
-|:-:|:-:|
-| [![Dual MOS8580](https://img.youtube.com/vi/lzvkWlDq2TM/1.jpg)](https://www.youtube.com/watch?v=lzvkWlDq2TM)<br><small><sub>by Nordischsound</sub></small> | [![MOS8580](https://img.youtube.com/vi/Mfbj21ntQXA/1.jpg)](https://www.youtube.com/watch?v=Mfbj21ntQXA)<br><small><sub>by Reed</sub></small> |
-
-Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-29KQ), [other socials](https://github.com/LouDnl) or the [SHOWCASE](SHOWCASE.md) page to see more examples.
+Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-29KQ), [other socials](https://github.com/LouDnl) or the [SHOWCASE](SHOWCASE.md) page to see more examples of the board in action.
 ### Software
 Also see the [Software manual](doc/USBSID-Pico-software-manual.adoc) for information on how to use supported software!  
 _Available examples with USBSID-Pico support:_<br>
