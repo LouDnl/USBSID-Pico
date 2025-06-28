@@ -3,6 +3,7 @@
 #### In progress, expected release v0.6.0-BETA
 * Rework Midi handling
 * Rework ASID handling for buffered writing
+* Start on embedded emu
 
 #### Version: 0.5.0-BETA
 * Add autodetection routine to first boot on new firmware and
