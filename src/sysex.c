@@ -46,7 +46,7 @@ extern uint16_t vu;
 extern void decode_asid_message(uint8_t* buffer, int size);
 
 /* Config */
-void handle_config_request(uint8_t * buffer);
+extern void handle_config_request(uint8_t * buffer, uint32_t size);
 
 /* Custom commands */
 enum {
@@ -62,7 +62,7 @@ void decode_sysex_command(uint8_t* buffer, int size)
   switch(buffer[2]) {
     case SYSEX_TOGGLE_AUDIO:  /* Toggle mono / stereo */
       config_buffer[0] = TOGGLE_AUDIO;
-      handle_config_request(config_buffer);
+      handle_config_request(config_buffer, 5);
       break;
     default:
       break;

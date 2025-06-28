@@ -341,12 +341,20 @@ enum
   TOGGLE_AUDIO     = 0x88,  /* Toggle mono <-> stereo (v1.3+ boards only) */
   SET_AUDIO        = 0x89,  /* Set mono <-> stereo (v1.3+ boards only) */
   LOCK_AUDIO       = 0x90,  /* Locks the audio switch into it's current state (v1.3+ boards only) */
+  GET_AUDIO        = 0x91,  /* Get current audio switch setting */
 
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
   TEST_FN2         = 0x9A,  /* TODO: Remove before v1 release */
   TEST_FN3         = 0x9B,  /* TODO: Remove before v1 release */
 };
 
+/* Config write command byte */
+enum {
+  FULL_CONFIG   = 0x00,
+  SOCKET_CONFIG = 0x10,
+  MIDI_CONFIG   = 0x20,
+  MIDI_CCVALUES = 0x30,
+};
 
 #ifdef __cplusplus
   }

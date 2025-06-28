@@ -164,7 +164,7 @@ void handle_asid_message(uint8_t sid, uint8_t* buffer)
          * or it will be too damn fast! So we do this for other
          * Pico's too */
         cycled_write_operation((address |= sid), register_value, 10);
-        WRITEDBG(dtype, reg, size, (address |= sid), register_value, 10);
+        WRITEDBG(dtype, reg, 28, (address |= sid), register_value, 10);
         reg++;
       }
     }
