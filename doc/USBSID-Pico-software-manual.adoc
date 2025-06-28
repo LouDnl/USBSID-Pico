@@ -42,7 +42,7 @@ sudo systemctl restart udev
 ----
 
 === Windows driver
-Use https://zadig.akeo.ie/[Zadig] to install the correct driver for USBSID-Pico. +
+Use https://zadig.akeo.ie/[Zadig] to install the correct driver. Replace the driver for `USBSID-Pico Data` with WinUSB. +
 image:images/software/zadig-list-all-devices.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/zadig-list-all-devices.png",width="400"]
 image:images/software/zadig-install-driver.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/zadig-install-driver.png",width="400"] +
 
