@@ -37,7 +37,7 @@
 
 
 /* Config */
-extern void save_load_apply_config(bool at_boot);
+extern void save_load_apply_config(bool at_boot, bool print_cfg);
 extern Config usbsid_config;
 extern RuntimeCFG cfg;
 
@@ -219,7 +219,8 @@ static void autoset_sid_id(void)
     : (cfg.sock_two && !cfg.sock_one) ? 0
     : (cfg.sock_two && cfg.sock_one && !cfg.sock_one_dual) ? 1
     : -1);
-  cfg.sidid[3] = ((cfg.sock_two && cfg.sock_two_dual && cfg.sock_one && cfg.sock_one_dual) ? 3
+  cfg.sidid[3] = (cfg.mirrored ? 1
+    : (cfg.sock_two && cfg.sock_two_dual && cfg.sock_one && cfg.sock_one_dual) ? 3
     : (cfg.sock_two && cfg.sock_two_dual && !cfg.sock_one) ? 1
     : (cfg.sock_two && cfg.sock_two_dual && cfg.sock_one && !cfg.sock_one_dual) ? 2
     : -1);
@@ -384,13 +385,20 @@ void set_socket_config(uint8_t cmd, bool s1en, bool s1dual, uint8_t s1chip, bool
       usbsid_config.socketOne.sid2.type = (usbsid_config.socketOne.sid2.type == 1 ? 0 : usbsid_config.socketOne.sid2.type);
   }
   usbsid_config.mirrored = mirror;
+  /* PCB v1.3 will lock Audio to Stereo in mirrored mode :) */
+  #if defined(HAS_AUDIOSWITCH)
+  if (mirror) {
+    usbsid_config.stereo_en = true;
+    usbsid_config.lock_audio_sw = true;
+  }
+  #endif
 
   verify_socket_settings();
   verify_chipdetection_results(true);
   verify_sid_addr(true);
 
   if (cmd == 0) {
-    save_load_apply_config(false);
+    save_load_apply_config(false, true);
   } else if (cmd == 1) {
     apply_socket_change(false);
   }
@@ -406,9 +414,21 @@ void apply_socket_config(bool quiet)
   cfg.sock_one_dual = usbsid_config.socketOne.dualsid;
   cfg.chip_one = usbsid_config.socketOne.chiptype;  /* Chiptype must be clone for dualsid to work! */
 
-  cfg.sock_two = usbsid_config.socketTwo.enabled;
-  cfg.sock_two_dual = usbsid_config.socketTwo.dualsid;
-  cfg.chip_two = usbsid_config.socketTwo.chiptype;  /* Chiptype must be clone for dualsid to work! */
+  if (!cfg.mirrored) {
+    cfg.sock_two = usbsid_config.socketTwo.enabled;
+    cfg.sock_two_dual = usbsid_config.socketTwo.dualsid;
+    cfg.chip_two = usbsid_config.socketTwo.chiptype;  /* Chiptype must be clone for dualsid to work! */
+  } else {
+    if (cfg.sock_one_dual == true) {
+      cfg.sock_two = usbsid_config.socketOne.enabled;
+      cfg.sock_two_dual = usbsid_config.socketOne.dualsid;
+      cfg.chip_two = usbsid_config.socketOne.chiptype;  /* Chiptype must be clone for dualsid to work! */
+    } else {
+      cfg.sock_two = usbsid_config.socketTwo.enabled;
+      cfg.sock_two_dual = usbsid_config.socketTwo.dualsid;
+      cfg.chip_two = usbsid_config.socketTwo.chiptype;  /* Chiptype must be clone for dualsid to work! */
+    }
+  }
 
   if (!cfg.mirrored) {
     cfg.sids_one = (cfg.sock_one == true) ? (cfg.sock_one_dual == true) ? 2 : 1 : 0;
@@ -416,7 +436,12 @@ void apply_socket_config(bool quiet)
     cfg.numsids = (cfg.sids_one + cfg.sids_two);
   } else {
     /* Mirrored (act-as-one) overrules everything at runtime :) */
-    cfg.sids_one = cfg.sids_two = cfg.numsids = 1;
+    if (cfg.sock_one_dual == true) {
+      cfg.sids_one = cfg.sids_two = cfg.numsids = 2;
+    } else {
+      cfg.sids_one = cfg.sids_two = cfg.numsids = 1;
+    }
+
   }
   return;
 }

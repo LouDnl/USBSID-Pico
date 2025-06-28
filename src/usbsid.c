@@ -36,11 +36,11 @@
 extern int flagged;  /* doubletap check */
 
 /* Declare variables ~ Do not change order to keep memory alignment! */
-uint8_t __not_in_flash("usbsid_buffer") config_buffer[5];
-uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __aligned(2 * (0x20 * 4));
 uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
 uint8_t __not_in_flash("usbsid_buffer") sid_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
 uint8_t __not_in_flash("usbsid_buffer") read_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
+uint8_t __not_in_flash("usbsid_buffer") config_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
+uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __aligned(2 * (0x20 * 4));
 int usb_connected = 0, usbdata = 0;
 uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
 uint8_t *cdc_itf = 0, *wusb_itf = 0;
@@ -55,8 +55,9 @@ uint8_t (*write_buffer_p)[MAX_BUFFER_SIZE] = &write_buffer;
 
 /* Config */
 extern void load_config(Config * config);
-extern void handle_config_request(uint8_t * buffer);
-extern void apply_config(bool at_boot);
+extern void handle_config_request(uint8_t * buffer, uint32_t size);
+extern void print_config(void);
+extern void apply_config(bool at_boot, bool print_cfg);
 extern void save_config_ext(void);
 extern void detect_default_config();
 extern Config usbsid_config;
@@ -218,7 +219,7 @@ void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
 }
 
 /* Process received usb data */
-void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, __unused uint32_t * n) /* TODO: Remove unused flag for config command sequences */
+void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
 {
   usbdata = 1;
   vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
@@ -242,8 +243,8 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, __unused uint3
     // n_bytes = (n_bytes == 0) ? 2 : n_bytes; /* if byte count is zero, this is a single write packet */
     if (n_bytes == 0) {
       cycled_write_operation(sid_buffer[1], sid_buffer[2], 6);  /* Add 6 cycles to each write for LDA(2) & STA(4) */
-      WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], 0);
-      IODBG("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], 0);
+      WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], 6);
+      IODBG("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], 6);
     } else {
       buffer_task(n_bytes, 2);
     }
@@ -323,8 +324,9 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, __unused uint3
         break;
       case CONFIG:
         DBG("[CONFIG]\n");
-        memcpy(config_buffer, (sid_buffer + 1), 5); /* TODO: Remove limitation for incoming command sequences */
-        handle_config_request(config_buffer);
+        /* Copy incoming buffer ignoring the command byte */
+        memcpy(config_buffer, (sid_buffer + 1), (int)*n - 1);
+        handle_config_request(config_buffer, *n - 1);
         memset(config_buffer, 0, count_of(config_buffer));
         break;
       case RESET_MCU:
@@ -743,7 +745,7 @@ int main()
   /* Load config before init of USBSID settings ~ NOTE: This cannot be run from Core 1! */
   load_config(&usbsid_config);
   /* Apply saved config to used vars */
-  apply_config(true);
+  apply_config(true, false);
 
   /* Log boot CPU and C64 clock speeds */
   cpu_mhz = (clock_get_hz(clk_sys) / 1000 / 1000);
@@ -787,6 +789,8 @@ int main()
     auto_config = false;
     mcu_reset();
   }
+  /* Print config once at end of boot routine */
+  print_config();
 
   /* Release core 0 semaphore to signal boot finished */
   sem_release(&core0_init);

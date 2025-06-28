@@ -1503,7 +1503,8 @@ void print_help(void)
   printf("                                  0: %s, 1: %s, 2: %s, 3: %s, 4: %s\n",
          sidtypes[0], sidtypes[1], sidtypes[2], sidtypes[3], sidtypes[4]);
   printf("                                  (Available for 'Clone' chiptype only!)\n");
-  printf("  -a1,      --as-one            : Socket 2 mirrors socket 1 (Socket 2 setting only!)\n");
+  printf("  -a1 N,    --as-one N          : Socket 2 mirrors socket 1 (Socket 2 setting only!)\n");
+  printf("                                  Enabled (1) or Disabled (0)\n");
   printf("--------------------------------------------------------------------------------------------------------------------\n");
 }
 
@@ -1971,6 +1972,10 @@ void config_usbsidpico(int argc, char **argv)
 
             if (socket == 2 && (!strcmp(argv[p], "-a1") || !strcmp(argv[p], "--as-one"))) {
               p++;
+              if (argv[p] == NULL) {
+                printf ("No argument supplied for option '%s'\n", argv[--p]);
+                goto exit;
+              }
               int asone = atoi(argv[p]);
               if (asone >= count_of(enabled)) {
                 printf("%d is not an enable option!\n", asone);

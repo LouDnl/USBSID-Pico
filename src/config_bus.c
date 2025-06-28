@@ -223,10 +223,16 @@ void apply_bus_config(bool quiet) // ISSUE: FINISH
 
   /* Mirrored is easy */
   if (cfg.mirrored) {  /* Mirrored (act-as-one) overrules everything at runtime :) */
-
     cfg.one = cfg.two = cfg.three = cfg.four = 0;  /* CS1 & CS2 low */
-    cfg.one_mask = cfg.two_mask = cfg.three_mask = cfg.four_mask = 0x1F;  /* Map everything to SID1 */
-    cfg.sidtype[1] = cfg.sidtype[2] = cfg.sidtype[3] = cfg.sidtype[0];    /* Map each sidtype to SID1 */
+    if ((cfg.sock_one_dual == true) && (cfg.numsids == 2)) {
+      cfg.one_mask = cfg.three_mask = 0x1F;
+      cfg.two_mask = cfg.four_mask = 0x3F;
+      cfg.sidtype[2] = cfg.sidtype[0];  /* Map sidtype to SID1 */
+      cfg.sidtype[3] = cfg.sidtype[1];  /* Map sidtype to SID2 */
+    } else {
+      cfg.one_mask = cfg.two_mask = cfg.three_mask = cfg.four_mask = 0x1F;  /* Map everything to SID1 */
+      cfg.sidtype[1] = cfg.sidtype[2] = cfg.sidtype[3] = cfg.sidtype[0];    /* Map each sidtype to SID1 */
+    }
 
   } else { /* Now for the tricky part */
 

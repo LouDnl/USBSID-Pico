@@ -286,7 +286,9 @@ void setup_dmachannels(void)
     //#endif
     dma_channel_configure(dma_tx_delay, &tx_config_delay, &bus_pio->txf[sm_delay], NULL, 1, false);
   }
-  CFG("[DMA CHANNELS CLAIMED] C:%d TX:%d RX:%d D:%d\n", dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay);
+
+  CFG("[DMA CHANNELS CLAIMED] C:%d TX:%d RX:%d D:%d\n",
+    dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay);
 
   CFG("[DMA CHANNELS INIT] FINISHED\n");
   return;

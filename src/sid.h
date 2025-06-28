@@ -239,8 +239,8 @@ enum {
   V3_ENV    = 28  /* readonly */
 };
 
-/* HEX DEC Attack(Time/Cycle) Decay(Time/Cycle) */
-static const uint8_t attack_decay[] =
+/* HEX DEC Attack(Time/Cycle) Decay/Release(Time/Cycle) */
+static const uint8_t attack_decayrelease[16] =
 {
   0x0,  // 0     2 mS    6 mS
   0x1,  // 1     8 mS   24 mS
@@ -263,7 +263,7 @@ static const uint8_t attack_decay[] =
 /*
  * Osc Fn (Hex), No, Musical Note, Freq (Hz), Osc Fn (Decimal)
  */
-static const uint32_t musical_scale_values[] =
+static const uint32_t musical_scale_values[96] =
 {
   0x0112,   // 0    C0    16.35   274
   0x0123,   // 1    C0$   17.32   291

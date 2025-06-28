@@ -1,7 +1,26 @@
 # Changelog
 
-#### In progress
+#### In progress, expected release v0.6.0-BETA
 * Rework Midi handling
+* Rework ASID handling for buffered writing
+
+#### Version: 0.5.0-BETA
+* Add autodetection routine to first boot on new firmware and
+  default firmware settings
+* Double tap the reset button to start autodetection routine
+  - This only works on Pico1 (rp2040) boards!
+* Improve SID and Clone detection
+* Add custom Sysex command for Stereo/Mono switch (v1.3 PCB only)
+* Add PCB version to USB ProductId
+* Disable fifo buffer for USB Vendor class (WebUSB) for
+  faster writes
+* Add support for ordered ASID writes
+* Start rework ASID handling for sidfactory2 (thanks @thomasj)
+* Rework config handling at runtime
+* Add initial FPGASID support
+* Fix SID reads for FPGASID
+* Lots of minor changes and fixes
+* Code splicing into separate files for readability
 
 #### Version: 0.4.0-BETA
 * Fix SID reads

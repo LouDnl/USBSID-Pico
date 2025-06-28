@@ -52,9 +52,8 @@ extern queue_t sidtest_queue;
 extern bool auto_config;
 
 /* SID */
-extern uint8_t (*sid_detection[4])(uint8_t);
 extern bool detect_fmopl(uint8_t base_address);
-extern void detect_sid_types(int detection_routine);
+extern uint8_t detect_sid_type(Socket * socket, SIDChip * sidchip);
 extern uint8_t detect_clone_type(Socket * cfg_ptr);
 extern void auto_detect_routine(bool auto_config, bool with_delay);
 extern void sid_test(int sidno, char test, char wf);
@@ -119,8 +118,8 @@ extern char *single_dual[2];
 extern char *mono_stereo[2];
 
 /* Pre declarations */
-void apply_config(bool at_boot);
-void save_load_apply_config(bool at_boot);
+void apply_config(bool at_boot, bool print_cfg);
+void save_load_apply_config(bool at_boot, bool print_cfg);
 void save_config_ext(void);
 int return_clockrate(void);
 void apply_clockrate(int n_clock, bool suspend_sids);
@@ -336,7 +335,7 @@ void write_back_data(size_t buffersize)
   return;
 }
 
-void handle_config_request(uint8_t * buffer)
+void handle_config_request(uint8_t * buffer, uint32_t size)
 { /* Incoming Config data buffer
    *
    * 5 bytes
@@ -345,6 +344,10 @@ void handle_config_request(uint8_t * buffer)
    * Byte 2 ~ setting entry e.g. dualsid
    * Byte 3 ~ new value
    * Byte 4 ~ reserved
+   * >= 6 bytes
+   * Byte 0 ~ write config command
+   * Byte 1 ~ config type
+   * Byte 2 ... 61 the config
    */
   CFG("[CONFIG BUFFER] %x %x %x %x %x\n", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4]);
   switch (buffer[0]) {
@@ -373,7 +376,7 @@ void handle_config_request(uint8_t * buffer)
       write_back_data(10);
       break;
     case READ_NUMSIDS:
-      CFG("[CMD] READ_NUMSIDS\n");
+      CFG("[CMD] READ_NUMSIDS: %u\n", (uint8_t)cfg.numsids);
       memset(write_buffer_p, 0, 64);
       write_buffer_p[0] = (uint8_t)cfg.numsids;
       write_back_data(1);
@@ -386,12 +389,12 @@ void handle_config_request(uint8_t * buffer)
       break;
     case APPLY_CONFIG:
       CFG("[CMD] APPLY_CONFIG\n");
-      apply_config(false);
+      apply_config(false, true);
       break;
     case RELOAD_CONFIG:
       CFG("[CMD] RELOAD_CONFIG\n");
       load_config(&usbsid_config);
-      apply_config(false);
+      apply_config(false, true);
       for (int i = 0; i < count_of(clockrates); i++) {
         if (clockrates[i] == usbsid_config.clock_rate) {
           apply_clockrate(i, true);
@@ -576,7 +579,7 @@ void handle_config_request(uint8_t * buffer)
       break;
     case SAVE_NORESET:
       CFG("[CMD] SAVE_CONFIG no RESET\n");
-      save_load_apply_config(false);
+      save_load_apply_config(false, true);
       break;
     case RESET_CONFIG:
       CFG("[CMD] RESET_CONFIG\n");
@@ -586,12 +589,21 @@ void handle_config_request(uint8_t * buffer)
         mcu_reset();
       } else {
         load_config(&usbsid_config);
-        apply_config(false);
+        apply_config(false, true);
       }
       break;
-    case WRITE_CONFIG:
-      /* TODO: FINISH */
-      CFG("[CMD] WRITE_CONFIG NOT IMPLEMENTED YET!\n");
+    case WRITE_CONFIG:  /* TODO: FINISH */
+      /* Max size of incoming buffer = 61 */
+      CFG("[CMD] WRITE_CONFIG\n");
+      print_cfg(buffer, size);
+      switch (buffer[1]) {
+        case FULL_CONFIG:
+        case SOCKET_CONFIG:
+        case MIDI_CONFIG:
+        case MIDI_CCVALUES:
+        default:
+          break;
+      }
       break;
     case SINGLE_SID:
       CFG("[CMD] SINGLE_SID\n");
@@ -689,7 +701,7 @@ void handle_config_request(uint8_t * buffer)
       }
       if (buffer[2] == 1) {  /* Save and apply if set to a 1 */
         CFG("[LOCK_CLOCK] SAVE_CONFIG\n");
-        save_load_apply_config(false);
+        save_load_apply_config(false, true);
       }
       break;
     case TOGGLE_AUDIO:      /* Toggle the audio state regardless of config setting */
@@ -706,13 +718,15 @@ void handle_config_request(uint8_t * buffer)
         set_audio_switch(usbsid_config.stereo_en);
         if (buffer[2] == 1) {  /* Save and apply if set to a 1 */
           CFG("[SET_AUDIO] SAVE_CONFIG\n");
-          save_load_apply_config(false);
+          save_load_apply_config(false, true);
         }
       } else {
         CFG("[CONFIG] Audio switch is locked at %d (%s), requested change to %d (%s)\n",
           (int)usbsid_config.stereo_en, mono_stereo[(int)usbsid_config.stereo_en], buffer[1], mono_stereo[buffer[1]]);
         return;
       }
+      break;
+    case GET_AUDIO: /* TODO: Finish */
       break;
     case LOCK_AUDIO:
       CFG("[CMD] LOCK_AUDIO\n");
@@ -722,14 +736,15 @@ void handle_config_request(uint8_t * buffer)
         : false;  /* Default to false if incorrect value ~ don't lock */
       if (buffer[2] == 1) {  /* Save and apply if set to a 1 */
         CFG("[SET_AUDIO] SAVE_CONFIG\n");
-        save_load_apply_config(false);
+        save_load_apply_config(false, true);
       }
       break;
     case DETECT_SIDS:       /* Detect SID types per socket */
       CFG("[CMD] DETECT_SIDS (ALL)\n");
-      uint detection_routine = buffer[1];
-      if (detection_routine > 3) detection_routine = 0;
-      // detect_sid_types(detection_routine); // BUG: FIX!
+      detect_sid_type(&usbsid_config.socketOne, &usbsid_config.socketOne.sid1);
+      detect_sid_type(&usbsid_config.socketOne, &usbsid_config.socketOne.sid2);
+      detect_sid_type(&usbsid_config.socketTwo, &usbsid_config.socketOne.sid1);
+      detect_sid_type(&usbsid_config.socketTwo, &usbsid_config.socketOne.sid2);
       memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
       read_config(&usbsid_config);  /* Read the config into the config buffer */
       memcpy(write_buffer_p, config_array, 64);  /* Copy the first 64 bytes from the buffer into the write buffer */
@@ -765,10 +780,10 @@ void handle_config_request(uint8_t * buffer)
         save_config_ext();
         mcu_reset(); /* Point of no return */
       } else {
-        save_load_apply_config(true);
+        save_load_apply_config(true, true);
       }
       break;
-    case TEST_ALLSIDS:  /* ISSUE: This must be run on Core 1 so we can actually stop it! */
+    case TEST_ALLSIDS:
       CFG("[CMD] TEST_ALLSIDS\n");
       running_tests = true;
       for (int s = 0; s < cfg.numsids; s++) {
@@ -776,11 +791,9 @@ void handle_config_request(uint8_t * buffer)
         if (running_tests) {
           sidtest_queue_entry_t s_entry = {sid_test, s, '1', 'A'};
           queue_try_add(&sidtest_queue, &s_entry);
-          /* sid_test(s, '1', 'A'); */
         } else return;
       };
       break;
-    /* ISSUE: This must be run on Core 1 so we can actually stop it! */
     case TEST_SID1 ... TEST_SID4:
       int s = (buffer[0] == TEST_SID1 ? 0
         : buffer[0] == TEST_SID2 ? 1
@@ -803,7 +816,6 @@ void handle_config_request(uint8_t * buffer)
       running_tests = true;
       sidtest_queue_entry_t s_entry = {sid_test, s, t, wf};
       queue_try_add(&sidtest_queue, &s_entry);
-      /* sid_test(s, t, wf); */
       break;
     case STOP_TESTS:
       CFG("[CMD] STOP_TESTS\n");
@@ -886,10 +898,6 @@ void handle_config_request(uint8_t * buffer)
       // print_cfg(sid_memory, (numsids * 0x20));
     case TEST_FN2:
       uint8_t st = 0xFF;
-      if (buffer[1] < 4) {
-        st = sid_detection[buffer[1]](buffer[2]);
-        CFG("[TEST FOUND] %u\n", st);
-      }
       if (buffer[1] == 4) {
         st = cycled_read_operation(buffer[2], buffer[3]);
         CFG("[TEST FOUND] %02X\n", st);
@@ -967,7 +975,15 @@ void apply_led_config(void)
   return;
 }
 
-void apply_config(bool at_boot)
+void print_config(void)
+{ /* The truth, and nothing but the truth!   */
+  print_pico_features();
+  print_config_settings();
+  print_socket_config();
+  print_bus_config();
+}
+
+void apply_config(bool at_boot, bool print_cfg)
 {
   CFG("\n");
   CFG("[START CONFIG APPLY]\n");
@@ -998,23 +1014,20 @@ void apply_config(bool at_boot)
   /* Don't print anything on auto config run */
   if (auto_config) return;
 
-  /* Print config at end of apply */
-  print_pico_features();
-  print_config_settings();
-  print_socket_config();
-  print_bus_config();
+  /* Print config at end of apply if requested */
+  if (print_cfg) print_config();
 
   CFG("\n");
 
   return;
 }
 
-void save_load_apply_config(bool at_boot)
+void save_load_apply_config(bool at_boot, bool print_cfg)
 {
   CFG("\n");
   save_config(&usbsid_config);
   load_config(&usbsid_config);
-  apply_config(at_boot);
+  apply_config(at_boot, print_cfg);
   return;
 }
 

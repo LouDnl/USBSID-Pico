@@ -139,7 +139,7 @@ Steps required for this to work
 
 ### Windows driver
 Also see the [Software manual](doc/USBSID-Pico-software-manual.adoc) for mroe information on how to use supported software!  
-Use [Zadig](https://zadig.akeo.ie/) to install the correct driver for USBSID-Pico.  
+Use [Zadig](https://zadig.akeo.ie/) to install the correct driver. Replace the driver for `USBSID-Pico Data` with WinUSB.  
 <img src="images/zadig-list-all-devices.png" width="200px">
 <img src="images/zadig-install-driver.png" width="200px">  
 Then configure check, configure and test your board on the [USBSID](https://usbsid.loudai.nl/?player=webusb) config tool website  
