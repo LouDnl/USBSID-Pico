@@ -14,7 +14,7 @@ on:
     tags:
       - 'v(\d|\.)+' # Only if the tag contains 'v0.0.0' etc
   # Allows you to run this workflow manually from the Actions tab when needed
-  # workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
   release:
