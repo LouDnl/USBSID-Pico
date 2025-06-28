@@ -898,10 +898,6 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       // print_cfg(sid_memory, (numsids * 0x20));
     case TEST_FN2:
       uint8_t st = 0xFF;
-      if (buffer[1] < 4) {
-        st = sid_detection[buffer[1]](buffer[2]);
-        CFG("[TEST FOUND] %u\n", st);
-      }
       if (buffer[1] == 4) {
         st = cycled_read_operation(buffer[2], buffer[3]);
         CFG("[TEST FOUND] %02X\n", st);
