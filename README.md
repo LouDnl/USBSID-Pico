@@ -105,7 +105,8 @@ While in development any mentioned features, options, etc. are subject to change
 
 ### Test and config your board
 Also see the [Firmware manual](doc/USBSID-Pico-firmware-manual.adoc) for information on how to set up your board!  
-You can configurate your board by using the commandline [config-tool](examples/config-tool) [binary](examples/config-tool/cfg_usbsid) (Linux only at the moment) provided in examples or use the web configurations, see below.  
+You can configurate your board by using the commandline [config-tool](examples/config-tool) [Linux binary](examples/config-tool/cfg_usbsid)  and [Windows binary](examples/config-tool/cfg_usbsid.exe) provided in examples. Windows requires the two `.dll` files aswell.  
+Or you can use the web configuration, see below.  
 
 You can test your board with WebUSB and ASID here: [USBSID](https://usbsid.loudai.nl/?player=webusb).  
 If needed you can change your USBSID configuration after selecting WebUSB and clicking on `Open config`.  
@@ -117,8 +118,8 @@ For testing purposes only you can use the debug functions available on the [USBS
 
 ### Supported platforms
 _In development_  
-Linux: Vice, RetroDebugger, SidBerry, SidplayFp, JSidplay2, USB Midi, ASID (in webbrowser) SID Play  
-Windows: Vice, SidBerry, USB Midi, ASID (in webbrowser) SID Play  
+Linux: Vice, JSidplay2, SidplayFp, RetroDebugger, SidBerry, USB Midi, ASID (in webbrowser) SID Play  
+Windows: Vice, JSidplay2, SidBerry, USB Midi, ASID (in webbrowser) SID Play  
 Android: USB Midi, ASID (in webbrowser) SID Play
 Amiga: PlaySID library
 
@@ -164,7 +165,7 @@ The firmware is still in development so features might change, be added or remov
 - Two SID sockets with up to 4 SID's (e.g. SKPico) supported
   - Socket one address range $00 ~ $7F (default $00 ~ $1F) auto based on configuration settings
   - Socket two address range $00 ~ $7F (default $40 ~ $7F) auto based on configuration settings
-  - Configurable via [config-tool](repo/examples/config-tool) for Linux (Windows still in development)
+  - Configurable via [config-tool](repo/examples/config-tool) for Linux and Windows
 - Onboard LED acts as VU meter calculated by the voices of SID1 (Pico & Pico2 only)
 - Onboard RGB LED acts as second VU meter calculated by the voices of SID1 (default)
   - Requires Black Pico clone board with RGB LED onboard!
