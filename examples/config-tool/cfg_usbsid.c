@@ -1714,6 +1714,18 @@ void config_usbsidpico(int argc, char **argv)
         printf("Unable to continue without required arguments, exiting...\n");
         exit(0);
       }
+      if (argc > 8) {
+        uint8_t test_buffer[64] = {0};
+        test_buffer[0] = ((COMMAND << 6) | 18);
+        test_buffer[1] = WRITE_CONFIG;
+        int tb_count = 2;
+        for (int i = 2; i < argc; i++) {
+          test_buffer[tb_count++] = strtol(argv[i], NULL, 16);
+        }
+        print_cfg_buffer(test_buffer, 64);
+        write_chars(test_buffer, 64);
+        break;
+      }
       if (argc >= 3)  cmd = strtol(argv[param_count++], NULL, 16);
       if (argc >= 4)  a = strtol(argv[param_count++], NULL, 16);
       if (argc >= 5)  b = strtol(argv[param_count++], NULL, 16);
@@ -1722,6 +1734,13 @@ void config_usbsidpico(int argc, char **argv)
       printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", cmd, a, b, c, d);
       write_config_command(cmd, a, b, c, d);
       break;
+    }
+    if (!strcmp(argv[param_count], "-control")) {
+
+      rc = libusb_control_transfer(devh, 0x21, 0x20, 0, 0, encoding, count_of(encoding), 0);
+      fprintf(stdout, "Control transfer status: %d, %s: %s\n",
+        rc, libusb_error_name(rc), libusb_strerror(rc));
+
     }
     if (!strcmp(argv[param_count], "-command") || !strcmp(argv[param_count], "--arbitrary-command")) {
       param_count++;  /* skip usbsid executable and -config self */
@@ -2230,7 +2249,7 @@ int main(int argc, char **argv)
     print_help_skpico();
     goto exit;
   }
-  fprintf(stdout, "Detecting Linux usbsid boards\n");
+  fprintf(stdout, "Detecting USBSID-Pico boards\n");
 
   if (usid_dev != 0) {
     rc = usbsid_init();
