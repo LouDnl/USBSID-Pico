@@ -67,7 +67,7 @@ With the cable already plugged into your computer and Pico and seated on the boa
 
 or
 
-- With the CLI config tool (linux) command in your `$PATH` variable
+- With the CLI config tool command in your `PATH` variable
 - Type `cfg_usbsid -boot` to send the reboot to bootloader command
 - A new drive should appear on your computer called `RPI-RP2` or `RP2350` depending on your Pico type.
 - Copy the correct `uf2` firmware file to this directory.
@@ -75,7 +75,7 @@ or
 
 == Firmware configuration
 USBSID-Pico has an extensive set of configuration options that expands with each firmware release. +
-At this point in time you can change the settings to your liking by using the configuration webpage or the CLI config tool for linux. +
+At this point in time you can change the settings to your liking by using the configuration webpage or the CLI config tool. +
 webpage: https://usbsid.loudai.nl/index.html?player=webusb&debug=usbsidpico +
 
 === Default configuration
@@ -236,19 +236,20 @@ Available options are: +
 `False`, `True`
 
 == Config tools
-t.b.d.
 
 === Configuration web page
-t.b.d.
+https://usbsid.loudai.nl/?player=webusb&debug=usbsidpico[usbsid.loudai.nl]
 
 === CLI Configuration tool (linux)
-t.b.d.
+https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/cfg_usbsid[Download executable]
 
 === CLI Configuration tool (Windows)
-t.b.d.
+https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/cfg_usbsid.exe[Download executable] +
+https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/libusb-1.0.dll[Download DLL 1] +
+https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/libwinpthread-1.dll[Download DLL 2]
 
 === Multiplatform Configuration GUI
-t.b.d.
+t.b.d. (help wanted)
 
 == Disclaimer
 include::disclaimer.adoc[]

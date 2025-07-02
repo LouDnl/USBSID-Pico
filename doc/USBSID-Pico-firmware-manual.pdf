@@ -5,16 +5,16 @@
 /Author (LouD)
 /Creator (LouD)
 /Producer (Asciidoctor PDF 2.3.19, based on Prawn 2.4.0)
-/ModDate (D:20250528130527+02'00')
-/CreationDate (D:20250528130527+02'00')
+/ModDate (D:20250702172503+02'00')
+/CreationDate (D:20250702172503+02'00')
 >>
 endobj
 2 0 obj
 << /Type /Catalog
 /Pages 3 0 R
 /Names 11 0 R
-/Outlines 158 0 R
-/PageLabels 198 0 R
+/Outlines 163 0 R
+/PageLabels 203 0 R
 /PageMode /UseOutlines
 /OpenAction [7 0 R /FitH 841.89]
 /ViewerPreferences << /DisplayDocTitle true
@@ -24,7 +24,7 @@ endobj
 3 0 obj
 << /Type /Pages
 /Count 10
-/Kids [7 0 R 14 0 R 16 0 R 25 0 R 30 0 R 35 0 R 43 0 R 54 0 R 64 0 R 79 0 R]
+/Kids [7 0 R 14 0 R 16 0 R 25 0 R 30 0 R 35 0 R 43 0 R 54 0 R 64 0 R 83 0 R]
 >>
 endobj
 4 0 obj
@@ -72,7 +72,7 @@ ET
 BT
 48.24 743.55743 Td
 /F1.0 13 Tf
-[<41> 20.01953 <7574686f723a204c6f7544202d2067656e6572> 20.01953 <61746564206f6e20323032352d30352d3238>] TJ
+[<41> 20.01953 <7574686f723a204c6f7544202d2067656e6572> 20.01953 <61746564206f6e20323032352d30372d3032>] TJ
 ET
 
 0.0 0.0 0.0 SCN
@@ -1655,32 +1655,32 @@ endobj
 /Font << /F2.0 8 0 R
 /F1.0 9 0 R
 >>
-/XObject << /Stamp1 201 0 R
+/XObject << /Stamp1 206 0 R
 >>
 >>
-/Annots [84 0 R 85 0 R 86 0 R 87 0 R 88 0 R 89 0 R 90 0 R 91 0 R 92 0 R 93 0 R 94 0 R 95 0 R 96 0 R 97 0 R 98 0 R 99 0 R 100 0 R 101 0 R 102 0 R 103 0 R 104 0 R 105 0 R 106 0 R 107 0 R 108 0 R 109 0 R 110 0 R 111 0 R 112 0 R 113 0 R 114 0 R 115 0 R 116 0 R 117 0 R 118 0 R 119 0 R 120 0 R 121 0 R 122 0 R 123 0 R 124 0 R 125 0 R 126 0 R 127 0 R 128 0 R 129 0 R 130 0 R 131 0 R 132 0 R 133 0 R 134 0 R 135 0 R 136 0 R 137 0 R 138 0 R 139 0 R 140 0 R 141 0 R 142 0 R 143 0 R 144 0 R 145 0 R 146 0 R 147 0 R 148 0 R 149 0 R 150 0 R 151 0 R]
+/Annots [89 0 R 90 0 R 91 0 R 92 0 R 93 0 R 94 0 R 95 0 R 96 0 R 97 0 R 98 0 R 99 0 R 100 0 R 101 0 R 102 0 R 103 0 R 104 0 R 105 0 R 106 0 R 107 0 R 108 0 R 109 0 R 110 0 R 111 0 R 112 0 R 113 0 R 114 0 R 115 0 R 116 0 R 117 0 R 118 0 R 119 0 R 120 0 R 121 0 R 122 0 R 123 0 R 124 0 R 125 0 R 126 0 R 127 0 R 128 0 R 129 0 R 130 0 R 131 0 R 132 0 R 133 0 R 134 0 R 135 0 R 136 0 R 137 0 R 138 0 R 139 0 R 140 0 R 141 0 R 142 0 R 143 0 R 144 0 R 145 0 R 146 0 R 147 0 R 148 0 R 149 0 R 150 0 R 151 0 R 152 0 R 153 0 R 154 0 R 155 0 R 156 0 R]
 >>
 endobj
 8 0 obj
 << /Type /Font
 /BaseFont /c71f81+NotoSerif-Bold
 /Subtype /TrueType
-/FontDescriptor 204 0 R
+/FontDescriptor 209 0 R
 /FirstChar 32
 /LastChar 255
-/Widths 206 0 R
-/ToUnicode 205 0 R
+/Widths 211 0 R
+/ToUnicode 210 0 R
 >>
 endobj
 9 0 obj
 << /Type /Font
 /BaseFont /539577+NotoSerif
 /Subtype /TrueType
-/FontDescriptor 208 0 R
+/FontDescriptor 213 0 R
 /FirstChar 32
 /LastChar 255
-/Widths 210 0 R
-/ToUnicode 209 0 R
+/Widths 215 0 R
+/ToUnicode 214 0 R
 >>
 endobj
 10 0 obj
@@ -1692,7 +1692,7 @@ endobj
 >>
 endobj
 12 0 obj
-<< /Kids [51 0 R 200 0 R 52 0 R]
+<< /Kids [51 0 R 205 0 R 52 0 R]
 >>
 endobj
 13 0 obj
@@ -1873,10 +1873,10 @@ endobj
 /Resources << /ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
 /Font << /F1.0 9 0 R
 >>
-/XObject << /Stamp2 202 0 R
+/XObject << /Stamp2 207 0 R
 >>
 >>
-/Annots [152 0 R 153 0 R 154 0 R 155 0 R 156 0 R 157 0 R]
+/Annots [157 0 R 158 0 R 159 0 R 160 0 R 161 0 R 162 0 R]
 >>
 endobj
 15 0 obj
@@ -2974,7 +2974,7 @@ endobj
 >>
 /XObject << /I1 18 0 R
 /I2 19 0 R
-/Stamp1 201 0 R
+/Stamp1 206 0 R
 >>
 >>
 >>
@@ -3082,13 +3082,13 @@ endstream
 endobj
 20 0 obj
 << /Type /Font
-/BaseFont /a29581+mplus1mn-regular
+/BaseFont /f96a9d+mplus1mn-regular
 /Subtype /TrueType
-/FontDescriptor 212 0 R
+/FontDescriptor 217 0 R
 /FirstChar 32
 /LastChar 255
-/Widths 214 0 R
-/ToUnicode 213 0 R
+/Widths 219 0 R
+/ToUnicode 218 0 R
 >>
 endobj
 21 0 obj
@@ -3098,18 +3098,18 @@ endobj
 << /Type /Font
 /BaseFont /466350+NotoSerif-Italic
 /Subtype /TrueType
-/FontDescriptor 216 0 R
+/FontDescriptor 221 0 R
 /FirstChar 32
 /LastChar 255
-/Widths 218 0 R
-/ToUnicode 217 0 R
+/Widths 223 0 R
+/ToUnicode 222 0 R
 >>
 endobj
 23 0 obj
 [16 0 R /XYZ 0 372.7 null]
 endobj
 24 0 obj
-<< /Length 16463
+<< /Length 16423
 >>
 stream
 q
@@ -4131,7 +4131,7 @@ ET
 BT
 66.24 286.986 Td
 /F1.0 10.5 Tf
-<576974682074686520434c4920636f6e66696720746f6f6c20286c696e75782920636f6d6d616e6420696e20796f757220> Tj
+<576974682074686520434c4920636f6e66696720746f6f6c20636f6d6d616e6420696e20796f757220> Tj
 ET
 
 0.0 0.0 0.0 SCN
@@ -4140,9 +4140,9 @@ ET
 0.69412 0.12941 0.27451 SCN
 
 BT
-315.3735 286.986 Td
+279.285 286.986 Td
 /F3.0 10.5 Tf
-<2450415448> Tj
+<50415448> Tj
 ET
 
 0.0 0.0 0.0 SCN
@@ -4151,7 +4151,7 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-341.6235 286.986 Td
+300.285 286.986 Td
 /F1.0 10.5 Tf
 <207661726961626c65> Tj
 ET
@@ -4469,7 +4469,7 @@ ET
 BT
 48.24 79.226 Td
 /F1.0 10.5 Tf
-<6f722074686520434c4920636f6e66696720746f6f6c20666f72206c696e75782e> Tj
+<6f722074686520434c4920636f6e66696720746f6f6c2e> Tj
 ET
 
 0.0 0.0 0.0 SCN
@@ -4534,7 +4534,7 @@ endobj
 /F3.0 20 0 R
 /F2.0 8 0 R
 >>
-/XObject << /Stamp2 202 0 R
+/XObject << /Stamp2 207 0 R
 >>
 >>
 /Annots [26 0 R 28 0 R]
@@ -5625,7 +5625,7 @@ endobj
 /F1.0 9 0 R
 /F3.0 20 0 R
 >>
-/XObject << /Stamp1 201 0 R
+/XObject << /Stamp1 206 0 R
 >>
 >>
 >>
@@ -6498,7 +6498,7 @@ endobj
 /F2.0 8 0 R
 /F4.0 22 0 R
 >>
-/XObject << /Stamp2 202 0 R
+/XObject << /Stamp2 207 0 R
 >>
 >>
 >>
@@ -7305,7 +7305,7 @@ endobj
 /F1.0 9 0 R
 /F3.0 20 0 R
 >>
-/XObject << /Stamp1 201 0 R
+/XObject << /Stamp1 206 0 R
 >>
 >>
 >>
@@ -7333,12 +7333,12 @@ endobj
 endobj
 51 0 obj
 << /Limits [(__anchor-top) (_configuration_web_page)]
-/Names [(__anchor-top) 199 0 R (_asid_enabled) 61 0 R (_audio_mode) 36 0 R (_board_clock_rate) 32 0 R (_cdc_enabled) 59 0 R (_cli_configuration_tool_linux) 67 0 R (_cli_configuration_tool_windows) 68 0 R (_clock_rate_locked) 33 0 R (_config_tools) 65 0 R (_configuration_web_page) 66 0 R]
+/Names [(__anchor-top) 204 0 R (_asid_enabled) 61 0 R (_audio_mode) 36 0 R (_board_clock_rate) 32 0 R (_cdc_enabled) 59 0 R (_cli_configuration_tool_linux) 68 0 R (_cli_configuration_tool_windows) 70 0 R (_clock_rate_locked) 33 0 R (_config_tools) 65 0 R (_configuration_web_page) 66 0 R]
 >>
 endobj
 52 0 obj
 << /Limits [(_license) (toc)]
-/Names [(_license) 72 0 R (_midi_enabled) 62 0 R (_multiplatform_configuration_gui) 69 0 R (_rgbled_brightness) 55 0 R (_rgbled_enabled) 49 0 R (_rgbled_idle_breathe_enabled) 50 0 R (_rgbled_sid_to_use) 56 0 R (_socket_onetwo_chiptype) 40 0 R (_socket_onetwo_clonetype) 41 0 R (_socket_onetwo_dualsid_enabled) 39 0 R (_socket_onetwo_enabled) 38 0 R (_socket_onetwo_sid_1_type) 44 0 R (_socket_onetwo_sid_2_type) 45 0 R (_socket_settings) 37 0 R (_socket_two_act_as_one) 46 0 R (_software_license_gnuv2) 73 0 R (_webusb_enabled) 60 0 R (toc) 10 0 R]
+/Names [(_license) 77 0 R (_midi_enabled) 62 0 R (_multiplatform_configuration_gui) 74 0 R (_rgbled_brightness) 55 0 R (_rgbled_enabled) 49 0 R (_rgbled_idle_breathe_enabled) 50 0 R (_rgbled_sid_to_use) 56 0 R (_socket_onetwo_chiptype) 40 0 R (_socket_onetwo_clonetype) 41 0 R (_socket_onetwo_dualsid_enabled) 39 0 R (_socket_onetwo_enabled) 38 0 R (_socket_onetwo_sid_1_type) 44 0 R (_socket_onetwo_sid_2_type) 45 0 R (_socket_settings) 37 0 R (_socket_two_act_as_one) 46 0 R (_software_license_gnuv2) 78 0 R (_webusb_enabled) 60 0 R (toc) 10 0 R]
 >>
 endobj
 53 0 obj
@@ -8190,7 +8190,7 @@ endobj
 /F1.0 9 0 R
 /F3.0 20 0 R
 >>
-/XObject << /Stamp2 202 0 R
+/XObject << /Stamp2 207 0 R
 >>
 >>
 >>
@@ -8220,7 +8220,7 @@ endobj
 [54 0 R /XYZ 0 130.53 null]
 endobj
 63 0 obj
-<< /Length 7413
+<< /Length 7588
 >>
 stream
 q
@@ -8241,31 +8241,20 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-48.24 753.206 Td
-/F1.0 10.5 Tf
-<742e622e642e> Tj
-ET
-
-0.0 0.0 0.0 SCN
-0.0 0.0 0.0 scn
-0.2 0.2 0.2 scn
-0.2 0.2 0.2 SCN
-
-BT
-48.24 713.366 Td
+48.24 741.146 Td
 /F2.0 18 Tf
 [<436f6e6669677572> 20.01953 <6174696f6e207765622070616765>] TJ
 ET
 
 0.0 0.0 0.0 SCN
 0.0 0.0 0.0 scn
-0.2 0.2 0.2 scn
-0.2 0.2 0.2 SCN
+0.25882 0.5451 0.79216 scn
+0.25882 0.5451 0.79216 SCN
 
 BT
-48.24 685.346 Td
+48.24 713.126 Td
 /F1.0 10.5 Tf
-<742e622e642e> Tj
+<7573627369642e6c6f756461692e6e6c> Tj
 ET
 
 0.0 0.0 0.0 SCN
@@ -8274,20 +8263,20 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-48.24 645.506 Td
+48.24 673.286 Td
 /F2.0 18 Tf
 [<434c4920436f6e6669677572> 20.01953 <6174696f6e20746f6f6c20286c696e757829>] TJ
 ET
 
 0.0 0.0 0.0 SCN
 0.0 0.0 0.0 scn
-0.2 0.2 0.2 scn
-0.2 0.2 0.2 SCN
+0.25882 0.5451 0.79216 scn
+0.25882 0.5451 0.79216 SCN
 
 BT
-48.24 617.486 Td
+48.24 645.266 Td
 /F1.0 10.5 Tf
-<742e622e642e> Tj
+<446f776e6c6f61642065786563757461626c65> Tj
 ET
 
 0.0 0.0 0.0 SCN
@@ -8296,20 +8285,20 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-48.24 577.646 Td
+48.24 605.426 Td
 /F2.0 18 Tf
 [<434c4920436f6e6669677572> 20.01953 <6174696f6e20746f6f6c202857696e646f777329>] TJ
 ET
 
 0.0 0.0 0.0 SCN
 0.0 0.0 0.0 scn
-0.2 0.2 0.2 scn
-0.2 0.2 0.2 SCN
+0.25882 0.5451 0.79216 scn
+0.25882 0.5451 0.79216 SCN
 
 BT
-48.24 549.626 Td
+48.24 577.406 Td
 /F1.0 10.5 Tf
-<742e622e642e> Tj
+<446f776e6c6f61642065786563757461626c65> Tj
 ET
 
 0.0 0.0 0.0 SCN
@@ -8318,7 +8307,47 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-48.24 509.786 Td
+48.24 561.626 Td
+ET
+
+0.0 0.0 0.0 SCN
+0.0 0.0 0.0 scn
+0.25882 0.5451 0.79216 scn
+0.25882 0.5451 0.79216 SCN
+
+BT
+48.24 561.626 Td
+/F1.0 10.5 Tf
+<446f776e6c6f616420444c4c2031> Tj
+ET
+
+0.0 0.0 0.0 SCN
+0.0 0.0 0.0 scn
+0.2 0.2 0.2 scn
+0.2 0.2 0.2 SCN
+
+BT
+48.24 545.846 Td
+ET
+
+0.0 0.0 0.0 SCN
+0.0 0.0 0.0 scn
+0.25882 0.5451 0.79216 scn
+0.25882 0.5451 0.79216 SCN
+
+BT
+48.24 545.846 Td
+/F1.0 10.5 Tf
+<446f776e6c6f616420444c4c2032> Tj
+ET
+
+0.0 0.0 0.0 SCN
+0.0 0.0 0.0 scn
+0.2 0.2 0.2 scn
+0.2 0.2 0.2 SCN
+
+BT
+48.24 506.006 Td
 /F2.0 18 Tf
 [<4d756c7469706c6174666f726d20436f6e6669677572> 20.01953 <6174696f6e20475549>] TJ
 ET
@@ -8329,9 +8358,9 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-48.24 481.766 Td
+48.24 477.986 Td
 /F1.0 10.5 Tf
-<742e622e642e> Tj
+<742e622e642e202868656c702077616e74656429> Tj
 ET
 
 0.0 0.0 0.0 SCN
@@ -8340,7 +8369,7 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-48.24 437.654 Td
+48.24 433.874 Td
 /F2.0 22 Tf
 <446973636c61696d6572> Tj
 ET
@@ -8353,7 +8382,7 @@ ET
 0.92791 Tw
 
 BT
-48.24 408.466 Td
+48.24 404.686 Td
 /F1.0 10.5 Tf
 [<4920646f207468697320737475666620696e206d7920667265652074696d6520666f72206d7920656e6a6f> 20.01953 <796d656e742e2053696e63652049206c696b> 20.01953 <6520746f207368617265206d79206a6f> 20.01953 <7920696e206372656174696e6720746869732077697468>] TJ
 ET
@@ -8368,7 +8397,7 @@ ET
 1.68687 Tw
 
 BT
-48.24 392.686 Td
+48.24 388.906 Td
 /F1.0 10.5 Tf
 [<65766572796f6e65204920747279206d79206265737420746f2070726f76696465206120776f726b696e672050434220616e64204669726d776172652e204920616d20696e206e6f207761> 20.01953 <7920616e20656c656374726f6e696373>] TJ
 ET
@@ -8383,7 +8412,7 @@ ET
 1.73725 Tw
 
 BT
-48.24 376.906 Td
+48.24 373.126 Td
 /F1.0 10.5 Tf
 <656e67696e65657220616e642063616e206769766520> Tj
 ET
@@ -8398,7 +8427,7 @@ ET
 1.73725 Tw
 
 BT
-168.05349 376.906 Td
+168.05349 373.126 Td
 /F5.0 10.5 Tf
 [<6e6f2067756172> 20.01953 <616e74656573>] TJ
 ET
@@ -8413,7 +8442,7 @@ ET
 1.73725 Tw
 
 BT
-246.76603 376.906 Td
+246.76603 373.126 Td
 /F1.0 10.5 Tf
 <2074686174207468697320737475666620646f6573206e6f7420627265616b206f722064616d61676520796f75722068617264776172652c> Tj
 ET
@@ -8428,7 +8457,7 @@ ET
 1.10529 Tw
 
 BT
-48.24 361.126 Td
+48.24 357.346 Td
 /F1.0 10.5 Tf
 [<636f6d70757465722c2070686f6e652c206f7220776861746576657220796f752074727920746f20686f6f6b20697420757020746f2e204265207375726520746f2074616b> 20.01953 <652067726561742063617265207768656e20696e73657274696e67>] TJ
 ET
@@ -8443,7 +8472,7 @@ ET
 0.71387 Tw
 
 BT
-48.24 345.346 Td
+48.24 341.566 Td
 /F1.0 10.5 Tf
 [<616e> 20.01953 <79207265616c204d4f532053494420636869707320696e746f2074686520626f6172642e205768696c652065766572797468696e6720686173206265656e207465737465642077697468207265616c2063686970732c207468697320697320696e>] TJ
 ET
@@ -8458,7 +8487,7 @@ ET
 0.34522 Tw
 
 BT
-48.24 329.566 Td
+48.24 325.786 Td
 /F1.0 10.5 Tf
 [<6e6f207761> 20.01953 <7920612067756172> 20.01953 <616e7465652074686174206e6f7468696e6720636f756c6420676f2077726f6e672e20557365206f66207468697320626f61726420616e64206669726d7761726520617420796f7572206f776e207269736b21>] TJ
 ET
@@ -8471,7 +8500,7 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-48.24 313.786 Td
+48.24 310.006 Td
 /F1.0 10.5 Tf
 [<4920616d20696e206e6f207761> 20.01953 <7920726573706f6e7369626c6520666f7220796f75722064616d616765642068617264776172652e2054686174206265696e6720736169642c20686176652066756e21>] TJ
 ET
@@ -8482,7 +8511,7 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-48.24 269.674 Td
+48.24 265.894 Td
 /F2.0 22 Tf
 <4c6963656e7365> Tj
 ET
@@ -8493,7 +8522,7 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-48.24 228.426 Td
+48.24 224.646 Td
 /F2.0 18 Tf
 <536f667477617265204c6963656e7365207e20474e557632> Tj
 ET
@@ -8506,7 +8535,7 @@ ET
 1.55326 Tw
 
 BT
-48.24 200.406 Td
+48.24 196.626 Td
 /F1.0 10.5 Tf
 [<416c6c20636f6465207772697474656e2062> 20.01953 <79206d6520696e2074686973207265706f7369746f7279206973206c6963656e73656420756e64657220746865207465726d73206f662074686520474e552047656e6572> 20.01953 <616c205075626c6963>] TJ
 ET
@@ -8521,7 +8550,7 @@ ET
 0.26765 Tw
 
 BT
-48.24 184.626 Td
+48.24 180.846 Td
 /F1.0 10.5 Tf
 [<4c6963656e7365206173207075626c69736865642062> 20.01953 <7920746865204672656520536f6674776172652046> 40.03906 <6f756e646174696f6e2c2076657273696f6e20322e20416e> 20.01953 <7920636f646520696e2074686973207265706f7369746f72792074686174206973>] TJ
 ET
@@ -8536,7 +8565,7 @@ ET
 0.61084 Tw
 
 BT
-48.24 168.846 Td
+48.24 165.066 Td
 /F1.0 10.5 Tf
 [<6e6f74207772697474656e2062> 20.01953 <79206d65206175746f6d61746963616c6c792066616c6c7320756e64657220746865206c6963656e73696e6720636f6e646974696f6e732062> 20.01953 <792074686520617574686f7273206f66207361696420636f6465206173>] TJ
 ET
@@ -8551,7 +8580,7 @@ ET
 0.82796 Tw
 
 BT
-48.24 153.066 Td
+48.24 149.286 Td
 /F1.0 10.5 Tf
 [<6d656e74696f6e656420696e2074686520736f7572636520636f6465206865616465722e2046> 40.03906 <6f7220666f72206d6f726520696e666f726d6174696f6e2061626f75742074686973206c6963656e736520706c65617365207265616420746865>] TJ
 ET
@@ -8564,7 +8593,7 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-48.24 137.286 Td
+48.24 133.506 Td
 /F1.0 10.5 Tf
 [<4c4943454e534520646f63756d656e7420696e2074686520726f6f74206f6620746865205553425349442d5069636f207265706f7369746f7279> 89.84375 <2e>] TJ
 ET
@@ -8575,7 +8604,7 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-48.24 97.446 Td
+48.24 93.666 Td
 /F2.0 18 Tf
 <4861726477617265204c6963656e7365207e20437265617469766520436f6d6d6f6e73> Tj
 ET
@@ -8586,7 +8615,7 @@ ET
 0.25882 0.5451 0.79216 SCN
 
 BT
-48.24 69.426 Td
+48.24 65.646 Td
 /F1.0 10.5 Tf
 <5553425349442d5069636f20504342> Tj
 ET
@@ -8597,7 +8626,7 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-132.03 69.426 Td
+132.03 65.646 Td
 /F1.0 10.5 Tf
 [<2062> 20.01953 <7920>] TJ
 ET
@@ -8608,7 +8637,7 @@ ET
 0.25882 0.5451 0.79216 SCN
 
 BT
-149.61729 69.426 Td
+149.61729 65.646 Td
 /F1.0 10.5 Tf
 <4c6f7544> Tj
 ET
@@ -8619,29 +8648,9 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-176.50779 69.426 Td
+176.50779 65.646 Td
 /F1.0 10.5 Tf
 <206973206c6963656e73656420756e646572> Tj
-ET
-
-0.0 0.0 0.0 SCN
-0.0 0.0 0.0 scn
-0.2 0.2 0.2 scn
-0.2 0.2 0.2 SCN
-
-BT
-48.24 53.646 Td
-ET
-
-0.0 0.0 0.0 SCN
-0.0 0.0 0.0 scn
-0.25882 0.5451 0.79216 scn
-0.25882 0.5451 0.79216 SCN
-
-BT
-48.24 53.646 Td
-/F1.0 10.5 Tf
-<437265617469766520436f6d6d6f6e73204174747269627574696f6e2d4e6f6e436f6d6d65726369616c2d4e6f446572697661746976657320342e3020496e7465726e6174696f6e616c> Tj
 ET
 
 0.0 0.0 0.0 SCN
@@ -8682,97 +8691,161 @@ endobj
 /Resources << /ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
 /Font << /F2.0 8 0 R
 /F1.0 9 0 R
-/F5.0 71 0 R
+/F5.0 76 0 R
 >>
-/XObject << /Stamp1 201 0 R
+/XObject << /Stamp1 206 0 R
 >>
 >>
-/Annots [75 0 R 76 0 R 77 0 R]
+/Annots [67 0 R 69 0 R 71 0 R 72 0 R 73 0 R 80 0 R 81 0 R]
 >>
 endobj
 65 0 obj
 [64 0 R /XYZ 0 841.89 null]
 endobj
 66 0 obj
-[64 0 R /XYZ 0 737.39 null]
+[64 0 R /XYZ 0 765.17 null]
 endobj
 67 0 obj
-[64 0 R /XYZ 0 669.53 null]
+<< /Border [0 0 0]
+/A << /Type /Action
+/S /URI
+/URI (https://usbsid.loudai.nl/?player=webusb&debug=usbsidpico)
+>>
+/Subtype /Link
+/Rect [48.24 710.06 127.5255 724.34]
+/Type /Annot
+>>
 endobj
 68 0 obj
-[64 0 R /XYZ 0 601.67 null]
+[64 0 R /XYZ 0 697.31 null]
 endobj
 69 0 obj
-[64 0 R /XYZ 0 533.81 null]
+<< /Border [0 0 0]
+/A << /Type /Action
+/S /URI
+/URI (https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/cfg_usbsid)
+>>
+/Subtype /Link
+/Rect [48.24 642.2 156.1485 656.48]
+/Type /Annot
+>>
 endobj
 70 0 obj
-[64 0 R /XYZ 0 465.95 null]
+[64 0 R /XYZ 0 629.45 null]
 endobj
 71 0 obj
-<< /Type /Font
-/BaseFont /0a9377+NotoSerif-BoldItalic
-/Subtype /TrueType
-/FontDescriptor 220 0 R
-/FirstChar 32
-/LastChar 255
-/Widths 222 0 R
-/ToUnicode 221 0 R
+<< /Border [0 0 0]
+/A << /Type /Action
+/S /URI
+/URI (https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/cfg_usbsid.exe)
+>>
+/Subtype /Link
+/Rect [48.24 574.34 156.1485 588.62]
+/Type /Annot
 >>
 endobj
 72 0 obj
-[64 0 R /XYZ 0 297.97 null]
+<< /Border [0 0 0]
+/A << /Type /Action
+/S /URI
+/URI (https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/libusb-1.0.dll)
+>>
+/Subtype /Link
+/Rect [48.24 558.56 131.421 572.84]
+/Type /Annot
+>>
 endobj
 73 0 obj
-[64 0 R /XYZ 0 252.45 null]
+<< /Border [0 0 0]
+/A << /Type /Action
+/S /URI
+/URI (https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/libwinpthread-1.dll)
+>>
+/Subtype /Link
+/Rect [48.24 542.78 131.421 557.06]
+/Type /Annot
+>>
 endobj
 74 0 obj
-[64 0 R /XYZ 0 121.47 null]
+[64 0 R /XYZ 0 530.03 null]
 endobj
 75 0 obj
+[64 0 R /XYZ 0 462.17 null]
+endobj
+76 0 obj
+<< /Type /Font
+/BaseFont /0a9377+NotoSerif-BoldItalic
+/Subtype /TrueType
+/FontDescriptor 225 0 R
+/FirstChar 32
+/LastChar 255
+/Widths 227 0 R
+/ToUnicode 226 0 R
+>>
+endobj
+77 0 obj
+[64 0 R /XYZ 0 294.19 null]
+endobj
+78 0 obj
+[64 0 R /XYZ 0 248.67 null]
+endobj
+79 0 obj
+[64 0 R /XYZ 0 117.69 null]
+endobj
+80 0 obj
 << /Border [0 0 0]
 /A << /Type /Action
 /S /URI
 /URI (https://github.com/LouDnl/USBSID-Pico)
 >>
 /Subtype /Link
-/Rect [48.24 66.36 132.03 80.64]
+/Rect [48.24 62.58 132.03 76.86]
 /Type /Annot
 >>
 endobj
-76 0 obj
+81 0 obj
 << /Border [0 0 0]
 /A << /Type /Action
 /S /URI
 /URI (https://github.com/LouDnl)
 >>
 /Subtype /Link
-/Rect [149.61729 66.36 176.50779 80.64]
+/Rect [149.61729 62.58 176.50779 76.86]
 /Type /Annot
 >>
 endobj
-77 0 obj
-<< /Border [0 0 0]
-/A << /Type /Action
-/S /URI
-/URI (https://creativecommons.org/licenses/by-nc-nd/4.0/?ref=chooser-v1)
->>
-/Subtype /Link
-/Rect [48.24 50.58 446.6415 64.86]
-/Type /Annot
->>
-endobj
-78 0 obj
-<< /Length 908
+82 0 obj
+<< /Length 1276
 >>
 stream
 q
 /DeviceRGB cs
-0.2 0.2 0.2 scn
+0.25882 0.5451 0.79216 scn
 /DeviceRGB CS
-0.2 0.2 0.2 SCN
+0.25882 0.5451 0.79216 SCN
 
 BT
 48.24 793.926 Td
+/F1.0 10.5 Tf
+<437265617469766520436f6d6d6f6e73204174747269627574696f6e2d4e6f6e436f6d6d65726369616c2d4e6f446572697661746976657320342e3020496e7465726e6174696f6e616c> Tj
+ET
+
+0.0 0.0 0.0 SCN
+0.0 0.0 0.0 scn
+0.2 0.2 0.2 scn
+0.2 0.2 0.2 SCN
+
+BT
+48.24 778.146 Td
+ET
+
+0.0 0.0 0.0 SCN
+0.0 0.0 0.0 scn
+0.2 0.2 0.2 scn
+0.2 0.2 0.2 SCN
+
+BT
+48.24 778.146 Td
 /F1.0 10.5 Tf
 <5b63635d> Tj
 ET
@@ -8783,7 +8856,7 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-66.111 793.926 Td
+66.111 778.146 Td
 /F1.0 10.5 Tf
 [<5b62> 20.01953 <795d>] TJ
 ET
@@ -8794,7 +8867,7 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-85.79829 793.926 Td
+85.79829 778.146 Td
 /F1.0 10.5 Tf
 <5b6e635d> Tj
 ET
@@ -8805,7 +8878,7 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-105.27579 793.926 Td
+105.27579 778.146 Td
 /F1.0 10.5 Tf
 <5b6e645d> Tj
 ET
@@ -8816,9 +8889,9 @@ ET
 0.2 0.2 0.2 SCN
 
 BT
-48.24 766.146 Td
+48.24 750.366 Td
 /F1.0 10.5 Tf
-[<41> 20.01953 <7574686f723a204c6f7544202d2067656e6572> 20.01953 <61746564206f6e20323032352d30352d3238>] TJ
+[<41> 20.01953 <7574686f723a204c6f7544202d2067656e6572> 20.01953 <61746564206f6e20323032352d30372d3032>] TJ
 ET
 
 0.0 0.0 0.0 SCN
@@ -8847,7 +8920,7 @@ Q
 
 endstream
 endobj
-79 0 obj
+83 0 obj
 << /Type /Page
 /Parent 3 0 R
 /MediaBox [0 0 595.28 841.89]
@@ -8855,61 +8928,72 @@ endobj
 /BleedBox [0 0 595.28 841.89]
 /TrimBox [0 0 595.28 841.89]
 /ArtBox [0 0 595.28 841.89]
-/Contents 78 0 R
+/Contents 82 0 R
 /Resources << /ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
 /Font << /F1.0 9 0 R
 >>
-/XObject << /Stamp2 202 0 R
+/XObject << /Stamp2 207 0 R
 >>
 >>
-/Annots [80 0 R 81 0 R 82 0 R 83 0 R]
->>
-endobj
-80 0 obj
-<< /Border [0 0 0]
-/A << /Type /Action
-/S /URI
-/URI (https://creativecommons.org/licenses/by-nc-nd/4.0/?ref=chooser-v1)
->>
-/Subtype /Link
-/Rect [48.24 790.86 66.111 805.14]
-/Type /Annot
->>
-endobj
-81 0 obj
-<< /Border [0 0 0]
-/A << /Type /Action
-/S /URI
-/URI (https://creativecommons.org/licenses/by-nc-nd/4.0/?ref=chooser-v1)
->>
-/Subtype /Link
-/Rect [66.111 790.86 85.79829 805.14]
-/Type /Annot
->>
-endobj
-82 0 obj
-<< /Border [0 0 0]
-/A << /Type /Action
-/S /URI
-/URI (https://creativecommons.org/licenses/by-nc-nd/4.0/?ref=chooser-v1)
->>
-/Subtype /Link
-/Rect [85.79829 790.86 105.27579 805.14]
-/Type /Annot
->>
-endobj
-83 0 obj
-<< /Border [0 0 0]
-/A << /Type /Action
-/S /URI
-/URI (https://creativecommons.org/licenses/by-nc-nd/4.0/?ref=chooser-v1)
->>
-/Subtype /Link
-/Rect [105.27579 790.86 126.02379 805.14]
-/Type /Annot
+/Annots [84 0 R 85 0 R 86 0 R 87 0 R 88 0 R]
 >>
 endobj
 84 0 obj
+<< /Border [0 0 0]
+/A << /Type /Action
+/S /URI
+/URI (https://creativecommons.org/licenses/by-nc-nd/4.0/?ref=chooser-v1)
+>>
+/Subtype /Link
+/Rect [48.24 790.86 446.6415 805.14]
+/Type /Annot
+>>
+endobj
+85 0 obj
+<< /Border [0 0 0]
+/A << /Type /Action
+/S /URI
+/URI (https://creativecommons.org/licenses/by-nc-nd/4.0/?ref=chooser-v1)
+>>
+/Subtype /Link
+/Rect [48.24 775.08 66.111 789.36]
+/Type /Annot
+>>
+endobj
+86 0 obj
+<< /Border [0 0 0]
+/A << /Type /Action
+/S /URI
+/URI (https://creativecommons.org/licenses/by-nc-nd/4.0/?ref=chooser-v1)
+>>
+/Subtype /Link
+/Rect [66.111 775.08 85.79829 789.36]
+/Type /Annot
+>>
+endobj
+87 0 obj
+<< /Border [0 0 0]
+/A << /Type /Action
+/S /URI
+/URI (https://creativecommons.org/licenses/by-nc-nd/4.0/?ref=chooser-v1)
+>>
+/Subtype /Link
+/Rect [85.79829 775.08 105.27579 789.36]
+/Type /Annot
+>>
+endobj
+88 0 obj
+<< /Border [0 0 0]
+/A << /Type /Action
+/S /URI
+/URI (https://creativecommons.org/licenses/by-nc-nd/4.0/?ref=chooser-v1)
+>>
+/Subtype /Link
+/Rect [105.27579 775.08 126.02379 789.36]
+/Type /Annot
+>>
+endobj
+89 0 obj
 << /Border [0 0 0]
 /Dest (_firmware_types)
 /Subtype /Link
@@ -8917,7 +9001,7 @@ endobj
 /Type /Annot
 >>
 endobj
-85 0 obj
+90 0 obj
 << /Border [0 0 0]
 /Dest (_firmware_types)
 /Subtype /Link
@@ -8925,7 +9009,7 @@ endobj
 /Type /Annot
 >>
 endobj
-86 0 obj
+91 0 obj
 << /Border [0 0 0]
 /Dest (_firmware_naming)
 /Subtype /Link
@@ -8933,7 +9017,7 @@ endobj
 /Type /Annot
 >>
 endobj
-87 0 obj
+92 0 obj
 << /Border [0 0 0]
 /Dest (_firmware_naming)
 /Subtype /Link
@@ -8941,7 +9025,7 @@ endobj
 /Type /Annot
 >>
 endobj
-88 0 obj
+93 0 obj
 << /Border [0 0 0]
 /Dest (_how_to_flash_your_pico)
 /Subtype /Link
@@ -8949,7 +9033,7 @@ endobj
 /Type /Annot
 >>
 endobj
-89 0 obj
+94 0 obj
 << /Border [0 0 0]
 /Dest (_how_to_flash_your_pico)
 /Subtype /Link
@@ -8957,7 +9041,7 @@ endobj
 /Type /Annot
 >>
 endobj
-90 0 obj
+95 0 obj
 << /Border [0 0 0]
 /Dest (_firmware_configuration)
 /Subtype /Link
@@ -8965,7 +9049,7 @@ endobj
 /Type /Annot
 >>
 endobj
-91 0 obj
+96 0 obj
 << /Border [0 0 0]
 /Dest (_firmware_configuration)
 /Subtype /Link
@@ -8973,7 +9057,7 @@ endobj
 /Type /Annot
 >>
 endobj
-92 0 obj
+97 0 obj
 << /Border [0 0 0]
 /Dest (_default_configuration)
 /Subtype /Link
@@ -8981,7 +9065,7 @@ endobj
 /Type /Annot
 >>
 endobj
-93 0 obj
+98 0 obj
 << /Border [0 0 0]
 /Dest (_default_configuration)
 /Subtype /Link
@@ -8989,7 +9073,7 @@ endobj
 /Type /Annot
 >>
 endobj
-94 0 obj
+99 0 obj
 << /Border [0 0 0]
 /Dest (_board_clock_rate)
 /Subtype /Link
@@ -8997,7 +9081,7 @@ endobj
 /Type /Annot
 >>
 endobj
-95 0 obj
+100 0 obj
 << /Border [0 0 0]
 /Dest (_board_clock_rate)
 /Subtype /Link
@@ -9005,7 +9089,7 @@ endobj
 /Type /Annot
 >>
 endobj
-96 0 obj
+101 0 obj
 << /Border [0 0 0]
 /Dest (_clock_rate_locked)
 /Subtype /Link
@@ -9013,7 +9097,7 @@ endobj
 /Type /Annot
 >>
 endobj
-97 0 obj
+102 0 obj
 << /Border [0 0 0]
 /Dest (_clock_rate_locked)
 /Subtype /Link
@@ -9021,7 +9105,7 @@ endobj
 /Type /Annot
 >>
 endobj
-98 0 obj
+103 0 obj
 << /Border [0 0 0]
 /Dest (_audio_mode)
 /Subtype /Link
@@ -9029,7 +9113,7 @@ endobj
 /Type /Annot
 >>
 endobj
-99 0 obj
+104 0 obj
 << /Border [0 0 0]
 /Dest (_audio_mode)
 /Subtype /Link
@@ -9037,7 +9121,7 @@ endobj
 /Type /Annot
 >>
 endobj
-100 0 obj
+105 0 obj
 << /Border [0 0 0]
 /Dest (_socket_settings)
 /Subtype /Link
@@ -9045,7 +9129,7 @@ endobj
 /Type /Annot
 >>
 endobj
-101 0 obj
+106 0 obj
 << /Border [0 0 0]
 /Dest (_socket_settings)
 /Subtype /Link
@@ -9053,7 +9137,7 @@ endobj
 /Type /Annot
 >>
 endobj
-102 0 obj
+107 0 obj
 << /Border [0 0 0]
 /Dest (_socket_onetwo_enabled)
 /Subtype /Link
@@ -9061,7 +9145,7 @@ endobj
 /Type /Annot
 >>
 endobj
-103 0 obj
+108 0 obj
 << /Border [0 0 0]
 /Dest (_socket_onetwo_enabled)
 /Subtype /Link
@@ -9069,7 +9153,7 @@ endobj
 /Type /Annot
 >>
 endobj
-104 0 obj
+109 0 obj
 << /Border [0 0 0]
 /Dest (_socket_onetwo_dualsid_enabled)
 /Subtype /Link
@@ -9077,7 +9161,7 @@ endobj
 /Type /Annot
 >>
 endobj
-105 0 obj
+110 0 obj
 << /Border [0 0 0]
 /Dest (_socket_onetwo_dualsid_enabled)
 /Subtype /Link
@@ -9085,7 +9169,7 @@ endobj
 /Type /Annot
 >>
 endobj
-106 0 obj
+111 0 obj
 << /Border [0 0 0]
 /Dest (_socket_onetwo_chiptype)
 /Subtype /Link
@@ -9093,7 +9177,7 @@ endobj
 /Type /Annot
 >>
 endobj
-107 0 obj
+112 0 obj
 << /Border [0 0 0]
 /Dest (_socket_onetwo_chiptype)
 /Subtype /Link
@@ -9101,7 +9185,7 @@ endobj
 /Type /Annot
 >>
 endobj
-108 0 obj
+113 0 obj
 << /Border [0 0 0]
 /Dest (_socket_onetwo_clonetype)
 /Subtype /Link
@@ -9109,7 +9193,7 @@ endobj
 /Type /Annot
 >>
 endobj
-109 0 obj
+114 0 obj
 << /Border [0 0 0]
 /Dest (_socket_onetwo_clonetype)
 /Subtype /Link
@@ -9117,7 +9201,7 @@ endobj
 /Type /Annot
 >>
 endobj
-110 0 obj
+115 0 obj
 << /Border [0 0 0]
 /Dest (_socket_onetwo_sid_1_type)
 /Subtype /Link
@@ -9125,7 +9209,7 @@ endobj
 /Type /Annot
 >>
 endobj
-111 0 obj
+116 0 obj
 << /Border [0 0 0]
 /Dest (_socket_onetwo_sid_1_type)
 /Subtype /Link
@@ -9133,7 +9217,7 @@ endobj
 /Type /Annot
 >>
 endobj
-112 0 obj
+117 0 obj
 << /Border [0 0 0]
 /Dest (_socket_onetwo_sid_2_type)
 /Subtype /Link
@@ -9141,7 +9225,7 @@ endobj
 /Type /Annot
 >>
 endobj
-113 0 obj
+118 0 obj
 << /Border [0 0 0]
 /Dest (_socket_onetwo_sid_2_type)
 /Subtype /Link
@@ -9149,7 +9233,7 @@ endobj
 /Type /Annot
 >>
 endobj
-114 0 obj
+119 0 obj
 << /Border [0 0 0]
 /Dest (_socket_two_act_as_one)
 /Subtype /Link
@@ -9157,7 +9241,7 @@ endobj
 /Type /Annot
 >>
 endobj
-115 0 obj
+120 0 obj
 << /Border [0 0 0]
 /Dest (_socket_two_act_as_one)
 /Subtype /Link
@@ -9165,7 +9249,7 @@ endobj
 /Type /Annot
 >>
 endobj
-116 0 obj
+121 0 obj
 << /Border [0 0 0]
 /Dest (_led_enabled)
 /Subtype /Link
@@ -9173,7 +9257,7 @@ endobj
 /Type /Annot
 >>
 endobj
-117 0 obj
+122 0 obj
 << /Border [0 0 0]
 /Dest (_led_enabled)
 /Subtype /Link
@@ -9181,7 +9265,7 @@ endobj
 /Type /Annot
 >>
 endobj
-118 0 obj
+123 0 obj
 << /Border [0 0 0]
 /Dest (_led_idle_breathe_enabled)
 /Subtype /Link
@@ -9189,7 +9273,7 @@ endobj
 /Type /Annot
 >>
 endobj
-119 0 obj
+124 0 obj
 << /Border [0 0 0]
 /Dest (_led_idle_breathe_enabled)
 /Subtype /Link
@@ -9197,7 +9281,7 @@ endobj
 /Type /Annot
 >>
 endobj
-120 0 obj
+125 0 obj
 << /Border [0 0 0]
 /Dest (_rgbled_enabled)
 /Subtype /Link
@@ -9205,7 +9289,7 @@ endobj
 /Type /Annot
 >>
 endobj
-121 0 obj
+126 0 obj
 << /Border [0 0 0]
 /Dest (_rgbled_enabled)
 /Subtype /Link
@@ -9213,7 +9297,7 @@ endobj
 /Type /Annot
 >>
 endobj
-122 0 obj
+127 0 obj
 << /Border [0 0 0]
 /Dest (_rgbled_idle_breathe_enabled)
 /Subtype /Link
@@ -9221,7 +9305,7 @@ endobj
 /Type /Annot
 >>
 endobj
-123 0 obj
+128 0 obj
 << /Border [0 0 0]
 /Dest (_rgbled_idle_breathe_enabled)
 /Subtype /Link
@@ -9229,7 +9313,7 @@ endobj
 /Type /Annot
 >>
 endobj
-124 0 obj
+129 0 obj
 << /Border [0 0 0]
 /Dest (_rgbled_brightness)
 /Subtype /Link
@@ -9237,7 +9321,7 @@ endobj
 /Type /Annot
 >>
 endobj
-125 0 obj
+130 0 obj
 << /Border [0 0 0]
 /Dest (_rgbled_brightness)
 /Subtype /Link
@@ -9245,7 +9329,7 @@ endobj
 /Type /Annot
 >>
 endobj
-126 0 obj
+131 0 obj
 << /Border [0 0 0]
 /Dest (_rgbled_sid_to_use)
 /Subtype /Link
@@ -9253,7 +9337,7 @@ endobj
 /Type /Annot
 >>
 endobj
-127 0 obj
+132 0 obj
 << /Border [0 0 0]
 /Dest (_rgbled_sid_to_use)
 /Subtype /Link
@@ -9261,7 +9345,7 @@ endobj
 /Type /Annot
 >>
 endobj
-128 0 obj
+133 0 obj
 << /Border [0 0 0]
 /Dest (_fmopl_enabled)
 /Subtype /Link
@@ -9269,7 +9353,7 @@ endobj
 /Type /Annot
 >>
 endobj
-129 0 obj
+134 0 obj
 << /Border [0 0 0]
 /Dest (_fmopl_enabled)
 /Subtype /Link
@@ -9277,7 +9361,7 @@ endobj
 /Type /Annot
 >>
 endobj
-130 0 obj
+135 0 obj
 << /Border [0 0 0]
 /Dest (_fmopl_sid_number)
 /Subtype /Link
@@ -9285,7 +9369,7 @@ endobj
 /Type /Annot
 >>
 endobj
-131 0 obj
+136 0 obj
 << /Border [0 0 0]
 /Dest (_fmopl_sid_number)
 /Subtype /Link
@@ -9293,7 +9377,7 @@ endobj
 /Type /Annot
 >>
 endobj
-132 0 obj
+137 0 obj
 << /Border [0 0 0]
 /Dest (_cdc_enabled)
 /Subtype /Link
@@ -9301,7 +9385,7 @@ endobj
 /Type /Annot
 >>
 endobj
-133 0 obj
+138 0 obj
 << /Border [0 0 0]
 /Dest (_cdc_enabled)
 /Subtype /Link
@@ -9309,7 +9393,7 @@ endobj
 /Type /Annot
 >>
 endobj
-134 0 obj
+139 0 obj
 << /Border [0 0 0]
 /Dest (_webusb_enabled)
 /Subtype /Link
@@ -9317,7 +9401,7 @@ endobj
 /Type /Annot
 >>
 endobj
-135 0 obj
+140 0 obj
 << /Border [0 0 0]
 /Dest (_webusb_enabled)
 /Subtype /Link
@@ -9325,7 +9409,7 @@ endobj
 /Type /Annot
 >>
 endobj
-136 0 obj
+141 0 obj
 << /Border [0 0 0]
 /Dest (_asid_enabled)
 /Subtype /Link
@@ -9333,7 +9417,7 @@ endobj
 /Type /Annot
 >>
 endobj
-137 0 obj
+142 0 obj
 << /Border [0 0 0]
 /Dest (_asid_enabled)
 /Subtype /Link
@@ -9341,7 +9425,7 @@ endobj
 /Type /Annot
 >>
 endobj
-138 0 obj
+143 0 obj
 << /Border [0 0 0]
 /Dest (_midi_enabled)
 /Subtype /Link
@@ -9349,7 +9433,7 @@ endobj
 /Type /Annot
 >>
 endobj
-139 0 obj
+144 0 obj
 << /Border [0 0 0]
 /Dest (_midi_enabled)
 /Subtype /Link
@@ -9357,7 +9441,7 @@ endobj
 /Type /Annot
 >>
 endobj
-140 0 obj
+145 0 obj
 << /Border [0 0 0]
 /Dest (_config_tools)
 /Subtype /Link
@@ -9365,7 +9449,7 @@ endobj
 /Type /Annot
 >>
 endobj
-141 0 obj
+146 0 obj
 << /Border [0 0 0]
 /Dest (_config_tools)
 /Subtype /Link
@@ -9373,7 +9457,7 @@ endobj
 /Type /Annot
 >>
 endobj
-142 0 obj
+147 0 obj
 << /Border [0 0 0]
 /Dest (_configuration_web_page)
 /Subtype /Link
@@ -9381,7 +9465,7 @@ endobj
 /Type /Annot
 >>
 endobj
-143 0 obj
+148 0 obj
 << /Border [0 0 0]
 /Dest (_configuration_web_page)
 /Subtype /Link
@@ -9389,7 +9473,7 @@ endobj
 /Type /Annot
 >>
 endobj
-144 0 obj
+149 0 obj
 << /Border [0 0 0]
 /Dest (_cli_configuration_tool_linux)
 /Subtype /Link
@@ -9397,7 +9481,7 @@ endobj
 /Type /Annot
 >>
 endobj
-145 0 obj
+150 0 obj
 << /Border [0 0 0]
 /Dest (_cli_configuration_tool_linux)
 /Subtype /Link
@@ -9405,7 +9489,7 @@ endobj
 /Type /Annot
 >>
 endobj
-146 0 obj
+151 0 obj
 << /Border [0 0 0]
 /Dest (_cli_configuration_tool_windows)
 /Subtype /Link
@@ -9413,7 +9497,7 @@ endobj
 /Type /Annot
 >>
 endobj
-147 0 obj
+152 0 obj
 << /Border [0 0 0]
 /Dest (_cli_configuration_tool_windows)
 /Subtype /Link
@@ -9421,7 +9505,7 @@ endobj
 /Type /Annot
 >>
 endobj
-148 0 obj
+153 0 obj
 << /Border [0 0 0]
 /Dest (_multiplatform_configuration_gui)
 /Subtype /Link
@@ -9429,7 +9513,7 @@ endobj
 /Type /Annot
 >>
 endobj
-149 0 obj
+154 0 obj
 << /Border [0 0 0]
 /Dest (_multiplatform_configuration_gui)
 /Subtype /Link
@@ -9437,7 +9521,7 @@ endobj
 /Type /Annot
 >>
 endobj
-150 0 obj
+155 0 obj
 << /Border [0 0 0]
 /Dest (_disclaimer)
 /Subtype /Link
@@ -9445,7 +9529,7 @@ endobj
 /Type /Annot
 >>
 endobj
-151 0 obj
+156 0 obj
 << /Border [0 0 0]
 /Dest (_disclaimer)
 /Subtype /Link
@@ -9453,7 +9537,7 @@ endobj
 /Type /Annot
 >>
 endobj
-152 0 obj
+157 0 obj
 << /Border [0 0 0]
 /Dest (_license)
 /Subtype /Link
@@ -9461,7 +9545,7 @@ endobj
 /Type /Annot
 >>
 endobj
-153 0 obj
+158 0 obj
 << /Border [0 0 0]
 /Dest (_license)
 /Subtype /Link
@@ -9469,7 +9553,7 @@ endobj
 /Type /Annot
 >>
 endobj
-154 0 obj
+159 0 obj
 << /Border [0 0 0]
 /Dest (_software_license_gnuv2)
 /Subtype /Link
@@ -9477,7 +9561,7 @@ endobj
 /Type /Annot
 >>
 endobj
-155 0 obj
+160 0 obj
 << /Border [0 0 0]
 /Dest (_software_license_gnuv2)
 /Subtype /Link
@@ -9485,7 +9569,7 @@ endobj
 /Type /Annot
 >>
 endobj
-156 0 obj
+161 0 obj
 << /Border [0 0 0]
 /Dest (_hardware_license_creative_commons)
 /Subtype /Link
@@ -9493,7 +9577,7 @@ endobj
 /Type /Annot
 >>
 endobj
-157 0 obj
+162 0 obj
 << /Border [0 0 0]
 /Dest (_hardware_license_creative_commons)
 /Subtype /Link
@@ -9501,363 +9585,363 @@ endobj
 /Type /Annot
 >>
 endobj
-158 0 obj
+163 0 obj
 << /Type /Outlines
 /Count 39
-/First 159 0 R
-/Last 195 0 R
->>
-endobj
-159 0 obj
-<< /Title <feff005500530042005300490044002d005000690063006f00200050004300420020006600690072006d00770061007200650020006d0061006e00750061006c>
-/Parent 158 0 R
-/Count 0
-/Next 160 0 R
-/Dest [7 0 R /XYZ 0 841.89 null]
->>
-endobj
-160 0 obj
-<< /Title <feff005400610062006c00650020006f006600200043006f006e00740065006e00740073>
-/Parent 158 0 R
-/Count 0
-/Next 161 0 R
-/Prev 159 0 R
-/Dest [7 0 R /XYZ 0 726.83286 null]
->>
-endobj
-161 0 obj
-<< /Title <feff004600690072006d0077006100720065002000740079007000650073>
-/Parent 158 0 R
-/Count 0
-/Next 162 0 R
-/Prev 160 0 R
-/Dest [16 0 R /XYZ 0 841.89 null]
->>
-endobj
-162 0 obj
-<< /Title <feff004600690072006d00770061007200650020006e0061006d0069006e0067>
-/Parent 158 0 R
-/Count 0
-/Next 163 0 R
-/Prev 161 0 R
-/Dest [16 0 R /XYZ 0 603.8 null]
->>
-endobj
-163 0 obj
-<< /Title <feff0048006f007700200074006f00200066006c00610073006800200079006f007500720020005000690063006f>
-/Parent 158 0 R
-/Count 0
-/Next 164 0 R
-/Prev 162 0 R
-/Dest [16 0 R /XYZ 0 372.7 null]
+/First 164 0 R
+/Last 200 0 R
 >>
 endobj
 164 0 obj
-<< /Title <feff004600690072006d007700610072006500200063006f006e00660069006700750072006100740069006f006e>
-/Parent 158 0 R
-/Count 24
-/First 165 0 R
-/Last 188 0 R
-/Next 189 0 R
-/Prev 163 0 R
-/Dest [25 0 R /XYZ 0 168.27 null]
+<< /Title <feff005500530042005300490044002d005000690063006f00200050004300420020006600690072006d00770061007200650020006d0061006e00750061006c>
+/Parent 163 0 R
+/Count 0
+/Next 165 0 R
+/Dest [7 0 R /XYZ 0 841.89 null]
 >>
 endobj
 165 0 obj
-<< /Title <feff00440065006600610075006c007400200063006f006e00660069006700750072006100740069006f006e>
-/Parent 164 0 R
+<< /Title <feff005400610062006c00650020006f006600200043006f006e00740065006e00740073>
+/Parent 163 0 R
 /Count 0
 /Next 166 0 R
-/Dest [30 0 R /XYZ 0 841.89 null]
+/Prev 164 0 R
+/Dest [7 0 R /XYZ 0 726.83286 null]
 >>
 endobj
 166 0 obj
-<< /Title <feff0042006f00610072006400200063006c006f0063006b00200072006100740065>
-/Parent 164 0 R
+<< /Title <feff004600690072006d0077006100720065002000740079007000650073>
+/Parent 163 0 R
 /Count 0
 /Next 167 0 R
 /Prev 165 0 R
-/Dest [30 0 R /XYZ 0 285.21 null]
+/Dest [16 0 R /XYZ 0 841.89 null]
 >>
 endobj
 167 0 obj
-<< /Title <feff0043006c006f0063006b002000720061007400650020006c006f0063006b00650064>
-/Parent 164 0 R
+<< /Title <feff004600690072006d00770061007200650020006e0061006d0069006e0067>
+/Parent 163 0 R
 /Count 0
 /Next 168 0 R
 /Prev 166 0 R
-/Dest [30 0 R /XYZ 0 154.23 null]
+/Dest [16 0 R /XYZ 0 603.8 null]
 >>
 endobj
 168 0 obj
-<< /Title <feff0041007500640069006f0020006d006f00640065>
-/Parent 164 0 R
+<< /Title <feff0048006f007700200074006f00200066006c00610073006800200079006f007500720020005000690063006f>
+/Parent 163 0 R
 /Count 0
 /Next 169 0 R
 /Prev 167 0 R
-/Dest [35 0 R /XYZ 0 714.99 null]
+/Dest [16 0 R /XYZ 0 372.7 null]
 >>
 endobj
 169 0 obj
-<< /Title <feff0053006f0063006b00650074002000730065007400740069006e00670073>
-/Parent 164 0 R
-/Count 7
+<< /Title <feff004600690072006d007700610072006500200063006f006e00660069006700750072006100740069006f006e>
+/Parent 163 0 R
+/Count 24
 /First 170 0 R
-/Last 176 0 R
-/Next 177 0 R
+/Last 193 0 R
+/Next 194 0 R
 /Prev 168 0 R
-/Dest [35 0 R /XYZ 0 552.45 null]
+/Dest [25 0 R /XYZ 0 168.27 null]
 >>
 endobj
 170 0 obj
-<< /Title <feff0053006f0063006b006500740020004f006e0065002f00540077006f00200045006e00610062006c00650064>
+<< /Title <feff00440065006600610075006c007400200063006f006e00660069006700750072006100740069006f006e>
 /Parent 169 0 R
 /Count 0
 /Next 171 0 R
-/Dest [35 0 R /XYZ 0 484.59 null]
+/Dest [30 0 R /XYZ 0 841.89 null]
 >>
 endobj
 171 0 obj
-<< /Title <feff0053006f0063006b006500740020004f006e0065002f00540077006f0020004400750061006c00730069006400200065006e00610062006c00650064>
+<< /Title <feff0042006f00610072006400200063006c006f0063006b00200072006100740065>
 /Parent 169 0 R
 /Count 0
 /Next 172 0 R
 /Prev 170 0 R
-/Dest [35 0 R /XYZ 0 391.97 null]
+/Dest [30 0 R /XYZ 0 285.21 null]
 >>
 endobj
 172 0 obj
-<< /Title <feff0053006f0063006b006500740020004f006e0065002f00540077006f002000430068006900700074007900700065>
+<< /Title <feff0043006c006f0063006b002000720061007400650020006c006f0063006b00650064>
 /Parent 169 0 R
 /Count 0
 /Next 173 0 R
 /Prev 171 0 R
-/Dest [35 0 R /XYZ 0 267.79 null]
+/Dest [30 0 R /XYZ 0 154.23 null]
 >>
 endobj
 173 0 obj
-<< /Title <feff0053006f0063006b006500740020004f006e0065002f00540077006f00200043006c006f006e00650074007900700065>
+<< /Title <feff0041007500640069006f0020006d006f00640065>
 /Parent 169 0 R
 /Count 0
 /Next 174 0 R
 /Prev 172 0 R
-/Dest [35 0 R /XYZ 0 175.17 null]
+/Dest [35 0 R /XYZ 0 714.99 null]
 >>
 endobj
 174 0 obj
-<< /Title <feff0053006f0063006b006500740020004f006e0065002f00540077006f00200053004900440020003100200074007900700065>
+<< /Title <feff0053006f0063006b00650074002000730065007400740069006e00670073>
 /Parent 169 0 R
-/Count 0
-/Next 175 0 R
+/Count 7
+/First 175 0 R
+/Last 181 0 R
+/Next 182 0 R
 /Prev 173 0 R
-/Dest [43 0 R /XYZ 0 841.89 null]
+/Dest [35 0 R /XYZ 0 552.45 null]
 >>
 endobj
 175 0 obj
-<< /Title <feff0053006f0063006b006500740020004f006e0065002f00540077006f00200053004900440020003200200074007900700065>
-/Parent 169 0 R
+<< /Title <feff0053006f0063006b006500740020004f006e0065002f00540077006f00200045006e00610062006c00650064>
+/Parent 174 0 R
 /Count 0
 /Next 176 0 R
-/Prev 174 0 R
-/Dest [43 0 R /XYZ 0 733.85 null]
+/Dest [35 0 R /XYZ 0 484.59 null]
 >>
 endobj
 176 0 obj
-<< /Title <feff0053006f0063006b00650074002000540077006f00200041006300740020006100730020004f006e0065>
-/Parent 169 0 R
+<< /Title <feff0053006f0063006b006500740020004f006e0065002f00540077006f0020004400750061006c00730069006400200065006e00610062006c00650064>
+/Parent 174 0 R
 /Count 0
+/Next 177 0 R
 /Prev 175 0 R
-/Dest [43 0 R /XYZ 0 657.01 null]
+/Dest [35 0 R /XYZ 0 391.97 null]
 >>
 endobj
 177 0 obj
-<< /Title <feff004c0045004400200045006e00610062006c00650064>
-/Parent 164 0 R
+<< /Title <feff0053006f0063006b006500740020004f006e0065002f00540077006f002000430068006900700074007900700065>
+/Parent 174 0 R
 /Count 0
 /Next 178 0 R
-/Prev 169 0 R
-/Dest [43 0 R /XYZ 0 548.61 null]
+/Prev 176 0 R
+/Dest [35 0 R /XYZ 0 267.79 null]
 >>
 endobj
 178 0 obj
-<< /Title <feff004c00450044002000490064006c00650020006200720065006100740068006500200065006e00610062006c00650064>
-/Parent 164 0 R
+<< /Title <feff0053006f0063006b006500740020004f006e0065002f00540077006f00200043006c006f006e00650074007900700065>
+/Parent 174 0 R
 /Count 0
 /Next 179 0 R
 /Prev 177 0 R
-/Dest [43 0 R /XYZ 0 433.41 null]
+/Dest [35 0 R /XYZ 0 175.17 null]
 >>
 endobj
 179 0 obj
-<< /Title <feff005200470042004c0045004400200045006e00610062006c00650064>
-/Parent 164 0 R
+<< /Title <feff0053006f0063006b006500740020004f006e0065002f00540077006f00200053004900440020003100200074007900700065>
+/Parent 174 0 R
 /Count 0
 /Next 180 0 R
 /Prev 178 0 R
-/Dest [43 0 R /XYZ 0 333.99 null]
+/Dest [43 0 R /XYZ 0 841.89 null]
 >>
 endobj
 180 0 obj
-<< /Title <feff005200470042004c00450044002000490064006c00650020006200720065006100740068006500200065006e00610062006c00650064>
-/Parent 164 0 R
+<< /Title <feff0053006f0063006b006500740020004f006e0065002f00540077006f00200053004900440020003200200074007900700065>
+/Parent 174 0 R
 /Count 0
 /Next 181 0 R
 /Prev 179 0 R
-/Dest [43 0 R /XYZ 0 203.01 null]
+/Dest [43 0 R /XYZ 0 733.85 null]
 >>
 endobj
 181 0 obj
-<< /Title <feff005200470042004c004500440020004200720069006700680074006e006500730073>
-/Parent 164 0 R
+<< /Title <feff0053006f0063006b00650074002000540077006f00200041006300740020006100730020004f006e0065>
+/Parent 174 0 R
 /Count 0
-/Next 182 0 R
 /Prev 180 0 R
-/Dest [54 0 R /XYZ 0 841.89 null]
+/Dest [43 0 R /XYZ 0 657.01 null]
 >>
 endobj
 182 0 obj
-<< /Title <feff005200470042004c00450044002000530049004400200074006f0020007500730065>
-/Parent 164 0 R
+<< /Title <feff004c0045004400200045006e00610062006c00650064>
+/Parent 169 0 R
 /Count 0
 /Next 183 0 R
-/Prev 181 0 R
-/Dest [54 0 R /XYZ 0 695.49 null]
+/Prev 174 0 R
+/Dest [43 0 R /XYZ 0 548.61 null]
 >>
 endobj
 183 0 obj
-<< /Title <feff0046004d004f0070006c00200045006e00610062006c00650064>
-/Parent 164 0 R
+<< /Title <feff004c00450044002000490064006c00650020006200720065006100740068006500200065006e00610062006c00650064>
+/Parent 169 0 R
 /Count 0
 /Next 184 0 R
 /Prev 182 0 R
-/Dest [54 0 R /XYZ 0 580.29 null]
+/Dest [43 0 R /XYZ 0 433.41 null]
 >>
 endobj
 184 0 obj
-<< /Title <feff0046004d004f0070006c00200053004900440020006e0075006d006200650072>
-/Parent 164 0 R
+<< /Title <feff005200470042004c0045004400200045006e00610062006c00650064>
+/Parent 169 0 R
 /Count 0
 /Next 185 0 R
 /Prev 183 0 R
-/Dest [54 0 R /XYZ 0 465.09 null]
+/Dest [43 0 R /XYZ 0 333.99 null]
 >>
 endobj
 185 0 obj
-<< /Title <feff00430044004300200045006e00610062006c00650064>
-/Parent 164 0 R
+<< /Title <feff005200470042004c00450044002000490064006c00650020006200720065006100740068006500200065006e00610062006c00650064>
+/Parent 169 0 R
 /Count 0
 /Next 186 0 R
 /Prev 184 0 R
-/Dest [54 0 R /XYZ 0 381.45 null]
+/Dest [43 0 R /XYZ 0 203.01 null]
 >>
 endobj
 186 0 obj
-<< /Title <feff00570065006200550053004200200045006e00610062006c00650064>
-/Parent 164 0 R
+<< /Title <feff005200470042004c004500440020004200720069006700680074006e006500730073>
+/Parent 169 0 R
 /Count 0
 /Next 187 0 R
 /Prev 185 0 R
-/Dest [54 0 R /XYZ 0 297.81 null]
+/Dest [54 0 R /XYZ 0 841.89 null]
 >>
 endobj
 187 0 obj
-<< /Title <feff004100730069006400200045006e00610062006c00650064>
-/Parent 164 0 R
+<< /Title <feff005200470042004c00450044002000530049004400200074006f0020007500730065>
+/Parent 169 0 R
 /Count 0
 /Next 188 0 R
 /Prev 186 0 R
-/Dest [54 0 R /XYZ 0 214.17 null]
+/Dest [54 0 R /XYZ 0 695.49 null]
 >>
 endobj
 188 0 obj
-<< /Title <feff004d00690064006900200045006e00610062006c00650064>
-/Parent 164 0 R
+<< /Title <feff0046004d004f0070006c00200045006e00610062006c00650064>
+/Parent 169 0 R
 /Count 0
+/Next 189 0 R
 /Prev 187 0 R
-/Dest [54 0 R /XYZ 0 130.53 null]
+/Dest [54 0 R /XYZ 0 580.29 null]
 >>
 endobj
 189 0 obj
-<< /Title <feff0043006f006e00660069006700200074006f006f006c0073>
-/Parent 158 0 R
-/Count 4
-/First 190 0 R
-/Last 193 0 R
-/Next 194 0 R
-/Prev 164 0 R
-/Dest [64 0 R /XYZ 0 841.89 null]
+<< /Title <feff0046004d004f0070006c00200053004900440020006e0075006d006200650072>
+/Parent 169 0 R
+/Count 0
+/Next 190 0 R
+/Prev 188 0 R
+/Dest [54 0 R /XYZ 0 465.09 null]
 >>
 endobj
 190 0 obj
-<< /Title <feff0043006f006e00660069006700750072006100740069006f006e002000770065006200200070006100670065>
-/Parent 189 0 R
+<< /Title <feff00430044004300200045006e00610062006c00650064>
+/Parent 169 0 R
 /Count 0
 /Next 191 0 R
-/Dest [64 0 R /XYZ 0 737.39 null]
+/Prev 189 0 R
+/Dest [54 0 R /XYZ 0 381.45 null]
 >>
 endobj
 191 0 obj
-<< /Title <feff0043004c004900200043006f006e00660069006700750072006100740069006f006e00200074006f006f006c00200028006c0069006e007500780029>
-/Parent 189 0 R
+<< /Title <feff00570065006200550053004200200045006e00610062006c00650064>
+/Parent 169 0 R
 /Count 0
 /Next 192 0 R
 /Prev 190 0 R
-/Dest [64 0 R /XYZ 0 669.53 null]
+/Dest [54 0 R /XYZ 0 297.81 null]
 >>
 endobj
 192 0 obj
-<< /Title <feff0043004c004900200043006f006e00660069006700750072006100740069006f006e00200074006f006f006c0020002800570069006e0064006f007700730029>
-/Parent 189 0 R
+<< /Title <feff004100730069006400200045006e00610062006c00650064>
+/Parent 169 0 R
 /Count 0
 /Next 193 0 R
 /Prev 191 0 R
-/Dest [64 0 R /XYZ 0 601.67 null]
+/Dest [54 0 R /XYZ 0 214.17 null]
 >>
 endobj
 193 0 obj
-<< /Title <feff004d0075006c007400690070006c006100740066006f0072006d00200043006f006e00660069006700750072006100740069006f006e0020004700550049>
-/Parent 189 0 R
+<< /Title <feff004d00690064006900200045006e00610062006c00650064>
+/Parent 169 0 R
 /Count 0
 /Prev 192 0 R
-/Dest [64 0 R /XYZ 0 533.81 null]
+/Dest [54 0 R /XYZ 0 130.53 null]
 >>
 endobj
 194 0 obj
-<< /Title <feff0044006900730063006c00610069006d00650072>
-/Parent 158 0 R
-/Count 0
-/Next 195 0 R
-/Prev 189 0 R
-/Dest [64 0 R /XYZ 0 465.95 null]
+<< /Title <feff0043006f006e00660069006700200074006f006f006c0073>
+/Parent 163 0 R
+/Count 4
+/First 195 0 R
+/Last 198 0 R
+/Next 199 0 R
+/Prev 169 0 R
+/Dest [64 0 R /XYZ 0 841.89 null]
 >>
 endobj
 195 0 obj
-<< /Title <feff004c006900630065006e00730065>
-/Parent 158 0 R
-/Count 2
-/First 196 0 R
-/Last 197 0 R
-/Prev 194 0 R
-/Dest [64 0 R /XYZ 0 297.97 null]
+<< /Title <feff0043006f006e00660069006700750072006100740069006f006e002000770065006200200070006100670065>
+/Parent 194 0 R
+/Count 0
+/Next 196 0 R
+/Dest [64 0 R /XYZ 0 765.17 null]
 >>
 endobj
 196 0 obj
-<< /Title <feff0053006f0066007400770061007200650020004c006900630065006e007300650020007e00200047004e005500760032>
-/Parent 195 0 R
+<< /Title <feff0043004c004900200043006f006e00660069006700750072006100740069006f006e00200074006f006f006c00200028006c0069006e007500780029>
+/Parent 194 0 R
 /Count 0
 /Next 197 0 R
-/Dest [64 0 R /XYZ 0 252.45 null]
+/Prev 195 0 R
+/Dest [64 0 R /XYZ 0 697.31 null]
 >>
 endobj
 197 0 obj
-<< /Title <feff004800610072006400770061007200650020004c006900630065006e007300650020007e00200043007200650061007400690076006500200043006f006d006d006f006e0073>
-/Parent 195 0 R
+<< /Title <feff0043004c004900200043006f006e00660069006700750072006100740069006f006e00200074006f006f006c0020002800570069006e0064006f007700730029>
+/Parent 194 0 R
 /Count 0
+/Next 198 0 R
 /Prev 196 0 R
-/Dest [64 0 R /XYZ 0 121.47 null]
+/Dest [64 0 R /XYZ 0 629.45 null]
 >>
 endobj
 198 0 obj
+<< /Title <feff004d0075006c007400690070006c006100740066006f0072006d00200043006f006e00660069006700750072006100740069006f006e0020004700550049>
+/Parent 194 0 R
+/Count 0
+/Prev 197 0 R
+/Dest [64 0 R /XYZ 0 530.03 null]
+>>
+endobj
+199 0 obj
+<< /Title <feff0044006900730063006c00610069006d00650072>
+/Parent 163 0 R
+/Count 0
+/Next 200 0 R
+/Prev 194 0 R
+/Dest [64 0 R /XYZ 0 462.17 null]
+>>
+endobj
+200 0 obj
+<< /Title <feff004c006900630065006e00730065>
+/Parent 163 0 R
+/Count 2
+/First 201 0 R
+/Last 202 0 R
+/Prev 199 0 R
+/Dest [64 0 R /XYZ 0 294.19 null]
+>>
+endobj
+201 0 obj
+<< /Title <feff0053006f0066007400770061007200650020004c006900630065006e007300650020007e00200047004e005500760032>
+/Parent 200 0 R
+/Count 0
+/Next 202 0 R
+/Dest [64 0 R /XYZ 0 248.67 null]
+>>
+endobj
+202 0 obj
+<< /Title <feff004800610072006400770061007200650020004c006900630065006e007300650020007e00200043007200650061007400690076006500200043006f006d006d006f006e0073>
+/Parent 200 0 R
+/Count 0
+/Prev 201 0 R
+/Dest [64 0 R /XYZ 0 117.69 null]
+>>
+endobj
+203 0 obj
 << /Nums [0 << /P (1)
 >> 1 << /P (2)
 >> 2 << /P (3)
@@ -9871,15 +9955,15 @@ endobj
 >>]
 >>
 endobj
-199 0 obj
+204 0 obj
 [7 0 R /XYZ 0 841.89 null]
 endobj
-200 0 obj
+205 0 obj
 << /Limits [(_default_configuration) (_led_idle_breathe_enabled)]
-/Names [(_default_configuration) 31 0 R (_disclaimer) 70 0 R (_firmware_configuration) 27 0 R (_firmware_naming) 21 0 R (_firmware_types) 17 0 R (_fmopl_enabled) 57 0 R (_fmopl_sid_number) 58 0 R (_hardware_license_creative_commons) 74 0 R (_how_to_flash_your_pico) 23 0 R (_led_enabled) 47 0 R (_led_idle_breathe_enabled) 48 0 R]
+/Names [(_default_configuration) 31 0 R (_disclaimer) 75 0 R (_firmware_configuration) 27 0 R (_firmware_naming) 21 0 R (_firmware_types) 17 0 R (_fmopl_enabled) 57 0 R (_fmopl_sid_number) 58 0 R (_hardware_license_creative_commons) 79 0 R (_how_to_flash_your_pico) 23 0 R (_led_enabled) 47 0 R (_led_idle_breathe_enabled) 48 0 R]
 >>
 endobj
-201 0 obj
+206 0 obj
 << /Type /XObject
 /Subtype /Form
 /BBox [0 0 595.28 841.89]
@@ -9907,7 +9991,7 @@ Q
 
 endstream
 endobj
-202 0 obj
+207 0 obj
 << /Type /XObject
 /Subtype /Form
 /BBox [0 0 595.28 841.89]
@@ -9935,7 +10019,7 @@ Q
 
 endstream
 endobj
-203 0 obj
+208 0 obj
 << /Length1 13884
 /Length 8813
 /Filter [/FlateDecode]
@@ -9962,10 +10046,10 @@ osÏGøÉaï}ı9Ş©Íºj‹:Ãèu†z¬•Ó§eÙµn{aµ>±v¤É¨0Ù3õÅ6KFV]ÏvW÷­]9º'ãjÙ!¡m´®È–Ÿ•^İ
 #v~ù°‹*¨	Z'@~ÀZ`¶Ã¼¥¡vàK£îå^!óÃÓ²vÂİœíĞ;§?7Æì*'¡¯m€ç×¾4ˆÉ"/Èú(à¸n$^–ñ×[û9Z¨ìH4ØdËJVõçôöÂN/ôñs:L£í@›ä¤İØß¬ı×s:9?±cµêÌ}psºŒq2Âq®ågi4Yô$ûÖHÇ%[¹…§ê»İÌ}­Àµb™t^à~àµÅ%OtãŞÁëF_‘ÚèÂú½—³†õr#ÇæbÅz6RXOû—ã€ç0à\±vÎ ìã¢ÈZ3Æñö€g×Ã³ƒubäõk$äåF9PÀyõÿF3÷s6Z…ãúÅdz¹»fE÷€Ù,¬ãtíáôØP/j­ûàÉâu0_ºáŞxrq};€BÃœì ª“ëÑÂÁ±¶Fnæµ£x¶AËÃÊöƒV1ïLsØ-à™i.BœÓœA ²^Ê*vÆøÿ.¿Òà£É51	q}†¹ùÇr²±ôró`†›±XLq9_.E$÷Ÿ/ÿ g;VÚÙ<İÉõX]»€6Ãé0×)6[ÃCT¯Ÿ!Ğ˜ìWÇ¬œnx²6B;ëùõÜˆû,€´}Š¸½û„$$A©ˆı¼ld@FdB9p>]ç<«®vTµ¨•Nˆ#TšfˆA+Äv=Ä¶u¢.È‡È˜~È7Ä}ÚŒÁŠ¥ÿŠ!ù ?Àâ&
 endstream
 endobj
-204 0 obj
+209 0 obj
 << /Type /FontDescriptor
 /FontName /c71f81+NotoSerif-Bold
-/FontFile2 203 0 R
+/FontFile2 208 0 R
 /FontBBox [-555 -250 1306 1058]
 /Flags 6
 /StemV 0
@@ -9976,7 +10060,7 @@ endobj
 /XHeight 1098
 >>
 endobj
-205 0 obj
+210 0 obj
 << /Length 1278
 /Filter [/FlateDecode]
 >>
@@ -9985,10 +10069,10 @@ xœe×ËnÛF†á½®BËtHs&Ã@‘n¼èu{stÔ’ +ß}ù½¤ikÀÆ/‰œy¾_Ã!}øôôÓÓùtß~»]ês¿ïÇéÜnıí
 ¿âíJ¼âíJ¼âíŠ¹âíâ¬x»¯x»¯x‡+Ş!ÃŠw¹âB®x‡b®x‡+ŞïrÅ;àà2äÍkçÎœñJ¼Y³e¼Y†Œ7+|œÆx‹oSŠŒ7+[Æ›eÈ›×šyŞ¢oVûòæµ–-ã­Œ‹·é€"¯åşR¦W*–Ó4Xq”êC™^Jú[(£à®^ƒ1ÂÂ»¢y]•¡Èk¹}¼YM-xe#e®ÊÙ_y+ë¡hÜŠ7k¶:û«/ âåæZå5«dUıµl¼uz5n¥¿[ç¾ÛeBø÷&Si|y»(ô%q&%+S%ñ*Aª¾ÛÊBijPUÃ6\¥h,(¶+L¥ºİ,¥‚4G©5Ş<¥ô…ÂcD›[Ë§©ñ¡*t›[jj¼aijü¼IµÙxÊªw¹g¶FÉ›wØ¶¥§Rô>¶Şís¡hâ>½:­O¯VRÇËí¾³P*#àÙi|e0¼Uıí,ì*o§¿Uáûì/ãÎş*[§¿Uê,”¦Nö¹°•m€lšx°:š&\}M³¹»)üÒğL2„´\%CHËF7æÕ§‰ÇÊ»BLÉ…’)æjæ€Æ»J1:%¦Hß¯:=Së©ÿÛ³zır»méükÀó¹ÌOçşí¿‡ëåª³ôû7±Ùğ
 endstream
 endobj
-206 0 obj
+211 0 obj
 [259 381 600 600 600 600 600 600 399 399 600 600 600 310 600 288 600 559 559 600 600 600 600 600 600 600 600 600 600 600 600 600 600 752 671 667 767 652 621 769 818 400 600 600 653 952 788 787 638 600 707 585 652 747 600 1066 600 600 600 600 600 600 600 600 600 599 648 526 648 570 407 560 666 352 600 636 352 985 666 612 645 600 522 487 404 666 605 855 645 579 600 600 600 600 559 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600]
 endobj
-207 0 obj
+212 0 obj
 << /Length1 16972
 /Length 10713
 /Filter [/FlateDecode]
@@ -10050,10 +10134,10 @@ JãÿÈÿkÛï?&±æè•‡fŸ++›{~fæ9oi©÷92Ÿüú<ÌK¾ mNLÖò™x8™¥àÛn‰Q/mJNğÕ´Fö×æ­ Ã#
 b_TZj€¹š`÷· gm¨l¦,¥l½9Á:zÑÔk=„1z%dnj<7·2—ÏÜDˆZ^FôÿØµ
 endstream
 endobj
-208 0 obj
+213 0 obj
 << /Type /FontDescriptor
 /FontName /539577+NotoSerif
-/FontFile2 207 0 R
+/FontFile2 212 0 R
 /FontBBox [-518 -250 1246 1047]
 /Flags 6
 /StemV 0
@@ -10064,7 +10148,7 @@ endobj
 /XHeight 1098
 >>
 endobj
-209 0 obj
+214 0 obj
 << /Length 1278
 /Filter [/FlateDecode]
 >>
@@ -10073,40 +10157,47 @@ xœe×ËnÛF†á½®BËtHs&Ã@‘n¼èu{stÔ’ +ß}ù½¤ikÀÆ/‰œy¾_Ã!}øôôÓÓùtß~»]ês¿ïÇéÜnıí
 ¿âíJ¼âíJ¼âíŠ¹âíâ¬x»¯x»¯x‡+Ş!ÃŠw¹âB®x‡b®x‡+ŞïrÅ;àà2äÍkçÎœñJ¼Y³e¼Y†Œ7+|œÆx‹oSŠŒ7+[Æ›eÈ›×šyŞ¢oVûòæµ–-ã­Œ‹·é€"¯åşR¦W*–Ó4Xq”êC™^Jú[(£à®^ƒ1ÂÂ»¢y]•¡Èk¹}¼YM-xe#e®ÊÙ_y+ë¡hÜŠ7k¶:û«/ âåæZå5«dUıµl¼uz5n¥¿[ç¾ÛeBø÷&Si|y»(ô%q&%+S%ñ*Aª¾ÛÊBijPUÃ6\¥h,(¶+L¥ºİ,¥‚4G©5Ş<¥ô…ÂcD›[Ë§©ñ¡*t›[jj¼aijü¼IµÙxÊªw¹g¶FÉ›wØ¶¥§Rô>¶Şís¡hâ>½:­O¯VRÇËí¾³P*#àÙi|e0¼Uıí,ì*o§¿Uáûì/ãÎş*[§¿Uê,”¦Nö¹°•m€lšx°:š&\}M³¹»)üÒğL2„´\%CHËF7æÕ§‰ÇÊ»BLÉ…’)æjæ€Æ»J1:%¦Hß¯:=Së©ÿÛ³zır»méükÀó¹ÌOçşí¿‡ëåª³ôû7±Ùğ
 endstream
 endobj
-210 0 obj
+215 0 obj
 [259 333 500 500 500 500 742 500 346 346 500 500 250 310 250 288 559 559 559 559 559 559 559 559 559 559 286 500 500 559 500 500 500 705 653 613 727 623 589 713 792 367 500 500 623 937 763 742 604 500 655 543 612 716 674 1046 660 500 500 359 500 359 500 500 500 562 613 492 613 535 369 538 634 319 299 584 310 944 645 577 613 613 471 451 352 634 579 861 578 564 500 500 500 500 559 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 361 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 259 500 500 500 500 500 500 500 500 500 500 250 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500]
 endobj
-211 0 obj
-<< /Length1 7512
-/Length 5169
+216 0 obj
+<< /Length1 7384
+/Length 5061
 /Filter [/FlateDecode]
 >>
 stream
-xœ½Y{X[Ç•ŸBâaƒñ6®$„x
- Ş %À`’ ƒğ«~¦‰cã¸q×Ÿëm›4ë&qê&JìÍ:i“MÜ¤é—M³n›:şÜ´›tİ|Ù$u³m“ºI¹ì™¹Ç}}ûß‚çŞyœsæw3#ŒJBmîé-5YşíÈ/ÂA˜íûf¾¿îÚ"ßƒ¹Ô±í¬íEHI×Çg&ÂÉJAHqh¾¹™¥%„Ö8a=nbr×xqÛËı@2’>¿òËß¹ kB+Â„2‚çÁ8/ìÜ}gÊ>¿ ã?ONùvwî;üûvÎàMhÖ[aÌMùÂï6"”~'ĞÍLÏEb?VC(;
-ëÎÌf¢¿+ÒÂZŒKÕ§p[rI®ù%(Şƒôê.³’¾®,ØŒ’—Vã_+J)~Dô|1fñ4€A”ŒÍ$İşSÇfêĞ b’€CKGŸbü|ÅÂÒµ&ºGzã·‘“¸x’OHüû+É¨«ˆãP=âĞnÅĞRÄ˜q=wkO"E­Ú^h!¹=­Z44'´h…Ğ¨&™Ç$Óhå±U¦ëƒ6­X^×ıĞrdşByÎ!7«L›,Ë5É²:ä·Un2]‡ŒuÛ²\“¼6uÛÚ2V­ŒÉÉ<#8ºÊ¿¶Üßş`æˆWjåX¥*.~EBâÊ¤äµLªÑ¦¥gd®Z²²×ä¬å.—ÏCùziµ ®[_d(.)Ñd.³”#kEeUuªµıß›ÿ¿üD‘!Š4ÑõNO´}»7ŠøºÌ¨²ÈSëes{½ÜQ¬)É,bw-šXT%†—§™÷êŠ£
-C(“‹Ö;=ºh½·8c ¬:^·Ûó‹¬y³€Î³˜õo¯‹Æy¢í^¶àõ‚¼XÃÊ¡â¨Òğd.>»s‡‡†²¢Ä¨Oæ±©ú[Sq†T5WYZ7p{é&/.ªÈoã¹hŒ¾=Šœ…À‚£Š,Î›µÀF.iD7\!¡KÉJÑÄ÷¦N¢+ªŠ†<×Â;|[8ç•DPº•tgØš[àZ>~[àÙv<­JĞNDët <Il§Ú+™:]weÌ Lm€¦OÆ¦cdÉ»"oÎsŞ,]{= P¿Àsm¼2H,ôUM¡nHÜjª í¤ş•ôÅû¶l¾]Êª1€wS³µûùU”szj²^€­á<ªÇõv;î¸˜‚Æ{Râ>}º<ü( çíYğÂ¼,_ïò<5¦qÌşæ0¼¢ÜXtU {y¯4CfÁ.ğ(†8»ˆ—îŠâc¨#çô<‰ñ—¼O:¨7¢)hZtx×€Õ†<Ş¨¶¡¥O óâÈ5¤#»€]¿.DûĞ=èz½…nàD\‡ğøYü’I:É89M'×É§Š$…IÑ®Ø¬Ø­XP<¦¸¤øUÌŠ˜ª˜-1{bNÇ<s5æzljlEìPì±Å¾û©rµRP¶*”‡”)_P^WŞTªÚUãªİªÓª¨ê‡PtPÖ“ÓpV©2«uê³š×áø÷^y…œ^×M&êXú6>§A6Ê…ìGXƒÓ´ª4Ş¢/°¤g¨K°¥¬Ül1CÍHÓ(Ó´k±¢ÜRV€;*„‹­%“±Bñ¶ó÷ŒoŠ'_?[ÓW÷]…KÜj§.	k×8mıÃşPœº]«UlÈQˆç•;Gx(U{—"ø¨‚ x8*S¬æ$œ’Áï½Ô9866ØYHôú~+~úÛ>DËZhwH´(EÅÛpŠ¾ÀŒwÈÄ¤{ñPc%P-Vâ£¸Ó‹.-„s±²±19ÏÀ£¤kT­gî8y’Í—.]Å/÷`>ó¿$^hÃ]äÚŸEØfk–>ÁÉu”Œ2ĞZ(£¦¢M"¹%¤Ì†5éf5ŠJ£çsÁF¯nn2efšš¤WÆêÆŠ
-å•—W×UTëyîû¯ŞïÎ“^‹×Fœë±~†ûúœkc8\ğèà5ğ™Êb5«Ñùö.r7t‡õ@ç>XR²¦™Ót–TKŸ«²”›MiZå#‹â¹?7÷;¾5ÛD C4?ŞSÕnz~ì*¿ô8¼pÑ˜Ò©«áÁç‚·s°Ùd)ÓaÓFO%ÚğûnßÎ;Ş,ª,^_UxØ9¨Õöu—›š76rİÛyŒWd=ğV‚¦-=ùÎf{c«¥b}[Z=‚
-a³×@`1”ŸÆCDñÄ šW¤á×úÜŸı~ÈMúûOØñ‹xR<Iï€ïqà[øÌ’B|.„"ÃÖUñ]ÿÉ¯xĞ7ÙRßRm¯Ù¼:WÛ±ÿ?óîÃ9mù]¾3šUxp8d¿e ™ Š©*9‰Ö[¨e…ÁwéxMm¹ÉÚÚG,{‡ÇúÍƒEV¡¤Ìb1’ëÚ–UÓÌ#Û=÷ïµ/ºáÑÎ®ÓjÛxœì£Ø¢ƒÈ#
->o?ÀÃ\^r¼!^ã)÷L€í`[Ø äà\Ø>Ã§WP\åVK?†T•FSYÀ-	ºhi²²¤¬ÒZ=â·W¶ÑÇGkÕöğ µv—­’<®ÚÔU]V¹èmÏ$«kÓğ†Š‘’l·76Ş£îv¢X‹ïÇ™rÊ-nå%™Mtó$¬`baòfmy™¥ÅN­äî¦©»À4h°
-‚i‹q…¶uµÿ¨iûWÜwğ›ßm%çºÆ½‡Ül-½²<K ó
-s.5kø?‘g’^Üü<ä€x²ş
-¹¶¨—kÔ'øÀ¦BjZ×¬ÁíqŠ!‚ÔR´PC= ÓßûMK‘³­¡¦(¾ãìèpş¨¶¼ª«1áô?ÕÛšËkÄê·´äÚµî$’°EªVØ‡æ½ÕB¤ñb6YÓ$#€ø|Æ•º¢gàl¹¹¬nçŞƒ‘ºJw"æ¾Sâ‹k[Wıë«ÿEKu¤9öc“@%Q´Ì§§Ršş­®¡cİÆa×ì?ìhltÙ×˜PvlßÃw%ˆo¿ñ
-îaÀÕ? ö¢Ö‚\çÕïj]ÚÙ?üD|·“SÔ‹?³“kv ‘i!ş4h'ÀqŞë?ü‹÷ÑõTÏbÀ÷àKƒÌTó³P©StRr¨Ae¼õ«´÷„–ªlÖ³èÛ1_/Nòø k[3Å7Å™½jàqQÆ¦6«YrÃï=Wİî«NrM|õØ'€†ÒÀã´D¿¼[ë¨Bø´øÂü<®ŸŸ·“~»}ñ±å\ú1Ğ&Ò: 1+ T¨lóäõMÿy}ÓO‰Ûãvñ!ñNO%F~à¡µ#–á;]Aí F9ğ€¨¢	ƒ8úKeÓèÃs¤§¿hœ…SmdÃp¡›œËğk‹“ †_¢ˆ‘C–Ï"—‚Ñ0¥¿X.§“‹—a·ËğÖ³X/;¿Æâ6™é)Ê\}Jª©<EŸ«L¹ç-¿ÿ-ÿ½‡êêÕ‘ëˆ›y?¸øÙİxèî»Å3ŒŸÚ€Æ}"d%’c‡gÑ£bá¤¦9Š_	GÖº;œó“®æö¢ìì¢&,îß+ş†\ÖNíìïN/%8©<Óÿ:ÒÀiOåAí_‹ù‚\„%¹X®²*|©®¢tM]uj¹Y ÙïˆW…¡ö{‹²IFİÈ*’ç¿rµÁ¶½¬µuMòg¹Ö®¥µŒVŠZ6äòP İ&hœá$kÁ8íşÑ`sÛPÄT;¼!0ÜÓé ÕZLötãÖşç‹]µ{¬­Ùë·vöä8,?áñœt6.Ïå¯âC_%§ j‚éœ¾†Rà‹²ü£egíà¡—†Üe•fçŠ?Ñ/Şèi¨w’ÔÅk~‰—ÆÅ¯¥ø°J!‰Â¬¹ßî¬#Æî-6âpv¸KÄW@¾á-ŠœşÊo‚Ç%à_y[ÌBˆ)ÌŸ‘pÿ‰“Caöœ<1€/â\ñëâlÿïÀcloÜo.-£÷ĞÌ„ßSQ!×’³$ê&Do¾T‰ªårba§˜Š—«²Ÿm~¬Ë«ìv¹ºƒ-.İÆÎÚ²Ò<mÎÆî«ÖésÚ#ÕµÆòd)¾X¸ñ•~+¾ÌiR|İ
-¯çÆ'†[\¥%¾Q×¶Šü¼Òš:s|_¹ö‘öà±×uâ—“}Ë÷ŠÓ€ó¶ÚÉ0IÅ3…ÖÎÓÎdmsWwS¥¥¢zrş¦2ìİ®˜˜³Vİu'%SLV¦ï¨a )ßdUƒ(TÀâF*UzSš—_±­î¾Q_I©«ex|¢,Oé^Ÿö]>vPûÑ¢>g?Z–u0¥¢Lğ(½ß08ê2éôWå›)Î£1Íu5íö7ışA/ş3ÅH…õÆ¨Pá¤c÷Sim´~¾³óAc1/‡2Ÿ›„×`ZšyuÇN[w‰!_Ïg%œ8áÂOÛ#+W¦”Ûmb;~zù¬]u$N³,êmSy-^†•¡Ö*Z³¤·ropG±ğıĞToë·¾@Ÿoo|·~Â“‡ÿ]»µbşî{ñŸ^\‹Tƒhßy°]*½Çójv£QÑ:Å|ŠÏw¯«È®Nq¹*í=Ø-Ãõ«35¢—Üø4gp…€¯™Ü„ú/Ià-V¸#ãf÷áHÄ-ŞÄ¯ÚvîÜÉör²ûİ¸» ¬Òğ´«­øµwßùw—ë5÷©ø»7È±öŒ¾A¾Aîæ3[YÌxíÂ/~i³‘¯Ù¤ü“ês*µŠN-U8şÖ›‡ùM§eë´İôá¬ì®X³®¼İŒd©Åºå×oùU«,]âŒ\—XİN¥ym–êgÚ²àS®ÖMÛ\Ns½1¿_ØæOá`ui–ä'é~–ú7õ»ê·ö+¯½:¶°§¼|O9Iİ/şjÿ~œ#şóÀ{ï±ÜÊƒÜJ…Ü‚S6CŞ•¥˜u9·¾îêü#Bñë_`ı¹œsàK÷î×~úz¢xl-Ã>ÅîúÂi’!ğ™][]_"©kÅnü¶IÒÑÉîo©Rí•Jïí7ç¿¨½ñ…–‰Ö±AwK½Öº¾z°}ĞÛÕÖßèæôÉÙ­÷tä4ò…Eõê–ª¦VmCÆ­ï†§¨6ê¿Û’›úÒbşãSOå¥E%ån»ßïÂ°‰oWéW6®hèÃëmÏKñÉdÄ±:+eòr}¶âàˆ­İNC­À“81½°u”ë6Cú­ºGm`•Š2TÔ9×IÿÉ~œÍ7a‰É—î–q¯~oël B«c¼´:®B?>ÃÎ÷›øqÑI÷¢<¸sÄ¡8£”Ùª0cDv÷}ÔÛıÄ†)|z1û],¢[ñhé]@—¦`ŸaïÄî›7Ås7“MÜNl6¼ ı5ëoı©4-ÿÙ#%Œ¤>ı
-å¾fKå~Ğlû±(	m”ûJ¸ä~|/í‘û+ÑOàûVê§ %Ê}5Rá)Œcè7t—û%âgä>AIøe¹¯ šŸÊı”H2ä~,Ê&¼ÜO@e¤Nî¯{ÌÉı”³L¯FI1½°=c”û”æ¹OişØ8=³k64Œ­ãL‚±’ë*â=İî^ÎéêiontÃØr&æ'}³é©ˆczv"À™J®Š“¡c2—S~i¦?0;šâŒ%B¹Ùç3Áñc,
-ÏLÎÏÁbñ¬$,‰ÌT•–²éâq<W2=çŸ*Ù2ã†æ8:ÃÑ÷l ÀÍMGvøf%\ßÔd(ŠüÜL`6šcû ÙÄ¬oŠÎF¦¹ù¹€ÍœoÊÏùCs‘ÙĞè|$À…"nG(ä¦gÙ{z>Â…§ı¡ñĞ˜/‚\ f³ÀfÇB¾ÉÉ]”xjzêö©ÎİÚÖËÅµ1Sõ·557q¹½0Îå6¶¹[{úÜÜÆ—«¡Ûí-‘Ì"+Ñ4šA»Ğ,”ÿ	DÂ1´qv2¢Jèu¡"x:PêFnÔ}'rÁ¨5¿[^7¢0”+åšG“È2 }
-dÒ÷,Ì˜ÜÌ¡ª[’%NiÆ„Ìğ1\myÿÛiúAÂ,š¬ÓŒÃÈd•a€.U:¥@=æ¶Ë(æ€z~• -@á®Ìp·h¸[ãYØ‹âƒ•qXÙÁ4
- 'ŸeS =»„`% 9F±…ÿç%i°âcò%Ú¬r]  7&{ö)¥ñ3ŞóÌ(ĞFº¥ÚÁzAèQË~>f”à˜fÆ¡ÌˆŒˆòdÚ ã¤{‡á—Æ`ÅšM–eÉSŒïQQk¸Q+jcq±#œ<–â¤FM+M0“W^y=Ş¡Gù{À¦n6n <©/È¿İÿ³·G—Ğ+L	?Î
-¿~(LCï}áÏKqßŸ7
-[–â…ç`æ‡ÂÃÂ£ÂCÂ„àˆ`‡„£Jo¼05¿M'lıÊCÂ½0; `aŸ0Òç…·ß)lq­›/»0&Œw˜ÉÜ*¸Ù<>¢:¼(àÇîëV€Ü£€#(t}ÈğBo
-ãÛt=¿X¨•>a¤4	#Âf™‚ücĞòÿÉ-}™şî€Ô±óAµ7j¨n{8ùÒàVš÷ÜUpdÁ÷]ÊGzúÿ9Êëa3²”%M0¤ŒU@ªT#;sµ0'¶Ã-²Lß®Û nè·ôƒS<àŠ4„6ÑSki	‘ÿ]’¬
+xœ½Y\[U–¿÷&$´P $Z¾ğøÕà‘
+~CM ¡’– Bè§µ­£¶¥VëXûÑîŒ:nÇNw;µëÖYuµëè¬[İ:£µŸº:[ı¸êtº3ÎLıÁcÏ½ïQ»ÎÌgÿ[è½÷Ü{Ï9÷{Ï=çÜû(Â¡$´)ĞÆîR“åŸ÷¿‡ÁhßhÄ?ıôÊ½„9c©£[¢Y×ƒ* ó‰cÓã‘äS¥ÇRœà¸vzq4¡¬s0?>±}lì­£à¿‚P².ôTßûÉ^˜ûŠ5ª(& ;ú¹¡HtÛ¶C)fè¿ ı«S£ş-WfãA~ú·DüÛ¦ñ ‚ùès“şHğğ3§l¥)§hzj6ªZ¥Úë0ÿàôLp:ö»"Ì•C¿Ñ½âîømWbÃÉÕ@	Ša½ºİ¬¢í¯TQòâ*ü¡‚PüˆÖôä”fñÔ?‡^2şiºşÇÎFì¨1M ‰¡¤¡o1şBq05O…şR‹ßGe˜Ä/#	qËQÂ¿oiFE‡ê‡nV.FQ¿ÒŒë¸k³x(*(;¡„åò”R(ÕPÜP\Pê¡B¡»pBi‡b’ytrß&óõB†R,Ï÷Ëó(Ù²|¡<æ”‹MæM–õšd]írk“K»Ì×.c]Â¶¤×$ÏM^7·„U'cr±S‘Œ›¤êÛVûóŸ¥“ àŸH§RÇ/[¸")9EĞ¤juú´ôŒ•hUfÖÙ«gÈáQn4›
+
+×¬-2—”"¡Ìd.· «­¢r]ª®ù¿ÿù‰!ciÛck]ŞXÛ_ñµ1U‘·ÆÇÆvú¸7cX[’QÃFîb,±¨8FŒínoï3ÇÆp«sy±:_qLi¤¢Şp³÷İÌ×|™Àç]Èü/“7ÄâŠ¼1ç›ğù@_œqÅ`qLe|"ïƒÕ¹}ƒƒ™1jÔÆ'rÙPİµ¡xcª†«,--3r;é"/.¦Èkå¹˜2¿-†\Şùà¼Ÿ£DE¦ÁàËœg=·Ô£.—Ğ¥d¦@c‚‘ûÛN¢‘+©‹½×Ì;ı›8/‘TP¾teXš›çšç~~›çÙr<U«NØˆÕid’ØJ5ç3†Lîü<˜„ZM¯ŒÍÀØ’<w^^œç¼í=™†öyçaC­ü<ÏÍ·Îó~* ‰Ğ¦8–B!pkè(‘ú­ÌÓ†÷oÚxıN¨¨Ö›˜ßKÍÖàçÕ1Îå­Î|ftÆ§P®s8pûé4ŠXM™{½´v{ù@Ï;2¡Á¼,_çö>	ù¥aÔñ$æ041n4¶2˜µ´–ŞƒQ°TÅàg§ñâí1|µÇâ]Ş'0¾Ë÷„“F,Mçb·ï°Ú ×Ó!´øGˆºxrÈv×ÁïZÈh]-7¡Ám_Çgc'Şã‹$‰’A²›<J%çÈçŠDE¢ZÑ¡˜PÜ¦8¦8«øZiTÚ•ƒÊÊ£ÊG•o*¿ŒËkŒ›ˆ;÷lÜ;q¿S-We©ZTÕ­ªGU?U}¢NTª«Õƒêõ<¢™Ù ¹`-9
+÷”!³Æ )0kx^öñ+¯£câ¥Á„ÑÎÅ(> 7Á2¸ªRlæ$œ’–Îï<Ó10::ĞQHòOõşVüò·½Œ7¼[%^”¢æí8%¿ÀŒ·ÊÌ¤ká"pcp/Vá¸•Ş“Z‹AÆ9XÕĞ ­ùTUè3[Ìúgn=r„—.^À/a|æ1~I<ÕŠ;ÉÅ¯EzU)Põâñir	%£t´¡TS6Ñ%‘œRnÇÚ4³Éj)/Pkóù•^÷êÆFSF†©QjÒW5TT¨ÎÿlUmE¹”ë¹÷Â½\©Y¸8²ÿd·í+ÜÛ»ÿd+Ãá†ªp€åÀnj‹Í¬A‹äïw“½8Ø^ÈÈÍø`IEÈ¦7ë–TK9Ÿ£¶XÍ&½Nu|A<ùÅPSŸ«ÿG3¼TûÆum¦çG? úëa'@ŞZSš^§ÖCÅçäX²±Ùd)Ï/Â¶›|ªÑ?ñø·İúvQeñÚu…û\:]o—ÕÔ´^°“K¾ƒ¼"ó¡w´­iÉu49Z,k[õIÔ
+a±³°å`1”§çõ¼…·hÁ4¼BÏöz¾úı ‡<ùßÇwàÿÓñ„x„Şéı€ï1[øÌÒ†øœ‹da°®š×ôüã$¯âaÿDs]s•£zãª]ûr\öŸø±ì¾ÉnÍëôÓ®Ä;€Ã)Ÿ[:â‘)]OHM5§1Õùz€ò†áìÒğ5V“­¥>Xê7ôö™ŠlBI¹ÅRF.éšWçMÓ»÷o9øÜƒÏ¶-x\‘‘ÎS^jÛv¨N vğQl1€çŸŠ7ŠŸâ¡İno9§!^áaê‹
+dlg ÛrÀas`ùt;(
+ŠËj³”@ÇÊªõÙšæhI@¢Å‰Ê’òJ[ÕpÀQ%ØG©)«rDl5Ûí•ä‘Èºõ	IUå•±‘Æ±’´¹oZ_1œNÒC-#c††½Ùš.çˆÅl5³;µSBé²Åm¼d!³‰.„ÌBÌMŞ®±–[šÔJ¾g»
+LF› ˜6•-×µ¬
+0m¹í÷ìùá?µ“cÁÇÂ¶¾ÈXœ%À	ó
+s:GjÖò_õÇ’^<§§¼d·x¤î<¹ŞNíÔØ^lj¤¡¹ÅÆ\ï§<¸@#y5ÔC†ü»h)rµÖWeáÂ\íí®×j¬ë:şM½ÉZ V½£#/ëNÕx’HÂ&)7Ø`WôUÉ[˜?¤˜M6½dPŸ¹S—w÷Ÿ°šËk·íÜ­­$ñ‡•÷Ü/¾¸ºeå?¾zútt4ÆŞ =	TEËÎ”áTÉ@ÓîÓêÛ×l2èpõ®}Î†çş[ÊŞòèí	âûoş„‚{0AöÃ½¨µ ÖyÄ»Æ ?ñÙgŸÆmäşOëÄ·ä¢x‡e^ğ?-Ä	H<åÁuŸıGÄ{éÓ:ºÏbÀ÷àÓCdjx‹Y¨4))84°e¼ùOÛú® ÅuözÛ‰‡òÛ0_'NğxèZ2Ä·Å™½ª¡:-cÓ˜5,¸á÷ÎÏ¹(¾‰ùØ‡‡ò÷CuTâ_§Kè†ğQñ…¹9\77ç }ÇÂß-ÅÒÀ›Hó€Ö¬ W¡ºÍ‘×oüK7ş’x<ønoÃ!ñ~àÄ¾™XîˆcxÀN§ÁFàE!€Q6TàU4#aPG©nê}x–t÷µ­«p²•¬*ôÃb9>»0Û°ã3Ô1rÊú™çR0Z¶éï–3Äå"ÂÂ9Xí´ùÌ×ÁÎg™ß&Ó#-E•“Ÿ’j²¦äç¨Rî|'x'p÷µµwÔ’KÇÅÇã‡¾Ú‹÷î1yjê÷‰•Höyš¹“†Æ(~%]]èiwÍM¸›ÚŠ²²ŠÚ±¸ë¦8ñ7äœnr[_W‚x&ÁEõ9Ùş/!-Êbú ÷¯Æ|A	.Â’^,gY5>S[QzCm_UªÕ,€îÄÂ`ÛİEY$½vx%Éœ¿P_¶=§lï< ÅÏR®]MsÍé4mÈé" €¥33õ3œd«5–My^hjŒšj†Ö‡º;œä‘‹É‘V¶¹ïùbwÍ[KÖÚÍ½ÃÙ.#‹O¨“îÆ%ç9÷ ¾ãr?xMHÂ İÓ|s(!já|tìî |iĞS^Qiv-ïü…Ëİõu.’ºp1 ÉR¿øPò›ä’“(ÌÚ{®ZRÖÕ¾ÉNœ®vOÉÃøüÂËäApoQ$pè/SyTg@~Åu>.¦0E"}‡FHÄ{äp?>sÄˆûq™øïx+ek›à}sfñ$}¤ÃÎLøĞr.9AR!o‚÷æI™¨JN'v‹©y9+Ûğ‰æ¡Ğ¹•]nwW¨ÙmØĞQS^š«ËŞĞujeıCCv[´¾ª¦Ìš,ùË—Á¿Ò®ù—Y/ù×5÷znl|¨Ù]ZâqßT‘—[Z]‹•‡nÉ&¯èö|İ ~/Ù¿ô®8
+8¯Ë“”<Shî<êJÖ5uv5VZ*ª&æ>h,Ç¾-ŠññP(«~åíûqR2Ådcû½94å™lPš
+˜ßH©*+Ksó*nª½gÄ_Rên/OÆ“†×§üçîÑ]YÈÏŞ…–t=˜RQœ(}ß08šréöWç™)ÎÊ¦Úêö6ÇÛÀ€ˆ¿zK1\a»<âT8éàÕ:ûñ¶oîwv?h-æ%Wæs’ğ˜¦f^Ó¾ÍŞUbÌËç3vã§íÎáöå+R¬B»Ø†Ÿ^ºkWAI…Û,“¶ÉZƒ—`¥kt*…Î,í[µ3´µXø—ğdOË¾CŸçhø¨nÜ›—ÿí7ëÄ¼›ïÆ_¼¸÷«Ğ¾§Àvğ.¤Í^4jš§Ø™â§ºÖTdU¥¸İ•îìOâºUZÑG.™= ¸Â ×D®Bş\&ià-6x#ã&Ï¾hˆÄ/\Å¯Ú·mÛÆÖr±÷İex» ¬Öò4‘kløìGÿ›Û}–Ä)şîòerY¬y—ñ×Ëo#ˆİ<f+‹¯oş=»|ß.ÅŸ”ŸS©U)Ãñ×Zjvn¼OŸeĞuÑÊUÙUqÃk›*ÈÔˆµKÍoù•+-â´œ—XŞN¥qm–ò§~Iñıî–or»Ìue9ø“ÂV¿x?U•fJç$½ÏRÿ,—CşÖİ÷êèè«£ó;¬ÖV’ºKüõ®]8[üÛşûû?f±•±•
+±·lº¼*1ÛRlıÀİŞ
+†…â×¿Ãúr.{÷]wïÒ}ùz¢xp5Ã>ÉŞúÂzÉøØöÍî»Hjıj±¿o’öèbï·T)÷J©÷ú—óÿÊ½ËÆ-ã-£ænGmmÕ@Û€¯³µ¿ÙÅå'gµÜÙİÀ5«š×5¶èêÓ¯}7<Iw£¥çw]pÓ³´˜ÿôä“ÙBiQ‰ÕãÜøs»øşºüËë{ñZûó’2ñ,ÏJ‘¼”ŸmxÄæ.—±FàI¼˜VØ2B¯u»1íZ^§6°II2ê¬ûHàHŸîæ«0ÅôKoËø¿”¿µvÔ¡Å9VGZ\Nwa c÷ûUü˜è†¥wQ.¼9âQ<õQ*lS˜1"7÷^ééz|ı$>ºõÑ5ÿ?¼ô-`Ğ+Øg˜ÖÂ»°çêUñäUÀd·»ÏKãÌÀù×ş@–ƒ–şX†‘
+zM`…2­€ÑR™VÏz™CIhƒL«àU”éø^Ú!Ó+Ğ/àûV¢S
+‡dZƒÔx4c%ı†nÄs2Q"~F¦	JÂ?“iğüR¦•(‘¤ËtÊ"¼L' rR+Ó+À³2‚•Kü”¤”ø5€í§Ê2™¦<ŸÊ4åùSÃÔôö™ğx(Z8º†3	e•\gçìîòôp.ww[Sƒúe‘Iwp|nÂ?ãœšŒ:§fÆƒœ©DàÖqÒ$&sqy1•—Fú‚3³á©I®¬D°šıc•Ve (2=17“Å3’²P4:½®´”æÙ’©ÙÀdÉ¦iO(<ËÑ¶3Á 7;5İêŸ	–p½“áH8pÓÁ™Hx–­lã3şI:âæfƒFnvfäü“.Î„Gæ¢A.5r[ÃÑ75ÃÚ©¹(™
+„ÇÂ£ş((2rAÎ€t$œû'&¶SæÉ©Éë‡J8OKk3×ÊLÕ×ÚØÔÈåÔ÷@?‡ÛĞêiéîõpêİîú.¯D2‹¼qÔ€¦Ğ4Úf ı£Š‚¢5ˆƒ°PªªAíDİ¨yPĞ.ä†^jy<_†"®Üà”ãhM ?èt‚öIĞIÛ2½% ™Cë®i–$¥2ÃÇp9”¥õ¯çé3h°N1‰2¦Ë
+2~†=
+{Y¡S
+ÜÓ€ax‹Ñ˜Œb¸§ @¯mH…a„»ÆÃ]ëÏÀZï,ÌŒÁÌV¶£ HrğY6	ÚÃ°Jf‚ ‘m[„ÉƒPÒ63~¦_âÂ,ÇĞ‘¨Qù(Mù(O€ÉFÙÉŒ o”¡¡ëQ®­Œ
+E-ûMŠqr€cŠiƒ2
+:£2"*”yƒL’®_Ú…?ìl°,idr‹ZÃƒZP+ó‹%áä¾ä'}Ğk_i„‘x
+ôÈó9Ğn ŠÊwƒM=¬_2n¨©è¿şüg®÷.¡G˜ŞN¿~.Lõ‰ğõbüOæÊ„M‹Ë„ç`äçÂ£Â…G„qÁ'Á!ìî+}Ë„Éñe7„Í÷="Ü£ın†{áÈ–Û„Mî5s… ãF…1áV3›ÇûÕû¼şà=C
+Ğ{ p„„àï> ğú0v“¡ûİùj˜é@K£0,l”9È_ßZú?±Åï"Ó_üO;»àe‘y3¾ætp+§ÁmVÂ=	_w¹(ş
+„ò´–2‚KY8Ñğ²@ÀØPJr°ƒq¢fv„mğ†ì ÃwÃÁ­‡CèCéƒ#ñÂAô£At£tk-."ò?àèŒ+
 endstream
 endobj
-212 0 obj
+217 0 obj
 << /Type /FontDescriptor
-/FontName /a29581+mplus1mn-regular
-/FontFile2 211 0 R
+/FontName /f96a9d+mplus1mn-regular
+/FontFile2 216 0 R
 /FontBBox [0 -270 1000 1025]
 /Flags 4
 /StemV 0
@@ -10117,7 +10208,7 @@ endobj
 /XHeight 0
 >>
 endobj
-213 0 obj
+218 0 obj
 << /Length 1278
 /Filter [/FlateDecode]
 >>
@@ -10126,10 +10217,10 @@ xœe×ËnÛF†á½®BËtHs&Ã@‘n¼èu{stÔ’ +ß}ù½¤ikÀÆ/‰œy¾_Ã!}øôôÓÓùtß~»]ês¿ïÇéÜnıí
 ¿âíJ¼âíJ¼âíŠ¹âíâ¬x»¯x»¯x‡+Ş!ÃŠw¹âB®x‡b®x‡+ŞïrÅ;àà2äÍkçÎœñJ¼Y³e¼Y†Œ7+|œÆx‹oSŠŒ7+[Æ›eÈ›×šyŞ¢oVûòæµ–-ã­Œ‹·é€"¯åşR¦W*–Ó4Xq”êC™^Jú[(£à®^ƒ1ÂÂ»¢y]•¡Èk¹}¼YM-xe#e®ÊÙ_y+ë¡hÜŠ7k¶:û«/ âåæZå5«dUıµl¼uz5n¥¿[ç¾ÛeBø÷&Si|y»(ô%q&%+S%ñ*Aª¾ÛÊBijPUÃ6\¥h,(¶+L¥ºİ,¥‚4G©5Ş<¥ô…ÂcD›[Ë§©ñ¡*t›[jj¼aijü¼IµÙxÊªw¹g¶FÉ›wØ¶¥§Rô>¶Şís¡hâ>½:­O¯VRÇËí¾³P*#àÙi|e0¼Uıí,ì*o§¿Uáûì/ãÎş*[§¿Uê,”¦Nö¹°•m€lšx°:š&\}M³¹»)üÒğL2„´\%CHËF7æÕ§‰ÇÊ»BLÉ…’)æjæ€Æ»J1:%¦Hß¯:=Së©ÿÛ³zır»méükÀó¹ÌOçşí¿‡ëåª³ôû7±Ùğ
 endstream
 endobj
-214 0 obj
-[500 364 364 364 500 364 364 364 500 500 364 364 364 500 500 500 500 500 500 500 500 500 500 500 500 500 364 364 364 364 364 364 364 500 500 500 500 500 500 500 500 500 364 500 500 500 500 500 500 364 500 500 500 500 364 500 500 364 364 364 364 364 364 500 364 500 500 500 500 500 500 500 500 500 364 500 500 500 500 500 500 364 500 500 500 500 500 500 364 500 500 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364]
+219 0 obj
+[500 364 364 364 364 364 364 364 500 500 364 364 364 500 500 500 500 500 500 500 500 500 500 500 500 500 364 364 364 364 364 364 364 500 500 500 500 500 500 500 500 500 364 500 500 500 500 500 500 364 500 500 500 500 364 500 500 364 364 364 364 364 364 500 364 500 500 500 500 500 500 500 500 500 364 500 500 500 500 500 500 364 500 500 500 500 500 500 364 500 500 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364 364]
 endobj
-215 0 obj
+220 0 obj
 << /Length1 10416
 /Length 6586
 /Filter [/FlateDecode]
@@ -10169,10 +10260,10 @@ oºó/ZÉâı)‘o¿d¸ß§Àùn˜OêªeCåÑCœ‹ ¢ƒ¯K †eÃ
 T‰@ÜÍ«÷ +D·-W“#*Dô ú'[
 endstream
 endobj
-216 0 obj
+221 0 obj
 << /Type /FontDescriptor
 /FontName /466350+NotoSerif-Italic
-/FontFile2 215 0 R
+/FontFile2 220 0 R
 /FontBBox [-421 -250 1238 1047]
 /Flags 70
 /StemV 0
@@ -10183,7 +10274,7 @@ endobj
 /XHeight 1098
 >>
 endobj
-217 0 obj
+222 0 obj
 << /Length 1278
 /Filter [/FlateDecode]
 >>
@@ -10192,10 +10283,10 @@ xœe×ËnÛF†á½®BËtHs&Ã@‘n¼èu{stÔ’ +ß}ù½¤ikÀÆ/‰œy¾_Ã!}øôôÓÓùtß~»]ês¿ïÇéÜnıí
 ¿âíJ¼âíJ¼âíŠ¹âíâ¬x»¯x»¯x‡+Ş!ÃŠw¹âB®x‡b®x‡+ŞïrÅ;àà2äÍkçÎœñJ¼Y³e¼Y†Œ7+|œÆx‹oSŠŒ7+[Æ›eÈ›×šyŞ¢oVûòæµ–-ã­Œ‹·é€"¯åşR¦W*–Ó4Xq”êC™^Jú[(£à®^ƒ1ÂÂ»¢y]•¡Èk¹}¼YM-xe#e®ÊÙ_y+ë¡hÜŠ7k¶:û«/ âåæZå5«dUıµl¼uz5n¥¿[ç¾ÛeBø÷&Si|y»(ô%q&%+S%ñ*Aª¾ÛÊBijPUÃ6\¥h,(¶+L¥ºİ,¥‚4G©5Ş<¥ô…ÂcD›[Ë§©ñ¡*t›[jj¼aijü¼IµÙxÊªw¹g¶FÉ›wØ¶¥§Rô>¶Şís¡hâ>½:­O¯VRÇËí¾³P*#àÙi|e0¼Uıí,ì*o§¿Uáûì/ãÎş*[§¿Uê,”¦Nö¹°•m€lšx°:š&\}M³¹»)üÒğL2„´\%CHËF7æÕ§‰ÇÊ»BLÉ…’)æjæ€Æ»J1:%¦Hß¯:=Së©ÿÛ³zır»méükÀó¹ÌOçşí¿‡ëåª³ôû7±Ùğ
 endstream
 endobj
-218 0 obj
+223 0 obj
 [259 600 600 600 600 600 600 600 600 600 600 600 600 600 250 600 600 559 600 559 600 600 600 600 600 600 600 600 600 600 600 600 600 600 653 626 725 623 600 713 600 600 600 600 623 600 763 742 620 600 664 600 612 600 600 600 600 600 600 600 600 600 600 600 600 579 562 486 579 493 317 556 599 304 600 568 304 895 599 574 600 600 467 463 368 599 538 818 600 527 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600 600]
 endobj
-219 0 obj
+224 0 obj
 << /Length1 7908
 /Length 4683
 /Filter [/FlateDecode]
@@ -10220,10 +10311,10 @@ AñSÅ»Ü#\T9¬œ‚*xû!w•~]âJ<Š‡ek²×¹2xb¾À­eÊåÈ?¸£¿ÇAü3NÁõs—¹æ-°—á³â2ûZƒ¯Ns©
 Û¹\$˜…QËõŒ¤¤ø¥üG™/t'ÜáÓ:=ÌæÆ6v×1 ­0V$›r»5ıGdõîı‹ifì‰gd¶-ÃH}\>üûÏaö#¸é·ş=Z;oÙ!Éûàës}¤ÙËNd*Äe³ˆÿ¾Û…e
 endstream
 endobj
-220 0 obj
+225 0 obj
 << /Type /FontDescriptor
 /FontName /0a9377+NotoSerif-BoldItalic
-/FontFile2 219 0 R
+/FontFile2 224 0 R
 /FontBBox [-476 -250 1289 1058]
 /Flags 70
 /StemV 0
@@ -10234,7 +10325,7 @@ endobj
 /XHeight 1098
 >>
 endobj
-221 0 obj
+226 0 obj
 << /Length 1278
 /Filter [/FlateDecode]
 >>
@@ -10243,11 +10334,11 @@ xœe×ËnÛF†á½®BËtHs&Ã@‘n¼èu{stÔ’ +ß}ù½¤ikÀÆ/‰œy¾_Ã!}øôôÓÓùtß~»]ês¿ïÇéÜnıí
 ¿âíJ¼âíJ¼âíŠ¹âíâ¬x»¯x»¯x‡+Ş!ÃŠw¹âB®x‡b®x‡+ŞïrÅ;àà2äÍkçÎœñJ¼Y³e¼Y†Œ7+|œÆx‹oSŠŒ7+[Æ›eÈ›×šyŞ¢oVûòæµ–-ã­Œ‹·é€"¯åşR¦W*–Ó4Xq”êC™^Jú[(£à®^ƒ1ÂÂ»¢y]•¡Èk¹}¼YM-xe#e®ÊÙ_y+ë¡hÜŠ7k¶:û«/ âåæZå5«dUıµl¼uz5n¥¿[ç¾ÛeBø÷&Si|y»(ô%q&%+S%ñ*Aª¾ÛÊBijPUÃ6\¥h,(¶+L¥ºİ,¥‚4G©5Ş<¥ô…ÂcD›[Ë§©ñ¡*t›[jj¼aijü¼IµÙxÊªw¹g¶FÉ›wØ¶¥§Rô>¶Şís¡hâ>½:­O¯VRÇËí¾³P*#àÙi|e0¼Uıí,ì*o§¿Uáûì/ãÎş*[§¿Uê,”¦Nö¹°•m€lšx°:š&\}M³¹»)üÒğL2„´\%CHËF7æÕ§‰ÇÊ»BLÉ…’)æjæ€Æ»J1:%¦Hß¯:=Së©ÿÛ³zır»méükÀó¹ÌOçşí¿‡ëåª³ôû7±Ùğ
 endstream
 endobj
-222 0 obj
+227 0 obj
 [259 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 665 500 500 500 535 500 580 500 500 500 500 500 500 671 618 500 500 550 514 416 672 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500 500]
 endobj
 xref
-0 223
+0 228
 0000000000 65535 f 
 0000000015 00000 n 
 0000000240 00000 n 
@@ -10256,226 +10347,231 @@ xref
 0000000616 00000 n 
 0000000888 00000 n 
 0000028004 00000 n 
-0000028881 00000 n 
-0000029053 00000 n 
-0000029220 00000 n 
-0000029266 00000 n 
-0000029315 00000 n 
-0000029367 00000 n 
-0000031875 00000 n 
-0000032262 00000 n 
-0000046295 00000 n 
-0000046684 00000 n 
-0000046728 00000 n 
-0000056569 00000 n 
-0000065603 00000 n 
-0000065778 00000 n 
-0000065821 00000 n 
-0000065996 00000 n 
-0000066039 00000 n 
-0000082556 00000 n 
-0000082934 00000 n 
-0000083145 00000 n 
-0000083189 00000 n 
-0000083397 00000 n 
-0000098483 00000 n 
-0000098837 00000 n 
-0000098881 00000 n 
-0000098925 00000 n 
-0000098969 00000 n 
-0000110369 00000 n 
-0000110736 00000 n 
-0000110780 00000 n 
-0000110824 00000 n 
-0000110868 00000 n 
-0000110912 00000 n 
-0000110956 00000 n 
-0000111000 00000 n 
-0000121631 00000 n 
-0000121998 00000 n 
-0000122042 00000 n 
-0000122086 00000 n 
-0000122130 00000 n 
-0000122174 00000 n 
-0000122218 00000 n 
-0000122262 00000 n 
-0000122306 00000 n 
-0000122668 00000 n 
-0000123266 00000 n 
-0000134271 00000 n 
-0000134638 00000 n 
-0000134682 00000 n 
-0000134726 00000 n 
-0000134770 00000 n 
-0000134814 00000 n 
-0000134858 00000 n 
-0000134902 00000 n 
-0000134946 00000 n 
-0000134990 00000 n 
-0000142456 00000 n 
-0000142841 00000 n 
-0000142885 00000 n 
-0000142929 00000 n 
-0000142973 00000 n 
-0000143017 00000 n 
-0000143061 00000 n 
-0000143105 00000 n 
-0000143284 00000 n 
-0000143328 00000 n 
-0000143372 00000 n 
-0000143416 00000 n 
-0000143591 00000 n 
-0000143761 00000 n 
-0000143966 00000 n 
-0000144926 00000 n 
-0000145293 00000 n 
-0000145498 00000 n 
-0000145706 00000 n 
-0000145917 00000 n 
-0000146129 00000 n 
-0000146261 00000 n 
-0000146395 00000 n 
-0000146528 00000 n 
-0000146663 00000 n 
-0000146804 00000 n 
-0000146946 00000 n 
-0000147088 00000 n 
-0000147230 00000 n 
-0000147371 00000 n 
-0000147512 00000 n 
-0000147648 00000 n 
-0000147784 00000 n 
-0000147921 00000 n 
-0000148058 00000 n 
-0000148188 00000 n 
-0000148318 00000 n 
+0000028886 00000 n 
+0000029058 00000 n 
+0000029225 00000 n 
+0000029271 00000 n 
+0000029320 00000 n 
+0000029372 00000 n 
+0000031880 00000 n 
+0000032267 00000 n 
+0000046300 00000 n 
+0000046689 00000 n 
+0000046733 00000 n 
+0000056574 00000 n 
+0000065608 00000 n 
+0000065783 00000 n 
+0000065826 00000 n 
+0000066001 00000 n 
+0000066044 00000 n 
+0000082521 00000 n 
+0000082899 00000 n 
+0000083110 00000 n 
+0000083154 00000 n 
+0000083362 00000 n 
+0000098448 00000 n 
+0000098802 00000 n 
+0000098846 00000 n 
+0000098890 00000 n 
+0000098934 00000 n 
+0000110334 00000 n 
+0000110701 00000 n 
+0000110745 00000 n 
+0000110789 00000 n 
+0000110833 00000 n 
+0000110877 00000 n 
+0000110921 00000 n 
+0000110965 00000 n 
+0000121596 00000 n 
+0000121963 00000 n 
+0000122007 00000 n 
+0000122051 00000 n 
+0000122095 00000 n 
+0000122139 00000 n 
+0000122183 00000 n 
+0000122227 00000 n 
+0000122271 00000 n 
+0000122633 00000 n 
+0000123231 00000 n 
+0000134236 00000 n 
+0000134603 00000 n 
+0000134647 00000 n 
+0000134691 00000 n 
+0000134735 00000 n 
+0000134779 00000 n 
+0000134823 00000 n 
+0000134867 00000 n 
+0000134911 00000 n 
+0000134955 00000 n 
+0000142596 00000 n 
+0000143009 00000 n 
+0000143053 00000 n 
+0000143097 00000 n 
+0000143295 00000 n 
+0000143339 00000 n 
+0000143561 00000 n 
+0000143605 00000 n 
+0000143832 00000 n 
+0000144058 00000 n 
+0000144289 00000 n 
+0000144333 00000 n 
+0000144377 00000 n 
+0000144556 00000 n 
+0000144600 00000 n 
+0000144644 00000 n 
+0000144688 00000 n 
+0000144863 00000 n 
+0000145033 00000 n 
+0000146362 00000 n 
+0000146736 00000 n 
+0000146943 00000 n 
+0000147148 00000 n 
+0000147356 00000 n 
+0000147567 00000 n 
+0000147779 00000 n 
+0000147911 00000 n 
+0000148045 00000 n 
+0000148178 00000 n 
+0000148313 00000 n 
 0000148454 00000 n 
-0000148590 00000 n 
-0000148732 00000 n 
-0000148874 00000 n 
-0000149024 00000 n 
-0000149174 00000 n 
-0000149317 00000 n 
-0000149460 00000 n 
-0000149604 00000 n 
-0000149748 00000 n 
-0000149893 00000 n 
-0000150038 00000 n 
-0000150183 00000 n 
-0000150328 00000 n 
-0000150470 00000 n 
-0000150612 00000 n 
-0000150743 00000 n 
-0000150875 00000 n 
-0000151018 00000 n 
-0000151163 00000 n 
-0000151298 00000 n 
-0000151433 00000 n 
-0000151581 00000 n 
-0000151729 00000 n 
-0000151867 00000 n 
-0000152005 00000 n 
-0000152143 00000 n 
-0000152281 00000 n 
-0000152414 00000 n 
-0000152548 00000 n 
-0000152683 00000 n 
-0000152820 00000 n 
-0000152951 00000 n 
-0000153083 00000 n 
-0000153218 00000 n 
-0000153353 00000 n 
-0000153484 00000 n 
-0000153617 00000 n 
-0000153748 00000 n 
-0000153881 00000 n 
-0000154013 00000 n 
-0000154146 00000 n 
-0000154289 00000 n 
-0000154432 00000 n 
-0000154581 00000 n 
-0000154730 00000 n 
-0000154880 00000 n 
-0000155030 00000 n 
-0000155180 00000 n 
-0000155330 00000 n 
-0000155457 00000 n 
-0000155586 00000 n 
-0000155704 00000 n 
-0000155826 00000 n 
-0000155961 00000 n 
-0000156098 00000 n 
-0000156245 00000 n 
-0000156393 00000 n 
-0000156471 00000 n 
-0000156704 00000 n 
-0000156898 00000 n 
-0000157078 00000 n 
-0000157261 00000 n 
-0000157472 00000 n 
-0000157714 00000 n 
-0000157908 00000 n 
-0000158096 00000 n 
-0000158288 00000 n 
-0000158452 00000 n 
-0000158665 00000 n 
-0000158863 00000 n 
-0000159107 00000 n 
-0000159323 00000 n 
-0000159543 00000 n 
-0000159767 00000 n 
-0000159991 00000 n 
-0000160185 00000 n 
-0000160353 00000 n 
-0000160573 00000 n 
-0000160753 00000 n 
-0000160985 00000 n 
-0000161177 00000 n 
-0000161369 00000 n 
-0000161545 00000 n 
-0000161733 00000 n 
-0000161901 00000 n 
-0000162081 00000 n 
-0000162253 00000 n 
-0000162411 00000 n 
-0000162612 00000 n 
-0000162810 00000 n 
-0000163054 00000 n 
-0000163306 00000 n 
-0000163540 00000 n 
-0000163704 00000 n 
-0000163871 00000 n 
-0000164077 00000 n 
-0000164327 00000 n 
-0000164509 00000 n 
-0000164553 00000 n 
-0000164970 00000 n 
-0000165244 00000 n 
-0000165518 00000 n 
-0000174423 00000 n 
-0000174642 00000 n 
-0000175997 00000 n 
-0000176913 00000 n 
-0000187719 00000 n 
-0000187933 00000 n 
-0000189288 00000 n 
-0000190204 00000 n 
-0000195464 00000 n 
-0000195677 00000 n 
-0000197032 00000 n 
-0000197947 00000 n 
-0000204625 00000 n 
-0000204849 00000 n 
-0000206204 00000 n 
-0000207119 00000 n 
-0000211893 00000 n 
-0000212121 00000 n 
-0000213476 00000 n 
+0000148596 00000 n 
+0000148738 00000 n 
+0000148880 00000 n 
+0000149021 00000 n 
+0000149162 00000 n 
+0000149298 00000 n 
+0000149435 00000 n 
+0000149573 00000 n 
+0000149711 00000 n 
+0000149842 00000 n 
+0000149973 00000 n 
+0000150109 00000 n 
+0000150245 00000 n 
+0000150387 00000 n 
+0000150529 00000 n 
+0000150679 00000 n 
+0000150829 00000 n 
+0000150972 00000 n 
+0000151115 00000 n 
+0000151259 00000 n 
+0000151403 00000 n 
+0000151548 00000 n 
+0000151693 00000 n 
+0000151838 00000 n 
+0000151983 00000 n 
+0000152125 00000 n 
+0000152267 00000 n 
+0000152398 00000 n 
+0000152530 00000 n 
+0000152673 00000 n 
+0000152818 00000 n 
+0000152953 00000 n 
+0000153088 00000 n 
+0000153236 00000 n 
+0000153384 00000 n 
+0000153522 00000 n 
+0000153660 00000 n 
+0000153798 00000 n 
+0000153936 00000 n 
+0000154069 00000 n 
+0000154203 00000 n 
+0000154338 00000 n 
+0000154475 00000 n 
+0000154606 00000 n 
+0000154738 00000 n 
+0000154873 00000 n 
+0000155008 00000 n 
+0000155139 00000 n 
+0000155272 00000 n 
+0000155403 00000 n 
+0000155536 00000 n 
+0000155668 00000 n 
+0000155801 00000 n 
+0000155944 00000 n 
+0000156087 00000 n 
+0000156236 00000 n 
+0000156385 00000 n 
+0000156535 00000 n 
+0000156685 00000 n 
+0000156835 00000 n 
+0000156985 00000 n 
+0000157112 00000 n 
+0000157241 00000 n 
+0000157359 00000 n 
+0000157481 00000 n 
+0000157616 00000 n 
+0000157753 00000 n 
+0000157900 00000 n 
+0000158048 00000 n 
+0000158126 00000 n 
+0000158359 00000 n 
+0000158553 00000 n 
+0000158733 00000 n 
+0000158916 00000 n 
+0000159127 00000 n 
+0000159369 00000 n 
+0000159563 00000 n 
+0000159751 00000 n 
+0000159943 00000 n 
+0000160107 00000 n 
+0000160320 00000 n 
+0000160518 00000 n 
+0000160762 00000 n 
+0000160978 00000 n 
+0000161198 00000 n 
+0000161422 00000 n 
+0000161646 00000 n 
+0000161840 00000 n 
+0000162008 00000 n 
+0000162228 00000 n 
+0000162408 00000 n 
+0000162640 00000 n 
+0000162832 00000 n 
+0000163024 00000 n 
+0000163200 00000 n 
+0000163388 00000 n 
+0000163556 00000 n 
+0000163736 00000 n 
+0000163908 00000 n 
+0000164066 00000 n 
+0000164267 00000 n 
+0000164465 00000 n 
+0000164709 00000 n 
+0000164961 00000 n 
+0000165195 00000 n 
+0000165359 00000 n 
+0000165526 00000 n 
+0000165732 00000 n 
+0000165982 00000 n 
+0000166164 00000 n 
+0000166208 00000 n 
+0000166625 00000 n 
+0000166899 00000 n 
+0000167173 00000 n 
+0000176078 00000 n 
+0000176297 00000 n 
+0000177652 00000 n 
+0000178568 00000 n 
+0000189374 00000 n 
+0000189588 00000 n 
+0000190943 00000 n 
+0000191859 00000 n 
+0000197011 00000 n 
+0000197224 00000 n 
+0000198579 00000 n 
+0000199494 00000 n 
+0000206172 00000 n 
+0000206396 00000 n 
+0000207751 00000 n 
+0000208666 00000 n 
+0000213440 00000 n 
+0000213668 00000 n 
+0000215023 00000 n 
 trailer
-<< /Size 223
+<< /Size 228
 /Root 2 0 R
 /Info 1 0 R
 >>
 startxref
-214391
+215938
 %%EOF
