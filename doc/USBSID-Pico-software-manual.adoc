@@ -16,9 +16,9 @@ toc::[]
 
 == Supported platforms
 _In active development_ +
-*Linux:* Vice, RetroDebugger, SidBerry, SidplayFp, JSidplay2, USB Midi, ASID & WebUSB (in webbrowser) SID Play +
-*Windows:* Vice, SidBerry, USB Midi, ASID & WebUSB (in webbrowser) SID Play +
-*Android:* USB Midi, ASID & WebUSB (in webbrowser) SID Play +
+*Linux:* Vice, JSidplay2, SidplayFp, RetroDebugger, SidBerry, USB Midi, WebUSB & ASID (in webbrowser) SID Play +
+*Windows:* Vice, JSidplay2, SidBerry, USB Midi, WebUSB & ASID (in webbrowser) SID Play +
+*Android:* USB Midi, WebUSB & ASID (in webbrowser) SID Play +
 *Amiga:* PlaySID library
 
 == Drivers

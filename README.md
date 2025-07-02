@@ -118,9 +118,9 @@ For testing purposes only you can use the debug functions available on the [USBS
 
 ### Supported platforms
 _In development_  
-Linux: Vice, JSidplay2, SidplayFp, RetroDebugger, SidBerry, USB Midi, ASID (in webbrowser) SID Play  
-Windows: Vice, JSidplay2, SidBerry, USB Midi, ASID (in webbrowser) SID Play  
-Android: USB Midi, ASID (in webbrowser) SID Play
+Linux: Vice, JSidplay2, SidplayFp, RetroDebugger, SidBerry, USB Midi, WebUSB & ASID (in webbrowser) SID Play  
+Windows: Vice, JSidplay2, SidBerry, USB Midi, WebUSB & ASID (in webbrowser) SID Play  
+Android: USB Midi, WebUSB & ASID (in webbrowser) SID Play
 Amiga: PlaySID library
 
 ### Linux Udev rules
