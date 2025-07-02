@@ -43,8 +43,14 @@
 #include "macros.h"
 
 /* Compile with:
- * gcc -g3 -L/usr/local/lib inih/ini.c cfg_usbsid.c -o cfg_usbsid $(pkg-config --libs --cflags libusb-1.0)
+ * gcc -g3 -L/usr/local/lib inih/ini.c cfg_usbsid.c -o cfg_usbsid $(pkg-config --libs --cflags libusb-1.0) -I./examples/config-tool/ini
  * gcc -g3 -L/usr/local/lib examples/config-tool/inih/ini.c examples/config-tool/cfg_usbsid.c -o examples/config-tool/cfg_usbsid $(pkg-config --libs --cflags libusb-1.0) -I./examples/config-tool/inih ; cp examples/config-tool/cfg_usbsid ~/.local/bin
+ * /usr/bin/x86_64-w64-mingw32-gcc -g3 \
+    -L/usr/x86_64-w64-mingw32/sys-root/mingw/lib \
+    inih/ini.c cfg_usbsid.c -o cfg_usbsid.exe \
+    -lusb-1.0 \
+    -I/usr/x86_64-w64-mingw32/sys-root/mingw/include/libusb-1.0
+    -I./examples/config-tool/inih
  */
 
 /* ---------------------- */
@@ -695,7 +701,7 @@ void print_config(void)
     truefalse[(int)usbsid_config.lock_clockrate]);
   printf("[CONFIG] [SOCKET ONE] %s as %s\n",
     enabled[(int)usbsid_config.socketOne.enabled],
-    socket[(int)usbsid_config.socketOne.dualsid]);
+    us_socket[(int)usbsid_config.socketOne.dualsid]);
   printf("[CONFIG] [SOCKET ONE] CHIP TYPE: %s, CLONE TYPE: %s\n",
     chiptypes[usbsid_config.socketOne.chiptype],
     clonetypes[usbsid_config.socketOne.clonetype]);
@@ -704,7 +710,7 @@ void print_config(void)
     sidtypes[usbsid_config.socketOne.sid2type]);
   printf("[CONFIG] [SOCKET TWO] %s as %s\n",
     enabled[(int)usbsid_config.socketTwo.enabled],
-    socket[(int)usbsid_config.socketTwo.dualsid]);
+    us_socket[(int)usbsid_config.socketTwo.dualsid]);
   printf("[CONFIG] [SOCKET TWO] CHIP TYPE: %s, CLONE TYPE: %s\n",
     chiptypes[usbsid_config.socketTwo.chiptype],
     clonetypes[usbsid_config.socketTwo.clonetype]);
@@ -968,7 +974,7 @@ void print_socket_config(void)
 
   printf("[CONFIG] [SOCKET ONE] %s as %s\n",
     enabled[usbsid_config.socketOne.enabled],
-    socket[usbsid_config.socketOne.dualsid]);
+    us_socket[usbsid_config.socketOne.dualsid]);
   printf("[CONFIG] [SOCKET ONE] CHIP TYPE: %s, CLONE TYPE: %s\n",
     chiptypes[usbsid_config.socketOne.chiptype],
     clonetypes[usbsid_config.socketOne.clonetype]);
@@ -977,7 +983,7 @@ void print_socket_config(void)
     sidtypes[usbsid_config.socketOne.sid2type]);
   printf("[CONFIG] [SOCKET TWO] %s as %s\n",
     enabled[usbsid_config.socketTwo.enabled],
-    socket[usbsid_config.socketTwo.dualsid]);
+    us_socket[usbsid_config.socketTwo.dualsid]);
   printf("[CONFIG] [SOCKET TWO] CHIP TYPE: %s, CLONE TYPE: %s\n",
     chiptypes[usbsid_config.socketTwo.chiptype],
     clonetypes[usbsid_config.socketTwo.clonetype]);
