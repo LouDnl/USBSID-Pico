@@ -187,12 +187,12 @@ Your USBSID-Pico PCB has several hardware features like jumpers and pins that re
 ## Cases
 All USBSID-Pico community created cases are available in the [cases](cases/) directory, direct links below.  
 _Cases for PCB revision v1.0:_
-* [Cartridge case](cases/v1.0/spotUP) by @spotUP
-* [boxy case](cases/v1.0/schorsch3000) by @schorsch3000
+* [Cartridge case](cases/v1.0/spotUP) by [@spotUP](https://github.com/spotUP/)
+* [boxy case](cases/v1.0/schorsch3000) by [@schorsch3000](https://github.com/schorsch3000/)
 
 _Cases for PCB revision v1.3:_
-* [spotUP Cartridge case revisited](cases/v1.3/spotUP-revisited) by @LouD
-* [Dual USBSID-Pico Commodore 64 Case](cases/v1.3/Dual_USBSID-Pico_Commodore_64_Case) by @OlefinMakes
+* [spotUP Cartridge case revisited](cases/v1.3/spotUP-revisited) by [@LouD](https://github.com/LouDnl/)
+* [Dual USBSID-Pico Commodore 64 Case](cases/v1.3/Dual_USBSID-Pico_Commodore_64_Case) by [@OlefinMakes](https://github.com/OlefinMakes/)
 
 ### Schematic and BOM
 If you want and are up to it you can solder your own PCB or create your own development board using the documents below
@@ -275,9 +275,9 @@ _Available examples with USBSID-Pico support:_<br>
 Pre compiled Vice binaries are available in my fork @ https://github.com/LouDnl/Vice-USBSID/releases
 
 # Acknowledgements
-Special thanks goes out to [Tobozo](https://github.com/tobozo/) for making the USBSID-Pico logo and for his (mental🤣) support since starting this project.  
-Thanks to [erique](https://github.com/erique) and [koobo](https://github.com/koobo) for creating and implementing Amiga support!  
-Thanks to [Chordian](https://github.com/Chordian) for implementing my crappy webusb solution into deepsid.  
+Special thanks goes out to [@tobozo](https://github.com/tobozo/) for making the USBSID-Pico logo and for his (mental🤣) support since starting this project.  
+Thanks to [@erique](https://github.com/erique) and [@koobo](https://github.com/koobo) for creating and implementing Amiga support!  
+Thanks to [@Chordian](https://github.com/Chordian) for implementing my crappy webusb solution into deepsid.  
 Thanks to [Ken](https://sourceforge.net/u/kenchis/profile/) for adding webusb support to jsidplay2's c64jukebox.
 
 Some portions of this code and board are heavily inspired on projects by other great people.
