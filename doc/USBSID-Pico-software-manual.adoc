@@ -199,10 +199,10 @@ To get to these settings follow the following settings path: +
 t.b.d.
 
 === jsidplay2
-This section covers the use of USBSID-Pico with `c64jukebox` website that runs on `jsidplay2`
+This section covers the use of USBSID-Pico with `jsidplay2`
 
 ==== c64jukebox
-t.b.d.
+`c64jukebox` website that runs on `jsidplay2`
 
 === sidplayfp
 t.b.d.
