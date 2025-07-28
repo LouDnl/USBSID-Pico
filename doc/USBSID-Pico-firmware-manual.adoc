@@ -67,7 +67,7 @@ With the cable already plugged into your computer and Pico and seated on the boa
 
 or
 
-- With the CLI config tool (linux) command in your `$PATH` variable
+- With the CLI config tool command in your `PATH` variable
 - Type `cfg_usbsid -boot` to send the reboot to bootloader command
 - A new drive should appear on your computer called `RPI-RP2` or `RP2350` depending on your Pico type.
 - Copy the correct `uf2` firmware file to this directory.
@@ -75,8 +75,32 @@ or
 
 == Firmware configuration
 USBSID-Pico has an extensive set of configuration options that expands with each firmware release. +
-At this point in time you can change the settings to your liking by using the configuration webpage or the CLI config tool for linux. +
-webpage: https://usbsid.loudai.nl/index.html?player=webusb&debug=usbsidpico +
+
+=== Configuration tool
+You can configurate your board by using the commandline config-tool or together with the Python Configuration GUI by ISL/Samar if you prefer a GUI.
+
+==== GUI downloads
+https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/cfg_usbsid_GUI.py[Download script] +
+Python3 -> https://www.python.org/downloads/[Download] +
+TkInter -> https://tkdocs.com/tutorial/install.html[Installation guide] +
+And either one of the Linux or Windows CLI downloads below
+
+==== Linux downloads
+https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/cfg_usbsid[Download executable]
+
+==== Windows downloads
+https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/cfg_usbsid.exe[Download executable] +
+https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/libusb-1.0.dll[Download DLL 1] +
+https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/libwinpthread-1.dll[Download DLL 2]
+
+=== Configuration web page (for Chrome/Edge based browsers using webusb)
+https://usbsid.loudai.nl/?player=webusb&debug=usbsidpico[USBSID web configuration tool] (requires a Chrome based browser). +
+If needed you can change your USBSID configuration after selecting WebUSB and clicking on `Open config`. +
+image:images/firmware/usbsidpico-config-dark.png[Title=Config Dark,300]image:images/firmware/usbsidpico-config-light.png[Title=Config Light,300] +
+_The player is set up with borrowed code from Deepsid using Hermit's JsSID implementation._
+
+==== Debug functions
+For additional testing there are some debug functions available on the https://usbsid.loudai.nl/?player=webusb&debug=usbsidpicoUSBSID Debug site (requires a Chrome based browser).
 
 === Default configuration
 Each firmware version comes with the same default configuration. +
@@ -234,21 +258,6 @@ Available options are: +
 _This config setting is intended for future use_
 Available options are: +
 `False`, `True`
-
-== Config tools
-t.b.d.
-
-=== Configuration web page
-t.b.d.
-
-=== CLI Configuration tool (linux)
-t.b.d.
-
-=== CLI Configuration tool (Windows)
-t.b.d.
-
-=== Multiplatform Configuration GUI
-t.b.d.
 
 == Disclaimer
 include::disclaimer.adoc[]

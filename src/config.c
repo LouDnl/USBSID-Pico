@@ -94,6 +94,7 @@ extern void apply_fmopl_config(bool quiet);
 
 /* Config socket */
 extern void verify_socket_settings(void);
+extern void verify_sid_addr(bool quiet);
 extern void apply_socket_config(bool quiet);
 extern void set_sid_addr_id(int socket, int sid, uint8_t addr); // TODO: REMOVE ME!!
 extern void set_sid_id_addr(int socket, int sid, int id); // TODO: REMOVE ME!!
@@ -989,7 +990,7 @@ void apply_config(bool at_boot, bool print_cfg)
   CFG("[START CONFIG APPLY]\n");
   CFG("[CONFIG] Verifying socket settings\n");
   verify_socket_settings();
-
+  verify_sid_addr(print_cfg);
 
   apply_socket_config(false);
   apply_bus_config(false);

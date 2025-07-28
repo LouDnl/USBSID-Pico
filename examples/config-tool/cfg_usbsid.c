@@ -43,8 +43,14 @@
 #include "macros.h"
 
 /* Compile with:
- * gcc -g3 -L/usr/local/lib inih/ini.c cfg_usbsid.c -o cfg_usbsid $(pkg-config --libs --cflags libusb-1.0)
+ * gcc -g3 -L/usr/local/lib inih/ini.c cfg_usbsid.c -o cfg_usbsid $(pkg-config --libs --cflags libusb-1.0) -I./examples/config-tool/ini
  * gcc -g3 -L/usr/local/lib examples/config-tool/inih/ini.c examples/config-tool/cfg_usbsid.c -o examples/config-tool/cfg_usbsid $(pkg-config --libs --cflags libusb-1.0) -I./examples/config-tool/inih ; cp examples/config-tool/cfg_usbsid ~/.local/bin
+ * /usr/bin/x86_64-w64-mingw32-gcc -g3 \
+    -L/usr/x86_64-w64-mingw32/sys-root/mingw/lib \
+    inih/ini.c cfg_usbsid.c -o cfg_usbsid.exe \
+    -lusb-1.0 \
+    -I/usr/x86_64-w64-mingw32/sys-root/mingw/include/libusb-1.0
+    -I./examples/config-tool/inih
  */
 
 /* ---------------------- */
@@ -695,7 +701,7 @@ void print_config(void)
     truefalse[(int)usbsid_config.lock_clockrate]);
   printf("[CONFIG] [SOCKET ONE] %s as %s\n",
     enabled[(int)usbsid_config.socketOne.enabled],
-    socket[(int)usbsid_config.socketOne.dualsid]);
+    us_socket[(int)usbsid_config.socketOne.dualsid]);
   printf("[CONFIG] [SOCKET ONE] CHIP TYPE: %s, CLONE TYPE: %s\n",
     chiptypes[usbsid_config.socketOne.chiptype],
     clonetypes[usbsid_config.socketOne.clonetype]);
@@ -704,7 +710,7 @@ void print_config(void)
     sidtypes[usbsid_config.socketOne.sid2type]);
   printf("[CONFIG] [SOCKET TWO] %s as %s\n",
     enabled[(int)usbsid_config.socketTwo.enabled],
-    socket[(int)usbsid_config.socketTwo.dualsid]);
+    us_socket[(int)usbsid_config.socketTwo.dualsid]);
   printf("[CONFIG] [SOCKET TWO] CHIP TYPE: %s, CLONE TYPE: %s\n",
     chiptypes[usbsid_config.socketTwo.chiptype],
     clonetypes[usbsid_config.socketTwo.clonetype]);
@@ -968,7 +974,7 @@ void print_socket_config(void)
 
   printf("[CONFIG] [SOCKET ONE] %s as %s\n",
     enabled[usbsid_config.socketOne.enabled],
-    socket[usbsid_config.socketOne.dualsid]);
+    us_socket[usbsid_config.socketOne.dualsid]);
   printf("[CONFIG] [SOCKET ONE] CHIP TYPE: %s, CLONE TYPE: %s\n",
     chiptypes[usbsid_config.socketOne.chiptype],
     clonetypes[usbsid_config.socketOne.clonetype]);
@@ -977,7 +983,7 @@ void print_socket_config(void)
     sidtypes[usbsid_config.socketOne.sid2type]);
   printf("[CONFIG] [SOCKET TWO] %s as %s\n",
     enabled[usbsid_config.socketTwo.enabled],
-    socket[usbsid_config.socketTwo.dualsid]);
+    us_socket[usbsid_config.socketTwo.dualsid]);
   printf("[CONFIG] [SOCKET TWO] CHIP TYPE: %s, CLONE TYPE: %s\n",
     chiptypes[usbsid_config.socketTwo.chiptype],
     clonetypes[usbsid_config.socketTwo.clonetype]);
@@ -1708,6 +1714,18 @@ void config_usbsidpico(int argc, char **argv)
         printf("Unable to continue without required arguments, exiting...\n");
         exit(0);
       }
+      if (argc > 8) {
+        uint8_t test_buffer[64] = {0};
+        test_buffer[0] = ((COMMAND << 6) | 18);
+        test_buffer[1] = WRITE_CONFIG;
+        int tb_count = 2;
+        for (int i = 2; i < argc; i++) {
+          test_buffer[tb_count++] = strtol(argv[i], NULL, 16);
+        }
+        print_cfg_buffer(test_buffer, 64);
+        write_chars(test_buffer, 64);
+        break;
+      }
       if (argc >= 3)  cmd = strtol(argv[param_count++], NULL, 16);
       if (argc >= 4)  a = strtol(argv[param_count++], NULL, 16);
       if (argc >= 5)  b = strtol(argv[param_count++], NULL, 16);
@@ -1716,6 +1734,13 @@ void config_usbsidpico(int argc, char **argv)
       printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", cmd, a, b, c, d);
       write_config_command(cmd, a, b, c, d);
       break;
+    }
+    if (!strcmp(argv[param_count], "-control")) {
+
+      rc = libusb_control_transfer(devh, 0x21, 0x20, 0, 0, encoding, count_of(encoding), 0);
+      fprintf(stdout, "Control transfer status: %d, %s: %s\n",
+        rc, libusb_error_name(rc), libusb_strerror(rc));
+
     }
     if (!strcmp(argv[param_count], "-command") || !strcmp(argv[param_count], "--arbitrary-command")) {
       param_count++;  /* skip usbsid executable and -config self */
@@ -2224,7 +2249,7 @@ int main(int argc, char **argv)
     print_help_skpico();
     goto exit;
   }
-  fprintf(stdout, "Detecting Linux usbsid boards\n");
+  fprintf(stdout, "Detecting USBSID-Pico boards\n");
 
   if (usid_dev != 0) {
     rc = usbsid_init();
