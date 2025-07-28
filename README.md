@@ -210,6 +210,7 @@ _Cases for PCB revision v1.0:_
 
 _Cases for PCB revision v1.3:_
 * [spotUP Cartridge case revisited](cases/v1.3/spotUP-revisited) by @LouD
+* [Dual USBSID-Pico Commodore 64 Case](cases/v1.3/Dual_USBSID-Pico_Commodore_64_Case) by @OlefinMakes
 
 ### Schematic and BOM
 If you want and are up to it you can solder your own PCB or create your own development board using the documents below
