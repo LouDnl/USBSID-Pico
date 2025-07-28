@@ -15,10 +15,14 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
 * [Questions & Support](#questions-and-support)
 * [Project status](#project-status)
 * [Firmware](#firmware)
+  * [Configuring your board's firmware](#configuring-your-boards-firmware)
+    * [Testing your board](#testing-your-board)
+  * [Firmware features](#firmware-features)
   * [Firmware types and naming](doc/USBSID-Pico-firmware-manual.adoc) [(PDF)](doc/USBSID-Pico-firmware-manual.pdf)
   * [How to flash new firmware](doc/USBSID-Pico-firmware-manual.adoc) [(PDF)](doc/USBSID-Pico-firmware-manual.pdf)
   * [How to configure your board](doc/USBSID-Pico-firmware-manual.adoc) [(PDF)](doc/USBSID-Pico-firmware-manual.pdf)
   * [Known issues](#known-issues)
+  * [Building](#building)
 * [Hardware](#hardware)
   * [PCB usage information](#pcb-usage-information)
     * [PCB revision v1.0 manual](#pcb-revision-v10-manual)
@@ -53,7 +57,9 @@ Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouD
 [erique](https://github.com/erique) and [koobo](https://github.com/koobo) have added support to [playsid](https://github.com/erique/playsid.library)
 ##### C64 Music trackers
 You should be able to use the ASID fork of [sidfactory2](https://github.com/Chordian/sidfactory2/tree/asid-support) without issues.  
-When using Vice or RetroDebugger you can freely use applications like [SID-Wizard](https://sourceforge.net/projects/sid-wizard/) for music creation.
+When using Vice or RetroDebugger you can freely use applications like [SID-Wizard](https://sourceforge.net/projects/sid-wizard/) for music creation.  
+There is also work being done in my forks of [Goattracker2](https://github.com/LouDnl/goattracker2) and [GTUltra](https://github.com/LouDnl/GTUltra-USBSID). Ask on Discord for latest binaries :)
+
 #### Midi
 USBSID-Pico acts as Midi device and supports basic Midi in ~ note that Midi is still in development and in Beta phase.  
 This means that no support is available here at this time, please visit the Discord for more information.
@@ -103,53 +109,29 @@ While in development any mentioned features, options, etc. are subject to change
 [J]: https://github.com/LouDnl/USBSID-Pico/blob/master/LICENSE
 [K]: https://github.com/LouDnl/USBSID-Pico
 
-### Test and config your board
-Also see the [Firmware manual](doc/USBSID-Pico-firmware-manual.adoc) for information on how to set up your board!  
-You can configurate your board by using the commandline [config-tool](examples/config-tool) [Linux binary](examples/config-tool/cfg_usbsid)  and [Windows binary](examples/config-tool/cfg_usbsid.exe) provided in examples. Windows requires the two `.dll` files aswell.  
-Or you can use the web configuration, see below.  
-
-You can test your board with WebUSB and ASID here: [USBSID](https://usbsid.loudai.nl/?player=webusb).  
-If needed you can change your USBSID configuration after selecting WebUSB and clicking on `Open config`.  
-<img src="images/usbsidpico-config-dark.png" width="300px"><img src="images/usbsidpico-config-light.png" width="300px"><br>
-_The player is set up with some borrowed code from Deepsid using Hermit's JsSID implementation._
-
-#### Debug functions
-For testing purposes only you can use the debug functions available on the [USBSID Debug](https://usbsid.loudai.nl/?player=webusb&debug=usbsidpico) site.
-
 ### Supported platforms
+See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for driver installation and supported software information!  
 _In development_  
 Linux: Vice, JSidplay2, SidplayFp, RetroDebugger, SidBerry, USB Midi, WebUSB & ASID (in webbrowser) SID Play  
 Windows: Vice, JSidplay2, SidBerry, USB Midi, WebUSB & ASID (in webbrowser) SID Play  
 Android: USB Midi, WebUSB & ASID (in webbrowser) SID Play
 Amiga: PlaySID library
 
-### Linux Udev rules
-Also see the [Software manual](doc/USBSID-Pico-software-manual.adoc) for more information on how to use supported software!  
-In the [examples/udev](repo/examples/udev-rules/69-usbsid-permissions.rules) directory you can find the udev rules that I use on Linux. This purely an example file that you can use and change to your own needs.  
-Steps required for this to work
-```shell
-  # Check if you are in the plugdev group
-  groups  # should show the plugdev group
-  # Copy the udev ules file to the correct directory
-  sudo cp 69-usbsid-permissions.rules /etc/udev/rules.d
-  # Now reload the udev rules
-  sudo udevadm control --reload-rules && sudo udevadm trigger
-  # Not working? Try reloading the service
-  sudo systemctl restart udev
-```
+#### Linux Udev rules
+See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for udev rule installation information!
 
-### Windows driver
-Also see the [Software manual](doc/USBSID-Pico-software-manual.adoc) for mroe information on how to use supported software!  
-Use [Zadig](https://zadig.akeo.ie/) to install the correct driver. Replace the driver for `USBSID-Pico Data` with WinUSB.  
-<img src="images/zadig-list-all-devices.png" width="200px">
-<img src="images/zadig-install-driver.png" width="200px">  
-Then configure check, configure and test your board on the [USBSID](https://usbsid.loudai.nl/?player=webusb) config tool website  
-<img src="images/usbsid-config-connect.png" width="200px">
-<img src="images/usbsid-config-checkversion.png" width="200px">  
+#### Windows driver
+See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for driver installation information!
 
 # Firmware
 See the [firmware changelog](CHANGELOG.md) for more information on what's changed and previous releases.  
-Also see the [Firmware manual](doc/USBSID-Pico-firmware-manual.adoc) for more information on how to set up your board!  
+
+### Configuring your board's firmware
+See the [Firmware manual](doc/USBSID-Pico-firmware-manual.adoc) for more information on how to set up your board!  
+
+#### Testing your board
+You can test your board with WebUSB and ASID here on the same site as the web configuration tool here: [USBSID web configuration tool](https://usbsid.loudai.nl/?player=webusb) (requires a Chrome based browser).  
+
 ### Firmware features
 The firmware is still in development so features might change, be added or removed.
 - By default both sockets are enabled and the configuration is set to 2 SID's.
@@ -280,7 +262,7 @@ If you want and are up to it you can solder your own PCB or create your own deve
 # Examples
 Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-29KQ), [other socials](https://github.com/LouDnl) or the [SHOWCASE](SHOWCASE.md) page to see more examples of the board in action.
 ### Software
-Also see the [Software manual](doc/USBSID-Pico-software-manual.adoc) for information on how to use supported software!  
+See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for information on how to use supported software!  
 _Available examples with USBSID-Pico support:_<br>
 [**USBSID-Pico driver**](https://github.com/LouDnl/USBSID-Pico-driver) repo is available @ https://github.com/LouDnl/USBSID-Pico-driver<br>
 [**HardSID USB / SidBlaster USB**](examples/hardsid-sidblaster) emulation driver example<br>
