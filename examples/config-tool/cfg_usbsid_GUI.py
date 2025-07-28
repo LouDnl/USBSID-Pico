@@ -34,9 +34,9 @@ class USBSidPicoConfigGUI:# {}
 
         # Sprawdź czy pliki istnieją
         if not os.path.exists(self.exe_path):
-            messagebox.showerror("Error", f"cfg_usbsid.exe not found at: {self.exe_path}")
+            messagebox.showerror("Error", f"{toolexe} not found at: {self.exe_path}")
         if not os.path.exists(self.default_ini_path):
-            messagebox.showwarning("Warning", f"default.ini not found at: {self.default_ini_path}")
+            messagebox.showwarning("Warning", f"{toolini} not found at: {self.default_ini_path}")
 
         # Konfiguracja
         self.config = configparser.ConfigParser()

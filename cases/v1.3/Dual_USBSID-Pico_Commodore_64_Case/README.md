@@ -1,6 +1,6 @@
 # Download
 Download the case print files here:  
-[Dual USBSID-Pico Commodore 64 Case](makerworld.com/en/models/1639001-dual-usbsid-pico-commodore-64-case)  
+[Dual USBSID-Pico Commodore 64 Case](https://makerworld.com/en/models/1639001-dual-usbsid-pico-commodore-64-case)  
 by [OlefinMakes](https://makerworld.com/en/@OlefinMakes) over at [MakerWorld](https://makerworld.com/en)
 
 # Description
