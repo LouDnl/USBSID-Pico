@@ -653,6 +653,33 @@ void __no_inline_not_in_flash_func(cycled_write_operation_nondma)(uint8_t addres
   return;
 }
 
+uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t address, uint8_t data, uint16_t cycles)
+{ /* This is a blocking function! */
+  sid_memory[(address & 0x7F)] = data;
+  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+  control_word = 0b111000;
+  dir_mask = 0b1111111111111111;  /* Always OUT never IN */
+  if (set_bus_bits(address, data) != 1) {
+    return 0;
+  }
+  data_word = (dir_mask << 16) | data_word;
+
+  dma_channel_set_read_addr(dma_tx_control, &control_word, false);
+  dma_channel_set_read_addr(dma_tx_data, &data_word, false);
+
+  cycled_delay_operation(cycles); /* Replaces the delay DMA */
+  pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, PIO_IRQ0));  /* Preset the statemachine IRQ to not wait for a 1 */
+  pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, PIO_IRQ1));     /* Preset the statemachine IRQ to not wait for a 1 */
+  pio_sm_exec(bus_pio, sm_data, pio_encode_wait_pin(true, PHI));
+  pio_sm_exec(bus_pio, sm_control, pio_encode_wait_pin(true, PHI));
+  dma_hw->multi_channel_trigger = (
+    1u << dma_tx_control  /* Control lines RW, CS1 & CS2 DMA transfer */
+    | 1u << dma_tx_data     /* Data & Address DMA transfer */
+  );
+  dma_channel_wait_for_finish_blocking(dma_tx_control);
+
+  return cycles;
+}
 
 void unmute_sid(void)
 {
