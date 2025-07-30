@@ -323,7 +323,9 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
         clear_bus_all();
         break;
       case CONFIG:
-        DBG("[CONFIG]\n");
+        if (buffer[1] < 0xD0) { /* Don't log incoming buffer to avoid spam above this region */
+          DBG("[CONFIG]\n");
+        }
         /* Copy incoming buffer ignoring the command byte */
         memcpy(config_buffer, (sid_buffer + 1), (int)*n - 1);
         handle_config_request(config_buffer, *n - 1);

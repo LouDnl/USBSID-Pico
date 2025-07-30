@@ -350,7 +350,9 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
    * Byte 1 ~ config type
    * Byte 2 ... 61 the config
    */
-  CFG("[CONFIG BUFFER] %x %x %x %x %x\n", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4]);
+  if (buffer[0] < 0xD0) { /* Don't log incoming buffer to avoid spam above this region */
+    CFG("[CONFIG BUFFER] %x %x %x %x %x\n", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4]);
+  }
   switch (buffer[0]) {
     case RESET_USBSID:
       CFG("[CMD] RESET_USBSID\n");
