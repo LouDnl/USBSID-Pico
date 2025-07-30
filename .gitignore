@@ -30,6 +30,9 @@
 !.github/**
 !src
 !src/pio
+!src/cRSID
+!src/cRSID/C64
+!src/sidtunes
 !doc
 !doc/images
 !doc/images/firmware
