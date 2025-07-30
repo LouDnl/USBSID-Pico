@@ -119,7 +119,7 @@ void led_vumeter_task(void)
     osc2 = (sid_memory[0x07] * 0.596f);  /* Frequency in Hz of SID1 @ $D400 Oscillator 2 */
     osc3 = (sid_memory[0x0E] * 0.596f);  /* Frequency in Hz of SID1 @ $D400 Oscillator 3 */
 
-    vu = abs((osc1 + osc2 + osc3) / 3.0f);
+    vu = abs((int)((osc1 + osc2 + osc3) / 3.0f));
     vu = map(vu, 0, HZ_MAX, 0, VU_MAX);
     if (usbsid_config.LED.enabled) {
       pwm_value = (uint16_t)vu;
@@ -131,9 +131,9 @@ void led_vumeter_task(void)
       int sidno = (usbsid_config.RGBLED.sid_to_use - 1) * 0x20;
       rgb_value = (
         (ugrb_u32(
-          rgbb((sid_memory[0x00 + sidno] * 0.596f),usbsid_config.RGBLED.brightness),
-          rgbb((sid_memory[0x07 + sidno] * 0.596f),usbsid_config.RGBLED.brightness),
-          rgbb((sid_memory[0x0E + sidno] * 0.596f),usbsid_config.RGBLED.brightness))
+          rgbb((int)(sid_memory[0x00 + sidno] * 0.596f),usbsid_config.RGBLED.brightness),
+          rgbb((int)(sid_memory[0x07 + sidno] * 0.596f),usbsid_config.RGBLED.brightness),
+          rgbb((int)(sid_memory[0x0E + sidno] * 0.596f),usbsid_config.RGBLED.brightness))
         ) << 8u);
       dma_hw->multi_channel_trigger = (1u << dma_rgbled);
     }
@@ -187,9 +187,9 @@ void led_breathe_task(void)
       b_ = (_rgb == 2 || _rgb == 4 || _rgb == 5) ? (rgb_ * 8) : 0;
       rgb_value = (
         (ugrb_u32(
-          rgbb(r_,usbsid_config.RGBLED.brightness),
-          rgbb(g_,usbsid_config.RGBLED.brightness),
-          rgbb(b_,usbsid_config.RGBLED.brightness))
+          rgbb((int)r_,usbsid_config.RGBLED.brightness),
+          rgbb((int)g_,usbsid_config.RGBLED.brightness),
+          rgbb((int)b_,usbsid_config.RGBLED.brightness))
         ) << 8u);
       dma_hw->multi_channel_trigger = (1u << dma_rgbled);
     } else {
