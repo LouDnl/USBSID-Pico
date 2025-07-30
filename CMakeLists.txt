@@ -49,6 +49,10 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(SIDWRITES_DEBUGGING 0)  # Enable logging of SID writes one core 2
 endif()
 
+### Enable / Disable build with embedded cRSID emulator for SID playing
+## Due to the memory footprint only available for Pico2 only at the moment
+set(ONBOARD_EMULATOR 0)
+
 
 #######################################
 #### You no touchy after this line ####
@@ -192,6 +196,9 @@ set(COMPILE_OPTS PRIVATE
   -Wno-format          # int != int32_t as far as the compiler is concerned because gcc has int32_t as long int
   -Wno-unused-function # extra check to verify no unused lingering code is present
   -Wno-maybe-uninitialized
+  -Wno-unused
+  -Wno-misleading-indentation
+  -Wno-implicit-fallthrough
   -save-temps
   ${C_OPT}
   -fverbose-asm
@@ -253,7 +260,6 @@ if(${PICO_BOARD} STREQUAL "pico")
 )
 endif()
 
-
 ### Source files to compile
 set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/usbsid_doubletap.c
@@ -277,6 +283,31 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c
 )
 
+### Header folders to include
+set(TARGET_INCLUDE_DIRS PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}
+  ${CMAKE_CURRENT_LIST_DIR}/src
+  ${TINYUSB_PATH}/hw
+  ${TINYUSB_PATH}/src
+)
+
+### Emulator compilation additions
+if(ONBOARD_EMULATOR EQUAL 1)
+  if(${PICO_BOARD} STREQUAL "pico2")
+    add_compile_definitions(ONBOARD_EMULATOR=1)
+    set(SOURCEFILES
+      ${SOURCEFILES}
+      ${CMAKE_CURRENT_LIST_DIR}/src/sidplayer.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/cRSID/libcRSID.c
+    )
+    set(TARGET_INCLUDE_DIRS PRIVATE
+      ${TARGET_INCLUDE_DIRS}
+      ${CMAKE_CURRENT_LIST_DIR}/src/cRSID
+      ${CMAKE_CURRENT_LIST_DIR}/src/sidtunes
+    )
+  endif()
+endif()
+
 ### Libraries to link
 set(TARGET_LL
   hardware_clocks
@@ -292,6 +323,7 @@ set(TARGET_LL
   pico_flash
   pico_mem_ops
   pico_mem_ops_compiler
+  pico_malloc
   pico_multicore
   pico_stdlib
   pico_unique_id
@@ -306,14 +338,6 @@ set(PIO_BUS ${CMAKE_CURRENT_LIST_DIR}/src/pio/bus_control.pio)
 set(PIO_CLOCK ${CMAKE_CURRENT_LIST_DIR}/src/pio/clock.pio)
 set(PIO_VU ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu.pio)
 set(PIO_RGB ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu_rgb.pio)
-
-### Header folders to include
-set(TARGET_INCLUDE_DIRS PRIVATE
-  .
-  src
-  ${TINYUSB_PATH}/hw
-  ${TINYUSB_PATH}/src
-)
 
 ### Pico sdk path
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
@@ -380,7 +404,6 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   message("Set USB manufacturer: ${USBSID_MANUFACTURER}")
   message("Set USB product: ${BUILD_VERSION}")
   # executable
-  # add_executable(${BUILD} ${SOURCEFILES} ${LIBSOURCEFILES})
   add_executable(${BUILD} ${SOURCEFILES})
   # BUILD TYPES
   if(PICOTYPE STREQUAL "RGB")
