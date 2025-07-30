@@ -99,6 +99,12 @@ extern bool running_tests;
 /* SID detection */
 extern void auto_detect_routine(bool auto_config, bool with_delay);
 
+/* SID player */
+#ifdef ONBOARD_EMULATOR
+extern bool sidplayer_init, sidplayer_playing;
+extern void run_emulator(void);
+#endif
+
 /* Midi */
 extern void midi_init(void);
 extern void process_stream(uint8_t *buffer, size_t size);
@@ -700,6 +706,12 @@ void core1_main(void)
       if (queue_try_remove(&logging_queue, &l_entry)) {
         DBG("[CORE2] [WRITE %c:%02d/%02d] $%02X:%02X %u\n", l_entry.dtype, l_entry.n, l_entry.s, l_entry.reg, l_entry.val, l_entry.cycles);
       }
+    }
+    #endif
+
+    #ifdef ONBOARD_EMULATOR
+    if (sidplayer_playing) {
+      run_emulator();
     }
     #endif
 

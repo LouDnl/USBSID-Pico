@@ -346,6 +346,21 @@ enum
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
   TEST_FN2         = 0x9A,  /* TODO: Remove before v1 release */
   TEST_FN3         = 0x9B,  /* TODO: Remove before v1 release */
+#ifdef ONBOARD_EMULATOR
+  /* Internal SID player */
+  UPLOAD_SID_START = 0xD0,  /* Start command for USBSID to go into receiving mode */
+  UPLOAD_SID_DATA  = 0xD1,  /* Init byte for each packet containing data */
+  UPLOAD_SID_END   = 0xD2,  /* End command for USBSID to exit receiving mode */
+  UPLOAD_SID_SIZE  = 0xD3,  /* Packet containing the actual file size */
+
+  /* Internal SID player */
+  SID_PLAYER_LOAD  = 0xE0,  /* Load SID file into SID player memory and initialize internal SID player */
+  SID_PLAYER_START = 0xE1,  /* Start SID file play */
+  SID_PLAYER_STOP  = 0xE2,  /* Stop SID file play */
+  SID_PLAYER_PAUSE = 0xE3,  /* Pause/Unpause SID file play */
+  SID_PLAYER_NEXT  = 0xE4,  /* Next SID subtune play */
+  SID_PLAYER_PREV  = 0xE5,  /* Previous SID subtune play */
+#endif
 };
 
 /* Config write command byte */

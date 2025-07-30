@@ -50,18 +50,9 @@ extern double sid_hz, sid_mhz, sid_us;
 extern uint8_t sid_memory[];
 extern queue_t sidtest_queue;
 extern bool auto_config;
-
-/* SID */
-extern bool detect_fmopl(uint8_t base_address);
-extern uint8_t detect_sid_type(Socket * socket, SIDChip * sidchip);
-extern uint8_t detect_clone_type(Socket * cfg_ptr);
-extern void auto_detect_routine(bool auto_config, bool with_delay);
-extern void sid_test(int sidno, char test, char wf);
-extern bool running_tests;
-
-/* SID clone config */
-extern void read_fpgasid_configuration(uint8_t base_address);
-extern void read_skpico_configuration(uint8_t base_address);
+#ifdef ONBOARD_EMULATOR
+extern bool offload_ledrunner;
+#endif
 
 /* GPIO */
 extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
@@ -76,18 +67,49 @@ extern void sync_pios(bool at_boot);
 extern void enable_sid(bool unmute);
 extern void disable_sid(void);
 extern void mute_sid(void);
+extern void unmute_sid(void);
 extern void reset_sid_registers(void);
 extern void toggle_audio_switch(void);
 extern void set_audio_switch(bool state);
 
+/* MCU */
+extern void mcu_reset(void);
 
 /* Midi */
 extern void midi_bus_operation(uint8_t a, uint8_t b);
 
-/* MCU */
-extern void mcu_reset(void);
+/* SID detection */
+extern bool detect_fmopl(uint8_t base_address);
+extern uint8_t detect_sid_type(Socket * socket, SIDChip * sidchip);
+extern uint8_t detect_clone_type(Socket * cfg_ptr);
+extern void auto_detect_routine(bool auto_config, bool with_delay);
 
-/* Config bus */
+/* SID tests */
+extern void sid_test(int sidno, char test, char wf);
+extern bool running_tests;
+
+/* SID clone config */
+extern void read_fpgasid_configuration(uint8_t base_address);
+extern void read_skpico_configuration(uint8_t base_address);
+
+/* SID player */
+#ifdef ONBOARD_EMULATOR
+extern int load_sidtune(uint8_t * sidfile, int sidfilesize, char subt);
+extern int load_sidtune_fromflash(int sidflashid, char tuneno);
+extern void reset_sidplayer(void);
+extern void next_subtune(void);
+extern void previous_subtune(void);
+extern uint16_t playtime(void);
+extern bool sidplayer_init, sidplayer_playing;
+
+/* SID player locals */
+uint8_t __not_in_flash("usbsid_sidfile") sidfile[0xFFFF];
+static int sidfile_size;
+static int sidbytes_received;
+static bool receiving_sidfile;
+#endif
+
+/* Config BUS */
 extern void apply_bus_config(bool quiet);
 extern void apply_bus_config_OLD(void); // TODO: REMOVE ME!!
 extern void apply_fmopl_config(bool quiet);
@@ -108,7 +130,6 @@ extern void print_pico_features(void);
 extern void print_config_settings(void);
 extern void print_socket_config(void);
 extern void print_bus_config(void);
-void (*config_print[5])(void) = { print_cfg_addr, print_pico_features, print_config_settings, print_socket_config, print_bus_config };
 extern char *sidtypes[5];
 extern char *chiptypes[2];
 extern char *clonetypes[6];
@@ -117,6 +138,8 @@ extern char *enabled[2];
 extern char *true_false[2];
 extern char *single_dual[2];
 extern char *mono_stereo[2];
+/* Config logging locals */
+void (*config_print[5])(void) = { print_cfg_addr, print_pico_features, print_config_settings, print_socket_config, print_bus_config };
 
 /* Pre declarations */
 void apply_config(bool at_boot, bool print_cfg);
@@ -901,6 +924,11 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       // print_cfg(sid_memory, (numsids * 0x20));
     case TEST_FN2:
       uint8_t st = 0xFF;
+      #ifdef ONBOARD_EMULATOR
+      if (buffer[1] == 0) {
+        CFG("PLAYTIME: %u seconds\n", playtime());
+      }
+      #endif
       if (buffer[1] == 4) {
         st = cycled_read_operation(buffer[2], buffer[3]);
         CFG("[TEST FOUND] %02X\n", st);
@@ -948,6 +976,97 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       }
       CFG("\n");
       break;
+    #ifdef ONBOARD_EMULATOR
+    case UPLOAD_SID_START:
+      CFG("[UPLOAD_SID_START]\n");
+      receiving_sidfile = true;
+      sidbytes_received = 0;
+      break;
+    case UPLOAD_SID_DATA:
+      if (sidbytes_received == 0) CFG("[UPLOAD_SID_DATA]\n");
+      if (receiving_sidfile) {
+        for (int i = 1; i < 63; i++) { /* Max buffer size minus command byte (config init byte is already gone) */
+          sidfile[sidbytes_received] = buffer[i];
+          sidbytes_received++;
+        }
+      }
+      break;
+    case UPLOAD_SID_END:
+      CFG("[UPLOAD_SID_END]\n");
+      DBG("Received %u bytes\n", sidbytes_received);
+      receiving_sidfile = false;
+      /* ISSUE: These are never the same size */
+      /* sidfile_size = sidbytes_received; */
+      sidbytes_received = 0;
+      break;
+    case UPLOAD_SID_SIZE:
+      CFG("[UPLOAD_SID_SIZE]\n");
+      sidfile_size = (buffer[1]<<8|buffer[2]);
+      DBG("Received SID file size: %u\n", sidfile_size);
+      break;
+    case SID_PLAYER_LOAD:
+      CFG("[SID_PLAYER_LOAD] %d\n", buffer[1]);
+      CFG("[CONFIG BUFFER SIZE] %d\n", count_of(buffer));
+      char tuneno = buffer[2]; /* Should be 0 if not supplied */
+      CFG("[SUBTUNE] %d\n", tuneno);
+      sidplayer_init = false;
+      switch (buffer[1]) {
+        case 0: /* From buffer */
+          if (load_sidtune(sidfile, sidfile_size, tuneno)) {
+            sidplayer_init = true;
+          }
+          break;
+        case 1: /* Supremacy */
+          if (load_sidtune_fromflash(1, tuneno)) {
+            sidplayer_init = true;
+          }
+          break;
+        case 2: /* Afterburner */
+          if (load_sidtune_fromflash(2, tuneno)) {
+            sidplayer_init = true;
+          }
+          break;
+        case 3: /* Edge of Disgrace */
+          if (load_sidtune_fromflash(3, tuneno)) {
+            sidplayer_init = true;
+          }
+          break;
+        default:
+          sidplayer_init = false;
+          break;
+      }
+      break;
+    case SID_PLAYER_START:
+      CFG("[SID_PLAYER_START]\n");
+      unmute_sid(); /* Must unmute before play start or some tunes will be silent */
+      if (sidplayer_init) sidplayer_playing = true;
+      sidplayer_init = false;
+      break;
+    case SID_PLAYER_STOP:
+      CFG("[SID_PLAYER_STOP]\n");
+      sidplayer_playing = false;
+      reset_sidplayer();
+      if (usbsid_config.socketOne.clonetype != 2
+          && usbsid_config.socketTwo.clonetype != 2) {
+        reset_sid(); /* Breaking for tunes on SKPico */
+      } else {
+        mute_sid();
+      }
+      break;
+    case SID_PLAYER_PAUSE:
+      sidplayer_playing = !sidplayer_playing;
+      break;
+    case SID_PLAYER_NEXT:
+      sidplayer_playing = false;
+      next_subtune();
+      sidplayer_playing = true;
+      break;
+    case SID_PLAYER_PREV:
+      sidplayer_playing = false;
+      previous_subtune();
+      sidplayer_playing = true;
+      break;
+    #endif
     default:
       break;
     }
