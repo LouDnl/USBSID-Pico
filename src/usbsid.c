@@ -49,6 +49,7 @@ bool web_serial_connected = false;
 double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
 int paused_state = 0, reset_state = 0;
 bool auto_config = false;
+bool offload_ledrunner = false;
 
 /* Init var pointers for external use */
 uint8_t (*write_buffer_p)[MAX_BUFFER_SIZE] = &write_buffer;
@@ -702,7 +703,9 @@ void core1_main(void)
     }
     #endif
 
-    led_runner();
+    if (!offload_ledrunner) {
+      led_runner();
+    }
   }
   /* Point of no return, this should never be reached */
   return;
@@ -806,6 +809,9 @@ int main()
 #ifdef USE_VENDOR_BUFFER
     vendor_task();  /* Only use this if buffering and fifo are enabled */
 #endif
+    if (offload_ledrunner) {
+      led_runner();
+    }
   }
 
   /* Point of no return, this should never be reached */
