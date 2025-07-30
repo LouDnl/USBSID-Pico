@@ -248,7 +248,7 @@ AGAIN:
   memcpy(&temp_config, (void *)(XIP_BASE + (FLASH_CONFIG_OFFSET + (FLASH_PAGE_SIZE * savelocationid))), sizeof(Config));
   stdio_flush();
   CFG("[CONFIG] LOAD CONFIG FROM SAVE POSITION %d (SAVED CONFIG ID: %d)\n", savelocationid, temp_config.config_saveid);
-  if ((temp_config.config_saveid >= 0) && (temp_config.config_saveid <= 0xF) /* Max 16 saves */
+  if (/* (temp_config.config_saveid >= 0) &&  */(temp_config.config_saveid <= 0xF) /* Max 16 saves */
     && temp_config.config_saveid == savelocationid) { /* Found previously saved config */
     savelocationid++;  /* Increase id and try again */
     goto AGAIN;
@@ -396,7 +396,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       CFG("[CMD] RELOAD_CONFIG\n");
       load_config(&usbsid_config);
       apply_config(false, true);
-      for (int i = 0; i < count_of(clockrates); i++) {
+      for (uint i = 0; i < count_of(clockrates); i++) {
         if (clockrates[i] == usbsid_config.clock_rate) {
           apply_clockrate(i, true);
         }
@@ -1063,7 +1063,7 @@ void detect_default_config(void)
 
 int return_clockrate(void)
 {
-  for (int i = 0; i < count_of(clockrates); i++) {
+  for (uint i = 0; i < count_of(clockrates); i++) {
     if (clockrates[i] == usbsid_config.clock_rate) {
       return i;
     }
