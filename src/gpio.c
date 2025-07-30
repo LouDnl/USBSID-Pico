@@ -631,6 +631,29 @@ void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint
   return;
 }
 
+void __no_inline_not_in_flash_func(cycled_write_operation_nondma)(uint8_t address, uint8_t data, uint16_t cycles)
+{
+  delay_word = cycles;
+  sid_memory[(address & 0x7F)] = data;
+  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+  control_word = 0b111000;
+  dir_mask = 0b1111111111111111;  /* Always OUT never IN */
+  if (set_bus_bits(address, data) != 1) {
+    return;
+  }
+  data_word = (dir_mask << 16) | data_word;
+
+  pio_sm_put_blocking(bus_pio, sm_control, control_word);
+  pio_sm_put_blocking(bus_pio, sm_data, data_word);
+  pio_sm_put_blocking(bus_pio, sm_delay, delay_word);
+
+  GPIODBG("[WC]$%04x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16" $%02X:%02X(%u %u)\n",
+    data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word),
+    address, data, cycles, delay_word);
+  return;
+}
+
+
 void unmute_sid(void)
 {
   DBG("[UNMUTE]\n");
