@@ -724,7 +724,7 @@ void reset_sid(void)
 
 void clear_sid_registers(int sidno)
 { /* NOTICE: CAUSES ISSUES IF USED RIGHT BEFORE PLAYING */
-  for (int reg = 0; reg < count_of(sid_registers) - 4; reg++) {
+  for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
     cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0x0, 0);
   }
   return;
