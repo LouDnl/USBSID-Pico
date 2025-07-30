@@ -140,7 +140,7 @@ uint8_t detect_sid_unsafe(uint8_t start_addr)
 { /* https://codebase64.org/doku.php?id=base:detecting_sid_type */
   CFG("[SID] DETECT SID UNSAFE\n");
   /* clear sid registers */
-  for (int reg = 0; reg < count_of(sid_registers) - 4; reg++) {
+  for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
     /* STA $D400,x ~ 5 cycles */
     /* DEX         ~ 2 cycles*/
     /* BPL         ~ 2 cycles */
