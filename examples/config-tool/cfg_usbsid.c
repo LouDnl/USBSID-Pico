@@ -42,15 +42,18 @@
 #include "cfg_skpico.h"
 #include "macros.h"
 
-/* Compile with:
- * gcc -g3 -L/usr/local/lib inih/ini.c cfg_usbsid.c -o cfg_usbsid $(pkg-config --libs --cflags libusb-1.0) -I./examples/config-tool/ini
+/**
+ * Compile from config-tool directory:
+ * gcc -g3 -L/usr/local/lib inih/ini.c cfg_usbsid.c -o cfg_usbsid $(pkg-config --libs --cflags libusb-1.0) -I./inih
+ * Compile from repo root directory and copy to ~/.local/bin:
  * gcc -g3 -L/usr/local/lib examples/config-tool/inih/ini.c examples/config-tool/cfg_usbsid.c -o examples/config-tool/cfg_usbsid $(pkg-config --libs --cflags libusb-1.0) -I./examples/config-tool/inih ; cp examples/config-tool/cfg_usbsid ~/.local/bin
+ * Compile with mingw from config-tool directory:
  * /usr/bin/x86_64-w64-mingw32-gcc -g3 \
     -L/usr/x86_64-w64-mingw32/sys-root/mingw/lib \
     inih/ini.c cfg_usbsid.c -o cfg_usbsid.exe \
     -lusb-1.0 \
-    -I/usr/x86_64-w64-mingw32/sys-root/mingw/include/libusb-1.0
-    -I./examples/config-tool/inih
+    -I/usr/x86_64-w64-mingw32/sys-root/mingw/include/libusb-1.0 \
+    -I./inih
  */
 
 /* ---------------------- */
@@ -1453,7 +1456,7 @@ void print_help(void)
   printf("                                  2: Detection routine (Clones)\n");
   printf("                                  3: Unsafe detection routine\n");
   printf("  -dclone,  --detect-clone-types: Send clone autodetect command to device, returns the config as with '-r' afterwards\n");
-  printf("  -auto,    ----auto-detect-all : Send run autodetection routine command to device and reboot\n");
+  printf("  -auto,    --auto-detect-all   : Send run autodetection routine command to device and reboot\n");
   printf("  -w,       --write-config      : Write single config item to USBSID-Pico (will read the full config first!)\n");
   printf("  -a,       --apply-config      : Apply the current config settings (from USBSID-Pico memory) that you changed with '-w'\n");
   printf("  -s,       --save-config       : Send the save config command to USBSID-Pico\n");
