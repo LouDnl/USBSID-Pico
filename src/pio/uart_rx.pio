@@ -1,0 +1,48 @@
+;
+; USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board
+; for interfacing one or two MOS SID chips and/or hardware SID emulators over
+; (WEB)USB with your computer, phone or ASID supporting player
+;
+; uart_rx.pio
+; This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
+; File author: LouD
+;
+; The contents of this file are based upon and heavily inspired by the sourcecode
+; from the original file: pico-examples/pio/uart_rx/uart_rx.pio
+; Licensing conditions from the above named source automatically apply to this
+; Copyright (c) 2021 Raspberry Pi (Trading) Ltd.
+; SPDX-License-Identifier: BSD-3-Clause
+;
+; This program is free software: you can redistribute it and/or modify
+; it under the terms of the GNU General Public License as published by
+; the Free Software Foundation, version 2.
+;
+; This program is distributed in the hope that it will be useful, but
+; WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+; General Public License for more details.
+;
+; You should have received a copy of the GNU General Public License
+; along with this program. If not, see <http://www.gnu.org/licenses/>.
+;
+
+.program uart_rx
+
+; Slightly more fleshed-out 8n1 UART receiver which handles framing errors and
+; break conditions more gracefully.
+; IN pin 0 and JMP pin are both mapped to the GPIO used as UART RX.
+
+start:
+    wait 0 pin 0        ; Stall until start bit is asserted
+    set x, 7    [10]    ; Preload bit counter, then delay until halfway through
+bitloop:                ; the first data bit (12 cycles incl wait, set).
+    in pins, 1          ; Shift data bit into ISR
+    jmp x-- bitloop [6] ; Loop 8 times, each loop iteration is 8 cycles
+    jmp pin good_stop   ; Check stop bit (should be high)
+
+    irq 4 rel           ; Either a framing error or a break. Set a sticky flag,
+    wait 1 pin 0        ; and wait for line to return to idle state.
+    jmp start           ; Don't push data if we didn't see good framing.
+
+good_stop:              ; No delay before returning to start; a little slack is
+    push                ; important in case the TX clock is slightly too fast.

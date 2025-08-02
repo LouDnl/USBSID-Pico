@@ -41,11 +41,16 @@ uint8_t __not_in_flash("usbsid_buffer") sid_buffer[MAX_BUFFER_SIZE] __aligned(2 
 uint8_t __not_in_flash("usbsid_buffer") read_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
 uint8_t __not_in_flash("usbsid_buffer") config_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
 uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __aligned(2 * (0x20 * 4));
+uint8_t __not_in_flash("usbsid_buffer") uart_buffer[64] __aligned(2 * 64);
+
 int usb_connected = 0, usbdata = 0;
 uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
 uint8_t *cdc_itf = 0, *wusb_itf = 0;
-char ntype = '0', dtype = '0', cdc = 'C', asid = 'A', midi = 'M', sysex = 'S', wusb = 'W';
+/* nonetype, datatype, returntype */
+char ntype = '0', dtype = '0', rtype = '0';
+char cdc = 'C', asid = 'A', midi = 'M', sysex = 'S', wusb = 'W', uart = 'U';
 bool web_serial_connected = false;
+
 double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
 int paused_state = 0, reset_state = 0;
 bool auto_config = false;
@@ -83,6 +88,11 @@ extern void clear_bus_all(void);
 extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
 extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
 extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
+
+/* Uart */
+#ifdef USE_PIO_UART
+extern void init_uart(void);
+#endif
 
 /* Vu */
 extern uint16_t vu;
@@ -260,7 +270,7 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
   if (command == READ) {  /* READING CAN ONLY HANDLE ONE AT A TIME, PERIOD. */
     IODBG("[I %d] [%c] $%02X:%02X\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2]);
     write_buffer[0] = cycled_read_operation(sid_buffer[1], 0);  /* write the address to the SID and read the data back */
-    switch (dtype) {  /* write the result to the USB client */
+    switch (rtype) {  /* write the result to the USB client */
       case 'C':
         cdc_write(itf, BYTES_TO_SEND);
         break;
@@ -268,7 +278,7 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
         webserial_write(itf, BYTES_TO_SEND);
         break;
       default:
-        IODBG("[WRITE ERROR]%c\n", dtype);
+        IODBG("[WRITE ERROR]%c\n", rtype);
         break;
     };
     vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
@@ -279,7 +289,7 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
       case CYCLED_READ:
         IODBG("[I %d] [%c] $%02X %u\n", n_bytes, dtype, sid_buffer[1], (sid_buffer[2] << 8 | sid_buffer[3]));
         write_buffer[0] = cycled_read_operation(sid_buffer[1], (sid_buffer[2] << 8 | sid_buffer[3]));
-        switch (dtype) {  /* write the result to the USB client */
+        switch (rtype) {  /* write the result to the USB client */
           case 'C':
             cdc_write(itf, BYTES_TO_SEND);
             break;
@@ -287,7 +297,7 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
             webserial_write(itf, BYTES_TO_SEND);
             break;
           default:
-            IODBG("[WRITE ERROR]%c\n", dtype);
+            IODBG("[WRITE ERROR]%c\n", rtype);
             break;
         };
         vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
@@ -365,7 +375,7 @@ void tud_mount_cb(void)
 
 void tud_umount_cb(void)
 {
-  usb_connected = 0, usbdata = 0, dtype = ntype;
+  usb_connected = 0, usbdata = 0, dtype = rtype = ntype;
   DBG("[%s]\n", __func__);
   disable_sid();  /* NOTICE: Testing if this is causing the random lockups */
 }
@@ -374,7 +384,7 @@ void tud_suspend_cb(bool remote_wakeup_en)
 {
   /* (void) remote_wakeup_en; */
   DBG("[%s] remote_wakeup_en:%d\n", __func__, remote_wakeup_en);
-  usb_connected = 0, usbdata = 0, dtype = ntype;
+  usb_connected = 0, usbdata = 0, dtype = rtype = ntype;
 }
 
 void tud_resume_cb(void)
@@ -426,7 +436,7 @@ void cdc_task(void)
   if (tud_cdc_n_connected(CDC_ITF)) {
     if (tud_cdc_n_available(CDC_ITF) > 0) {
       cdc_itf = CDC_ITF;
-      usbdata = 1, dtype = cdc;
+      usbdata = 1, dtype = cdc, rtype = cdc;
       cdcread = tud_cdc_n_read(CDC_ITF, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
       tud_cdc_n_read_flush(CDC_ITF);
       memcpy(sid_buffer, read_buffer, cdcread);
@@ -444,7 +454,7 @@ void tud_cdc_rx_cb(uint8_t itf)
 #ifdef USE_CDC_CALLBACK
   if (itf == CDC_ITF) {
     cdc_itf = &itf;
-    usbdata = 1, dtype = cdc;
+    usbdata = 1, dtype = cdc, rtype = cdc;
     cdcread = tud_cdc_n_read(*cdc_itf, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
     tud_cdc_n_read_flush(*cdc_itf);
     memcpy(sid_buffer, read_buffer, cdcread);
@@ -510,7 +520,7 @@ void vendor_task(void)
   /* If the fifo buffer is disabled, this function has no use */
   if (web_serial_connected) {
       wusb_itf = WUSB_ITF;
-      usbdata = 1, dtype = wusb;
+      usbdata = 1, dtype = wusb, rtype = wusb;
       webread = tud_vendor_n_read(WUSB_ITF, &read_buffer, MAX_BUFFER_SIZE);
       tud_vendor_n_read_flush(*wusb_itf);
       memcpy(sid_buffer, read_buffer, webread);
@@ -530,7 +540,7 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
   /* vendor class has no connect check, thus use this */
   if (web_serial_connected && itf == WUSB_ITF) {
       wusb_itf = &itf; /* Since there's only 1 vendor interface, we know it's 0 */
-      usbdata = 1, dtype = wusb;
+      usbdata = 1, dtype = wusb, rtype = wusb;
       webread = bufsize;
       memcpy(sid_buffer, buffer, bufsize);
       /* No need to flush since we have no fifo */
@@ -685,6 +695,11 @@ void core1_main(void)
   queue_init(&logging_queue, sizeof(writelogging_queue_entry_t), 16);  /* 16 entries deep */
   #endif
 
+  /* Initialize PIO Uart */
+  #ifdef USE_PIO_UART
+  init_uart();
+  #endif
+
   /* Release semaphore when core 1 is started */
   sem_release(&core1_init);
 
@@ -700,15 +715,6 @@ void core1_main(void)
       }
     }
 
-    #ifdef WRITE_DEBUG  /* Only run this queue when needed */
-    if (usbdata == 1) {
-      writelogging_queue_entry_t l_entry;
-      if (queue_try_remove(&logging_queue, &l_entry)) {
-        DBG("[CORE2] [WRITE %c:%02d/%02d] $%02X:%02X %u\n", l_entry.dtype, l_entry.n, l_entry.s, l_entry.reg, l_entry.val, l_entry.cycles);
-      }
-    }
-    #endif
-
     #ifdef ONBOARD_EMULATOR
     if (sidplayer_playing) {
       run_emulator();
@@ -718,6 +724,17 @@ void core1_main(void)
     if (!offload_ledrunner) {
       led_runner();
     }
+
+    #ifdef WRITE_DEBUG  /* Only run this queue when needed */
+    if (usbdata == 1) {
+      writelogging_queue_entry_t l_entry;
+      if (queue_try_remove(&logging_queue, &l_entry)) {
+        DBG("[CORE2] [WRITE %c:%02d/%02d] $%02X:%02X %u\n", l_entry.dtype, l_entry.n, l_entry.s, l_entry.reg, l_entry.val, l_entry.cycles);
+      }
+    }
+    #endif
+
+
   }
   /* Point of no return, this should never be reached */
   return;

@@ -53,6 +53,18 @@ endif()
 ## Due to the memory footprint only available for Pico2 only at the moment
 set(ONBOARD_EMULATOR 0)
 
+### Enable/ Disable build with PIO Uart on unused pins 26/27
+set(USE_PIO_UART 0)
+
+### Information on the use of CDC callback
+## This is turned on/off by changing USE_CDC_CALLBACK in globals.h
+
+### Information on the use of Vendor buffer
+## This is turned on/off by setting both vendor buffer size
+## defines in tusb_config.h and by changing USE_VENDOR_BUFFER in globals.h
+# CFG_TUD_VENDOR_TX_BUFSIZE
+# CFG_TUD_VENDOR_RX_BUFSIZE
+
 
 #######################################
 #### You no touchy after this line ####
@@ -308,6 +320,15 @@ if(ONBOARD_EMULATOR EQUAL 1)
   endif()
 endif()
 
+### PIO Uart compilation additions
+if(USE_PIO_UART EQUAL 1)
+  add_compile_definitions(USE_PIO_UART=1)
+  set(SOURCEFILES
+    ${SOURCEFILES}
+    ${CMAKE_CURRENT_LIST_DIR}/src/uart.c
+  )
+endif()
+
 ### Libraries to link
 set(TARGET_LL
   hardware_clocks
@@ -338,6 +359,9 @@ set(PIO_BUS ${CMAKE_CURRENT_LIST_DIR}/src/pio/bus_control.pio)
 set(PIO_CLOCK ${CMAKE_CURRENT_LIST_DIR}/src/pio/clock.pio)
 set(PIO_VU ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu.pio)
 set(PIO_RGB ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu_rgb.pio)
+if(USE_PIO_UART EQUAL 1)
+set(PIO_UART ${CMAKE_CURRENT_LIST_DIR}/src/pio/uart_rx.pio)
+endif()
 
 ### Pico sdk path
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
@@ -422,6 +446,9 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   pico_generate_pio_header(${BUILD} ${PIO_BUS})
   pico_generate_pio_header(${BUILD} ${PIO_CLOCK})
   pico_generate_pio_header(${BUILD} ${PIO_VU})
+  if(USE_PIO_UART EQUAL 1)
+  pico_generate_pio_header(${BUILD} ${PIO_UART})
+  endif()
   if(PICOTYPE STREQUAL "RGB")
     pico_generate_pio_header(${BUILD} ${PIO_RGB})
   endif()

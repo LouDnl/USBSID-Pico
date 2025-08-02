@@ -41,7 +41,7 @@ extern void init_sidclock(void);
 extern void deinit_sidclock(void);
 extern void cdc_write(uint8_t * itf, uint32_t n);
 extern void webserial_write(uint8_t * itf, uint32_t n);
-extern char dtype;
+extern char rtype;
 extern uint8_t *cdc_itf;
 extern uint8_t *wusb_itf;
 extern uint8_t *write_buffer_p;
@@ -348,7 +348,7 @@ void __no_inline_not_in_flash_func(save_config)(Config* config)
 
 void write_back_data(size_t buffersize)
 {
-  switch (dtype) {
+  switch (rtype) {
     case 'C':
       cdc_write(cdc_itf, buffersize);
       break;
@@ -774,7 +774,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
       read_config(&usbsid_config);  /* Read the config into the config buffer */
       memcpy(write_buffer_p, config_array, 64);  /* Copy the first 64 bytes from the buffer into the write buffer */
-      switch (dtype) {
+      switch (rtype) {
         case 'C':
           cdc_write(cdc_itf, 64);
           break;
@@ -790,7 +790,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
       read_config(&usbsid_config);  /* Read the config into the config buffer */
       memcpy(write_buffer_p, config_array, 64);  /* Copy the first 64 bytes from the buffer into the write buffer */
-      switch (dtype) {
+      switch (rtype) {
         case 'C':
           cdc_write(cdc_itf, 64);
           break;
@@ -853,7 +853,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       read_firmware_version();
       memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
       memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
-        switch (dtype) {
+        switch (rtype) {
           case 'C':
             cdc_write(cdc_itf, MAX_BUFFER_SIZE);
             break;
@@ -869,7 +869,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         read_pcb_version();
         memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
         memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
-          switch (dtype) {
+          switch (rtype) {
             case 'C':
               cdc_write(cdc_itf, MAX_BUFFER_SIZE);
               break;
