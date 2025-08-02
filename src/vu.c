@@ -40,6 +40,7 @@ extern Config usbsid_config;  /* usbsid.c */
 extern uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));  /* usbsid.c */
 extern int usbdata;     /* usbsid.c */
 extern int numsids;     /* config.c */
+extern bool offload_ledrunner;
 
 /* GPIO externals */
 extern void setup_vu(void);
@@ -217,6 +218,7 @@ void led_runner(void)
       if (n_checks >= MAX_CHECKS)  /* 100 checks */
       {
         n_checks = 0, usbdata = 0, dtype = ntype;  /* NOTE: This sets dtype to 0 which causes buffertask write to go to default and error out with many consecutive reads from the bus */
+        offload_ledrunner = false;
       }
     }
     return;
