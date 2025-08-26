@@ -5,9 +5,9 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
 
 # This is USBSID-Pico! :)
 
-| **“Raster Bar” (8-bit)** | **Van Halen's Jump<br>dual SID in Stereo!** | **Flamethrower** | **Multiverse 100%<br>in Stereo!** |
+| **“Raster Bar” (8-bit)** | **Van Halen's Jump<br>dual SID in Stereo!** | **Next Level** | **Coma Light 13** |
 |:-:|:-:|:-:|:-:|
-| [![MOS6581](https://img.youtube.com/vi/nh0SxO1y6I0/1.jpg)](https://www.youtube.com/watch?v=nh0SxO1y6I0)<br><small><sub>by LukHash</sub></small> | [![Dual MOS8580](https://img.youtube.com/vi/lzvkWlDq2TM/1.jpg)](https://www.youtube.com/watch?v=lzvkWlDq2TM)<br><small><sub>by Nordischsound</sub></small> | [![MOS8580](https://img.youtube.com/vi/Mfbj21ntQXA/1.jpg)](https://www.youtube.com/watch?v=Mfbj21ntQXA)<br><small><sub>by Reed</sub></small> | [![Dual MOS8580](https://img.youtube.com/vi/Rr-oq5jBeDg/1.jpg)](https://www.youtube.com/watch?v=Rr-oq5jBeDg)<br><small><sub>by Nah-Kolor</sub></small> |
+| [<img src="https://img.youtube.com/vi/nh0SxO1y6I0/0.jpg" width=50%>](https://www.youtube.com/watch?v=nh0SxO1y6I0)<br><small><sub>by LukHash</sub></small> | [<img src="https://img.youtube.com/vi/lzvkWlDq2TM/0.jpg" width=50%>](https://www.youtube.com/watch?v=lzvkWlDq2TM)<br><small><sub>by Nordischsound</sub></small> | [<img src="https://img.youtube.com/vi/ER8v2g7TlwA/0.jpg" width=50%>](https://www.youtube.com/watch?v=ER8v2g7TlwA)<br><small><sub>by Performers</sub> | [<img src="https://img.youtube.com/vi/iXviof4ZtIg/0.jpg" width=50%>](https://www.youtube.com/watch?v=iXviof4ZtIg)<br><small><sub>by Oxyron</sub></small> |
 
 # Index
 
