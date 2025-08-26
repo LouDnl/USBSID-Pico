@@ -94,6 +94,13 @@ extern void read_skpico_configuration(uint8_t base_address);
 
 /* SID player */
 #ifdef ONBOARD_EMULATOR
+extern bool stop_emulator(void);
+extern void run_emulator(void);
+extern void set_logging(int logid);
+extern void unset_logging(int logid);
+bool emulator_running, starting_emulator, stopping_emulator;
+
+#ifdef ONBOARD_SIDPLAYER
 extern int load_sidtune(uint8_t * sidfile, int sidfilesize, char subt);
 extern int load_sidtune_fromflash(int sidflashid, char tuneno);
 extern void reset_sidplayer(void);
@@ -103,15 +110,16 @@ extern uint16_t playtime(void);
 extern bool sidplayer_init, sidplayer_playing;
 
 /* SID player locals */
-uint8_t __not_in_flash("usbsid_sidfile") sidfile[0xFFFF];
+uint8_t __not_in_flash("usbsid_sidfile") sidfile[0xFFFF]; /* Temporary buffer to store incoming data */
 static int sidfile_size;
 static int sidbytes_received;
 static bool receiving_sidfile;
-#endif
+bool sidplayer_start;
+#endif /* ONBOARD_SIDPLAYER */
+#endif /* ONBOARD_EMULATOR */
 
 /* Config BUS */
 extern void apply_bus_config(bool quiet);
-extern void apply_bus_config_OLD(void); // TODO: REMOVE ME!!
 extern void apply_fmopl_config(bool quiet);
 
 /* Config socket */
@@ -926,7 +934,28 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       uint8_t st = 0xFF;
       #ifdef ONBOARD_EMULATOR
       if (buffer[1] == 0) {
-        CFG("PLAYTIME: %u seconds\n", playtime());
+        CFG("START EMULATOR\n");
+        emulator_running = false;
+        offload_ledrunner = true;
+        starting_emulator = true;
+      }
+      if (buffer[1] == 1) {
+        CFG("STOP EMULATOR\n");
+        #ifdef ONBOARD_SIDPLAYER
+        sidplayer_playing = false;
+        #endif
+        stopping_emulator = true;
+        stop_emulator();
+      }
+      if (buffer[1] == 2) {
+        set_logging((int)buffer[2]);
+      }
+      #endif
+      #if defined(ONBOARD_EMULATOR) && defined(ONBOARD_SIDPLAYER)
+      if (buffer[1] == 3) {
+        CFG("START SID PLAYER\n");
+        offload_ledrunner = true;
+        sidplayer_start = true;
       }
       #endif
       if (buffer[1] == 4) {
@@ -976,7 +1005,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       }
       CFG("\n");
       break;
-    #ifdef ONBOARD_EMULATOR
+    #if defined(ONBOARD_EMULATOR) && defined(ONBOARD_SIDPLAYER)
     case UPLOAD_SID_START:
       CFG("[UPLOAD_SID_START]\n");
       receiving_sidfile = true;
@@ -1037,7 +1066,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       }
       break;
     case SID_PLAYER_START:
-      CFG("[SID_PLAYER_START]\n");
+      CFG("[SID_PLAYER_START] %d\n", sidplayer_init);
       unmute_sid(); /* Must unmute before play start or some tunes will be silent */
       if (sidplayer_init) sidplayer_playing = true;
       sidplayer_init = false;
