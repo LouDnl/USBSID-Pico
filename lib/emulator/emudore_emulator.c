@@ -43,7 +43,7 @@
 #endif
 
 #ifdef ONBOARD_SIDPLAYER
-#include "sidtunes/supremacyprg.h"
+#include <supremacyprg.h>
 #endif
 
 
