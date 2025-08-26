@@ -109,6 +109,7 @@ delay:
 .wrap
 
 ; Buffer raster cycle counter program ~ PIO1 SM0
+; If used, triggers an IRQ after each n raster cycles provided
 .program raster_buffer
 .wrap_target
     pull noblock             ; Pull data from FIFO, if empty re-use previous data stored in X
