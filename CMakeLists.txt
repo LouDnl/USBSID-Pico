@@ -75,11 +75,12 @@ set(USE_PIO_UART 0)
 # remember that enabling debugging and disabling optimizations
 # will weird out tune playing and reading from and writing to
 # SKPico will stop functioning
-SET(DEBUG_SYMBOLS 0)      # 0 default, 1 debug symbols & debug build enabled
-SET(DEBUGGING 0)          # 0 default, 1~3 equals -g1~3
-SET(OPTIMIZATIONS 2)      # 3 default, 2 ~ -O1 for debugging *3 causes desync with DMA read_address and chain_to!()
-SET(TUSB_DEBUG 0)         # 0 default, 0~3 non verbose to very verbose
-SET(ANALYSE_STACKUSAGE 0) # 0 default, 1 enabled, 0 disabled
+set(DEBUG_SYMBOLS 0)      # 0 default, 1 debug symbols & debug build enabled
+set(DEBUGGING 0)          # 0 default, 1~3 equals -g1~3
+set(OPTIMIZATIONS 2)      # 2 default, 2 ~ -O1 for debugging *3 causes desync with DMA read_address and chain_to!()
+set(WARNINGS_ONLY 0)      # 0 default, 0 error on warnings
+set(TUSB_DEBUG 0)         # 0 default, 0~3 non verbose to very verbose
+set(ANALYSE_STACKUSAGE 0) # 0 default, 1 enabled, 0 disabled
 
 ### Target board pico, pico_w, pico2
 if(DEFINED PICO_BOARD)
@@ -194,29 +195,39 @@ endif()
 
 ### Define compile time optimizations
 if(OPTIMIZATIONS EQUAL 0)
-  set(C_OPT -O0)
+  set(O_OPT -O0)
 elseif(OPTIMIZATIONS EQUAL 1)
-  set(C_OPT -Og)
+  set(O_OPT -Og)
 elseif(OPTIMIZATIONS EQUAL 2)
-  set(C_OPT -Ofast)
+  set(O_OPT -Ofast)
 elseif(OPTIMIZATIONS EQUAL 3)
-  set(C_OPT -O3)
+  set(O_OPT -O3)
+endif()
+
+if(WARNINGS_ONLY EQUAL 1)
+  set(W_OPT
+    -Wall
+    -Wextra
+    -Wunused
+  )
+else()
+  set(W_OPT
+    -Werror
+    -Wno-format          # int != int32_t as far as the compiler is concerned because gcc has int32_t as long int
+    -Wno-unused-function # extra check to verify no unused lingering code is present
+    -Wno-maybe-uninitialized
+    -Wno-unused
+    -Wno-misleading-indentation
+    -Wno-implicit-fallthrough
+  )
 endif()
 
 ### Compiler flags and options
 set(COMPILE_OPTS PRIVATE
   ${D_OPT}
-  -Wall
-  -Wunused
-  -Werror
-  -Wno-format          # int != int32_t as far as the compiler is concerned because gcc has int32_t as long int
-  -Wno-unused-function # extra check to verify no unused lingering code is present
-  -Wno-maybe-uninitialized
-  -Wno-unused
-  -Wno-misleading-indentation
-  -Wno-implicit-fallthrough
+  ${W_OPT}
+  ${O_OPT}
   -save-temps
-  ${C_OPT}
   -fverbose-asm
   -Wl,--wrap=ceil
   -Wl,--wrap=memcpy
