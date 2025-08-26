@@ -47,7 +47,7 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(MIDIVOICE_DEBUGGING 0)  # Enable debugging in midi.c
   set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
   set(SIDWRITES_DEBUGGING 0)  # Enable logging of SID writes one core 2
-  set(EMULATOR_DEBUGGING 0)     # Enable debugging in emulator
+  set(EMULATOR_DEBUGGING 0)   # Enable debugging in emulator
 endif()
 
 ### Enable / Disable build with embedded emulator for Midi
