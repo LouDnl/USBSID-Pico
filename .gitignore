@@ -30,9 +30,10 @@
 !.github/**
 !src
 !src/pio
-!src/cRSID
-!src/cRSID/C64
-!src/sidtunes
+!lib
+!lib/emulator
+!lib/emulator/flash
+!lib/emulator/sidtunes
 !doc
 !doc/images
 !doc/images/firmware
