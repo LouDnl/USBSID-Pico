@@ -81,9 +81,9 @@ unsigned char o1 = 0, o2 = 0, o3 = 0;
 void init_rgb(void)
 {
   #if defined(USE_RGB)
-  _rgb = randval(0, 5);  /* Select random color to start with */
+  _rgb = RANDVAL(0, 5);  /* Select random color to start with */
   r_ = g_ = b_ = 0;
-  rgb_value = (ugrb_u32(r_,g_,b_) << 8u);
+  rgb_value = (UGRB_U32(r_,g_,b_) << 8u);
   dma_hw->multi_channel_trigger = (1u << dma_rgbled);
   #endif
   return;
@@ -122,7 +122,7 @@ void led_vumeter_task(void)
     osc3 = (sid_memory[0x0E] * 0.596f);  /* Frequency in Hz of SID1 @ $D400 Oscillator 3 */
 
     vu = fabsl(((osc1 + osc2 + osc3) / 3.0f));
-    vu = map(vu, 0, HZ_MAX, 0, VU_MAX);
+    vu = MAP(vu, 0, HZ_MAX, 0, VU_MAX);
     if (usbsid_config.LED.enabled) {
       pwm_value = (uint16_t)vu;
       dma_hw->multi_channel_trigger = (1u << dma_pwmled);
@@ -132,10 +132,10 @@ void led_vumeter_task(void)
     if(usbsid_config.RGBLED.enabled) {
       int sidno = (usbsid_config.RGBLED.sid_to_use - 1) * 0x20;
       rgb_value = (
-        (ugrb_u32(
-          rgbb((sid_memory[0x00 + sidno] * 0.596f),usbsid_config.RGBLED.brightness),
-          rgbb((sid_memory[0x07 + sidno] * 0.596f),usbsid_config.RGBLED.brightness),
-          rgbb((sid_memory[0x0E + sidno] * 0.596f),usbsid_config.RGBLED.brightness))
+        (UGRB_U32(
+          RGBB((sid_memory[0x00 + sidno] * 0.596f),usbsid_config.RGBLED.brightness),
+          RGBB((sid_memory[0x07 + sidno] * 0.596f),usbsid_config.RGBLED.brightness),
+          RGBB((sid_memory[0x0E + sidno] * 0.596f),usbsid_config.RGBLED.brightness))
         ) << 8u);
       dma_hw->multi_channel_trigger = (1u << dma_rgbled);
     }
@@ -169,7 +169,7 @@ void led_breathe_task(void)
     if (pwm_value <= 0) {
       updown = 1;
       #ifdef USE_RGB
-      _rgb = randval(0, 5);  /* Select random color when at 0 brightness */
+      _rgb = RANDVAL(0, 5);  /* Select random color when at 0 brightness */
       #endif
     }
 
@@ -183,19 +183,19 @@ void led_breathe_task(void)
     }
     #if defined(USE_RGB)
     if (usbsid_config.RGBLED.enabled && usbsid_config.RGBLED.idle_breathe) {
-      int rgb_ = map(pwm_value, 0, VU_MAX, 0, 31);
+      int rgb_ = MAP(pwm_value, 0, VU_MAX, 0, 31);
       r_ = (_rgb == 0 || _rgb == 3 || _rgb == 5) ? (rgb_ * 8) : 0;
       g_ = (_rgb == 1 || _rgb == 3 || _rgb == 4) ? (rgb_ * 8) : 0;
       b_ = (_rgb == 2 || _rgb == 4 || _rgb == 5) ? (rgb_ * 8) : 0;
       rgb_value = (
-        (ugrb_u32(
-          rgbb(r_,usbsid_config.RGBLED.brightness),
-          rgbb(g_,usbsid_config.RGBLED.brightness),
-          rgbb(b_,usbsid_config.RGBLED.brightness))
+        (UGRB_U32(
+          RGBB(r_,usbsid_config.RGBLED.brightness),
+          RGBB(g_,usbsid_config.RGBLED.brightness),
+          RGBB(b_,usbsid_config.RGBLED.brightness))
         ) << 8u);
       dma_hw->multi_channel_trigger = (1u << dma_rgbled);
     } else {
-      rgb_value = ((ugrb_u32(0,0,0)) << 8u);
+      rgb_value = ((UGRB_U32(0,0,0)) << 8u);
       dma_hw->multi_channel_trigger = (1u << dma_rgbled);
     }
     #endif

@@ -63,31 +63,31 @@
 #endif
 
 /* Helper macro for finding the highest value of two */
-#ifndef max
-#define max(a,b)            (((a) > (b)) ? (a) : (b))
+#ifndef MAX
+#define MAX(a,b)            (((a) > (b)) ? (a) : (b))
 #endif
 
 /* Helper macro for finding the lowest value of two */
-#ifndef min
-#define min(a,b)            (((a) < (b)) ? (a) : (b))
+#ifndef MIN
+#define MIN(a,b)            (((a) < (b)) ? (a) : (b))
 #endif
 
 /* Helper macro that creates a random value */
-#ifndef randval
-#define randval(min,max)    (min + rand() / (RAND_MAX / (max - min + 1) + 1))
+#ifndef RANDVAL
+#define RANDVAL(min,max)    (min + rand() / (RAND_MAX / (max - min + 1) + 1))
 #endif
 
 /* Helper macro for mapping a value from a range to another range */
-#ifndef map
-#define map(x,in_min,in_max,out_min,out_max) ((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
+#ifndef MAP
+#define MAP(x,in_min,in_max,out_min,out_max) ((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 #endif
 
 #if defined(USE_RGB)
-#ifndef ugrb_u32  /* RGB ->> GRB */
-#define ugrb_u32(r,g,b) ((uint32_t)(r) << 8) | ((uint32_t)(g) << 16) | (uint32_t)(b)
+#ifndef UGRB_U32  /* RGB ->> GRB */
+#define UGRB_U32(r,g,b) ((uint32_t)(r) << 8) | ((uint32_t)(g) << 16) | (uint32_t)(b)
 #endif
-#ifndef rgbb
-#define rgbb(inp,br) (uint8_t)fabsl((inp / 255) * br)
+#ifndef RGBB
+#define RGBB(inp,br) (uint8_t)fabsl((inp / 255) * br)
 #endif
 #endif
 
