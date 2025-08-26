@@ -721,6 +721,9 @@ void core1_main(void)
     }
 
     #ifdef ONBOARD_EMULATOR
+    /* BUG: If not running directly after boot
+     * or after stopped and then started again
+     * the sound is distorted */
     if (!emulator_running && starting_emulator) {
       starting_emulator = false;
       emulator_running = true;
