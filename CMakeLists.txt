@@ -30,15 +30,15 @@ set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
 string(TIMESTAMP MAGIC_SMOKE "%Y%m%d")  # Auto generate dated version
-set(PROJECT_VERSION "0.5.1-BETA.${MAGIC_SMOKE}")  # Generate compile version
+set(PROJECT_VERSION "0.6.0-BETA.${MAGIC_SMOKE}")  # Generate compile version
 
 ### Want a cookie?
 # NOTICE: ENABLING THESE DEBUGGING DEFINITIONS WILL HAVE SIGNIFICANT IMPACT AND WILL DELAY PLAYING!
 # NOTICE: UART AND USBCDC ARE MUTUALLY EXCLUSIVE!
 if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(USBSID_DEBUGGING 1)     # Enable debugging ~ mandatory enable for all other logging types
-  set(UART_DEBUGGING 1)       # Enable debugging over uart pins
-  set(USBCDC_DEBUGGING 0)     # Enable debugging over cdc port 2
+  set(UART_DEBUGGING 1)       # Enable debugging over uart pins ~ USBCDC must be 0!
+  set(USBCDC_DEBUGGING 0)     # Enable debugging over cdc port 2 ~ UART must be 0!
   set(DEFAULT_DEBUGGING 1)    # Enable debugging in usbsid.c
   set(CONFIG_DEBUGGING 1)     # Enable debugging in config.c
   set(USBIO_DEBUGGING 0)      # Enable debugging in usbsid.c
@@ -47,11 +47,12 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(MIDIVOICE_DEBUGGING 0)  # Enable debugging in midi.c
   set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
   set(SIDWRITES_DEBUGGING 0)  # Enable logging of SID writes one core 2
+  set(EMULATOR_DEBUGGING 0)     # Enable debugging in emulator
 endif()
 
-### Enable / Disable build with embedded cRSID emulator for SID playing
-## Due to the memory footprint only available for Pico2 only at the moment
+### Enable / Disable build with embedded emulator for Midi
 set(ONBOARD_EMULATOR 0)
+set(ONBOARD_SIDPLAYER 0) # Not functional yet!
 
 ### Enable/ Disable build with PIO Uart on unused pins 26/27
 set(USE_PIO_UART 0)
@@ -74,10 +75,11 @@ set(USE_PIO_UART 0)
 # remember that enabling debugging and disabling optimizations
 # will weird out tune playing and reading from and writing to
 # SKPico will stop functioning
-SET(DEBUG_SYMBOLS 0)   # 0 default, 1 debug symbols & debug build enabled
-SET(DEBUGGING 0)       # 0 default, 1~3 equals -g1~3
-SET(OPTIMIZATIONS 2)   # 2 default, 1 ~ -O1 for debugging, 3 causes desync with DMA read_address and chain_to!
-SET(TUSB_DEBUG 0)      # 0 default, 0~3 non verbose to very verbose
+SET(DEBUG_SYMBOLS 0)      # 0 default, 1 debug symbols & debug build enabled
+SET(DEBUGGING 0)          # 0 default, 1~3 equals -g1~3
+SET(OPTIMIZATIONS 2)      # 3 default, 2 ~ -O1 for debugging *3 causes desync with DMA read_address and chain_to!()
+SET(TUSB_DEBUG 0)         # 0 default, 0~3 non verbose to very verbose
+SET(ANALYSE_STACKUSAGE 0) # 0 default, 1 enabled, 0 disabled
 
 ### Target board pico, pico_w, pico2
 if(DEFINED PICO_BOARD)
@@ -177,6 +179,8 @@ else()
   endif()
 endif()
 
+message("Firmware build type is ${CMAKE_BUILD_TYPE}")
+
 ### Define compile time debugging
 if(DEBUGGING EQUAL 0)
   set(D_OPT -DNDEBUG)
@@ -219,6 +223,7 @@ set(COMPILE_OPTS PRIVATE
   -Wl,--wrap=memset
   -Wl,--wrap=__aeabi_memcpy
   -Wl,--wrap=__aeabi_memset
+  -Wl,--wrap=__aeabi_memcmp
   -Wl,--wrap=__aeabi_memcpy4
   -Wl,--wrap=__aeabi_memset4
   -Wl,--wrap=__aeabi_memcpy8
@@ -227,7 +232,14 @@ set(COMPILE_OPTS PRIVATE
   -Wl,--wrap=vprintf
   -Wl,--wrap=puts
 )
-message("Compile time flags: ${COMPILE_OPTS}")
+
+if(ANALYSE_STACKUSAGE EQUAL 1)
+  set(COMPILE_OPTS
+    ${COMPILE_OPTS}
+     -fstack-usage
+     -fcallgraph-info
+     -DANALYSE_STACKUSAGE=1)
+endif()
 
 ### Target product & output filename
 if(${PICO_BOARD} STREQUAL "pico")
@@ -283,8 +295,7 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/gpio.c
   ${CMAKE_CURRENT_LIST_DIR}/src/vu.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi.c
-  # ${CMAKE_CURRENT_LIST_DIR}/src/midi_patches.c
-  # ${CMAKE_CURRENT_LIST_DIR}/src/midi_bankmsb0.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi_handler.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sysex.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid.c
@@ -305,20 +316,47 @@ set(TARGET_INCLUDE_DIRS PRIVATE
 
 ### Emulator compilation additions
 if(ONBOARD_EMULATOR EQUAL 1)
-  if(${PICO_BOARD} STREQUAL "pico2")
+    set(COMPILE_OPTS ${COMPILE_OPTS} -DEMBEDDED=1)
     add_compile_definitions(ONBOARD_EMULATOR=1)
+    if(ONBOARD_SIDPLAYER EQUAL 1)
+      add_compile_definitions(ONBOARD_SIDPLAYER=1)
+    endif()
+    set(EMULATOR_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emulator)
+    set(EMUDORE_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emudore-embedded)
     set(SOURCEFILES
       ${SOURCEFILES}
-      ${CMAKE_CURRENT_LIST_DIR}/src/sidplayer.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/cRSID/libcRSID.c
+      ${EMULATOR_LIST_DIR}/emudore_emulator.c
+      ${EMULATOR_LIST_DIR}/interface.cpp
+      ${EMUDORE_LIST_DIR}/src/sidfile.cpp
+      ${EMUDORE_LIST_DIR}/src/cpu.cpp
+      ${EMUDORE_LIST_DIR}/src/memory.cpp
+      ${EMUDORE_LIST_DIR}/src/c64.cpp
+      ${EMUDORE_LIST_DIR}/src/cia1.cpp
+      ${EMUDORE_LIST_DIR}/src/cia2.cpp
+      ${EMUDORE_LIST_DIR}/src/io.cpp
+      ${EMUDORE_LIST_DIR}/src/vic.cpp
+      ${EMUDORE_LIST_DIR}/src/sidadapter.cpp
+      ${EMUDORE_LIST_DIR}/src/pla.cpp
+      ${EMUDORE_LIST_DIR}/src/cart.cpp
+      ${EMUDORE_LIST_DIR}/src/cart/MC68B50.cpp
     )
-    set(TARGET_INCLUDE_DIRS PRIVATE
+    set(TARGET_INCLUDE_DIRS
       ${TARGET_INCLUDE_DIRS}
-      ${CMAKE_CURRENT_LIST_DIR}/src/cRSID
-      ${CMAKE_CURRENT_LIST_DIR}/src/sidtunes
+      ${EMUDORE_LIST_DIR}/src
+      ${EMUDORE_LIST_DIR}/src/cart
+      ${EMULATOR_LIST_DIR}
+      ${EMULATOR_LIST_DIR}/flash
+      ${EMULATOR_LIST_DIR}/sidtunes
+      ${CMAKE_FIND_ROOT_PATH}/arm-none-eabi/include
+      ${CMAKE_FIND_ROOT_PATH}/arm-none-eabi/include/c++
     )
-  endif()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11 -std=c++11")
+    set(PICO_CXX_ENABLE_EXCEPTIONS 1)
 endif()
+
+message("Compile time options: ${COMPILE_OPTS}")
+message("C Compile time flags: ${CMAKE_C_FLAGS}")
+message("CXX Compile time flags: ${CMAKE_CXX_FLAGS}")
 
 ### PIO Uart compilation additions
 if(USE_PIO_UART EQUAL 1)
@@ -333,6 +371,7 @@ endif()
 set(TARGET_LL
   hardware_clocks
   hardware_dma
+  hardware_exception
   hardware_flash
   hardware_gpio
   hardware_pio
@@ -341,11 +380,15 @@ set(TARGET_LL
   hardware_sync
   hardware_timer
   hardware_uart
+  # hardware_interp
+  pico_atomic # memcmp
+  pico_cxx_options
   pico_flash
   pico_mem_ops
   pico_mem_ops_compiler
   pico_malloc
   pico_multicore
+  pico_rand
   pico_stdlib
   pico_unique_id
   pico_usb_reset_interface
@@ -365,6 +408,7 @@ endif()
 
 ### Pico sdk path
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
+#include($ENV{PICO_EXTRAS_PATH}/external/pico_extras_import.cmake) # i2s audio
 
 ### Project type
 project(${PROJECT_NAME} C CXX ASM)
@@ -412,6 +456,9 @@ if(USBSID_DEBUGGING EQUAL 1)
   endif()
   if(GPIOBUS_DEBUGGING EQUAL 1)
     add_compile_definitions(USBSIDGPIO_DEBUG=1)
+  endif()
+  if(EMULATOR_DEBUGGING EQUAL 1)
+    add_compile_definitions(EMUDEBUG=1)
   endif()
 endif()
 
