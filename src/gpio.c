@@ -22,7 +22,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+/* TODO: Split PIO, DMA, GPIO and calling functions into separate files/namespaces */
 #include "globals.h"
 #include "config.h"
 #include "gpio.h"
@@ -181,7 +181,7 @@ void setup_piobus(void)
   busclock_frequency = (float)pico_hz / (usbsid_config.clock_rate * 32) / 2;  /* Clock frequency is 8 times the SID clock */
 
   CFG("[BUS CLK INIT] START\n");
-  CFG("[PI CLK]@%dMHz [DIV]@%.2f [BUS CLK]@%.2f [CFG SID CLK]%d\n",
+  CFG("[PI CLK]@%luMHz [DIV]@%.2f [BUS CLK]@%.2f [CFG SID CLK]%d\n",
      (pico_hz / 1000 / 1000),
      busclock_frequency,
      ((float)pico_hz / busclock_frequency / 2),
@@ -321,12 +321,12 @@ void restart_bus_clocks(void)
   pio_sm_set_clkdiv(bus_pio, sm_control, busclock_frequency);
   pio_sm_set_clkdiv(bus_pio, sm_data, busclock_frequency);
 
-  CFG("[PI CLK]@%dMHz [DIV]@%.2f [BUS CLK]@%.2f [CFG SID CLK]%d\n",
+  CFG("[PI CLK]@%luMHz [DIV]@%.2f [BUS CLK]@%.2f [CFG SID CLK]%d\n",
     (pico_hz / 1000 / 1000),
     busclock_frequency,
     ((float)pico_hz / busclock_frequency / 2),
     (int)usbsid_config.clock_rate);
-  CFG("[PI CLK]@%dMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n",
+  CFG("[PI CLK]@%luMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n",
     (pico_hz / 1000 / 1000),
     sidclock_frequency,
     ((float)pico_hz / sidclock_frequency / 2),
@@ -418,7 +418,7 @@ void init_sidclock(void)
   sidclock_frequency = (float)pico_hz / usbsid_config.clock_rate / 2;
 
   CFG("[SID CLK INIT] START\n");
-  CFG("[PI CLK]@%dMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n",
+  CFG("[PI CLK]@%luMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n",
     (pico_hz / 1000 / 1000),
     sidclock_frequency,
     ((float)pico_hz / sidclock_frequency / 2),
@@ -842,5 +842,7 @@ void set_audio_switch(bool state)
       (int)usbsid_config.stereo_en, mono_stereo[(int)usbsid_config.stereo_en], state, mono_stereo[state]);
     return;
   }
+  #else
+  (void)state;
   #endif
 }
