@@ -52,7 +52,7 @@ endif()
 
 ### Enable / Disable build with embedded emulator for Midi
 set(ONBOARD_EMULATOR 0 CACHE STRING "ONBOARD_EMULATOR")
-set(ONBOARD_SIDPLAYER 1) # Not functional yet!
+set(ONBOARD_SIDPLAYER 0) # Not functional yet!
 
 ### Enable/ Disable build with PIO Uart on unused pins 26/27
 set(USE_PIO_UART 0)
