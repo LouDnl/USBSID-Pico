@@ -138,7 +138,7 @@ jobs:
             }
           - {
               buildname: Pico_W,
-              directory: picow,
+              directory: pico_w,
               pico_board: pico_w,
               pico_platform: rp2040,
               withemulator: 0,
@@ -152,7 +152,7 @@ jobs:
             }
           - {
               buildname: Pico2_W,
-              directory: pico2w,
+              directory: pico2_w,
               pico_board: pico2_w,
               pico_platform: rp2350-arm-s,
               withemulator: 0,
@@ -318,7 +318,7 @@ jobs:
         working-directory: ${{github.workspace}}/master
         run: |
           mkdir usbsid${{matrix.directory}}
-          cp -av build_${{matrix.directory}}/*.uf2 usbsid${{matrix.pico_board}}/
+          cp -av build_${{matrix.directory}}/*.uf2 usbsid${{matrix.directory}}/
           zip -r usbsid${{matrix.directory}}-taggedbuild-${{ steps.vars.outputs.tag }}.zip usbsid${{matrix.directory}}/
 
       - name: Get current branch
