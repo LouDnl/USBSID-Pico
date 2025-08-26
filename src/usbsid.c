@@ -111,8 +111,13 @@ extern void auto_detect_routine(bool auto_config, bool with_delay);
 
 /* SID player */
 #ifdef ONBOARD_EMULATOR
-extern bool sidplayer_init, sidplayer_playing;
-extern void run_emulator(void);
+extern bool emulator_running, starting_emulator, stopping_emulator;
+extern void start_emulator(void);
+#ifdef ONBOARD_SIDPLAYER
+extern bool sidplayer_init, sidplayer_playing, sidplayer_start;
+extern unsigned int run_emulator(void);
+extern void start_sidplayer(void);
+#endif
 #endif
 
 /* Midi */
@@ -716,6 +721,22 @@ void core1_main(void)
     }
 
     #ifdef ONBOARD_EMULATOR
+    if (!emulator_running && starting_emulator) {
+      starting_emulator = false;
+      emulator_running = true;
+      start_emulator();
+    }
+    #endif
+
+    #if defined(ONBOARD_EMULATOR) && defined(ONBOARD_SIDPLAYER)
+    if (sidplayer_start) {
+      sidplayer_start = false;
+      start_sidplayer();
+      sidplayer_playing = true;
+    }
+    #endif
+
+    #if defined(ONBOARD_EMULATOR) && defined(ONBOARD_SIDPLAYER)
     if (sidplayer_playing) {
       run_emulator();
     }
@@ -733,8 +754,6 @@ void core1_main(void)
       }
     }
     #endif
-
-
   }
   /* Point of no return, this should never be reached */
   return;
