@@ -134,24 +134,56 @@ jobs:
               directory: pico,
               pico_board: pico,
               pico_platform: rp2040,
+              withemulator: 0,
             }
           - {
               buildname: Pico_W,
               directory: picow,
               pico_board: pico_w,
               pico_platform: rp2040,
+              withemulator: 0,
             }
           - {
               buildname: Pico2,
               directory: pico2,
               pico_board: pico2,
               pico_platform: rp2350-arm-s,
+              withemulator: 0,
             }
           - {
               buildname: Pico2_W,
               directory: pico2w,
               pico_board: pico2_w,
               pico_platform: rp2350-arm-s,
+              withemulator: 0,
+            }
+          - {
+              buildname: Pico_Emulator,
+              directory: pico_em,
+              pico_board: pico,
+              pico_platform: rp2040,
+              withemulator: 1,
+            }
+          - {
+              buildname: Pico2_Emulator,
+              directory: pico2_em,
+              pico_board: pico2,
+              pico_platform: rp2350-arm-s,
+              withemulator: 1,
+            }
+          - {
+              buildname: Pico_W_Emulator,
+              directory: pico_w_em,
+              pico_board: pico_w,
+              pico_platform: rp2040,
+              withemulator: 1,
+            }
+          - {
+              buildname: Pico2_W_Emulator,
+              directory: pico2_w_em,
+              pico_board: pico2_w,
+              pico_platform: rp2350-arm-s,
+              withemulator: 1,
             }
       fail-fast: false
     steps:
@@ -257,6 +289,13 @@ jobs:
         with:
           path: master
 
+      - name: 📇 Checkout emudore-embedded
+        if: ${{matrix.withemulator == 1 }}
+        uses: actions/checkout@v4
+        with:
+          repository: loudnl/emudore-embedded
+          path: master/lib/emudore-embedded
+
       - name: 🏭 Create build directory
         run: |
           mkdir -p ${{github.workspace}}/master/build_${{matrix.directory}}
@@ -265,7 +304,7 @@ jobs:
         run: |
           unset PICO_PLATFORM
           unset PICO_BOARD
-          cmake -S master -B ${{github.workspace}}/master/build_${{matrix.directory}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DPICO_PLATFORM=${{matrix.pico_platform}} -DPICO_BOARD=${{matrix.pico_board}} -Dpicotool_DIR=${{github.workspace}}/picotool/picotool $extra_arg
+          cmake -S master -B ${{github.workspace}}/master/build_${{matrix.directory}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DPICO_PLATFORM=${{matrix.pico_platform}} -DPICO_BOARD=${{matrix.pico_board}} -Dpicotool_DIR=${{github.workspace}}/picotool/picotool -DONBOARD_EMULATOR=${{matrix.withemulator}} $extra_arg
 
       - name: 🏭 Build ${{matrix.buildname}}
         run: |
@@ -278,9 +317,9 @@ jobs:
       - name: 💾 Gather Artifact Files
         working-directory: ${{github.workspace}}/master
         run: |
-          mkdir usbsid${{matrix.pico_board}}
+          mkdir usbsid${{matrix.directory}}
           cp -av build_${{matrix.directory}}/*.uf2 usbsid${{matrix.pico_board}}/
-          zip -r usbsid${{matrix.pico_board}}-taggedbuild-${{ steps.vars.outputs.tag }}.zip usbsid${{matrix.pico_board}}/
+          zip -r usbsid${{matrix.directory}}-taggedbuild-${{ steps.vars.outputs.tag }}.zip usbsid${{matrix.directory}}/
 
       - name: Get current branch
         run: |
