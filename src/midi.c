@@ -45,6 +45,7 @@ const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT;
 
 /* GPIO */
 extern uint8_t __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
+extern void reset_sid(void);
 
 /* Midi handler */
 extern void midi_processor_init(void);
@@ -87,18 +88,19 @@ void midi_init(void)
 }
 
 #ifdef ONBOARD_EMULATOR
-static void emulator_queue_init(void)
+static inline void emulator_queue_init(void)
 {
   /* emudore */
   queue_init(&cynthcart_queue, sizeof(cynthcart_queue_entry_t), 16); /* 16 entries */
 }
-static void emulator_queue_deinit(void)
+static inline void emulator_queue_deinit(void)
 {
   /* emudore */
   queue_free(&cynthcart_queue);
+  reset_sid();
 }
 
-static void handle_emulater_data(void)
+static inline void handle_emulater_data(void)
 {
   for (size_t e = 0; e < midimachine.index; e++) {
     /* Create queue entry */
@@ -111,28 +113,46 @@ static void handle_emulater_data(void)
   return;
 }
 
-static void handle_emulator_cc(void)
+static inline void emulator_enable(void)
+{
+  emulator_queue_init();
+  emulator_running = false;
+  offload_ledrunner = true;
+  starting_emulator = true;
+  return;
+}
+
+static inline void emulator_disable(void)
+{
+  emulator_running = false;
+  stopping_emulator = true;
+  stop_emulator();
+  offload_ledrunner = false;
+  emulator_queue_deinit();
+  return;
+}
+
+static inline void emulator_reset(void)
+{
+  DBG("[MIDI] Emulator reset not implemented yet!\n");
+  return;
+}
+
+static inline void handle_emulator_cc(void)
 {
   if (midimachine.streambuffer[1] == midi_ccvalues_defaults.CC_CEN) { /* control emulator enable 0x55 (85) */
     if (!emulator_running) {
-      emulator_queue_init();
-      emulator_running = false;
-      offload_ledrunner = true;
-      starting_emulator = true;
+      emulator_enable();
     }
   } else
   if (midimachine.streambuffer[1] == midi_ccvalues_defaults.CC_CDI) { /* control emulator disable 0x56 (86) */
     if (emulator_running) {
-      emulator_running = false;
-      stopping_emulator = true;
-      stop_emulator();
-      offload_ledrunner = false;
-      emulator_queue_deinit();
+      emulator_disable();
     }
   } else
   if (midimachine.streambuffer[1] == midi_ccvalues_defaults.CC_CRE) { /* control emulator reset 0x57 (87) */
     if (emulator_running) {
-      DBG("[MIDI] Emulator reset not implemented yet!\n");
+      emulator_reset();
     }
   }
   return;
