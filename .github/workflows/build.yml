@@ -56,29 +56,29 @@ jobs:
               withemulator: 0,
             }
           - {
-              buildname: Pico1Emulator,
-              directory: pico1em,
+              buildname: Pico_Emulator,
+              directory: pico_em,
               pico_board: pico,
               pico_platform: rp2040,
               withemulator: 1,
             }
           - {
-              buildname: Pico2Emulator,
-              directory: pico2em,
+              buildname: Pico2_Emulator,
+              directory: pico2_em,
               pico_board: pico2,
               pico_platform: rp2350-arm-s,
               withemulator: 1,
             }
           - {
-              buildname: Pico1wEmulator,
-              directory: pico1wem,
+              buildname: Pico_W_Emulator,
+              directory: pico_w_em,
               pico_board: pico_w,
               pico_platform: rp2040,
               withemulator: 1,
             }
           - {
-              buildname: Pico2wEmulator,
-              directory: pico2wem,
+              buildname: Pico2_W_Emulator,
+              directory: pico2_w_em,
               pico_board: pico2_w,
               pico_platform: rp2350-arm-s,
               withemulator: 1,
@@ -220,5 +220,5 @@ jobs:
       - name: 💾 Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: usbsid${{matrix.pico_board}}-${{matrix.name}}-${{env.BRANCHNAME}}-autobuild-${{github.run_number}}-${{env.DATETIME}}
+          name: usbsid${{matrix.directory}}-${{env.BRANCHNAME}}-autobuild-${{github.run_number}}-${{env.DATETIME}}
           path: ${{github.workspace}}/master/dist
