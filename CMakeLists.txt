@@ -51,8 +51,8 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
 endif()
 
 ### Enable / Disable build with embedded emulator for Midi
-set(ONBOARD_EMULATOR 0)
-set(ONBOARD_SIDPLAYER 0) # Not functional yet!
+set(ONBOARD_EMULATOR 0 CACHE STRING "ONBOARD_EMULATOR")
+set(ONBOARD_SIDPLAYER 1) # Not functional yet!
 
 ### Enable/ Disable build with PIO Uart on unused pins 26/27
 set(USE_PIO_UART 0)
@@ -70,6 +70,13 @@ set(USE_PIO_UART 0)
 #######################################
 #### You no touchy after this line ####
 #######################################
+
+### Build notes
+# Do not use the below setting, this _will_ break compilation on both
+# rp2040 and rp2350
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11 -std=c++11")
+# rp2040 will bug out complaining about assembly calls not being available
+# rp2350 will bug out on PICO_USE_SW_SPIN_LOCK not being available
 
 ### Optimization and debugging
 # remember that enabling debugging and disabling optimizations
@@ -140,14 +147,18 @@ else()
   return()
 endif()
 
+# ### Compilers to use
+if(${PICO_PLATFORM} MATCHES rp2040)
+  set(PICO_COMPILER pico_arm_cortex_m0plus_gcc)
+elseif(${PICO_PLATFORM} MATCHES rp2350)
+  set(PICO_COMPILER pico_arm_cortex_m33_gcc)
+else()
+  set(PICO_COMPILER pico_arm_gcc)  # required for mem_ops on rp2040
+endif()
+
 ### Cmake compiler standard versions
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
-
-### Compilers to use
-if(${PICO_PLATFORM} MATCHES rp2040)
-  set(PICO_COMPILER pico_arm_gcc)  # required for mem_ops on rp2040
-endif()
 
 ### Target environment path
 set(CMAKE_FIND_ROOT_PATH $ENV{PICO_ENV_PATH})
@@ -358,16 +369,9 @@ if(ONBOARD_EMULATOR EQUAL 1)
       ${EMULATOR_LIST_DIR}
       ${EMULATOR_LIST_DIR}/flash
       ${EMULATOR_LIST_DIR}/sidtunes
-      ${CMAKE_FIND_ROOT_PATH}/arm-none-eabi/include
-      ${CMAKE_FIND_ROOT_PATH}/arm-none-eabi/include/c++
     )
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11 -std=c++11")
     set(PICO_CXX_ENABLE_EXCEPTIONS 1)
 endif()
-
-message("Compile time options: ${COMPILE_OPTS}")
-message("C Compile time flags: ${CMAKE_C_FLAGS}")
-message("CXX Compile time flags: ${CMAKE_CXX_FLAGS}")
 
 ### PIO Uart compilation additions
 if(USE_PIO_UART EQUAL 1)
@@ -476,6 +480,20 @@ endif()
 ### It escapes every damn time!
 add_compile_definitions(MAGIC_SMOKE=${MAGIC_SMOKE})
 
+### Captain I canna change the options anymore!
+message("C Compiler root: " ${CMAKE_FIND_ROOT_PATH})
+message("CXX Compiler root: " ${CMAKE_FIND_ROOT_PATH})
+message("C Compile time flags:")
+message("${CMAKE_C_FLAGS}")
+message("CXX Compile time flags:")
+message("${CMAKE_CXX_FLAGS}")
+message("Compile time options:")
+message("${COMPILE_OPTS}")
+message("Compile time source files:")
+message("${SOURCEFILES}")
+message("Compile time include dirs:")
+message("${TARGET_INCLUDE_DIRS}")
+
 ### Compile targets
 foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSIONS)
   # set filename
@@ -483,8 +501,8 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   set(BUILD_VERSION "")
   string(CONCAT BUILD_VERSION ${PROJECT_PRODUCT} " v" ${PCBVERSION})
   message(STATUS "Building ${FILENAME} with PICOTYPE=${PICOTYPE} and MAGIC_SMOKE=${MAGIC_SMOKE}")
-  message("Set USB manufacturer: ${USBSID_MANUFACTURER}")
-  message("Set USB product: ${BUILD_VERSION}")
+  message(STATUS "Set USB manufacturer: ${USBSID_MANUFACTURER}")
+  message(STATUS "Set USB product: ${BUILD_VERSION}")
   # executable
   add_executable(${BUILD} ${SOURCEFILES})
   # BUILD TYPES
@@ -516,11 +534,11 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   target_link_options(${BUILD} PRIVATE -Xlinker --print-memory-usage)
   # memory map linkers
   if(${PICO_PLATFORM} MATCHES rp2350)
-    message("Memmap linker, platform ${PICO_PLATFORM} MATCHES rp2350")
+    message(STATUS "Memmap linker, platform ${PICO_PLATFORM} MATCHES rp2350")
     target_compile_definitions(${BUILD} PRIVATE USBSID PICO_EMBED_XIP_SETUP=1)
     set_target_properties(${BUILD} PROPERTIES PICO_TARGET_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/src/usbsidpico-rp2350.ld)
   else()
-    message("Memmap linker, platform ${PICO_PLATFORM} EQUALS rp2040")
+    message(STATUS "Memmap linker, platform ${PICO_PLATFORM} EQUALS rp2040")
     set_target_properties(${BUILD} PROPERTIES PICO_TARGET_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/src/usbsidpico-rp2040.ld)
   endif()
   # tell the linker what libraries to link
