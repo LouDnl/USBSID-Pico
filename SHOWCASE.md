@@ -18,7 +18,7 @@ Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-2
 |:-:|:-:|:-:|
 | [![MOS8580](https://img.youtube.com/vi/UQVDTNV3mgs/1.jpg)](https://www.youtube.com/watch?v=UQVDTNV3mgs) | [![MOS8580](https://img.youtube.com/vi/lXxlArB3VS4/1.jpg)](https://www.youtube.com/watch?v=lXxlArB3VS4) | [![MOS8580](https://img.youtube.com/vi/B4iYnZELbSc/1.jpg)](https://www.youtube.com/watch?v=B4iYnZELbSc) |
 
-| **Codeboys & Endians** | **No Limit** | **Multiverse 100%<br>in Stereo!** |
+| **Codeboys & Endians** | **No Limit** | **Multiverse 100%<br>with mirrored SID's!** |
 |:-:|:-:|:-:|
 | [![MOS8580](https://img.youtube.com/vi/sSDsOih1Wbw/1.jpg)](https://www.youtube.com/watch?v=sSDsOih1Wbw)<br><small><sub>by Booze Design</sub></small> | [![MOS8580](https://img.youtube.com/vi/hJit04tWUaM/1.jpg)](https://www.youtube.com/watch?v=hJit04tWUaM)<br><small><sub>Quantum tracker demo</sub></small> | [![Dual MOS8580](https://img.youtube.com/vi/Rr-oq5jBeDg/1.jpg)](https://www.youtube.com/watch?v=Rr-oq5jBeDg)<br><small><sub>by Nah-Kolor</sub></small> |
 
