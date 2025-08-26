@@ -595,6 +595,27 @@ uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, ui
   return (read_data & 0xFF);
 }
 
+void __no_inline_not_in_flash_func(write_operation)(uint8_t address, uint8_t data)
+{
+  sid_memory[(address & 0x7F)] = data;
+  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+  control_word = 0b111000;
+  dir_mask = 0b1111111111111111;  /* Always OUT never IN */
+  if (set_bus_bits(address, data) != 1) {
+    return;
+  }
+  data_word = (dir_mask << 16) | data_word;
+
+  pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, PIO_IRQ0));  /* Preset the statemachine IRQ to not wait for a 1 */
+  pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, PIO_IRQ1));     /* Preset the statemachine IRQ to not wait for a 1 */
+  pio_sm_exec(bus_pio, sm_data, pio_encode_wait_pin(true, PHI));
+  pio_sm_exec(bus_pio, sm_control, pio_encode_wait_pin(true, PHI));
+  pio_sm_put_blocking(bus_pio, sm_control, control_word);
+  pio_sm_put_blocking(bus_pio, sm_data, data_word);
+
+  return;
+}
+
 void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles)
 {
   delay_word = cycles;
