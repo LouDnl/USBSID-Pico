@@ -69,6 +69,20 @@ jobs:
               pico_platform: rp2350-arm-s,
               withemulator: 1,
             }
+          - {
+              buildname: Pico1wEmulator,
+              directory: pico1wem,
+              pico_board: pico_w,
+              pico_platform: rp2040,
+              withemulator: 1,
+            }
+          - {
+              buildname: Pico2wEmulator,
+              directory: pico2wem,
+              pico_board: pico2_w,
+              pico_platform: rp2350-arm-s,
+              withemulator: 1,
+            }
 
       fail-fast: false
 
