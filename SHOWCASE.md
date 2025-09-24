@@ -10,9 +10,9 @@ Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-2
 - [Mahoney - Musik Run Stop (partial recording)](media/Mahoney-MusikRunStop(partial).mp3)
 
 ### MOS8580 chip
-| **Van Halen's Jump<br>in Stereo!** | **Flamethrower** |
-|:-:|:-:|
-| [![Dual MOS8580](https://img.youtube.com/vi/lzvkWlDq2TM/1.jpg)](https://www.youtube.com/watch?v=lzvkWlDq2TM)<br><small><sub>by Nordischsound</sub></small> | [![MOS8580](https://img.youtube.com/vi/Mfbj21ntQXA/1.jpg)](https://www.youtube.com/watch?v=Mfbj21ntQXA)<br><small><sub>by Reed</sub></small> |
+| **Van Halen's Jump<br>in Stereo!** | **Flamethrower** | **Coma Light 13** |
+|:-:|:-:|:-:|
+| [![Dual MOS8580](https://img.youtube.com/vi/lzvkWlDq2TM/1.jpg)](https://www.youtube.com/watch?v=lzvkWlDq2TM)<br><small><sub>by Nordischsound</sub></small> | [![MOS8580](https://img.youtube.com/vi/Mfbj21ntQXA/1.jpg)](https://www.youtube.com/watch?v=Mfbj21ntQXA)<br><small><sub>by Reed</sub></small> | [![MOS8580](https://img.youtube.com/vi/iXviof4ZtIg/3.jpg)](https://www.youtube.com/watch?v=iXviof4ZtIg)<br><small><sub>by Oxyron</sub></small> |
 
 | **Layers<br>Finnish Gold** | **Mojo<br>Bonzai & Pretzel Logic** | **Spy vs Spy II<br>The Island Caper** |
 |:-:|:-:|:-:|
