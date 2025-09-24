@@ -14,6 +14,9 @@ toc::[]
 [%always]
 <<<
 
+== Disclaimer
+include::disclaimer.adoc[]
+
 == Supported platforms
 _In active development_ +
 *Linux:* Vice, JSidplay2, SidplayFp, RetroDebugger, SidBerry, USB Midi, WebUSB & ASID (in webbrowser) SID Play +
@@ -102,58 +105,28 @@ usbsidberry.exe -asid 1 path/to/sidfile.sid
 === Vice
 This section covers the use of USBSID-Pico with Vice under Linux, Windows and MacOS for the GTK and SDL2 versions of `vsid` and `x64sc`
 
+WARNING: Switching on readmode and then switching it off again without restarting the PCB and Vice _will_ result in distorted audio
+
 ==== Command-line arguments
 Command-line arguments override any previously configured items in your `vicerc` config file. +
 All three OS support the same command-line arguments for both `vsid` and `x64sc`. +
 However, the sound device argument is OS specific and `vsid` supports a maximum of 3 SID chips +
-*Note* that if you define extra SID's and their addresses, these addresses need to point to the required address for the SID tune or Software you want to use. The Vice USBSID-Pico driver will automatically convert each write to the in firmware configured SID chip.
+*Note* that if you define extra SID's and their addresses, these addresses need to point to the required address for the SID tune or Software you want to use. The Vice USBSID-Pico driver will automatically convert each write to the in firmware configured SID chip. +
+Below is an excerpt from the Vice manual with information about each command-line option
 [source,shell]
 ----
-# vsid with usbsid enabled
-vsid -sidenginemodel usbsid
-# Define extra SID chips and their respective addresses in de Commodore 64 memory space
-vsid -sidenginemodel usbsid -sidextra 2 -sid2address 0xD420 -sid3address 0xD440
+-usreadmode <0 or 1>
+    Enable USBSID-Pico read mode. When enabled, this mode allows for reading from SID registers that provides a means to configure an FPGASID that is seated on USBSID-Pico. This mode is not suited for regular audio use as it disables cycle exact writing & digiplay. Default is (SidUSBSIDReadMode=0) for off, (SidUSBSIDReadMode=1) for on. 
 
-# vsid with linux Alsa driver and usbsid enabled
-vsid -sounddev alsa -sidenginemodel usbsid
+-usaudiomode <0 or 1>
+    Set USBSID-Pico PCB (v1.3) audio mode to Stereo or Mono. When enabled the audio of SID socket 1 will be output over the left audio channel and the audio of SID socket 2 over the right channel of USBSID-Pico's audio out. Default is (SidUSBSIDAudioMode=0) for Mono, (SidUSBSIDAudioMode=1) for Stereo. 
+
+-usdiffsize <number divisable by 8>
+    Specifies the minimal difference in bytes to use between the head and tail of the drivers ringbuffer, this allows for some audio quality tuning on slower systems. In most cases the default value of 64 bytes (also the size of a USB packet) is the right setting for best audio quality. (SidUSBSIDDiffSize=32-256). 
+
+-usbuffsize <number divisable by 8>
+    Specifies the size in bytes to use as ringbuffer to store temporary data when sending SID writes to USBSID-Pico, this allows for some audio quality tuning on slower systems. In most cases the default value of 8192 bytes is the right setting for best audio quality. (SidUSBSIDBufferSize=512-16384). 
 ----
-
-[%always]
-<<<
-
-==== vsid GTK
-ALT+O or click Preferences/Settings to open the settings menu. +
-*Sound configuration* +
-The sound configuration will require tuning for the computer you use it on. +
-In the screenshot below you can see that for this system I use the `pulse` audio driver and have the `Buffer size` set to 1 millisecond and `Fragment size` set to very small. +
-These 3 settings can make or break the audio quality. +
-image:images/software/vsid-soundsettings-linux-gtk.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/vsid-soundsettings-linux-gtk.png",width="600"] +
-*SID configuration* +
-For any audio to come out of the board you _need_ to select USBSID-Pico as SID engine. +
-If you want to use more the one SID then you need to select the amount of `Extra SIDs` and set their I/O addresses. +
-image:images/software/vsid-sidsettings-linux-gtk.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/vsid-sidsettings-linux-gtk.png",width="600"]
-
-[%always]
-<<<
-
-==== vsid SDL2
-F12 to open the settings menu. +
-*Sound configuration* +
-The sound configuration will require tuning for the computer you use it on. +
-In the screenshot below you can see that for this system I use the `pulse` audio driver and have the `Buffer size` set to 10 milliseconds and `Fragment size` set to very small. +
-These 3 settings can make or break the audio quality. +
-image:images/software/vsid-soundsettings-linux-sdl2.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/vsid-soundsettings-linux-sdl2.png",width="600"] +
-To get to these settings follow the following settings path: +
-`Sound settings` => `Output driver` => Select the driver you want to use +
-`Sound settings` => `Buffer size` => Select the milliseconds you want to use +
-`Sound settings` => `Fragment size` => Select the size you want to use +
-*SID configuration* +
-For any audio to come out of the board you _need_ to select USBSID-Pico as SID engine. +
-If you want to use more the one SID then you need to select the amount of `Extra SIDs` and set their I/O addresses. +
-image:images/software/vsid-sidsettings-linux-sdl2.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/vsid-sidsettings-linux-sdl2.png",width="600"]
-To get to these settings follow the following settings path: +
-`SID settings` => `SID model` => `USBSID-Pico` +
-`SID settings` => `Extra SIDs` => select the amount of extra SID's and set their addresses +
 
 [%always]
 <<<
@@ -174,7 +147,7 @@ image:images/software/x64sc-sidsettings-linux-gtk.png[link="https://github.com/L
 <<<
 
 ==== x64sc SDL2
-F12 to open the settings menu. +
+Press F12 (Linux/Windows) / F10 (MacOs) to open the settings menu. +
 *Sound configuration* +
 The sound configuration will require tuning for the computer you use it on. +
 In the screenshot below you can see that for this system I use the `pulse` audio driver and have the `Buffer size` set to 25 milliseconds and `Fragment size` set to very small. +
@@ -195,20 +168,85 @@ To get to these settings follow the following settings path: +
 [%always]
 <<<
 
-=== Retrodebugger
-t.b.d.
+==== vsid GTK
+ALT+O or click Preferences/Settings to open the settings menu. +
+*Sound configuration* +
+The sound configuration will require tuning for the computer you use it on. +
+In the screenshot below you can see that for this system I use the `pulse` audio driver and have the `Buffer size` set to 1 millisecond and `Fragment size` set to very small. +
+These 3 settings can make or break the audio quality. +
+image:images/software/vsid-soundsettings-linux-gtk.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/vsid-soundsettings-linux-gtk.png",width="600"] +
+*SID configuration* +
+For any audio to come out of the board you _need_ to select USBSID-Pico as SID engine. +
+If you want to use more the one SID then you need to select the amount of `Extra SIDs` and set their I/O addresses. +
+image:images/software/vsid-sidsettings-linux-gtk.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/vsid-sidsettings-linux-gtk.png",width="600"]
+
+[%always]
+<<<
+
+==== vsid SDL2
+Press F12 (Linux/Windows) / F10 (MacOs) to open the settings menu. +
+*Sound configuration* +
+The sound configuration will require tuning for the computer you use it on. +
+In the screenshot below you can see that for this system I use the `pulse` audio driver and have the `Buffer size` set to 10 milliseconds and `Fragment size` set to very small. +
+These 3 settings can make or break the audio quality. +
+image:images/software/vsid-soundsettings-linux-sdl2.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/vsid-soundsettings-linux-sdl2.png",width="600"] +
+To get to these settings follow the following settings path: +
+`Sound settings` => `Output driver` => Select the driver you want to use +
+`Sound settings` => `Buffer size` => Select the milliseconds you want to use +
+`Sound settings` => `Fragment size` => Select the size you want to use +
+*SID configuration* +
+For any audio to come out of the board you _need_ to select USBSID-Pico as SID engine. +
+If you want to use more the one SID then you need to select the amount of `Extra SIDs` and set their I/O addresses. +
+image:images/software/vsid-sidsettings-linux-sdl2.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/vsid-sidsettings-linux-sdl2.png",width="600"]
+To get to these settings follow the following settings path: +
+`SID settings` => `SID model` => `USBSID-Pico` +
+`SID settings` => `Extra SIDs` => select the amount of extra SID's and set their addresses +
+
+[%always]
+<<<
 
 === jsidplay2
 This section covers the use of USBSID-Pico with `jsidplay2`
 
+==== Settings
+After starting JSidplay2 you can choose USBSID-Pico from the dropdown menu that says emulation and set the board to mono or stereo using the settings dropdown
+
+image:images/software/jsidplay2-sid-config.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/jsidplay2-sid-config.png",width="600"]
+image:images/software/jsidplay2-usbsid-config.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/jsidplay2-usbsid-config.png",width="600"]
+
 ==== c64jukebox
-`c64jukebox` website that runs on `jsidplay2`
+`c64jukebox` website that runs on `jsidplay2` available at https://haendel.ddns.net:8443/static/c64jukebox.vue
+
+To enable USBSID-Pico in a WebUSB supporting browser (like Chrome) click on the `Hardware` tab and then click `Connect` in the USBSID-Pico box. After connecting search for any SID file in the search tab and click the play button.
+
+WARNING: Because this play method is not perfected yet there will be delays when selecting a follow up tune and pressing stop or pause. This can be circumvented enabling `use await for USBSID write` on the Hardware tab, but this will severely impact playing tunes that rely on timing
+
+image:images/software/c64jukebox-usbsid-config.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/c64jukebox-usbsid-config.png",width="600"]
+
+[%always]
+<<<
+
+=== Denise
+This section covers the use of USBSID-Pico with the C64 emulator of `Denise`
+
+==== USBSID settings
+Open the C64 settings menu and go to the audio tab. Under this tab on the left side you will see an `USBSID-Pico` option +
+Here you can enable or disable the use of USBSID-Pico. If you have any audio issue you can try to increase the buffer and diff sizes.
+image:images/software/denise-usbsid-config.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/denise-usbsid-config.png",width="600"]
+
+==== SID settings
+Open the C64 settings menu and go to the audio tab. Under this tab on the left side you will see a `Chip` option +
+Here you can configure the amount of SID's you have on the board. Be sure to try the different settings for better output.
+image:images/software/denise-sid-config.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/denise-sid-config.png",width="600"]
+
+[%always]
+<<<
+
+=== Retrodebugger
+t.b.d.
 
 === sidplayfp
 t.b.d.
-
-== Disclaimer
-include::disclaimer.adoc[]
 
 == License
 === Software License ~ GNUv2

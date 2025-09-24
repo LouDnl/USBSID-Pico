@@ -12,6 +12,9 @@ toc::[]
 [%always]
 <<<
 
+== Disclaimer
+include::disclaimer.adoc[]
+
 == PCB top overview
 .Click image for larger view
 [#img-v13top,link=images/v1.3/v1.3b-top-marked.png]
@@ -163,9 +166,6 @@ Last but not least, the digital audio switch IC. Switching from mono (both SID c
 .Click image for larger view
 [#img-v13bottom,link=images/v1.3/v1.3b-bottom.png]
 image::images/v1.3/v1.3b-bottom.png[title=PCB bottom overview]
-
-== Disclaimer
-include::disclaimer.adoc[]
 
 == License
 === Software License ~ GNUv2
