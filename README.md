@@ -5,15 +5,21 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
 
 # This is USBSID-Pico! :)
 
-| **“Raster Bar” (8-bit)** | **Van Halen's Jump<br>dual SID in Stereo!** | **Next Level** | **Coma Light 13** |
+| **“Raster Bar” (8-bit)** | **Van Halen's Jump<br>dual SID in Stereo!** | **Next Level** | **Outerversal<br>dual SID in Stereo!** |
 |:-:|:-:|:-:|:-:|
-| [<img src="https://img.youtube.com/vi/nh0SxO1y6I0/0.jpg" width=75%>](https://www.youtube.com/watch?v=nh0SxO1y6I0)<br><small><sub>by LukHash</sub></small> | [<img src="https://img.youtube.com/vi/lzvkWlDq2TM/0.jpg" width=75%>](https://www.youtube.com/watch?v=lzvkWlDq2TM)<br><small><sub>by Nordischsound</sub></small> | [<img src="https://img.youtube.com/vi/ER8v2g7TlwA/0.jpg" width=75%>](https://www.youtube.com/watch?v=ER8v2g7TlwA)<br><small><sub>by Performers</sub> | [<img src="https://img.youtube.com/vi/iXviof4ZtIg/0.jpg" width=75%>](https://www.youtube.com/watch?v=iXviof4ZtIg)<br><small><sub>by Oxyron</sub></small> |
+| [<img src="https://img.youtube.com/vi/nh0SxO1y6I0/0.jpg" width=75%>](https://www.youtube.com/watch?v=nh0SxO1y6I0)<br><small><sub>by LukHash</sub></small> | [<img src="https://img.youtube.com/vi/lzvkWlDq2TM/0.jpg" width=75%>](https://www.youtube.com/watch?v=lzvkWlDq2TM)<br><small><sub>by Nordischsound</sub></small> | [<img src="https://img.youtube.com/vi/ER8v2g7TlwA/0.jpg" width=75%>](https://www.youtube.com/watch?v=ER8v2g7TlwA)<br><small><sub>by Performers</sub> | [<img src="https://img.youtube.com/vi/h2ThT3TWZEw/0.jpg" width=75%>](https://www.youtube.com/watch?v=h2ThT3TWZEw)<br><small><sub>by Abyxus</sub></small> |
+
+| **Wonderland XI** | **Wonderland XII** | **Wonderland XIII** | **Wonderland XIV** |
+|:-:|:-:|:-:|:-:|
+| [<img src="https://img.youtube.com/vi/7hiAkLAqsiI/0.jpg" width=75%>](https://www.youtube.com/watch?v=7hiAkLAqsiI)<br><small><sub>by Censor Design</sub></small> | [<img src="https://img.youtube.com/vi/4gckiwzOW9U/0.jpg" width=75%>](https://www.youtube.com/watch?v=4gckiwzOW9U)<br><small><sub>by Censor Design</sub></small> | [<img src="https://img.youtube.com/vi/q4Fg7V2DYCI/0.jpg" width=75%>](https://www.youtube.com/watch?v=q4Fg7V2DYCI)<br><small><sub>by Censor Design</sub> | [<img src="https://img.youtube.com/vi/RTtmsbH4jC0/0.jpg" width=75%>](https://www.youtube.com/watch?v=RTtmsbH4jC0)<br><small><sub>by Censor Design</sub></small> |
 
 # Index
 
-* [Features](#features)
+* [Software support & Features](#software-support-and-features)
 * [Questions & Support](#questions-and-support)
 * [Project status](#project-status)
+  * [Known issues](#known-issues)
+  * [Code status](#code-status)
 * [Firmware](#firmware)
   * [Configuring your board's firmware](#configuring-your-boards-firmware)
     * [Testing your board](#testing-your-board)
@@ -21,7 +27,6 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
   * [Firmware types and naming](doc/USBSID-Pico-firmware-manual.adoc) [(PDF)](doc/USBSID-Pico-firmware-manual.pdf)
   * [How to flash new firmware](doc/USBSID-Pico-firmware-manual.adoc) [(PDF)](doc/USBSID-Pico-firmware-manual.pdf)
   * [How to configure your board](doc/USBSID-Pico-firmware-manual.adoc) [(PDF)](doc/USBSID-Pico-firmware-manual.pdf)
-  * [Known issues](#known-issues)
   * [Building](#building)
 * [Hardware](#hardware)
   * [PCB usage information](#pcb-usage-information)
@@ -40,7 +45,7 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
 * [License](#license)
 * [Changelog](CHANGELOG.md)
 
-# Features
+# Software support and features
 ![USBSID-Pico](images/pcbv1.3-neon.png)  
 See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for more information on how to use supported software!  
 #### SID Playing
@@ -51,20 +56,30 @@ USBSID-Pico supports various ways of playing SID files.
 - Out-of-the box playing is also supported by using [C64jukebox by Kenchis](https://haendel.ddns.net:8443/static/c64jukebox.vue), note that this is still in BETA.  
 - [SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux & Windows with up to 4 SIDs supported (Windows version is buggy).  
 #### C64 emulators
+Several Commodore 64 emulatores have official support
 - [Vice](https://github.com/VICE-Team/svn-mirror/releases) has official support starting at tag [r45763](https://github.com/VICE-Team/svn-mirror/releases/tag/r45763) and up, up to 3 SIDs are supported in vsid and up to 4 in x64sc.  
 - [JSidplay2](https://haendel.ddns.net/~ken/#_latest_beta_versions) has official support in latest Java beta versions, up to 4 sids.
-- [Denise](https://sourceforge.net/projects/deniseemu/) has official support in [Windows](https://ci.appveyor.com/project/piciji/denise/history) and [Linux](https://sourceforge.net/projects/deniseemu/files/nightlies/) nightly builds and in [code repo](https://bitbucket.org/piciji/denise/src/master/), up to 4 sids.
+- [Denise](https://sourceforge.net/projects/deniseemu/) has official support in [Windows](https://ci.appveyor.com/project/piciji/denise/history) and [Linux](https://sourceforge.net/projects/deniseemu/files/nightlies/) nightly builds and in [code repo](https://bitbucket.org/piciji/denise/src/master/), up to 4 sids.  
+
+And some have unofficial support through forks on my Github
 - Unofficial support is added to a fork of [sidplayfp](https://github.com/LouDnl/sidplayfp-usbsid) which requires a fork of [libsidplayfp](https://github.com/LouDnl/libsidplayfp-usbsid).  
 - Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouDnl/RetroDebugger), up to 4 SIDs are supported.
 
-##### Amiga
-- [erique](https://github.com/erique) and [koobo](https://github.com/koobo) have added support to [playsid](https://github.com/erique/playsid.library)
-
 #### C64 Music trackers
+Into creating chiptunes? USBSID-Pico is your board!
 - You should be able to use the ASID fork of [sidfactory2](https://github.com/Chordian/sidfactory2/tree/asid-support) without issues.  
 - When using Vice or RetroDebugger you can freely use applications like [SID-Wizard](https://sourceforge.net/projects/sid-wizard/) for music creation.  
 - There is also work being done in my forks of [Goattracker2](https://github.com/LouDnl/goattracker2) and [GTUltra](https://github.com/LouDnl/GTUltra-USBSID).  
   Ask on Discord for latest binaries :)
+
+#### Amiga
+Real SID's on the Amiga? Why yes!
+- [erique](https://github.com/erique) and [koobo](https://github.com/koobo) have added support to [playsid](https://github.com/erique/playsid.library)
+
+#### Driver code
+Want to create your own implementation? You can by using the driver code examples below
+- [USBSID-Pico driver](https://github.com/LouDnl/USBSID-Pico-driver) repo is available @ https://github.com/LouDnl/USBSID-Pico-driver and contains `C++`, `Java` and `Javascript` implementation examples
+- [HardSID USB / SidBlaster USB](examples/hardsid-sidblaster) emulation driver example
 
 #### Midi
 USBSID-Pico acts as Midi device and supports basic Midi in ~ note that Midi is still in development and in Beta phase.  
@@ -79,6 +94,9 @@ Any questions about or support with USBSID-Pico can be asked
 # Project status
 Visit the [Project Page](https://github.com/users/LouDnl/projects/1) for an up-to-date list of things being worked on.
 While in development any mentioned features, options, etc. are subject to change.  
+### Known issues
+* Enabling and then disabling the onboard cynthcart emulator without restarting the board causes audio glitches
+* Switching on readmode and then switching it off again without restarting the PCB and Vice _will_ result in distorted audio  
 ### Code status
 |          | Master             | Dev                    |
 | -------  | :-----             | :-----                 |
@@ -158,10 +176,7 @@ The firmware is still in development so features might change, be added or remov
   - Requires Black Pico clone board with RGB LED onboard!
   - SID voices to use for calculation can be changed in config
 - Uses the [TinyUSB](https://github.com/hathach/tinyusb) stack
-### Known issues
-* Digiplay is better in Vice then SidplayFp at the moment.  
-  While not yet at 100%, most tunes will play!  
-  See the [discussion](https://github.com/LouDnl/USBSID-Pico/discussions/1) about this.
+
 ### Building
 You can build the firmware using the Pico SDK 2.1.1 and the included TinyUSB. Be sure to clone the SDK with `--recurse-submodules`.  
 After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py PICO_PLATFORM` where PICO_PLATFORM is either rp2040 or rp2350 depending on the board you are using.
@@ -266,18 +281,6 @@ If you want and are up to it you can solder your own PCB or create your own deve
 
 # Examples
 Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-29KQ), [other socials](https://github.com/LouDnl) or the [SHOWCASE](SHOWCASE.md) page to see more examples of the board in action.
-### Software
-See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for information on how to use supported software!  
-_Available examples with USBSID-Pico support:_<br>
-[**USBSID-Pico driver**](https://github.com/LouDnl/USBSID-Pico-driver) repo is available @ https://github.com/LouDnl/USBSID-Pico-driver<br>
-[**HardSID USB / SidBlaster USB**](examples/hardsid-sidblaster) emulation driver example<br>
-[**Vice**](https://github.com/LouDnl/Vice-USBSID) fork is available @ https://github.com/LouDnl/Vice-USBSID<br>
-[**sidplayfp**](https://github.com/LouDnl/sidplayfp-usbsid) for [**libsidplayfp**](https://github.com/LouDnl/libsidplayfp-usbsid) forks are available @ https://github.com/LouDnl/sidplayfp-usbsid and https://github.com/LouDnl/libsidplayfp-usbsid<br>
-[**SidBerry**](https://github.com/LouDnl/SidBerry) fork is available @ https://github.com/LouDnl/SidBerry<br>
-[**RetroDebugger**](https://github.com/LouDnl/RetroDebugger) fork is available @ https://github.com/LouDnl/RetroDebugger<br>
-[**playsid.library**](https://github.com/erique/playsid.library) Amiga implementation is available @ https://github.com/erique/playsid.library<br>
-### Precompiled Vice binaries
-Pre compiled Vice binaries are available in my fork @ https://github.com/LouDnl/Vice-USBSID/releases
 
 # Acknowledgements
 Special thanks goes out to [@tobozo](https://github.com/tobozo/) for making the USBSID-Pico logo and for his (mental🤣) support since starting this project.  
