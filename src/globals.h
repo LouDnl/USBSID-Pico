@@ -123,6 +123,12 @@ enum
   WEBUSB_TOGGLEAU = 0x3B,
 };
 
+/* USBSID Uart */
+enum {
+  BAUD_RATE = 115200,
+  FFIN_FAST_BAUD_RATE = 921600,
+};
+
 
 #ifdef __cplusplus
   }

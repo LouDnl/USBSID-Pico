@@ -12,6 +12,9 @@ toc::[]
 [%always]
 <<<
 
+== Disclaimer
+include::disclaimer.adoc[]
+
 == PCB top overview
 .Click image for larger view
 [#img-v13top,link=images/v1.0/v1.0-explained.png]
@@ -103,9 +106,6 @@ Ground and S1 as labeled
 
 == 14. Reset button
 image:images/v1.0/reset-button-smaller.png[title=Reset button]
-
-== Disclaimer
-include::disclaimer.adoc[]
 
 == License
 === Software License ~ GNUv2

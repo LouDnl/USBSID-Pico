@@ -5,9 +5,9 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
 
 # This is USBSID-Pico! :)
 
-| **“Raster Bar” (8-bit)** | **Van Halen's Jump<br>dual SID in Stereo!** | **Flamethrower** | **Multiverse 100%<br>in Stereo!** |
+| **“Raster Bar” (8-bit)** | **Van Halen's Jump<br>dual SID in Stereo!** | **Next Level** | **Coma Light 13** |
 |:-:|:-:|:-:|:-:|
-| [![MOS6581](https://img.youtube.com/vi/nh0SxO1y6I0/1.jpg)](https://www.youtube.com/watch?v=nh0SxO1y6I0)<br><small><sub>by LukHash</sub></small> | [![Dual MOS8580](https://img.youtube.com/vi/lzvkWlDq2TM/1.jpg)](https://www.youtube.com/watch?v=lzvkWlDq2TM)<br><small><sub>by Nordischsound</sub></small> | [![MOS8580](https://img.youtube.com/vi/Mfbj21ntQXA/1.jpg)](https://www.youtube.com/watch?v=Mfbj21ntQXA)<br><small><sub>by Reed</sub></small> | [![Dual MOS8580](https://img.youtube.com/vi/Rr-oq5jBeDg/1.jpg)](https://www.youtube.com/watch?v=Rr-oq5jBeDg)<br><small><sub>by Nah-Kolor</sub></small> |
+| [<img src="https://img.youtube.com/vi/nh0SxO1y6I0/0.jpg" width=75%>](https://www.youtube.com/watch?v=nh0SxO1y6I0)<br><small><sub>by LukHash</sub></small> | [<img src="https://img.youtube.com/vi/lzvkWlDq2TM/0.jpg" width=75%>](https://www.youtube.com/watch?v=lzvkWlDq2TM)<br><small><sub>by Nordischsound</sub></small> | [<img src="https://img.youtube.com/vi/ER8v2g7TlwA/0.jpg" width=75%>](https://www.youtube.com/watch?v=ER8v2g7TlwA)<br><small><sub>by Performers</sub> | [<img src="https://img.youtube.com/vi/iXviof4ZtIg/0.jpg" width=75%>](https://www.youtube.com/watch?v=iXviof4ZtIg)<br><small><sub>by Oxyron</sub></small> |
 
 # Index
 
@@ -44,21 +44,27 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
 ![USBSID-Pico](images/pcbv1.3-neon.png)  
 See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for more information on how to use supported software!  
 #### SID Playing
-USBSID-Pico supports various ways of playing SID files.  
-Out-of-the box playing is supported by using [Deepsid by Chordian](https://deepsid.chordian.net)  
-by selecting `WebUSB (Hermit)` as player in the pulldown menu or  
-by selecting `ASID (MIDI)` as player in the pulldown menu.  
-Out-of-the box playing is also supported by using [C64jukebox by Kenchis](https://haendel.ddns.net:8443/static/c64jukebox.vue), note that this is still in BETA.  
-[SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux & Windows with up to 4 SIDs supported (Windows version is buggy).  
-Unofficial support is added to a fork of [Vice](https://github.com/LouDnl/Vice-USBSID), up to 3 SIDs are supported in vsid and up to 4 in x64sc.  
-Unofficial support is added to a fork of [sidplayfp](https://github.com/LouDnl/sidplayfp-usbsid) which requires a fork of [libsidplayfp](https://github.com/LouDnl/libsidplayfp-usbsid).  
-Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouDnl/RetroDebugger), up to 4 SIDs are supported.
+USBSID-Pico supports various ways of playing SID files.
+- Out-of-the box playing is supported by using [Deepsid by Chordian](https://deepsid.chordian.net)  
+  by selecting `WebUSB (Hermit)` as player in the pulldown menu or  
+  by selecting `ASID (MIDI)` as player in the pulldown menu.
+- Out-of-the box playing is also supported by using [C64jukebox by Kenchis](https://haendel.ddns.net:8443/static/c64jukebox.vue), note that this is still in BETA.  
+- [SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux & Windows with up to 4 SIDs supported (Windows version is buggy).  
+#### C64 emulators
+- [Vice](https://github.com/VICE-Team/svn-mirror/releases) has official support starting at tag [r45763](https://github.com/VICE-Team/svn-mirror/releases/tag/r45763) and up, up to 3 SIDs are supported in vsid and up to 4 in x64sc.  
+- [JSidplay2](https://haendel.ddns.net/~ken/#_latest_beta_versions) has official support in latest Java beta versions, up to 4 sids.
+- [Denise](https://sourceforge.net/projects/deniseemu/) has official support in [Windows](https://ci.appveyor.com/project/piciji/denise/history) and [Linux](https://sourceforge.net/projects/deniseemu/files/nightlies/) nightly builds and in [code repo](https://bitbucket.org/piciji/denise/src/master/), up to 4 sids.
+- Unofficial support is added to a fork of [sidplayfp](https://github.com/LouDnl/sidplayfp-usbsid) which requires a fork of [libsidplayfp](https://github.com/LouDnl/libsidplayfp-usbsid).  
+- Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouDnl/RetroDebugger), up to 4 SIDs are supported.
+
 ##### Amiga
-[erique](https://github.com/erique) and [koobo](https://github.com/koobo) have added support to [playsid](https://github.com/erique/playsid.library)
-##### C64 Music trackers
-You should be able to use the ASID fork of [sidfactory2](https://github.com/Chordian/sidfactory2/tree/asid-support) without issues.  
-When using Vice or RetroDebugger you can freely use applications like [SID-Wizard](https://sourceforge.net/projects/sid-wizard/) for music creation.  
-There is also work being done in my forks of [Goattracker2](https://github.com/LouDnl/goattracker2) and [GTUltra](https://github.com/LouDnl/GTUltra-USBSID). Ask on Discord for latest binaries :)
+- [erique](https://github.com/erique) and [koobo](https://github.com/koobo) have added support to [playsid](https://github.com/erique/playsid.library)
+
+#### C64 Music trackers
+- You should be able to use the ASID fork of [sidfactory2](https://github.com/Chordian/sidfactory2/tree/asid-support) without issues.  
+- When using Vice or RetroDebugger you can freely use applications like [SID-Wizard](https://sourceforge.net/projects/sid-wizard/) for music creation.  
+- There is also work being done in my forks of [Goattracker2](https://github.com/LouDnl/goattracker2) and [GTUltra](https://github.com/LouDnl/GTUltra-USBSID).  
+  Ask on Discord for latest binaries :)
 
 #### Midi
 USBSID-Pico acts as Midi device and supports basic Midi in ~ note that Midi is still in development and in Beta phase.  
@@ -72,7 +78,6 @@ Any questions about or support with USBSID-Pico can be asked
 
 # Project status
 Visit the [Project Page](https://github.com/users/LouDnl/projects/1) for an up-to-date list of things being worked on.
-Firmware is in beta stage and still in development.  
 While in development any mentioned features, options, etc. are subject to change.  
 ### Code status
 |          | Master             | Dev                    |
@@ -112,8 +117,8 @@ While in development any mentioned features, options, etc. are subject to change
 ### Supported platforms
 See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for driver installation and supported software information!  
 _In development_  
-Linux: Vice, JSidplay2, SidplayFp, RetroDebugger, SidBerry, USB Midi, WebUSB & ASID (in webbrowser) SID Play  
-Windows: Vice, JSidplay2, SidBerry, USB Midi, WebUSB & ASID (in webbrowser) SID Play  
+Linux: Vice, JSidplay2, Denise, SidplayFp, RetroDebugger, SidBerry, USB Midi, WebUSB & ASID (in webbrowser) SID Play  
+Windows: Vice, JSidplay2, Denise, SidBerry, USB Midi, WebUSB & ASID (in webbrowser) SID Play  
 Android: USB Midi, WebUSB & ASID (in webbrowser) SID Play
 Amiga: PlaySID library
 
@@ -187,12 +192,12 @@ Your USBSID-Pico PCB has several hardware features like jumpers and pins that re
 ## Cases
 All USBSID-Pico community created cases are available in the [cases](cases/) directory, direct links below.  
 _Cases for PCB revision v1.0:_
-* [Cartridge case](cases/v1.0/spotUP) by @spotUP
-* [boxy case](cases/v1.0/schorsch3000) by @schorsch3000
+* [Cartridge case](cases/v1.0/spotUP) by [@spotUP](https://github.com/spotUP/)
+* [boxy case](cases/v1.0/schorsch3000) by [@schorsch3000](https://github.com/schorsch3000/)
 
 _Cases for PCB revision v1.3:_
-* [spotUP Cartridge case revisited](cases/v1.3/spotUP-revisited) by @LouD
-* [Dual USBSID-Pico Commodore 64 Case](cases/v1.3/Dual_USBSID-Pico_Commodore_64_Case) by @OlefinMakes
+* [spotUP Cartridge case revisited](cases/v1.3/spotUP-revisited) by [@LouD](https://github.com/LouDnl/)
+* [Dual USBSID-Pico Commodore 64 Case](cases/v1.3/Dual_USBSID-Pico_Commodore_64_Case) by [@OlefinMakes](https://github.com/OlefinMakes/)
 
 ### Schematic and BOM
 If you want and are up to it you can solder your own PCB or create your own development board using the documents below
@@ -275,10 +280,11 @@ _Available examples with USBSID-Pico support:_<br>
 Pre compiled Vice binaries are available in my fork @ https://github.com/LouDnl/Vice-USBSID/releases
 
 # Acknowledgements
-Special thanks goes out to [Tobozo](https://github.com/tobozo/) for making the USBSID-Pico logo and for his (mental🤣) support since starting this project.  
-Thanks to [erique](https://github.com/erique) and [koobo](https://github.com/koobo) for creating and implementing Amiga support!  
-Thanks to [Chordian](https://github.com/Chordian) for implementing my crappy webusb solution into deepsid.  
-Thanks to [Ken](https://sourceforge.net/u/kenchis/profile/) for adding webusb support to jsidplay2's c64jukebox.
+Special thanks goes out to [@tobozo](https://github.com/tobozo/) for making the USBSID-Pico logo and for his (mental🤣) support since starting this project.  
+Thanks to [@erique](https://github.com/erique) and [@koobo](https://github.com/koobo) for creating and implementing Amiga support!  
+Thanks to [@Chordian](https://github.com/Chordian) for implementing my crappy webusb solution into deepsid.  
+Thanks to [@kenchis](https://sourceforge.net/u/kenchis/profile/) for adding webusb support to jsidplay2's c64jukebox.  
+Thanks to [PiCiJi](https://bitbucket.org/piciji/workspace/overview) for adding support to Denise.  
 
 Some portions of this code and board are heavily inspired on projects by other great people.
 Some of those projects are - in no particular order:

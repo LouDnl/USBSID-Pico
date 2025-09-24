@@ -22,7 +22,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+/* TODO: Split PIO, DMA, GPIO and calling functions into separate files/namespaces */
 #include "globals.h"
 #include "config.h"
 #include "gpio.h"
@@ -181,7 +181,7 @@ void setup_piobus(void)
   busclock_frequency = (float)pico_hz / (usbsid_config.clock_rate * 32) / 2;  /* Clock frequency is 8 times the SID clock */
 
   CFG("[BUS CLK INIT] START\n");
-  CFG("[PI CLK]@%dMHz [DIV]@%.2f [BUS CLK]@%.2f [CFG SID CLK]%d\n",
+  CFG("[PI CLK]@%luMHz [DIV]@%.2f [BUS CLK]@%.2f [CFG SID CLK]%d\n",
      (pico_hz / 1000 / 1000),
      busclock_frequency,
      ((float)pico_hz / busclock_frequency / 2),
@@ -321,12 +321,12 @@ void restart_bus_clocks(void)
   pio_sm_set_clkdiv(bus_pio, sm_control, busclock_frequency);
   pio_sm_set_clkdiv(bus_pio, sm_data, busclock_frequency);
 
-  CFG("[PI CLK]@%dMHz [DIV]@%.2f [BUS CLK]@%.2f [CFG SID CLK]%d\n",
+  CFG("[PI CLK]@%luMHz [DIV]@%.2f [BUS CLK]@%.2f [CFG SID CLK]%d\n",
     (pico_hz / 1000 / 1000),
     busclock_frequency,
     ((float)pico_hz / busclock_frequency / 2),
     (int)usbsid_config.clock_rate);
-  CFG("[PI CLK]@%dMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n",
+  CFG("[PI CLK]@%luMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n",
     (pico_hz / 1000 / 1000),
     sidclock_frequency,
     ((float)pico_hz / sidclock_frequency / 2),
@@ -418,7 +418,7 @@ void init_sidclock(void)
   sidclock_frequency = (float)pico_hz / usbsid_config.clock_rate / 2;
 
   CFG("[SID CLK INIT] START\n");
-  CFG("[PI CLK]@%dMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n",
+  CFG("[PI CLK]@%luMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n",
     (pico_hz / 1000 / 1000),
     sidclock_frequency,
     ((float)pico_hz / sidclock_frequency / 2),
@@ -494,37 +494,6 @@ static int __not_in_flash_func(set_bus_bits)(uint8_t address, uint8_t data)
   //   address, data, data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word));
   return 1;
 }
-// static int __not_in_flash_func(set_bus_bits)(uint8_t address, uint8_t data)
-// {
-//   /* CFG("[BUS BITS]$%02X:%02X ", address, data); */
-//   switch (address) {
-//     case 0x00 ... 0x1F:
-//       if (cfg.one == 0b110 || cfg.one == 0b111) return 0;
-//       data_word = (address & cfg.one_mask) << 8 | data;
-//       control_word |= cfg.one;
-//       break;
-//     case 0x20 ... 0x3F:
-//       if (cfg.two == 0b110 || cfg.two == 0b111) return 0;
-//       data_word = (address & cfg.two_mask) << 8 | data;
-//       control_word |= cfg.two;
-//       break;
-//     case 0x40 ... 0x5F:
-//       if (cfg.three == 0b110 || cfg.three == 0b111) return 0;
-//       /* Workaround for addresses in this range, mask doesn't work properly */
-//       address &= cfg.three_mask;
-//       data_word = (cfg.three_mask == 0x3f ? (address + 0x20) : address) << 8 | data;
-//       control_word |= cfg.three;
-//       break;
-//     case 0x60 ... 0x7F:
-//       if (cfg.four == 0b110 || cfg.four == 0b111) return 0;
-//       data_word = (address & cfg.four_mask) << 8 | data;
-//       control_word |= cfg.four;
-//       break;
-//   }
-//   /* CFG("$%04x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\n",
-//     data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word)); */
-//   return 1;
-// }
 
 uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data)
 { /* WARNING: DEPRECATED AND NO LONGER WORKS */
@@ -626,6 +595,27 @@ uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, ui
   return (read_data & 0xFF);
 }
 
+void __no_inline_not_in_flash_func(write_operation)(uint8_t address, uint8_t data)
+{
+  sid_memory[(address & 0x7F)] = data;
+  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+  control_word = 0b111000;
+  dir_mask = 0b1111111111111111;  /* Always OUT never IN */
+  if (set_bus_bits(address, data) != 1) {
+    return;
+  }
+  data_word = (dir_mask << 16) | data_word;
+
+  pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, PIO_IRQ0));  /* Preset the statemachine IRQ to not wait for a 1 */
+  pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, PIO_IRQ1));     /* Preset the statemachine IRQ to not wait for a 1 */
+  pio_sm_exec(bus_pio, sm_data, pio_encode_wait_pin(true, PHI));
+  pio_sm_exec(bus_pio, sm_control, pio_encode_wait_pin(true, PHI));
+  pio_sm_put_blocking(bus_pio, sm_control, control_word);
+  pio_sm_put_blocking(bus_pio, sm_data, data_word);
+
+  return;
+}
+
 void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles)
 {
   delay_word = cycles;
@@ -660,6 +650,56 @@ void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint
     data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word),
     address, data, cycles, delay_word);
   return;
+}
+
+void __no_inline_not_in_flash_func(cycled_write_operation_nondma)(uint8_t address, uint8_t data, uint16_t cycles)
+{
+  delay_word = cycles;
+  sid_memory[(address & 0x7F)] = data;
+  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+  control_word = 0b111000;
+  dir_mask = 0b1111111111111111;  /* Always OUT never IN */
+  if (set_bus_bits(address, data) != 1) {
+    return;
+  }
+  data_word = (dir_mask << 16) | data_word;
+
+  pio_sm_put_blocking(bus_pio, sm_control, control_word);
+  pio_sm_put_blocking(bus_pio, sm_data, data_word);
+  pio_sm_put_blocking(bus_pio, sm_delay, delay_word);
+
+  GPIODBG("[WC]$%04x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16" $%02X:%02X(%u %u)\n",
+    data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word),
+    address, data, cycles, delay_word);
+  return;
+}
+
+uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t address, uint8_t data, uint16_t cycles)
+{ /* This is a blocking function! */
+  sid_memory[(address & 0x7F)] = data;
+  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+  control_word = 0b111000;
+  dir_mask = 0b1111111111111111;  /* Always OUT never IN */
+  if (set_bus_bits(address, data) != 1) {
+    return 0;
+  }
+  data_word = (dir_mask << 16) | data_word;
+
+  dma_channel_set_read_addr(dma_tx_control, &control_word, false);
+  dma_channel_set_read_addr(dma_tx_data, &data_word, false);
+
+  cycled_delay_operation(cycles); /* Replaces the delay DMA */
+  pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, PIO_IRQ0));  /* Preset the statemachine IRQ to not wait for a 1 */
+  pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, PIO_IRQ1));     /* Preset the statemachine IRQ to not wait for a 1 */
+  pio_sm_exec(bus_pio, sm_data, pio_encode_wait_pin(true, PHI));
+  pio_sm_exec(bus_pio, sm_control, pio_encode_wait_pin(true, PHI));
+  dma_hw->multi_channel_trigger = (
+    1u << dma_tx_control  /* Control lines RW, CS1 & CS2 DMA transfer */
+    | 1u << dma_tx_data     /* Data & Address DMA transfer */
+  );
+  dma_channel_wait_for_finish_blocking(dma_tx_control);
+
+  return cycles;
 }
 
 void unmute_sid(void)
@@ -755,7 +795,7 @@ void reset_sid(void)
 
 void clear_sid_registers(int sidno)
 { /* NOTICE: CAUSES ISSUES IF USED RIGHT BEFORE PLAYING */
-  for (int reg = 0; reg < count_of(sid_registers) - 4; reg++) {
+  for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
     cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0x0, 0);
   }
   return;
@@ -802,5 +842,7 @@ void set_audio_switch(bool state)
       (int)usbsid_config.stereo_en, mono_stereo[(int)usbsid_config.stereo_en], state, mono_stereo[state]);
     return;
   }
+  #else
+  (void)state;
   #endif
 }

@@ -72,12 +72,18 @@
  * PIO1
  * SM0: RGB LED control
  * SM1: LED PWM control
+ * SM2: Uart RX
  */
 
-/* Uart */
-#define BAUD_RATE 115200
+/* Uart 0 */
 #define TX 16  /* uart 0 tx */
 #define RX 17  /* uart 0 rx */
+
+/* PIO Uart */
+#ifdef USE_PIO_UART
+#define PIOUART_TX 26
+#define PIOUART_RX 27
+#endif
 
 /* Data bus ~ output/input */
 #define D0 0
@@ -125,8 +131,10 @@
 #ifndef HAS_AUDIOSWITCH
 #define NIL1 15
 #endif
+#ifndef USE_PIO_UART
 #define NIL2 26
 #define NIL3 27
+#endif
 #define NIL4 28
 
 /* Masks */

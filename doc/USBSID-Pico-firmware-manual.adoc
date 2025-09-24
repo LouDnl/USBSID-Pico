@@ -14,6 +14,9 @@ toc::[]
 [%always]
 <<<
 
+== Disclaimer
+include::disclaimer.adoc[]
+
 == Firmware types
 image:images/firmware/logo-v1.0.jpg[Title=PCB logo v1.0]
 image:images/firmware/logo-v1.3.jpg[Title=PCB logo v1.3] +
@@ -258,9 +261,6 @@ Available options are: +
 _This config setting is intended for future use_
 Available options are: +
 `False`, `True`
-
-== Disclaimer
-include::disclaimer.adoc[]
 
 == License
 === Software License ~ GNUv2

@@ -5,21 +5,38 @@ import configparser
 import subprocess
 import os
 import threading
-from pathlib import Path
-from sys import argv, platform
+import shlex
+import tempfile
+from sys import argv, platform # <-- CHANGE: Added import for platform check
 
-class USBSidPicoConfigGUI:# {}
+class USBSidPicoConfigGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("USBSID-Pico Config Tool GUI v0.1 ~ by ISL/Samar")
+        self.root.title("USBSID-Pico Config Tool GUI v0.2.1 ~ by ISL/Samar")
         self.root.geometry("800x800")
 
-        # Ścieżki - względne do lokalizacji tego pliku
+        style = ttk.Style(self.root)
+        # --- CHANGE --- Define the appearance of the button in the new 'selected' state
+        style.map('Active.TButton',
+          font=[('selected', ('Arial', 10, 'bold'))],
+          relief=[('selected', 'raised')],
+          highlightbackground=[('selected', 'gray')],
+            highlightcolor=[('selected', 'gray')],
+          borderwidth=[('selected', 7)],
+          background=[('selected', 'lightgreen')],
+          foreground=[('selected', 'green')])
+
         script_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # --- START OF CHANGE: Multi-platform logic implementation ---
         if platform == "linux" or platform == "linux2" or platform == "darwin":
             toolexe = "cfg_usbsid"
         elif platform == "win32":
             toolexe = "cfg_usbsid.exe"
+        else:
+            # Default value for other, unforeseen systems
+            toolexe = "cfg_usbsid"
+
         argc = len(argv)
         if (argc > 1):
             toolini = argv[1]
@@ -27,30 +44,27 @@ class USBSidPicoConfigGUI:# {}
             toolini = "default.ini"
         if not ".ini" in toolini:
             toolini = "default.ini"
+
         self.exe_path = os.path.join(script_dir, toolexe)
         self.default_ini_path = os.path.join(script_dir, toolini)
-        # self.exe_path = os.path.join(script_dir, "cfg_usbsid.exe")
-        # self.default_ini_path = os.path.join(script_dir, "default.ini")
 
         # Sprawdź czy pliki istnieją
         if not os.path.exists(self.exe_path):
             messagebox.showerror("Error", f"{toolexe} not found at: {self.exe_path}")
-        if not os.path.exists(self.default_ini_path):
-            messagebox.showwarning("Warning", f"{toolini} not found at: {self.default_ini_path}")
+            root.destroy()
+            return
+        # --- END OF CHANGE ---
 
-        # Konfiguracja
         self.config = configparser.ConfigParser()
+        self.preset_buttons = {}
         self.current_ini_path = self.default_ini_path
 
         self.setup_ui()
-        self.load_config()
+        self._initial_load()
 
     def setup_ui(self):
-        # Main notebook
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill='both', expand=True, padx=10, pady=10)
-
-        # Tabs
         self.setup_general_tab()
         self.setup_socket_tab()
         self.setup_led_tab()
@@ -60,513 +74,393 @@ class USBSidPicoConfigGUI:# {}
     def setup_general_tab(self):
         general_frame = ttk.Frame(self.notebook)
         self.notebook.add(general_frame, text="General")
-
-        # General controls
         ttk.Label(general_frame, text="General Configuration", font=('Arial', 12, 'bold')).pack(pady=10)
-
-        # Clock rate
         clock_frame = ttk.LabelFrame(general_frame, text="SID Clock Rate")
         clock_frame.pack(fill='x', padx=10, pady=5)
-
         self.clock_var = tk.StringVar(value="1000000")
         clock_rates = [("1.000 MHz", "1000000"), ("0.985 MHz", "985248"),
-                      ("1.023 MHz", "1022727"), ("1.023 MHz (Alt)", "1023440")]
-
+                       ("1.023 MHz", "1022727"), ("1.023 MHz (Alt)", "1023440")]
         for text, value in clock_rates:
-            ttk.Radiobutton(clock_frame, text=text, variable=self.clock_var,
-                           value=value).pack(anchor='w', padx=10, pady=2)
-
-        # Lock clock rate
+            ttk.Radiobutton(clock_frame, text=text, variable=self.clock_var, value=value).pack(anchor='w', padx=10, pady=2)
         self.lock_clock_var = tk.BooleanVar()
-        ttk.Checkbutton(general_frame, text="Lock clock rate",
-                       variable=self.lock_clock_var).pack(pady=5)
-
-        # Audio switch
+        ttk.Checkbutton(general_frame, text="Lock clock rate", variable=self.lock_clock_var).pack(pady=5)
         audio_frame = ttk.LabelFrame(general_frame, text="Audio Switch")
         audio_frame.pack(fill='x', padx=10, pady=5)
-
         self.audio_var = tk.StringVar(value="Stereo")
-        ttk.Radiobutton(audio_frame, text="Mono", variable=self.audio_var,
-                       value="Mono").pack(anchor='w', padx=10, pady=2)
-        ttk.Radiobutton(audio_frame, text="Stereo", variable=self.audio_var,
-                       value="Stereo").pack(anchor='w', padx=10, pady=2)
-
+        ttk.Radiobutton(audio_frame, text="Mono", variable=self.audio_var, value="Mono").pack(anchor='w', padx=10, pady=2)
+        ttk.Radiobutton(audio_frame, text="Stereo", variable=self.audio_var, value="Stereo").pack(anchor='w', padx=20, pady=1)
         self.lock_audio_var = tk.BooleanVar()
-        ttk.Checkbutton(audio_frame, text="Lock audio switch",
-                       variable=self.lock_audio_var).pack(pady=5)
-
-        # FMOPL
+        ttk.Checkbutton(audio_frame, text="Lock audio switch", variable=self.lock_audio_var).pack(pady=5)
         fmopl_frame = ttk.LabelFrame(general_frame, text="FMOPL")
         fmopl_frame.pack(fill='x', padx=10, pady=5)
-
         self.fmopl_var = tk.BooleanVar()
         ttk.Checkbutton(fmopl_frame, text="Enable FMOPL", variable=self.fmopl_var).pack(pady=5)
 
     def setup_socket_tab(self):
         socket_frame = ttk.Frame(self.notebook)
         self.notebook.add(socket_frame, text="SID Sockets")
-
-        # Create a frame to hold both sockets side by side
         sockets_container = ttk.Frame(socket_frame)
         sockets_container.pack(fill='both', expand=True, padx=10, pady=5)
-
-        # Socket 1
-        socket1_frame = ttk.LabelFrame(sockets_container, text="Socket 1")
-        socket1_frame.pack(side='left', fill='both', expand=True, padx=(0, 5))
-
-        self.socket1_enabled = tk.BooleanVar(value=True)
-        ttk.Checkbutton(socket1_frame, text="Enabled", variable=self.socket1_enabled).pack(anchor='w', padx=10, pady=2)
-
-        self.socket1_dualsid = tk.StringVar(value="Disabled")
-        ttk.Label(socket1_frame, text="Dual SID:").pack(anchor='w', padx=10, pady=2)
-        ttk.Radiobutton(socket1_frame, text="Disabled", variable=self.socket1_dualsid,
-                       value="Disabled").pack(anchor='w', padx=20, pady=1)
-        ttk.Radiobutton(socket1_frame, text="Enabled", variable=self.socket1_dualsid,
-                       value="Enabled").pack(anchor='w', padx=20, pady=1)
-
-        self.socket1_chiptype = tk.StringVar(value="Real")
-        ttk.Label(socket1_frame, text="Chip type:").pack(anchor='w', padx=10, pady=2)
-        ttk.Radiobutton(socket1_frame, text="Real", variable=self.socket1_chiptype,
-                       value="Real").pack(anchor='w', padx=20, pady=1)
-        ttk.Radiobutton(socket1_frame, text="Clone", variable=self.socket1_chiptype,
-                       value="Clone").pack(anchor='w', padx=20, pady=1)
-
-        self.socket1_clonetype = tk.StringVar(value="Disabled")
-        ttk.Label(socket1_frame, text="Clone type:").pack(anchor='w', padx=10, pady=2)
         clone_types = ["Disabled", "Other", "SKPico", "ARMSID", "FPGASID", "RedipSID"]
-        for clone_type in clone_types:
-            ttk.Radiobutton(socket1_frame, text=clone_type, variable=self.socket1_clonetype,
-                           value=clone_type).pack(anchor='w', padx=20, pady=1)
-
-        self.socket1_sid1type = tk.StringVar(value="MOS8580")
-        ttk.Label(socket1_frame, text="SID 1 type:").pack(anchor='w', padx=10, pady=2)
         sid_types = ["Unknown", "N/A", "MOS8580", "MOS6581", "FMopl"]
-        for sid_type in sid_types:
-            ttk.Radiobutton(socket1_frame, text=sid_type, variable=self.socket1_sid1type,
-                           value=sid_type).pack(anchor='w', padx=20, pady=1)
-
-        self.socket1_sid2type = tk.StringVar(value="N/A")
-        ttk.Label(socket1_frame, text="SID 2 type:").pack(anchor='w', padx=10, pady=2)
-        for sid_type in sid_types:
-            ttk.Radiobutton(socket1_frame, text=sid_type, variable=self.socket1_sid2type,
-                           value=sid_type).pack(anchor='w', padx=20, pady=1)
-
-        # Socket 2
-        socket2_frame = ttk.LabelFrame(sockets_container, text="Socket 2")
-        socket2_frame.pack(side='right', fill='both', expand=True, padx=(5, 0))
-
-        self.socket2_enabled = tk.BooleanVar(value=True)
-        ttk.Checkbutton(socket2_frame, text="Enabled", variable=self.socket2_enabled).pack(anchor='w', padx=10, pady=2)
-
-        self.socket2_dualsid = tk.StringVar(value="Disabled")
-        ttk.Label(socket2_frame, text="Dual SID:").pack(anchor='w', padx=10, pady=2)
-        ttk.Radiobutton(socket2_frame, text="Disabled", variable=self.socket2_dualsid,
-                       value="Disabled").pack(anchor='w', padx=20, pady=1)
-        ttk.Radiobutton(socket2_frame, text="Enabled", variable=self.socket2_dualsid,
-                       value="Enabled").pack(anchor='w', padx=20, pady=1)
-
-        self.socket2_chiptype = tk.StringVar(value="Real")
-        ttk.Label(socket2_frame, text="Chip type:").pack(anchor='w', padx=10, pady=2)
-        ttk.Radiobutton(socket2_frame, text="Real", variable=self.socket2_chiptype,
-                       value="Real").pack(anchor='w', padx=20, pady=1)
-        ttk.Radiobutton(socket2_frame, text="Clone", variable=self.socket2_chiptype,
-                       value="Clone").pack(anchor='w', padx=20, pady=1)
-
-        self.socket2_clonetype = tk.StringVar(value="Disabled")
-        ttk.Label(socket2_frame, text="Clone type:").pack(anchor='w', padx=10, pady=2)
-        for clone_type in clone_types:
-            ttk.Radiobutton(socket2_frame, text=clone_type, variable=self.socket2_clonetype,
-                           value=clone_type).pack(anchor='w', padx=20, pady=1)
-
-        self.socket2_sid1type = tk.StringVar(value="MOS8580")
-        ttk.Label(socket2_frame, text="SID 1 type:").pack(anchor='w', padx=10, pady=2)
-        for sid_type in sid_types:
-            ttk.Radiobutton(socket2_frame, text=sid_type, variable=self.socket2_sid1type,
-                           value=sid_type).pack(anchor='w', padx=20, pady=1)
-
-        self.socket2_sid2type = tk.StringVar(value="N/A")
-        ttk.Label(socket2_frame, text="SID 2 type:").pack(anchor='w', padx=10, pady=2)
-        for sid_type in sid_types:
-            ttk.Radiobutton(socket2_frame, text=sid_type, variable=self.socket2_sid2type,
-                           value=sid_type).pack(anchor='w', padx=20, pady=1)
-
+        self.socket1_vars = self._create_socket_widgets(sockets_container, "Socket 1", clone_types, sid_types)
+        self.socket1_vars["frame"].pack(side='left', fill='both', expand=True, padx=(0, 5))
+        self.socket2_vars = self._create_socket_widgets(sockets_container, "Socket 2", clone_types, sid_types)
+        self.socket2_vars["frame"].pack(side='right', fill='both', expand=True, padx=(5, 0))
         self.socket2_act_as_one = tk.BooleanVar(value=True)
-        ttk.Checkbutton(socket2_frame, text="Act as one (mirror socket 1)",
-                       variable=self.socket2_act_as_one).pack(pady=5)
+        ttk.Checkbutton(self.socket2_vars["frame"], text="Act as one (mirror socket 1)", variable=self.socket2_act_as_one).pack(pady=5)
+
+    def _create_socket_widgets(self, parent, title, clone_types, sid_types):
+        frame = ttk.LabelFrame(parent, text=title)
+        vars = {"frame": frame, "enabled": tk.BooleanVar(value=True), "dualsid": tk.StringVar(value="Disabled"),
+                "chiptype": tk.StringVar(value="Real"), "clonetype": tk.StringVar(value="Disabled"),
+                "sid1type": tk.StringVar(value="MOS8580"), "sid2type": tk.StringVar(value="N/A")}
+        ttk.Checkbutton(frame, text="Enabled", variable=vars["enabled"]).pack(anchor='w', padx=10, pady=2)
+        ttk.Label(frame, text="Dual SID:").pack(anchor='w', padx=10, pady=2)
+        ttk.Radiobutton(frame, text="Disabled", variable=vars["dualsid"], value="Disabled").pack(anchor='w', padx=20, pady=1)
+        ttk.Radiobutton(frame, text="Enabled", variable=vars["dualsid"], value="Enabled").pack(anchor='w', padx=20, pady=1)
+        ttk.Label(frame, text="Chip type:").pack(anchor='w', padx=10, pady=2)
+        ttk.Radiobutton(frame, text="Real", variable=vars["chiptype"], value="Real").pack(anchor='w', padx=20, pady=1)
+        ttk.Radiobutton(frame, text="Clone", variable=vars["chiptype"], value="Clone").pack(anchor='w', padx=20, pady=1)
+        ttk.Label(frame, text="Clone type:").pack(anchor='w', padx=10, pady=2)
+        for t in clone_types: ttk.Radiobutton(frame, text=t, variable=vars["clonetype"], value=t).pack(anchor='w', padx=20, pady=1)
+        ttk.Label(frame, text="SID 1 type:").pack(anchor='w', padx=10, pady=2)
+        for t in sid_types: ttk.Radiobutton(frame, text=t, variable=vars["sid1type"], value=t).pack(anchor='w', padx=20, pady=1)
+        ttk.Label(frame, text="SID 2 type:").pack(anchor='w', padx=10, pady=2)
+        for t in sid_types: ttk.Radiobutton(frame, text=t, variable=vars["sid2type"], value=t).pack(anchor='w', padx=20, pady=1)
+        return vars
 
     def setup_led_tab(self):
         led_frame = ttk.Frame(self.notebook)
         self.notebook.add(led_frame, text="LED")
-
-        # LED
         led_config_frame = ttk.LabelFrame(led_frame, text="LED")
         led_config_frame.pack(fill='x', padx=10, pady=5)
-
         self.led_enabled = tk.BooleanVar(value=True)
         ttk.Checkbutton(led_config_frame, text="Enabled", variable=self.led_enabled).pack(anchor='w', padx=10, pady=2)
-
         self.led_breathe = tk.BooleanVar(value=True)
         ttk.Checkbutton(led_config_frame, text="Idle breathing", variable=self.led_breathe).pack(anchor='w', padx=10, pady=2)
-
-        # RGB LED
         rgb_frame = ttk.LabelFrame(led_frame, text="RGB LED")
         rgb_frame.pack(fill='x', padx=10, pady=5)
-
         self.rgb_enabled = tk.BooleanVar(value=True)
         ttk.Checkbutton(rgb_frame, text="Enabled", variable=self.rgb_enabled).pack(anchor='w', padx=10, pady=2)
-
         self.rgb_breathe = tk.BooleanVar(value=True)
         ttk.Checkbutton(rgb_frame, text="Idle breathing", variable=self.rgb_breathe).pack(anchor='w', padx=10, pady=2)
-
-        # Brightness
         ttk.Label(rgb_frame, text="Brightness (0-255):").pack(anchor='w', padx=10, pady=2)
         self.rgb_brightness = tk.Scale(rgb_frame, from_=0, to=255, orient='horizontal')
         self.rgb_brightness.set(1)
         self.rgb_brightness.pack(fill='x', padx=10, pady=2)
-
-        # SID to use
         ttk.Label(rgb_frame, text="SID to use:").pack(anchor='w', padx=10, pady=2)
         self.rgb_sid_to_use = tk.StringVar(value="1")
         for i in range(1, 5):
-            ttk.Radiobutton(rgb_frame, text=f"SID {i}", variable=self.rgb_sid_to_use,
-                           value=str(i)).pack(anchor='w', padx=20, pady=1)
+            ttk.Radiobutton(rgb_frame, text=f"SID {i}", variable=self.rgb_sid_to_use, value=str(i)).pack(anchor='w', padx=20, pady=1)
 
     def setup_actions_tab(self):
         actions_frame = ttk.Frame(self.notebook)
         self.notebook.add(actions_frame, text="Actions")
 
-        # Presets
         presets_frame = ttk.LabelFrame(actions_frame, text="Presets")
         presets_frame.pack(fill='x', padx=10, pady=5)
+        preset_buttons_data = [("Single SID", "--single-sid"), ("Dual SID", "--dual-sid"), ("Dual SID Socket 1", "--dual-sid-socket1"),
+                               ("Dual SID Socket 2", "--dual-sid-socket2"), ("Triple SID 1", "--triple-sid1"), ("Triple SID 2", "--triple-sid2"),
+                               ("Quad SID", "--quad-sid"), ("Mirrored SID", "--mirrored-sid")]
+        for i, (text, command_tag) in enumerate(preset_buttons_data):
+            # --- CHANGE --- All preset buttons now use the new style
+            button = ttk.Button(presets_frame, text=text, command=lambda cmd=text: self.apply_preset(cmd), style='Active.TButton')
+            button.grid(row=i // 2, column=i % 2, padx=5, pady=2, sticky='ew')
+            self.preset_buttons[text] = button
 
-        preset_buttons = [
-            ("Single SID", "--single-sid"),
-            ("Dual SID", "--dual-sid"),
-            ("Dual SID Socket 1", "--dual-sid-socket1"),
-            ("Dual SID Socket 2", "--dual-sid-socket2"),
-            ("Triple SID 1", "--triple-sid1"),
-            ("Triple SID 2", "--triple-sid2"),
-            ("Quad SID", "--quad-sid"),
-            ("Mirrored SID", "--mirrored-sid")
-        ]
-
-        for i, (text, command) in enumerate(preset_buttons):
-            row = i // 2
-            col = i % 2
-            ttk.Button(presets_frame, text=text,
-                      command=lambda cmd=command: self.run_command(cmd)).grid(row=row, column=col, padx=5, pady=2, sticky='ew')
-
-        # Device actions
         device_frame = ttk.LabelFrame(actions_frame, text="Device Actions")
         device_frame.pack(fill='x', padx=10, pady=5)
+        device_buttons = [("Read Device settings", self.load_from_device),
+                          ("Write current settings to Device", self.send_to_device),
+                          ("Read Version [console]", lambda: self.run_command_threaded("--version")),
+                          ("Start SID configuration autodetect", self.execute_auto_detect),
+                          ("Reboot USBSID-Pico", lambda: self.run_command_threaded("--reboot-usp")),
+                          ("Save and Reboot", lambda: self.run_command_threaded("--save-reboot"))]
+        for text, command in device_buttons: ttk.Button(device_frame, text=text, command=command).pack(fill='x', padx=5, pady=2)
 
-        # Create a frame for device buttons and results
-        device_content_frame = ttk.Frame(device_frame)
-        device_content_frame.pack(fill='both', expand=True, padx=5, pady=5)
-
-        # Left side - buttons
-        device_buttons_frame = ttk.Frame(device_content_frame)
-        device_buttons_frame.pack(side='left', fill='y', padx=(0, 10))
-
-        device_buttons = [
-            ("Read Configuration", "--read-config"),
-            ("Read Version", "--version"),
-            ("Read Clock Speed", "--read-clock-speed"),
-            ("Reset SID", "--reset-sids"),
-            ("Reset SID Registers", "--reset-sid-registers"),
-            ("Reboot USBSID-Pico", "--reboot-usp"),
-            ("Bootloader for FW update", "--bootloader"),
-            ("Auto-detect All", "--auto-detect-all"),
-            ("Apply Configuration", "--apply-config"),
-            ("Save Configuration", "--save-config"),
-            ("Save and Reboot", "--save-reboot")
-        ]
-
-        for i, (text, command) in enumerate(device_buttons):
-            ttk.Button(device_buttons_frame, text=text,
-                      command=lambda cmd=command: self.run_device_command(cmd)).pack(fill='x', padx=5, pady=2)
-
-        # Right side - results display
-        device_results_frame = ttk.LabelFrame(device_content_frame, text="Device Results")
-        device_results_frame.pack(side='right', fill='both', expand=True)
-
-        # Results text area
-        self.device_results_text = tk.Text(device_results_frame, height=15, width=50)
-        device_scrollbar = ttk.Scrollbar(device_results_frame, orient="vertical", command=self.device_results_text.yview)
-        self.device_results_text.configure(yscrollcommand=device_scrollbar.set)
-
-        self.device_results_text.pack(side="left", fill="both", expand=True, padx=5, pady=5)
-        device_scrollbar.pack(side="right", fill="y")
-
-        # Clear results button
-        ttk.Button(device_results_frame, text="Clear Results",
-                  command=self.clear_device_results).pack(pady=2)
-
-        # File actions
-        file_frame = ttk.LabelFrame(actions_frame, text="File Actions")
+        file_frame = ttk.LabelFrame(actions_frame, text="File Operations")
         file_frame.pack(fill='x', padx=10, pady=5)
-
-        ttk.Button(file_frame, text="Generate Default INI",
-                  command=self.generate_default_ini).pack(fill='x', padx=5, pady=2)
-        ttk.Button(file_frame, text="Export Configuration",
-                  command=self.export_config).pack(fill='x', padx=5, pady=2)
-        ttk.Button(file_frame, text="Import Configuration",
-                  command=self.import_config).pack(fill='x', padx=5, pady=2)
-        ttk.Button(file_frame, text="Save Settings to INI",
-                  command=self.save_to_ini).pack(fill='x', padx=5, pady=2)
-        ttk.Button(file_frame, text="Load Settings from INI",
-                  command=self.load_from_ini).pack(fill='x', padx=5, pady=2)
+        ttk.Button(file_frame, text="Dump settings from device to .ini File", command=self.export_config).pack(fill='x', padx=5, pady=2)
+        ttk.Button(file_frame, text="Write settings to Device from .ini File", command=self.import_config).pack(fill='x', padx=5, pady=2)
+        ttk.Button(file_frame, text="Export GUI settings to .ini File", command=self.save_to_ini).pack(fill='x', padx=5, pady=2)
+        ttk.Button(file_frame, text="Import .ini File to GUI", command=self.load_from_ini).pack(fill='x', padx=5, pady=2)
 
     def setup_console_tab(self):
         console_frame = ttk.Frame(self.notebook)
         self.notebook.add(console_frame, text="Console")
-
-        # Console output
-        self.console_text = tk.Text(console_frame, height=20, width=80)
+        self.console_text = tk.Text(console_frame, height=20, width=80, wrap='word')
         scrollbar = ttk.Scrollbar(console_frame, orient="vertical", command=self.console_text.yview)
         self.console_text.configure(yscrollcommand=scrollbar.set)
-
         self.console_text.pack(side="left", fill="both", expand=True, padx=10, pady=10)
         scrollbar.pack(side="right", fill="y")
+        ttk.Button(console_frame, text="Clear Console", command=self.clear_console).pack(pady=5)
 
-        # Clear button
-        ttk.Button(console_frame, text="Clear Console",
-                  command=self.clear_console).pack(pady=5)
+    def _initial_load(self):
+        self.log_to_console("--- Application Start ---")
+        self.log_to_console("Attempting to auto-load configuration from device...")
+        temp_filepath = None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ini', encoding='utf-8') as temp_file:
+                temp_filepath = temp_file.name
+
+            command = f'--export-config "{temp_filepath}"'
+            self.run_command_blocking(command, silent=True)
+            self.load_config(temp_filepath)
+            messagebox.showinfo("Device Connected", "Successfully connected and loaded settings from the USBSID-Pico device.")
+        except Exception as e:
+            self.log_to_console(f"Auto-load from device failed. This is normal if the device is not connected. Details: {e}")
+            messagebox.showwarning("Device Not Found", "Could not automatically load settings from the USBSID-Pico device.\n\nPlease ensure the device is connected \n\nAnd NOT playing SID music.\n\nLoading default settings from file instead.")
+            self.load_config(self.default_ini_path)
+        finally:
+            if temp_filepath and os.path.exists(temp_filepath):
+                os.remove(temp_filepath)
+
+    def apply_preset(self, preset_name):
+        self.log_to_console(f"Preset button clicked: {preset_name}")
+        self._set_gui_for_preset(preset_name)
+
+        if messagebox.askyesno("Apply Preset", f"Apply the '{preset_name}' preset and write it to the device?"):
+            self.send_to_device(confirm=False)
+        else:
+            self.log_to_console("Preset application cancelled by user. Reverting to last known device state.")
+            self.update_ui_from_config()
+
+    def _set_gui_for_preset(self, preset_name):
+        preset_map = {
+            "Single SID":        (True, False, False, False, False), "Dual SID":          (True, False, True,  False, False),
+            "Dual SID Socket 1": (True, True,  False, False, False), "Dual SID Socket 2": (False,False, True,  True,  False),
+            "Triple SID 1":      (True, True,  True,  False, False), "Triple SID 2":      (True, False, True,  True,  False),
+            "Quad SID":          (True, True,  True,  True,  False), "Mirrored SID":      (True, False, True,  False, True),
+        }
+        state = preset_map.get(preset_name)
+        if not state: return
+
+        s1_en, s1_dual, s2_en, s2_dual, s2_mirror = state
+        self.socket1_vars["enabled"].set(s1_en)
+        self.socket1_vars["dualsid"].set("Enabled" if s1_dual else "Disabled")
+        self.socket2_vars["enabled"].set(s2_en)
+        self.socket2_vars["dualsid"].set("Enabled" if s2_dual else "Disabled")
+        self.socket2_act_as_one.set(s2_mirror)
+        self.log_to_console(f"GUI controls set to '{preset_name}' state.")
+        self._update_preset_highlighting()
+
+    def execute_auto_detect(self, confirm=True):
+        if confirm and not messagebox.askyesno("Confirm Autodetection", "Are you sure? Current settings in the GUI will no longer match device settings. You must reload the configuration afterwards!"):
+            self.log_to_console("Autodetection cancelled by user.")
+            return
+
+        self.log_to_console("Attempting send auto detect command to device...")
+        try:
+            command = f'--auto-detect-all'
+            self.run_command_blocking(command)
+            if confirm: messagebox.showinfo("Success", "Autodetect command sent!")
+        except Exception as e:
+            self.log_to_console(f"Operation failed: {e}")
+            messagebox.showerror("Error", f"Failed to send autodetect command.\n\nDetails: {e}")
+
+    def load_from_device(self, confirm=True):
+        if confirm and not messagebox.askyesno("Confirm Refresh", "Are you sure? All current settings in the GUI will be overwritten by the settings from the device."):
+            self.log_to_console("Refresh operation cancelled by user.")
+            return
+
+        self.log_to_console("Attempting to refresh settings from device...")
+        temp_filepath = None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ini', encoding='utf-8') as temp_file:
+                temp_filepath = temp_file.name
+
+            command = f'--export-config "{temp_filepath}"'
+            self.run_command_blocking(command)
+            self.load_config(temp_filepath)
+            if confirm: messagebox.showinfo("Success", "Settings have been successfully refreshed from the device.")
+        except Exception as e:
+            self.log_to_console(f"Operation failed: {e}")
+            messagebox.showerror("Error", f"Failed to refresh settings from device.\n\nDetails: {e}")
+        finally:
+            if temp_filepath and os.path.exists(temp_filepath): os.remove(temp_filepath)
+
+    def send_to_device(self, confirm=True):
+        if confirm and not messagebox.askyesno("Confirm Write", "Are you sure? All settings on the device will be overwritten."):
+            self.log_to_console("Write operation cancelled by user.")
+            return
+
+        self.log_to_console("Attempting to write current GUI settings to device...")
+        temp_filepath = None
+        try:
+            self._update_config_from_ui()
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.ini', encoding='utf-8', newline='') as temp_file:
+                temp_filepath = temp_file.name
+                self.config.write(temp_file)
+
+            command = f'--import-config "{temp_filepath}"'
+            self.run_command_blocking(command)
+            messagebox.showinfo("Success", "Successfully wrote GUI settings to the device.")
+        except Exception as e:
+            self.log_to_console(f"Operation failed: {e}")
+            messagebox.showerror("Error", f"Failed to write settings to device.\n\nDetails: {e}")
+        finally:
+            if temp_filepath and os.path.exists(temp_filepath): os.remove(temp_filepath)
 
     def log_to_console(self, message):
         self.console_text.insert(tk.END, f"{message}\n")
         self.console_text.see(tk.END)
 
-    def clear_console(self):
-        self.console_text.delete(1.0, tk.END)
+    def clear_console(self): self.console_text.delete(1.0, tk.END)
+    def run_command_threaded(self, command_string): threading.Thread(target=self.run_command_blocking, args=(command_string,), daemon=True).start()
 
-    def run_command(self, command):
-        def run():
-            try:
-                self.log_to_console(f"Executing: {command}")
-                result = subprocess.run([self.exe_path, command],
-                                      capture_output=True, text=True, timeout=10)
-
-                if result.stdout:
-                    self.log_to_console(f"STDOUT: {result.stdout}")
-                if result.stderr:
-                    self.log_to_console(f"STDERR: {result.stderr}")
-
-                self.log_to_console(f"Exit code: {result.returncode}")
-
-            except subprocess.TimeoutExpired:
-                self.log_to_console("Command timed out")
-            except Exception as e:
-                self.log_to_console(f"Error: {e}")
-
-        threading.Thread(target=run, daemon=True).start()
-
-    def run_device_command(self, command):
-        """Run device command and display results in device results area"""
-        def run():
-            try:
-                self.log_to_device_results(f"Executing: {command}")
-                result = subprocess.run([self.exe_path, command],
-                                      capture_output=True, text=True, timeout=10)
-
-                if result.stdout:
-                    self.log_to_device_results(f"STDOUT:\n{result.stdout}")
-                if result.stderr:
-                    self.log_to_device_results(f"STDERR:\n{result.stderr}")
-
-                self.log_to_device_results(f"Exit code: {result.returncode}")
-
-            except subprocess.TimeoutExpired:
-                self.log_to_device_results("Command timed out")
-            except Exception as e:
-                self.log_to_device_results(f"Error: {e}")
-
-        threading.Thread(target=run, daemon=True).start()
-
-    def log_to_device_results(self, message):
-        """Log message to device results area"""
-        self.device_results_text.insert(tk.END, f"{message}\n")
-        self.device_results_text.see(tk.END)
-
-    def clear_device_results(self):
-        """Clear device results area"""
-        self.device_results_text.delete(1.0, tk.END)
-
-    def load_config(self):
+    def run_command_blocking(self, command_string, silent=False):
         try:
-            if os.path.exists(self.current_ini_path):
-                self.config.read(self.current_ini_path)
+            cmd_list = [self.exe_path] + shlex.split(command_string)
+            if not silent: self.log_to_console(f"Executing: {cmd_list}")
+            result = subprocess.run(cmd_list, capture_output=True, text=True, timeout=15, check=True, encoding='utf-8', errors='ignore')
+            if not silent:
+                if result.stdout: self.log_to_console(f"STDOUT: {result.stdout}")
+                if result.stderr: self.log_to_console(f"STDERR: {result.stderr}")
+            return True
+        except FileNotFoundError: raise Exception(f"Executable not found at: {self.exe_path}") # CHANGE: Better error message
+        except subprocess.TimeoutExpired: raise Exception("The operation timed out. Is the device connected and responsive?")
+        except subprocess.CalledProcessError as e:
+            error_details = f"Command failed with exit code {e.returncode}.\n\nSTDERR:\n{e.stderr or 'N/A'}\n\nSTDOUT:\n{e.stdout or 'N/A'}"
+            raise Exception(error_details)
+        except Exception as e: raise Exception(f"An unexpected error occurred during command execution: {e}")
+
+    def load_config(self, file_path):
+        try:
+            if os.path.exists(file_path):
+                config = configparser.ConfigParser()
+                config.read(file_path)
+                self.config = config
                 self.update_ui_from_config()
-                self.log_to_console(f"Loaded configuration from: {self.current_ini_path}")
-            else:
-                self.log_to_console(f"Configuration file does not exist: {self.current_ini_path}")
-        except Exception as e:
-            self.log_to_console(f"Error loading configuration: {e}")
+                self.current_ini_path = file_path
+                self.log_to_console(f"Successfully loaded and applied config from: {file_path}")
+        except Exception as e: self.log_to_console(f"Error loading INI file {file_path}: {e}")
 
     def update_ui_from_config(self):
         try:
-            # General
-            if 'General' in self.config:
+            if self.config.has_section('General'):
                 gen = self.config['General']
                 self.clock_var.set(gen.get('clock_rate', '1000000'))
-                self.lock_clock_var.set(gen.get('lock_clockrate', 'False').lower() == 'true')
-
-            # Socket 1
-            if 'socketOne' in self.config:
-                s1 = self.config['socketOne']
-                self.socket1_enabled.set(s1.get('enabled', 'True').lower() == 'true')
-                self.socket1_dualsid.set(s1.get('dualsid', 'Disabled'))
-                self.socket1_chiptype.set(s1.get('chiptype', 'Real'))
-                self.socket1_clonetype.set(s1.get('clonetype', 'Disabled'))
-                self.socket1_sid1type.set(s1.get('sid1type', 'MOS8580'))
-                self.socket1_sid2type.set(s1.get('sid2type', 'N/A'))
-
-            # Socket 2
-            if 'socketTwo' in self.config:
-                s2 = self.config['socketTwo']
-                self.socket2_enabled.set(s2.get('enabled', 'True').lower() == 'true')
-                self.socket2_dualsid.set(s2.get('dualsid', 'Disabled'))
-                self.socket2_chiptype.set(s2.get('chiptype', 'Real'))
-                self.socket2_clonetype.set(s2.get('clonetype', 'Disabled'))
-                self.socket2_sid1type.set(s2.get('sid1type', 'MOS8580'))
-                self.socket2_sid2type.set(s2.get('sid2type', 'N/A'))
-                self.socket2_act_as_one.set(s2.get('act_as_one', 'True').lower() == 'true')
-
-            # LED
-            if 'LED' in self.config:
-                led = self.config['LED']
-                self.led_enabled.set(led.get('enabled', 'True').lower() == 'true')
-                self.led_breathe.set(led.get('idle_breathe', 'True').lower() == 'true')
-
-            # RGB LED
-            if 'RGBLED' in self.config:
+                self.lock_clock_var.set(gen.getboolean('lock_clockrate', fallback=False))
+            if self.config.has_section('Audioswitch'):
+                self.audio_var.set(self.config['Audioswitch'].get('set_to', 'Stereo'))
+                self.lock_audio_var.set(self.config['Audioswitch'].getboolean('lock_audio_switch', fallback=False))
+            if self.config.has_section('FMOPL'): self.fmopl_var.set(self.config['FMOPL'].getboolean('enabled', fallback=False))
+            if self.config.has_section('socketOne'): self._update_socket_ui(self.socket1_vars, self.config['socketOne'])
+            if self.config.has_section('socketTwo'):
+                self._update_socket_ui(self.socket2_vars, self.config['socketTwo'])
+                self.socket2_act_as_one.set(self.config['socketTwo'].getboolean('act_as_one', fallback=True))
+            if self.config.has_section('LED'):
+                self.led_enabled.set(self.config['LED'].getboolean('enabled', fallback=True))
+                self.led_breathe.set(self.config['LED'].getboolean('idle_breathe', fallback=True))
+            if self.config.has_section('RGBLED'):
                 rgb = self.config['RGBLED']
-                self.rgb_enabled.set(rgb.get('enabled', 'True').lower() == 'true')
-                self.rgb_breathe.set(rgb.get('idle_breathe', 'True').lower() == 'true')
-                self.rgb_brightness.set(int(rgb.get('brightness', '1')))
+                self.rgb_enabled.set(rgb.getboolean('enabled', fallback=True))
+                self.rgb_breathe.set(rgb.getboolean('idle_breathe', fallback=True))
+                self.rgb_brightness.set(rgb.getint('brightness', fallback=1))
                 self.rgb_sid_to_use.set(rgb.get('sid_to_use', '1'))
+            self.root.after(50, self._update_preset_highlighting)
+        except Exception as e: self.log_to_console(f"CRITICAL ERROR updating UI from config: {e}")
 
-            # FMOPL
-            if 'FMOPL' in self.config:
-                self.fmopl_var.set(self.config['FMOPL'].get('enabled', 'False').lower() == 'true')
+    def _update_preset_highlighting(self):
+        # --- CHANGE --- Managing the 'selected' state instead of changing the style
+        for button in self.preset_buttons.values():
+            button.state(['!selected'])
 
-            # Audio switch
-            if 'Audioswitch' in self.config:
-                audio = self.config['Audioswitch']
-                self.audio_var.set(audio.get('set_to', 'Stereo'))
-                self.lock_audio_var.set(audio.get('lock_audio_switch', 'False').lower() == 'true')
+        preset_map = {
+            "Single SID":        (True, False, False, False, False), "Dual SID":          (True, False, True,  False, False),
+            "Dual SID Socket 1": (True, True,  False, False, False), "Dual SID Socket 2": (False,False, True,  True,  False),
+            "Triple SID 1":      (True, True,  True,  False, False), "Triple SID 2":      (True, False, True,  True,  False),
+            "Quad SID":          (True, True,  True,  True,  False), "Mirrored SID":      (True, False, True,  False, True),
+        }
 
-        except Exception as e:
-            self.log_to_console(f"Error updating UI: {e}")
+        s1_en = self.socket1_vars["enabled"].get()
+        s1_dual = self.socket1_vars["dualsid"].get() == 'Enabled'
+        s2_en = self.socket2_vars["enabled"].get()
+        s2_dual = self.socket2_vars["dualsid"].get() == 'Enabled'
+        s2_mirror = self.socket2_act_as_one.get()
+        current_state = (s1_en, s1_dual, s2_en, s2_dual, s2_mirror)
+
+        active_preset_name = None
+        for name, state in preset_map.items():
+            if state == current_state:
+                active_preset_name = name
+                break
+
+        if active_preset_name and self.preset_buttons.get(active_preset_name):
+            self.preset_buttons[active_preset_name].state(['selected'])
+            self.log_to_console(f"Active preset detected: {active_preset_name}")
+
+    def _update_socket_ui(self, uivars, config_section):
+        uivars["enabled"].set(config_section.getboolean('enabled', fallback=True))
+        uivars["dualsid"].set(config_section.get('dualsid', 'Disabled'))
+        uivars["chiptype"].set(config_section.get('chiptype', 'Real'))
+        uivars["clonetype"].set(config_section.get('clonetype', 'Disabled'))
+        uivars["sid1type"].set(config_section.get('sid1type', 'MOS8580'))
+        uivars["sid2type"].set(config_section.get('sid2type', 'N/A'))
 
     def save_to_ini(self):
         try:
-            # General
-            if 'General' not in self.config:
-                self.config['General'] = {}
+            file_path = filedialog.asksaveasfilename(title="Export GUI settings to .ini File", defaultextension=".ini", filetypes=[("INI files", "*.ini"), ("All files", "*.*")])
+            if not file_path: return
+            self._update_config_from_ui()
+            with open(file_path, 'w') as configfile: self.config.write(configfile)
+            messagebox.showinfo("Success", f"GUI settings have been exported to\n{file_path}")
+        except Exception as e: messagebox.showerror("Error", f"Failed to export configuration: {e}")
 
-            self.config['General']['clock_rate'] = self.clock_var.get()
-            self.config['General']['lock_clockrate'] = str(self.lock_clock_var.get())
+    def _update_config_from_ui(self):
+        if not self.config.has_section('General'): self.config.add_section('General')
+        self.config['General']['clock_rate'] = self.clock_var.get()
+        self.config['General']['lock_clockrate'] = str(self.lock_clock_var.get())
+        self._update_socket_config(self.socket1_vars, 'socketOne')
+        self._update_socket_config(self.socket2_vars, 'socketTwo')
+        if not self.config.has_section('socketTwo'): self.config.add_section('socketTwo')
+        self.config['socketTwo']['act_as_one'] = str(self.socket2_act_as_one.get())
+        if not self.config.has_section('LED'): self.config.add_section('LED')
+        self.config['LED']['enabled'] = str(self.led_enabled.get())
+        self.config['LED']['idle_breathe'] = str(self.led_breathe.get())
+        if not self.config.has_section('RGBLED'): self.config.add_section('RGBLED')
+        self.config['RGBLED']['enabled'] = str(self.rgb_enabled.get())
+        self.config['RGBLED']['idle_breathe'] = str(self.rgb_breathe.get())
+        self.config['RGBLED']['brightness'] = str(self.rgb_brightness.get())
+        self.config['RGBLED']['sid_to_use'] = self.rgb_sid_to_use.get()
+        if not self.config.has_section('FMOPL'): self.config.add_section('FMOPL')
+        self.config['FMOPL']['enabled'] = str(self.fmopl_var.get())
+        if not self.config.has_section('Audioswitch'): self.config.add_section('Audioswitch')
+        self.config['Audioswitch']['set_to'] = self.audio_var.get()
+        self.config['Audioswitch']['lock_audio_switch'] = str(self.lock_audio_var.get())
 
-            # Socket 1
-            if 'socketOne' not in self.config:
-                self.config['socketOne'] = {}
-
-            self.config['socketOne']['enabled'] = str(self.socket1_enabled.get())
-            self.config['socketOne']['dualsid'] = self.socket1_dualsid.get()
-            self.config['socketOne']['chiptype'] = self.socket1_chiptype.get()
-            self.config['socketOne']['clonetype'] = self.socket1_clonetype.get()
-            self.config['socketOne']['sid1type'] = self.socket1_sid1type.get()
-            self.config['socketOne']['sid2type'] = self.socket1_sid2type.get()
-
-            # Socket 2
-            if 'socketTwo' not in self.config:
-                self.config['socketTwo'] = {}
-
-            self.config['socketTwo']['enabled'] = str(self.socket2_enabled.get())
-            self.config['socketTwo']['dualsid'] = self.socket2_dualsid.get()
-            self.config['socketTwo']['chiptype'] = self.socket2_chiptype.get()
-            self.config['socketTwo']['clonetype'] = self.socket2_clonetype.get()
-            self.config['socketTwo']['sid1type'] = self.socket2_sid1type.get()
-            self.config['socketTwo']['sid2type'] = self.socket2_sid2type.get()
-            self.config['socketTwo']['act_as_one'] = str(self.socket2_act_as_one.get())
-
-            # LED
-            if 'LED' not in self.config:
-                self.config['LED'] = {}
-
-            self.config['LED']['enabled'] = str(self.led_enabled.get())
-            self.config['LED']['idle_breathe'] = str(self.led_breathe.get())
-
-            # RGB LED
-            if 'RGBLED' not in self.config:
-                self.config['RGBLED'] = {}
-
-            self.config['RGBLED']['enabled'] = str(self.rgb_enabled.get())
-            self.config['RGBLED']['idle_breathe'] = str(self.rgb_breathe.get())
-            self.config['RGBLED']['brightness'] = str(self.rgb_brightness.get())
-            self.config['RGBLED']['sid_to_use'] = self.rgb_sid_to_use.get()
-
-            # FMOPL
-            if 'FMOPL' not in self.config:
-                self.config['FMOPL'] = {}
-
-            self.config['FMOPL']['enabled'] = str(self.fmopl_var.get())
-
-            # Audio switch
-            if 'Audioswitch' not in self.config:
-                self.config['Audioswitch'] = {}
-
-            self.config['Audioswitch']['set_to'] = self.audio_var.get()
-            self.config['Audioswitch']['lock_audio_switch'] = str(self.lock_audio_var.get())
-
-            # Save to file
-            with open(self.current_ini_path, 'w') as configfile:
-                self.config.write(configfile)
-
-            self.log_to_console(f"Saved configuration to: {self.current_ini_path}")
-            messagebox.showinfo("Success", "Configuration has been saved")
-
-        except Exception as e:
-            self.log_to_console(f"Error saving: {e}")
-            messagebox.showerror("Error", f"Failed to save configuration: {e}")
+    def _update_socket_config(self, uivars, section_name):
+        if not self.config.has_section(section_name): self.config.add_section(section_name)
+        s = self.config[section_name]
+        s['enabled'], s['dualsid'], s['chiptype'], s['clonetype'], s['sid1type'], s['sid2type'] = \
+            str(uivars["enabled"].get()), uivars["dualsid"].get(), uivars["chiptype"].get(), \
+            uivars["clonetype"].get(), uivars["sid1type"].get(), uivars["sid2type"].get()
 
     def load_from_ini(self):
-        file_path = filedialog.askopenfilename(
-            title="Select INI file",
-            filetypes=[("INI files", "*.ini"), ("All files", "*.*")]
-        )
-
-        if file_path:
-            self.current_ini_path = file_path
-            self.load_config()
-
-    def generate_default_ini(self):
-        self.run_command("--default-ini")
+        file_path = filedialog.askopenfilename(title="Import .ini File to GUI", filetypes=[("INI files", "*.ini"), ("All files", "*.*")])
+        if file_path: self.load_config(file_path)
 
     def export_config(self):
-        file_path = filedialog.asksaveasfilename(
-            title="Export Configuration",
-            defaultextension=".ini",
-            filetypes=[("INI files", "*.ini"), ("All files", "*.*")]
-        )
-
-        if file_path:
-            self.run_command(f"--export-config {file_path}")
+        file_path = filedialog.asksaveasfilename(title="Dump settings from device to .ini File", defaultextension=".ini", filetypes=[("INI files", "*.ini"), ("All files", "*.*")])
+        if not file_path: return
+        try:
+            self.run_command_blocking(f'--export-config "{file_path}"')
+            messagebox.showinfo("Success", f"Successfully dumped device configuration to\n{file_path}")
+        except Exception as e: messagebox.showerror("Error", f"Failed to dump configuration from device.\n\nDetails: {e}")
 
     def import_config(self):
-        file_path = filedialog.askopenfilename(
-            title="Import Configuration",
-            filetypes=[("INI files", "*.ini"), ("All files", "*.*")]
-        )
-
-        if file_path:
-            self.run_command(f"--import-config {file_path}")
+        file_path = filedialog.askopenfilename(title="Write settings to Device from .ini File", filetypes=[("INI files", "*.ini"), ("All files", "*.*")])
+        if not file_path: return
+        try:
+            self.run_command_blocking(f'--import-config "{file_path}"')
+            messagebox.showinfo("Success", f"Successfully wrote configuration to device from\n{file_path}")
+        except Exception as e: messagebox.showerror("Error", f"Failed to write configuration to device.\n\nDetails: {e}")
 
 def main():
     root = tk.Tk()
     app = USBSidPicoConfigGUI(root)
-    root.mainloop()
+    if app.root.winfo_exists(): root.mainloop()
 
 if __name__ == "__main__":
     main()

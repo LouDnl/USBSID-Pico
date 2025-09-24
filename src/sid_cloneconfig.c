@@ -82,7 +82,7 @@ void print_fpgasid_sidconfig(int slot, int sidno, uint8_t * configarray)
 void read_fpgasid_configuration(uint8_t base_address)
 {
 
-  if (((base_address >= 0x0 && base_address < 0x40) && (usbsid_config.socketOne.clonetype != 4))
+  if (((/* base_address >= 0x0 &&  */base_address < 0x40) && (usbsid_config.socketOne.clonetype != 4))
     || ((base_address >= 0x40 && base_address < 0x80) && (usbsid_config.socketTwo.clonetype != 4))) {
       CFG("[SID] ERROR INCORRECT ADDRESS (0x%02x) AND CLONETYPE (%d %d)\n",
          base_address, usbsid_config.socketOne.clonetype, usbsid_config.socketTwo.clonetype);
