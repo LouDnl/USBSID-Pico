@@ -36,6 +36,7 @@ set(PROJECT_VERSION "0.6.0-BETA.${MAGIC_SMOKE}")  # Generate compile version
 # NOTICE: ENABLING THESE DEBUGGING DEFINITIONS WILL HAVE SIGNIFICANT IMPACT AND WILL DELAY PLAYING!
 # NOTICE: UART AND USBCDC ARE MUTUALLY EXCLUSIVE!
 if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
+  set(BUILD_DEBUGGING DEBUG)  # Set loglevel from CMake build steps (STATUS,DEBUG,TRACE) override with --log-level
   set(USBSID_DEBUGGING 1)     # Enable debugging ~ mandatory enable for all other logging types
   set(UART_DEBUGGING 1)       # Enable debugging over uart pins ~ USBCDC must be 0!
   set(USBCDC_DEBUGGING 0)     # Enable debugging over cdc port 2 ~ UART must be 0!
@@ -78,6 +79,17 @@ set(USE_PIO_UART 0)
 # rp2040 will bug out complaining about assembly calls not being available
 # rp2350 will bug out on PICO_USE_SW_SPIN_LOCK not being available
 
+### Build steps log level
+set(CMAKE_MESSAGE_LOG_LEVEL ${BUILD_DEBUGGING})
+message(DEBUG "Starting compilation of ${PRODUCT_STRING} firmware version ${PROJECT_VERSION}")
+if(ONBOARD_EMULATOR EQUAL 1)
+  message(DEBUG "Firmware is built with ONBOARD_EMULATOR")
+endif()
+if(ONBOARD_SIDPLAYER EQUAL 1)
+  message(DEBUG "Firmware is built with ONBOARD_SIDPLAYER")
+endif()
+message(DEBUG "LOG_LEVEL is ${CMAKE_MESSAGE_LOG_LEVEL}")
+
 ### Optimization and debugging
 # remember that enabling debugging and disabling optimizations
 # will weird out tune playing and reading from and writing to
@@ -91,23 +103,23 @@ set(ANALYSE_STACKUSAGE 0) # 0 default, 1 enabled, 0 disabled
 
 ### Target board pico, pico_w, pico2
 if(DEFINED PICO_BOARD)
-  message("PICO_BOARD is defined as ${PICO_BOARD}")
+  message(STATUS "PICO_BOARD is defined as ${PICO_BOARD}")
 else()
-  message("PICO_BOARD not defined, defaulting to 'pico'")
+  message(WARNING "PICO_BOARD not defined, defaulting to 'pico'")
   set(PICO_BOARD pico)
 endif()
 
 ### Target platform rp2040, rp2350 (rp2350-arm-s)
 if(DEFINED PICO_PLATFORM)
-  message("PICO_PLATFORM is defined as ${PICO_PLATFORM}")
+  message(STATUS "PICO_PLATFORM is defined as ${PICO_PLATFORM}")
 else()
   if(DEFINED PICO_BOARD)
     if(PICO_BOARD STREQUAL "pico2")
       set(PICO_PLATFORM rp2350)
-      message("PICO_PLATFORM not defined, board is ${PICO_BOARD} setting PICO_PLATFORM to ${PICO_PLATFORM}")
+      message(STATUS "PICO_PLATFORM not defined, board is ${PICO_BOARD} setting PICO_PLATFORM to ${PICO_PLATFORM}")
     endif()
   else()
-    message("PICO_PLATFORM not defined, defaulting to 'rp2040'")
+    message(WARNING "PICO_PLATFORM not defined, defaulting to 'rp2040'")
     set(PICO_PLATFORM rp2040)
   endif()
 endif()
@@ -124,7 +136,7 @@ if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/src/globals.h)
       string(REGEX MATCH "^#define PROJECT_VERSION" VALIDATED ${LINE})
       if(${VALIDATED} MATCHES ${VALIDATION_LINE})
         set(REDUCTION_SUCCESS True)
-        message("VALIDATED header line '${VALIDATION_LINE}'")
+        message(DEBUG "VALIDATED header line '${VALIDATION_LINE}'")
         set(USBSID_MANUFACTURER "${PROJECT_MANUFACTURER} (v${PROJECT_VERSION})")
         add_compile_definitions(USBSID_MANUFACTURER="${USBSID_MANUFACTURER}")
         ### CMake shenanigens
@@ -132,18 +144,18 @@ if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/src/globals.h)
         add_compile_definitions(PROJECT_VERSION="${PJVER}")
         break()
       else()
-        message("ERROR header validation line is present but incorrect")
+        message(SEND_ERROR "ERROR header validation line is present but incorrect")
         set(REDUCTION_SUCCESS False)
         return()
       endif()
     endif()
   endwhile()
   if(NOT REDUCTION_SUCCESS)
-    message("ERROR header validation fallback line not present")
+    message(SEND_ERROR "ERROR header validation fallback line not present")
     return()
   endif()
 else()
-  message("ERROR globals.h missing")
+  message(SEND_ERROR "ERROR globals.h missing")
   return()
 endif()
 
@@ -183,7 +195,7 @@ else()
   set(PICO_DEOPTIMIZED_DEBUG 0)
   ### TinyUSB debug logging
   if(TUSB_DEBUG GREATER 0)
-    message("TinyUSB debugging set to ${TUSB_DEBUG}")
+    message(DEBUG "TinyUSB debugging set to ${TUSB_DEBUG}")
     set(CFG_TUSB_DEBUG ${TUSB_DEBUG})
     # add_compile_definitions(CFG_TUSB_DEBUG=${TUSB_DEBUG})
   else()
@@ -191,7 +203,7 @@ else()
   endif()
 endif()
 
-message("Firmware build type is ${CMAKE_BUILD_TYPE}")
+message(STATUS "Firmware build type is ${CMAKE_BUILD_TYPE}")
 
 ### Define compile time debugging
 if(DEBUGGING EQUAL 0)
@@ -436,7 +448,7 @@ include_directories(".")
 
 ### Double check debugging types
 if(UART_DEBUGGING EQUAL 1 AND USBCDC_DEBUGGING EQUAL 1)
-  message("ERROR cannot have both UART_DEBUGGING and USBCDC_DEBUGGING enabled!")
+  message(SEND_ERROR "ERROR cannot have both UART_DEBUGGING and USBCDC_DEBUGGING enabled!")
   return()
 endif()
 
@@ -481,18 +493,18 @@ endif()
 add_compile_definitions(MAGIC_SMOKE=${MAGIC_SMOKE})
 
 ### Captain I canna change the options anymore!
-message("C Compiler root: " ${CMAKE_FIND_ROOT_PATH})
-message("CXX Compiler root: " ${CMAKE_FIND_ROOT_PATH})
-message("C Compile time flags:")
-message("${CMAKE_C_FLAGS}")
-message("CXX Compile time flags:")
-message("${CMAKE_CXX_FLAGS}")
-message("Compile time options:")
-message("${COMPILE_OPTS}")
-message("Compile time source files:")
-message("${SOURCEFILES}")
-message("Compile time include dirs:")
-message("${TARGET_INCLUDE_DIRS}")
+message(TRACE "C Compiler root: " ${CMAKE_FIND_ROOT_PATH})
+message(TRACE "CXX Compiler root: " ${CMAKE_FIND_ROOT_PATH})
+message(TRACE "C Compile time flags:")
+message(TRACE "${CMAKE_C_FLAGS}")
+message(TRACE "CXX Compile time flags:")
+message(TRACE "${CMAKE_CXX_FLAGS}")
+message(TRACE "Compile time options:")
+message(TRACE "${COMPILE_OPTS}")
+message(TRACE "Compile time source files:")
+message(TRACE "${SOURCEFILES}")
+message(TRACE "Compile time include dirs:")
+message(TRACE "${TARGET_INCLUDE_DIRS}")
 
 ### Compile targets
 foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSIONS)
@@ -500,9 +512,9 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   set(BUILD ${FILENAME})
   set(BUILD_VERSION "")
   string(CONCAT BUILD_VERSION ${PROJECT_PRODUCT} " v" ${PCBVERSION})
-  message(STATUS "Building ${FILENAME} with PICOTYPE=${PICOTYPE} and MAGIC_SMOKE=${MAGIC_SMOKE}")
-  message(STATUS "Set USB manufacturer: ${USBSID_MANUFACTURER}")
-  message(STATUS "Set USB product: ${BUILD_VERSION}")
+  message(DEBUG "Building ${FILENAME} with PICOTYPE=${PICOTYPE} and MAGIC_SMOKE=${MAGIC_SMOKE}")
+  message(DEBUG "Set USB manufacturer: ${USBSID_MANUFACTURER}")
+  message(DEBUG "Set USB product: ${BUILD_VERSION}")
   # executable
   add_executable(${BUILD} ${SOURCEFILES})
   # BUILD TYPES
@@ -534,11 +546,11 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   target_link_options(${BUILD} PRIVATE -Xlinker --print-memory-usage)
   # memory map linkers
   if(${PICO_PLATFORM} MATCHES rp2350)
-    message(STATUS "Memmap linker, platform ${PICO_PLATFORM} MATCHES rp2350")
+    message(TRACE "Memmap linker, platform ${PICO_PLATFORM} MATCHES rp2350")
     target_compile_definitions(${BUILD} PRIVATE USBSID PICO_EMBED_XIP_SETUP=1)
     set_target_properties(${BUILD} PROPERTIES PICO_TARGET_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/src/usbsidpico-rp2350.ld)
   else()
-    message(STATUS "Memmap linker, platform ${PICO_PLATFORM} EQUALS rp2040")
+    message(TRACE "Memmap linker, platform ${PICO_PLATFORM} EQUALS rp2040")
     set_target_properties(${BUILD} PROPERTIES PICO_TARGET_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/src/usbsidpico-rp2040.ld)
   endif()
   # tell the linker what libraries to link
