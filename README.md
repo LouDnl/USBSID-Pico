@@ -16,6 +16,7 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
 # Index
 
 * [Software support & Features](#software-support-and-features)
+  * [Software manual](doc/USBSID-Pico-software-manual.adoc) [PDF](doc/USBSID-Pico-software-manual.pdf)
 * [Questions & Support](#questions-and-support)
 * [Project status](#project-status)
   * [Known issues](#known-issues)
@@ -37,9 +38,6 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
   * [Schematic and BOM](#schematic-and-bom)
   * [PCB Features](#pcb-features)
   * [PCB Development](#pcb-development)
-* [Software](#software)
-  * [Software manual](doc/USBSID-Pico-software-manual.adoc) [PDF](doc/USBSID-Pico-software-manual.pdf)
-  * [Pre compiled Vice binaries](#precompiled-vice-binaries)
 * [Acknowledgements](#acknowledgements)
 * [Disclaimer](#disclaimer)
 * [License](#license)
