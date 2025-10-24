@@ -16,6 +16,7 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
 # Index
 
 * [Software support & Features](#software-support-and-features)
+  * [Software manual](doc/USBSID-Pico-software-manual.adoc) [PDF](doc/USBSID-Pico-software-manual.pdf)
 * [Questions & Support](#questions-and-support)
 * [Project status](#project-status)
   * [Known issues](#known-issues)
@@ -34,12 +35,10 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
     * [PCB revision v1.3 manual](#pcb-revision-v13-manual)
   * [Where to buy](#where-to-buy)
   * [Cases](#cases)
-  * [Schematic and BOM](#schematic-and-bom)
   * [PCB Features](#pcb-features)
-  * [PCB Development](#pcb-development)
-* [Software](#software)
-  * [Software manual](doc/USBSID-Pico-software-manual.adoc) [PDF](doc/USBSID-Pico-software-manual.pdf)
-  * [Pre compiled Vice binaries](#precompiled-vice-binaries)
+  * [Open source design files, schematic and BOM](#open-source-design-files-schematic-and-bom)
+  * [PCB Dev(elopment](#pcb-development)
+* [Examples](#examples)
 * [Acknowledgements](#acknowledgements)
 * [Disclaimer](#disclaimer)
 * [License](#license)
@@ -56,7 +55,10 @@ USBSID-Pico supports various ways of playing SID files.
 - Out-of-the box playing is also supported by using [C64jukebox by Kenchis](https://haendel.ddns.net:8443/static/c64jukebox.vue), note that this is still in BETA.  
 - [SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux & Windows with up to 4 SIDs supported (Windows version is buggy).  
 #### C64 emulators
-Several Commodore 64 emulatores have official support
+Several Commodore 64 emulatores have official support  
+[<img src="images/vice.svg" width="10%">](https://github.com/VICE-Team/svn-mirror/releases)
+[<img src="images/jsidplay2.png" width="5%">](https://haendel.ddns.net/~ken/#_latest_beta_versions)
+[<img src="images/denise.png" width="10%">](https://sourceforge.net/projects/deniseemu/)
 - [Vice](https://github.com/VICE-Team/svn-mirror/releases) has official support starting at tag [r45763](https://github.com/VICE-Team/svn-mirror/releases/tag/r45763) and up, up to 3 SIDs are supported in vsid and up to 4 in x64sc.  
 - [JSidplay2](https://haendel.ddns.net/~ken/#_latest_beta_versions) has official support in latest Java beta versions, up to 4 sids.
 - [Denise](https://sourceforge.net/projects/deniseemu/) has official support in [Windows](https://ci.appveyor.com/project/piciji/denise/history) and [Linux](https://sourceforge.net/projects/deniseemu/files/nightlies/) nightly builds and in [code repo](https://bitbucket.org/piciji/denise/src/master/), up to 4 sids.  
@@ -183,17 +185,19 @@ After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py
 
 # Hardware
 ## Where to buy
-#### Licensed resellers
-[Run Stop Re-Store](https://www.runstoprestore.nl) at [Retro8BITshop](https://www.retro8bitshop.com) is the first reseller to sell licensed USBSID-Pico boards.  
-PCB revision v1.0 [product page](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/)  
-PCB revision v1.3 [product page](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/) (to be updated)
 #### PCBWay
 At a minimum of 5 bare or assembled boards it is also possible to purchase PCB's at PCBWay  
 No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral link](https://pcbway.com/g/2458i7) to register, thanks!  
 [PCB revision v1.0](https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html)  
 [PCB revision v1.3](https://www.pcbway.com/project/shareproject/USBSID_Pico_v1_3_05f2b88e.html)
-#### Me (when I have boards)
-If available you can purchase (semi) assembled boards minus Pico from me - send me a message on any of my socials.  
+#### Licensed resellers
+[Run Stop Re-Store](https://www.runstoprestore.nl) at [Retro8BITshop](https://www.retro8bitshop.com) is the first reseller to sell licensed USBSID-Pico boards.  
+PCB revision v1.0 [product page](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/)  
+PCB revision v1.3 [product page](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/) (to be updated)
+#### My Tindie store!
+[<img src="images/tindie.png" width="10%">](https://www.tindie.com/stores/loud/)  
+If available you can purchase (semi) assembled boards minus Pico from me via my [Tindie store](https://www.tindie.com/stores/loud/)!
+
 
 ## PCB usage information
 Your USBSID-Pico PCB has several hardware features like jumpers and pins that require your attention. Click on the viewing method
@@ -214,15 +218,8 @@ _Cases for PCB revision v1.3:_
 * [spotUP Cartridge case revisited](cases/v1.3/spotUP-revisited) by [@LouD](https://github.com/LouDnl/)
 * [Dual USBSID-Pico Commodore 64 Case](cases/v1.3/Dual_USBSID-Pico_Commodore_64_Case) by [@OlefinMakes](https://github.com/OlefinMakes/)
 
-### Schematic and BOM
-If you want and are up to it you can solder your own PCB or create your own development board using the documents below
-#### revision v1.3
-[v1.3 schematic](resources/v1.3-schematic.pdf) and [v1.3 interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/resources/v1.3-ibom.html)
-#### revision v1.0
-[v1.0 schematic](resources/v1.0-schematic.pdf) and [v1.0 interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/resources/v1.0-ibom.html)
-
-### PCB Features
-#### revision v1.3
+## PCB Features
+### revision v1.3
 - Supports all MOS SID chips e.g. MOS6581, MOS6582 & MOS8580
 - Supports SID chip replacements e.g. [SIDKick-Pico](https://github.com/frntc/SIDKick-pico), [ARMSID](https://www.nobomi.cz/8bit/armsid/index_en.php) & [FPGASID](https://www.fpgasid.de), [SwinSID](https://github.com/dmantione/swinsid).
 - USBSID-Pico will by default generate a 1 MHz square wave using pio
@@ -249,7 +246,7 @@ If you want and are up to it you can solder your own PCB or create your own deve
   - SID Ext in pins (requires closing the solder jumper on the bottom)
   - Ground pin
 - New soldermask art ;)
-#### revision v1.0
+### revision v1.0
 - Supports all MOS SID chips e.g. MOS6581, MOS6582 & MOS8580
 - Supports SID chip replacements e.g. [SIDKick-Pico](https://github.com/frntc/SIDKick-pico), [SwinSID](https://github.com/dmantione/swinsid), ARMSID (untested), FPGASID (untested)
 - 1 MHz oscillator (external optional, enabled via jumper pad)
@@ -266,7 +263,24 @@ If you want and are up to it you can solder your own PCB or create your own deve
   - SID1 audio left & right
   - SID1 audio left & SID2 audio right
 - Optional EXT-IN pulldown resistor as filter bypass to reduce filter noise for Digiplay on 8580 SID's
-### PCB Development
+
+## Open source design files, schematic and BOM
+If you want and are up to it you can solder your own PCB or create your own development board using  
+the open source KiCad design files and gerbers documents below.
+#### revision v1.0
+- [USBSID-Pico v1.0 schematic](hardware/v1.0-schematic.pdf)
+- [USBSID-Pico v1.0 interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/hardware/v1.0-ibom.html)
+- [USBSID-Pico v1.0 KiCad project](hardware/USBSID-Pico-v1.0/README.md)
+- [USBSID-Pico v1.0 gerber files](hardware/USBSID-Pico-v1.0/gerbers/)
+#### revision v1.3
+- [USBSID-Pico v1.3 schematic](hardware/v1.3-schematic.pdf)
+- [USBSID-Pico v1.3 interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/hardware/v1.3-ibom.html)
+- [USBSID-Pico v1.3 KiCad project](hardware/USBSID-Pico-v1.3/README.md)
+- [USBSID-Pico v1.3 gerber files](hardware/USBSID-Pico-v1.3/README.md)
+#### Datasheets of parts used
+[Datasheets](resources/)
+
+## PCB Development
 * v1.3b release board<br>
   [<img src="images/v1.3b-top.png" width="30%">](images/v1.3b-top.png) 
 * v1.2 testboard<br>
