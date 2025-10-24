@@ -37,7 +37,7 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
   * [Cases](#cases)
   * [PCB Features](#pcb-features)
   * [Open source design files, schematic and BOM](#open-source-design-files-schematic-and-bom)
-  * [PCB Dev(elopment](#pcb-development)
+  * [PCB Development](#pcb-development)
 * [Examples](#examples)
 * [Acknowledgements](#acknowledgements)
 * [Disclaimer](#disclaimer)
