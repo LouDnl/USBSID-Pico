@@ -40,10 +40,11 @@
 !doc/images/software
 !doc/images/v1.0
 !doc/images/v1.3
+!hardware
+!hardware/**
 !images
 !media
 !resources
-!resources/datasheets
 !examples
 !examples/cloje64
 !examples/cloje64/**
