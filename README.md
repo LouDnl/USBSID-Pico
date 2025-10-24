@@ -270,12 +270,10 @@ the open source KiCad design files and gerbers documents below.
 #### revision v1.0
 - [USBSID-Pico v1.0 schematic](hardware/v1.0-schematic.pdf)
 - [USBSID-Pico v1.0 interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/hardware/v1.0-ibom.html)
-- [USBSID-Pico v1.0 KiCad project](hardware/USBSID-Pico-v1.0/README.md)
-- [USBSID-Pico v1.0 gerber files](hardware/USBSID-Pico-v1.0/gerbers/)
+- [USBSID-Pico v1.0 KiCad project & gerber files](hardware/USBSID-Pico-v1.0/README.md)
 #### revision v1.3
 - [USBSID-Pico v1.3 schematic](hardware/v1.3-schematic.pdf)
 - [USBSID-Pico v1.3 interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/hardware/v1.3-ibom.html)
-- [USBSID-Pico v1.3 KiCad project](hardware/USBSID-Pico-v1.3/README.md)
 - [USBSID-Pico v1.3 gerber files](hardware/USBSID-Pico-v1.3/README.md)
 #### Datasheets of parts used
 [Datasheets](resources/)
