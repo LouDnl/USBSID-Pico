@@ -1,5 +1,8 @@
 # USBSID-Pico v1.0 PCB design files
-This directory contains the open source design files for v1.0 of the USBSID-Pico pcb.  
+This directory contains the open source KiCad design files for v1.0 of the USBSID-Pico pcb.  
+
+# Gerbers
+The gerber files are in the [gerbers](gerbers/) directory.
 
 # OSHWA certification
 Pending approval

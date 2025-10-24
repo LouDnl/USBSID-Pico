@@ -1,40 +1,27 @@
-﻿Designator,Footprint,Quantity,Value,LCSC Part #
-C1,CP_EIA-3216-10_Kemet-I_Pad1.58x1.35mm_HandSolder,1,10uF,
-"C10, C11",0805,2,1000pF,
-"C12, C13, C18, C19, C22, C23, C24, C25",0805,8,100nF,
-"C14, C15",CP_Elec_4x5.3,2,10uF,
-"C16, C17, C20, C21, C28, C29",0805,6,22uF,
-"C2, C26, C27, C4, C6, C8",0805,6,470pF,
-"C3, C5, C7, C9",0805,4,22nF,
-"D1, D2, D3",SOD-123FL_diode,3,MBR120,
-J1,DIP-28_W15.24mm_Socket,1,SID1 (DIP28-Wide-socket),
-J11,PinHeader_1x02_P2.54mm_Vertical,1,GND/S1,
-J12,PinHeader_1x02_P2.54mm_Vertical,1,12v/9v,
-J13,PinHeader_2x01_P2.54mm_Vertical,1,A5,
-J14,PinHeader_1x02_P2.54mm_Vertical,1,UART,
-J16,PinHeader_1x02_P2.54mm_Vertical,1,S2/GND,
-J2,DIP-28_W15.24mm_Socket,1,SID2 (DIP28-Wide-socket),
-J20,3.5MM_SWITCHCRAFT_35RAPC4BHN2,1,AudioJack2_Ground_Switch,
-J3,DIP-14_W7.62mm,1,1MHz Crystal,
-J5,PinHeader_1x03_P2.54mm_Vertical,1,S1 6581/8580 J1,
-J6,PinHeader_1x03_P2.54mm_Vertical,1,S1 6581/8580 J2,
-J7,PinHeader_1x03_P2.54mm_Vertical,1,S2 6581/8580 J1,
-J8,PinHeader_1x03_P2.54mm_Vertical,1,S2 6581/8580 J2,
-J9,PinHeader_1x03_P2.54mm_Horizontal,1,Audio jumper,
-"L1, L2",1008,2,"4,7uH 1000mA",
-"Q1, Q2",SOT-23,2,MMBT2222A,
-"R1, R4, R5",0805,3,10k,
-R10,0805,1,"7,5k",
-R11,0805,1,18k,
-R12,0805,1,47k,
-"R13, R14",0805,2,100k,
-"R15, R2, R3, R6, R7, R8, R9",0805,7,1k,
-"R16, R17",0805,2,330k,
-SW1,SW_SPST_B3U-1000P_larger_pads,1,RST,
-TP1,TestPoint_Pad_D1.0mm,1,GPIO14,
-TP2,TestPoint_Pad_D1.0mm,1,GPIO15,
-TP3,TestPoint_Pad_D1.0mm,1,GPIO26,
-TP4,TestPoint_Pad_D1.0mm,1,GPIO27,
-TP5,TestPoint_Pad_D1.0mm,1,GPIO28,
-U1,RPi_Pico_TH_PinRows_Only,1,Pico,
-"U2, U3",SOT-23-6,2,MT3608,
+"Reference","Value","Mfg Qty","Mfg Part #","Manufacturer","Mfg Part Desc","Datasheet","Footprint","Optional Part #","Optional datasheet"
+"TP1,TP2,TP3,TP4,TP5","-- mixed values --","","","","","~","TestPoint:TestPoint_Pad_D1.0mm","",""
+"C1","10uF","1","T491A106K016AT","KEMET","10uF 16V 3Ω@100kHz ±10% CASE-A-3216-18(mm) Tantalum Capacitors","https://eu.mouser.com/datasheet/2/447/KEM_T2005_T491-3316937.pdf","Capacitor_Tantalum_SMD:CP_EIA-3216-10_Kemet-I_Pad1.58x1.35mm_HandSolder","",""
+"C2,C4,C6,C8,C26,C27","470pF","1","0805B471K500NT","Guangdong Fenghua Advanced Tech","50V 470pF X7R ±10% 0805 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_FH--Guangdong-Fenghua-Advanced-Tech-0805B471K500NT_C1743.pdf","Capacitor_SMD:C_0805_2012Metric","",""
+"C3,C5,C7,C9","22nF","1","CL21B223KBANNNC","Samsung","50V 22nF X7R ±10% 0805 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL21B223KBANNNC_C1729.pdf","Capacitor_SMD:C_0805_2012Metric","",""
+"C10,C11","1000pF","1","CL21B102KBANNNC","Samsung","50V 1nF X7R ±10% 0805 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL21B102KBANNNC_C51210.pdf","Capacitor_SMD:C_0805_2012Metric","",""
+"C12,C13,C18,C19,C22,C23,C24,C25","100nF","1","CL21B104KBCNNNC","Samsung","50V 100nF X7R ±10% 0805 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL21B104KBCNNNC_C1711.pdf","Capacitor_SMD:C_0805_2012Metric","",""
+"C14,C15","10uF","1","RVT1E100M0405","Honor Elec","10uF 25V ±20% SMD,D4xL5.4mm Aluminum Electrolytic Capacitors - SMD ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Honor-Elec-RVT1E100M0405_C3343.pdf","Capacitor_SMD:CP_Elec_4x5.3","",""
+"C16,C17,C20,C21,C28,C29","22uF","1","CL21A226MAQNNNE","Samsung","25V 22uF X5R ±20% 0805 Multilayer Ceramic Capacitors MLCC - SMD/SMT ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_Samsung-Electro-Mechanics-CL21A226MAQNNNE_C45783.pdf","Capacitor_SMD:C_0805_2012Metric","",""
+"D1,D2,D3","MBR120","1","MBR120VLSFT1G","onsemi","20V 300mV@1A 1A SOD-123FL Schottky Diodes ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2210210200_onsemi-MBR120VLSFT1G_C223608.pdf","LouD:SOD-123FL_diode","",""
+"J1,J2","-- mixed values --","1","IC254V-12-28-0743-P1524","XFCN","28P DIP Round Hole -40℃~+105℃ 15.24mm 2.54mm DIP-28 IC / Transistor Socket ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2108150330_XFCN-IC254V-12-28-0743-P1524_C2874016.pdf","Package_DIP:DIP-28_W15.24mm_Socket","DS1010-32T1NX","https://www.lcsc.com/datasheet/lcsc_datasheet_1810281820_CONNFLY-Elec-DS1010-32T1NX_C72253.pdf"
+"J5,J6,J7,J8","-- mixed values --","1","PH2.54-01-03PZD","XUNPU","Direct Insert Policy 2.5mm 6mm 3P -40℃~+105℃ 3mm 2.54mm Black Brass Single Row 1x3P Plugin,P=2.54mm Pin Headers ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2401280925_XUNPU-PH2-54-01-03PZD_C7501581.pdf","Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical","",""
+"J9","Audio jumper","1","PH2.54-07-03PWD","XUNPU","Bend insert Policy 2.5mm 6mm 3P -40℃~+105℃ 2.54mm Black Brass Single Row 1x3P Push-Pull,P=2.54mm Pin Headers ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2401281210_XUNPU-PH2-54-07-03PWD_C7501613.pdf","Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Horizontal","",""
+"J11,J12,J13,J14,J16","-- mixed values --","1","PH2.54-01-02PZD","XUNPU","Direct Insert Policy 2.5mm 6mm 2P -40℃~+105℃ 3mm 2.54mm Black Brass Single Row 1x2P Plugin,P=2.54mm Pin Headers ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2401281145_XUNPU-PH2-54-01-02PZD_C7501580.pdf","-- mixed values --","",""
+"J20","AudioJack2_Ground_Switch","1","SJ1-3525N","CuiDevices","Audio Jack with tip and ring switch","https://www.switchcraft.com/3-5mm-pc-horizontal-mount-jack-stereo-non-threaded-bushing/35rapc4bhn","LouD:3.5MM_SWITCHCRAFT_35RAPC4BHN2","PJ3F07-5P","https://www.lcsc.com/datasheet/lcsc_datasheet_2409272203_SHOU-HAN-PJ3F07-5P_C668604.pdf"
+"L1,L2","4,7uH 1000mA","1","SPH252012H4R7MT","SunLord","1.25A 4.7uH ±20% 1.2A 1008 Power Inductors ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2310251550_Sunlord-SPH252012H4R7MT_C98380.pdf","Inductor_SMD:L_1008_2520Metric_Pad1.43x2.20mm_HandSolder","",""
+"Q1,Q2","MMBT2222A","1","MMBT2222ALT1G","onsemi","40V 225mW 100@150mA,10V 600mA NPN SOT-23 Bipolar (BJT) ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2304140030_onsemi-MMBT2222ALT1G_C82460.pdf","Package_TO_SOT_SMD:SOT-23","",""
+"R1,R4,R5","10k","1","0805W8F1002T5E","UNI-ROYAL","125mW Thick Film Resistors 150V ±100ppm/℃ ±1% 10kΩ 0805 Chip Resistor - Surface Mount ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2206010216_UNI-ROYAL-Uniroyal-Elec-0805W8F1002T5E_C17414.pdf","Resistor_SMD:R_0805_2012Metric","",""
+"R2,R3,R6,R7,R8,R9,R15","1k","1","0805W8F1001T5E","-- mixed values --","-- mixed values --","https://www.lcsc.com/datasheet/lcsc_datasheet_2205311800_UNI-ROYAL-Uniroyal-Elec-0805W8F1001T5E_C17513.pdf","Resistor_SMD:R_0805_2012Metric","",""
+"R10","7,5k","1","0805W8F7501T5E","UNI-ROYAL","125mW Thick Film Resistors 150V ±100ppm/℃ ±1% 7.5kΩ 0805 Chip Resistor - Surface Mount ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2205311830_UNI-ROYAL-Uniroyal-Elec-0805W8F7501T5E_C17807.pdf","Resistor_SMD:R_0805_2012Metric","",""
+"R11","18k","1","0805W8F1802T5E","UNI-ROYAL","125mW Thick Film Resistors 150V ±100ppm/℃ ±1% 18kΩ 0805 Chip Resistor - Surface Mount ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2206010216_UNI-ROYAL-Uniroyal-Elec-0805W8F1802T5E_C17506.pdf","Resistor_SMD:R_0805_2012Metric","",""
+"R12","47k","1","0805W8F4702T5E","UNI-ROYAL","125mW Thick Film Resistors 150V ±100ppm/℃ ±1% 47kΩ 0805 Chip Resistor - Surface Mount ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2206010200_UNI-ROYAL-Uniroyal-Elec-0805W8F4702T5E_C17713.pdf","Resistor_SMD:R_0805_2012Metric","",""
+"R13,R14","100k","1","0805W8F1003T5E","UNI-ROYAL","125mW Thick Film Resistors 150V ±100ppm/℃ ±1% 100kΩ 0805 Chip Resistor - Surface Mount ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2205312316_UNI-ROYAL-Uniroyal-Elec-0805W8F1003T5E_C149504.pdf","Resistor_SMD:R_0805_2012Metric","",""
+"R16,R17","330k","1","0805W8F3303T5E","UNI-ROYAL","125mW Thick Film Resistors 150V ±100ppm/℃ ±1% 330kΩ 0805 Chip Resistor - Surface Mount ROHS","https://www.lcsc.com/datasheet/lcsc_datasheet_2205311830_UNI-ROYAL-Uniroyal-Elec-0805W8F3303T5E_C17629.pdf","Resistor_SMD:R_0805_2012Metric","",""
+"SW1","RST","1","B3U-1000P","Omron Electronics","2.5mm 1.6mm Round Button 50mA Standing paste 3mm SPST 153gf 12V SMD,2.5x3mm Tactile Switches ROHS","https://eu.mouser.com/datasheet/2/307/en-b3u-3615.pdf","LouD:SW_SPST_B3U-1000P_larger_pads","",""
+"U2,U3","MT3608","1","MT3608","AeroSemi","High Efficiency 1.2MHz 2A Step Up Converter","https://www.olimex.com/Products/Breadboarding/BB-PWR-3608/resources/MT3608.pdf","Package_TO_SOT_SMD:SOT-23-6","",""
+"U1","Pico","2","PM254-1-20-Z-8.5","HCTL","2.54mm Single Row 3A Brass Alloy 20P","https://www.lcsc.com/datasheet/lcsc_datasheet_2306091006_HCTL-PM254-1-20-Z-8-5_C2897383.pdf","LouD:RPi_Pico_TH_PinRows_Only","",""
