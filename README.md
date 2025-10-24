@@ -196,8 +196,8 @@ No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral
 PCB revision v1.0 [product page](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/)  
 PCB revision v1.3 [product page](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/) (to be updated)
 #### My Tindie store!
-If available you can purchase (semi) assembled boards minus Pico from me via my [Tindie store](https://www.tindie.com/stores/loud/)!  
-[<img src="images/tindie.png" width="10%">](images/tindie.png)
+[<img src="images/tindie.png" width="10%">](https://www.tindie.com/stores/loud/)  
+If available you can purchase (semi) assembled boards minus Pico from me via my [Tindie store](https://www.tindie.com/stores/loud/)!
 
 
 ## PCB usage information
