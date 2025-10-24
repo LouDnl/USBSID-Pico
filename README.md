@@ -56,7 +56,10 @@ USBSID-Pico supports various ways of playing SID files.
 - Out-of-the box playing is also supported by using [C64jukebox by Kenchis](https://haendel.ddns.net:8443/static/c64jukebox.vue), note that this is still in BETA.  
 - [SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux & Windows with up to 4 SIDs supported (Windows version is buggy).  
 #### C64 emulators
-Several Commodore 64 emulatores have official support
+Several Commodore 64 emulatores have official support  
+[<img src="images/vice.svg" width="10%">](https://github.com/VICE-Team/svn-mirror/releases)
+[<img src="images/jsidplay2.png" width="5%">](https://haendel.ddns.net/~ken/#_latest_beta_versions)
+[<img src="images/denise.png" width="10%">](https://sourceforge.net/projects/deniseemu/)
 - [Vice](https://github.com/VICE-Team/svn-mirror/releases) has official support starting at tag [r45763](https://github.com/VICE-Team/svn-mirror/releases/tag/r45763) and up, up to 3 SIDs are supported in vsid and up to 4 in x64sc.  
 - [JSidplay2](https://haendel.ddns.net/~ken/#_latest_beta_versions) has official support in latest Java beta versions, up to 4 sids.
 - [Denise](https://sourceforge.net/projects/deniseemu/) has official support in [Windows](https://ci.appveyor.com/project/piciji/denise/history) and [Linux](https://sourceforge.net/projects/deniseemu/files/nightlies/) nightly builds and in [code repo](https://bitbucket.org/piciji/denise/src/master/), up to 4 sids.  
@@ -192,8 +195,10 @@ No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral
 [Run Stop Re-Store](https://www.runstoprestore.nl) at [Retro8BITshop](https://www.retro8bitshop.com) is the first reseller to sell licensed USBSID-Pico boards.  
 PCB revision v1.0 [product page](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/)  
 PCB revision v1.3 [product page](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/) (to be updated)
-#### Me (when I have boards)
-If available you can purchase (semi) assembled boards minus Pico from me - send me a message on any of my socials.  
+#### My Tindie store!
+If available you can purchase (semi) assembled boards minus Pico from me via my [Tindie store](https://www.tindie.com/stores/loud/)!  
+[<img src="images/tindie.png" width="10%">](images/tindie.png)
+
 
 ## PCB usage information
 Your USBSID-Pico PCB has several hardware features like jumpers and pins that require your attention. Click on the viewing method
