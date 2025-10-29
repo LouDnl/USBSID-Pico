@@ -249,10 +249,8 @@ t.b.d.
 t.b.d.
 
 == License
-=== Software License ~ GNUv2
 include::license-software.adoc[]
 
-=== Hardware License ~ Creative Commons
 include::license-hardware.adoc[]
 
 Author: {author} - generated on {revdate}

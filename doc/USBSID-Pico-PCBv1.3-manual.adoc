@@ -168,10 +168,8 @@ Last but not least, the digital audio switch IC. Switching from mono (both SID c
 image::images/v1.3/v1.3b-bottom.png[title=PCB bottom overview]
 
 == License
-=== Software License ~ GNUv2
 include::license-software.adoc[]
 
-=== Hardware License ~ Creative Commons
 include::license-hardware.adoc[]
 
 Author: {author} - generated on {revdate}
