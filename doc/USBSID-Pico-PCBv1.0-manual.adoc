@@ -108,10 +108,8 @@ Ground and S1 as labeled
 image:images/v1.0/reset-button-smaller.png[title=Reset button]
 
 == License
-=== Software License ~ GNUv2
 include::license-software.adoc[]
 
-=== Hardware License ~ Creative Commons
 include::license-hardware.adoc[]
 
 Author: {author} - generated on {revdate}
