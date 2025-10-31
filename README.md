@@ -42,6 +42,7 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
 * [Acknowledgements](#acknowledgements)
 * [Disclaimer](#disclaimer)
 * [License](#license)
+* [Certification](#certification)
 * [Changelog](CHANGELOG.md)
 
 # Software support and features
@@ -323,3 +324,7 @@ For for more information about this license please read the LICENSE document in 
 ### USBSID-Pico v1.0 PCB Hardware License ~ Creative Commons
 <a href="https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/USBSID-Pico-v1.0">USBSID-Pico v1.0 PCB</a> © 2024 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;">  
 
+# Certification
+### USBSID-Pico v1.0 PCB OSHWA certification
+[<img src="hardware/USBSID-Pico-v1.0/logos/certification-mark-NL000035-stacked.png" width="25%">](https://certification.oshwa.org/nl000035.html)  
+[OSHW] NL000035 | Certified open source hardware | [oshwa.org/cert](https://certification.oshwa.org/nl000035.html)

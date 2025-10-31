@@ -1,4 +1,4 @@
-26318664476568311
+26320426392637355
 Audio_Module
 Reverb_BTDR-1H
 Digital Reverberation Unit, http://www.belton.co.kr/inc/downfile.php?seq=17&file=pdf (footprint from http://www.uk-electronic.de/PDF/BTDR-1.pdf)
@@ -68914,6 +68914,13 @@ Lumberg 1503 17
 0
 5
 5
+LouD
+OSHW_US1.0_-Certification-Mark-Stacked_8x7mm_SilkScreen
+OSHW Certification Mark, Stacked, SilkScreen
+Symbol OSHW Mark Certification
+0
+0
+0
 LouD
 PinHeader_2x02_P2.54mm_custom_silkscreen
 Through hole straight pin header, 2x02, 2.54mm pitch, double rows
