@@ -57,9 +57,9 @@ USBSID-Pico supports various ways of playing SID files.
 - [SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux & Windows with up to 4 SIDs supported (Windows version is buggy).  
 #### C64 emulators
 Several Commodore 64 emulatores have official support  
-[<img src="images/vice.svg" width="10%">](https://github.com/VICE-Team/svn-mirror/releases)
-[<img src="images/jsidplay2.png" width="5%">](https://haendel.ddns.net/~ken/#_latest_beta_versions)
-[<img src="images/denise.png" width="10%">](https://sourceforge.net/projects/deniseemu/)
+[<img src="images/vice.svg" width="20%">](https://github.com/VICE-Team/svn-mirror/releases)
+[<img src="images/jsidplay2.png" width="20%">](https://haendel.ddns.net/~ken/#_latest_beta_versions)
+[<img src="images/denise.png" width="20%">](https://sourceforge.net/projects/deniseemu/)
 - [Vice](https://github.com/VICE-Team/svn-mirror/releases) has official support starting at tag [r45763](https://github.com/VICE-Team/svn-mirror/releases/tag/r45763) and up, up to 3 SIDs are supported in vsid and up to 4 in x64sc.  
 - [JSidplay2](https://haendel.ddns.net/~ken/#_latest_beta_versions) has official support in latest Java beta versions, up to 4 sids.
 - [Denise](https://sourceforge.net/projects/deniseemu/) has official support in [Windows](https://ci.appveyor.com/project/piciji/denise/history) and [Linux](https://sourceforge.net/projects/deniseemu/files/nightlies/) nightly builds and in [code repo](https://bitbucket.org/piciji/denise/src/master/), up to 4 sids.  
@@ -186,14 +186,15 @@ After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py
 
 # Hardware
 ## Where to buy
+#### My Tindie store
+You can purchase/pre-order (semi) assembled boards minus Pico via my [Tindie store](https://www.tindie.com/stores/loud/)!  
+[<img src="images/tindie.png" width="10%">](https://www.tindie.com/stores/loud/)  
+Partially sponsored by [<img src="images/pcbway.png" width="10%">](images/pcbway.png)
 #### PCBWay
 At a minimum of 5 bare or assembled boards it is also possible to purchase PCB's at PCBWay  
 No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral link](https://pcbway.com/g/2458i7) to register, thanks!  
 [PCB revision v1.0](https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html)  
 [PCB revision v1.3](https://www.pcbway.com/project/shareproject/USBSID_Pico_v1_3_05f2b88e.html)
-#### My Tindie store!
-[<img src="images/tindie.png" width="10%">](https://www.tindie.com/stores/loud/)  
-You can purchase/pre-order (semi) assembled boards minus Pico via my [Tindie store](https://www.tindie.com/stores/loud/)!
 #### Known and approved resellers
 [Run Stop Re-Store](https://www.runstoprestore.nl) at [Retro8BITshop](https://www.retro8bitshop.com) is the first reseller to sell licensed USBSID-Pico boards.  
 PCB revision v1.3 [product page](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/)
