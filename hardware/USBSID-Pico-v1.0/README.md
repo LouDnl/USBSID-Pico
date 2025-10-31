@@ -5,7 +5,8 @@ This directory contains the open source KiCad design files for v1.0 of the USBSI
 The gerber files are in the [gerbers](gerbers/) directory.
 
 # OSHWA certification
-Pending approval
+[<img src="logos/certification-mark-NL000035-stacked.png" width="25%">](https://certification.oshwa.org/nl000035.html)  
+[OSHW] NL000035 | Certified open source hardware | [oshwa.org/cert](https://certification.oshwa.org/nl000035.html)
 
 # Disclaimer
 I do this stuff in my free time for my enjoyment. Since I like to share my joy in creating this with everyone I try my best to provide a working PCB and Firmware. I am in no way an electronics engineer and can give __no guarantees__ that this stuff does not break or damage your hardware, computer, phone, or whatever you try to hook it up to. Be sure to take great care when inserting any real MOS SID chips into the board. While everything has been tested with real chips, this is in no way a guarantee that nothing could go wrong. Use of this board and firmware at your own risk! I am in no way responsible for your damaged hardware. That being said, have fun!
