@@ -947,8 +947,12 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         stopping_emulator = true;
         stop_emulator();
       }
-      if (buffer[1] == 2) {
-        set_logging((int)buffer[2]);
+      if (buffer[1] == 2) { /* 9A 2 n on/off(0) */
+        if (buffer[3] == 0) {
+          unset_logging((int)buffer[2]);
+        } else {
+          set_logging((int)buffer[2]);
+        }
       }
       #endif
       #if defined(ONBOARD_EMULATOR) && defined(ONBOARD_SIDPLAYER)

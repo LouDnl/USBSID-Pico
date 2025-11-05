@@ -78,6 +78,7 @@ static bool logiorw    = false; /* log io memory reads and writes */
 static bool logplarw   = false; /* log pla memory reads and writes */
 static bool logcrtrw   = false; /* log cart memory reads and writes */
 static bool logsidrw   = false; /* log sid memory reads and writes */
+static bool logsidiorw = false; /* log sid io writes */
 static bool bankswlog  = false; /* log bank switching */
 /* Static IO/Memory variables */
 static uint16_t load_addr, init_addr; /* Zero as signal it hasn't been changed */
@@ -148,13 +149,14 @@ static uint16_t read_short_be(uint8_t * ptr, uint8_t pos)
 extern "C" void logging_enable(int logid)
 {
   switch(logid) {
-    case 0: logmemrw  = true; break;
-    case 1: logcia1rw = true; break;
-    case 2: logcia2rw = true; break;
-    case 3: logiorw   = true; break;
-    case 4: logplarw  = true; break;
-    case 5: logcrtrw  = true; break;
-    case 6: logsidrw  = true; break;
+    case 0: logmemrw    = true; break;
+    case 1: logcia1rw   = true; break;
+    case 2: logcia2rw   = true; break;
+    case 3: logiorw     = true; break;
+    case 4: logplarw    = true; break;
+    case 5: logcrtrw    = true; break;
+    case 6: logsidrw    = true; break;
+    case 7: logsidiorw  = true; break;
     default: break;
   }
   return;
@@ -166,13 +168,14 @@ extern "C" void logging_enable(int logid)
 extern "C" void logging_disable(int logid)
 {
   switch(logid) {
-    case 0: logmemrw  = false; break;
-    case 1: logcia1rw = false; break;
-    case 2: logcia2rw = false; break;
-    case 3: logiorw   = false; break;
-    case 4: logplarw  = false; break;
-    case 5: logcrtrw  = false; break;
-    case 6: logsidrw  = false; break;
+    case 0: logmemrw    = false; break;
+    case 1: logcia1rw   = false; break;
+    case 2: logcia2rw   = false; break;
+    case 3: logiorw     = false; break;
+    case 4: logplarw    = false; break;
+    case 5: logcrtrw    = false; break;
+    case 6: logsidrw    = false; break;
+    case 7: logsidiorw  = false; break;
     default: break;
   }
   return;
@@ -190,6 +193,7 @@ static void disable_all_logging(void)
  logplarw   = false;
  logcrtrw   = false;
  logsidrw   = false;
+ logsidiorw = false;
  bankswlog  = false;
  return;
 }
@@ -199,13 +203,14 @@ static void disable_all_logging(void)
  */
 extern "C" void _set_logging(void)
 {
-  if(logmemrw) {c64->mem_->setlogrw(0);} else {c64->mem_->unsetlogrw(0);};
-  if(logcia1rw){c64->mem_->setlogrw(1);} else {c64->mem_->unsetlogrw(1);};
-  if(logcia2rw){c64->mem_->setlogrw(2);} else {c64->mem_->unsetlogrw(2);};
-  if(logiorw)  {c64->mem_->setlogrw(3);} else {c64->mem_->unsetlogrw(3);};
-  if(logplarw) {c64->mem_->setlogrw(4);} else {c64->mem_->unsetlogrw(4);};
-  if(logcrtrw) {c64->mem_->setlogrw(5);} else {c64->mem_->unsetlogrw(5);};
-  if(logsidrw) {c64->mem_->setlogrw(6);} else {c64->mem_->unsetlogrw(6);};
+  if(logmemrw)   {c64->mem_->setlogrw(0);} else {c64->mem_->unsetlogrw(0);};
+  if(logcia1rw)  {c64->mem_->setlogrw(1);} else {c64->mem_->unsetlogrw(1);};
+  if(logcia2rw)  {c64->mem_->setlogrw(2);} else {c64->mem_->unsetlogrw(2);};
+  if(logiorw)    {c64->mem_->setlogrw(3);} else {c64->mem_->unsetlogrw(3);};
+  if(logplarw)   {c64->mem_->setlogrw(4);} else {c64->mem_->unsetlogrw(4);};
+  if(logcrtrw)   {c64->mem_->setlogrw(5);} else {c64->mem_->unsetlogrw(5);};
+  if(logsidrw)   {c64->mem_->setlogrw(6);} else {c64->mem_->unsetlogrw(6);};
+  if(logsidiorw) {c64->mem_->setlogrw(7);} else {c64->mem_->unsetlogrw(7);};
 }
 
 /**
