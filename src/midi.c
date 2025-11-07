@@ -91,8 +91,9 @@ void midi_init(void)
 static inline void emulator_queue_init(void)
 {
   /* emudore */
-  queue_init(&cynthcart_queue, sizeof(cynthcart_queue_entry_t), 16); /* 16 entries */
+  queue_init(&cynthcart_queue, sizeof(cynthcart_queue_entry_t), (4 * 16)); /* 4 * 16 entries */
 }
+
 static inline void emulator_queue_deinit(void)
 {
   /* emudore */
