@@ -267,7 +267,8 @@ void midi_buffer_task(uint8_t buffer)
                 handle_emulater_data();
               } else { /* Boring midi ;-) */
               #endif
-                process_midi(midimachine.streambuffer, midimachine.index);
+                /* process_midi(midimachine.streambuffer, midimachine.index); */ // BUG: DISABLED
+                /* This function causes strange behaviour on SIDs after use */
               #ifdef ONBOARD_EMULATOR
               }
               #endif
