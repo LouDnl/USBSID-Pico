@@ -795,6 +795,7 @@ void clear_sid_registers(int sidno)
   for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
     cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0x0, 0);
   }
+  memset(sid_memory, 0, (4 * 0x20));
   return;
 }
 
