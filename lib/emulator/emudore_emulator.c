@@ -110,6 +110,14 @@ void unset_logging(int logid)
   _set_logging();
   return;
 }
+uint64_t cpu_cycles = 0;
+
+void start_cynthcart(void)
+{
+  apply_clockrate(1,true); /* Fixed to PAL */
+  start_emudore_cynthcart(basic,chargen,kernal,cynthcart,false);
+  return;
+}
 
 void start_emulator(void)
 {
@@ -126,7 +134,25 @@ void stop_emulator(void)
 
 unsigned int run_emulator(void)
 {
+  cpu_cycles = run_emulation_cycle();
+  return cpu_cycles;
+}
+
+unsigned int run_sidplayer(void)
+{
   return run_emulation_cycle();
+}
+
+unsigned int run_cynthcart(void)
+{
+  return run_specified_cycle(
+    true,  // cpu
+    true,  // cia1
+    false, // cia2
+    true,  // vic
+    false, // io
+    true   // cart
+  );
 }
 
 #ifdef ONBOARD_SIDPLAYER

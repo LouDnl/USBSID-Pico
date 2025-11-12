@@ -381,7 +381,7 @@ extern "C" void start_emudore_prgtuneplayer(
     return;
   }
   (void) heapbefore();
-  midi_ = true;
+  midi_ = false; /* No need when playing PRG SID tunes! ;-) */
   c64 = new C64(
     nosdl_,isbinary_,havecart_,bankswlog,midi_,
     basic_,chargen_,kernal_,binary_

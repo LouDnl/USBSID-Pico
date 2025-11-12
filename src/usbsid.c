@@ -118,10 +118,12 @@ extern void auto_detect_routine(bool auto_config, bool with_delay);
 #ifdef ONBOARD_EMULATOR
 extern bool emulator_running, starting_emulator, stopping_emulator;
 extern void start_emulator(void);
+extern void start_cynthcart(void);
+extern unsigned int run_cynthcart(void);
 #ifdef ONBOARD_SIDPLAYER
-extern bool sidplayer_init, sidplayer_playing, sidplayer_start;
-extern unsigned int run_emulator(void);
-extern void start_sidplayer(void);
+extern bool sidplayer_init, sidplayer_playing, sidplayer_start, sidplayer_log_timings;
+extern void start_sidplayer(bool dolog);
+extern unsigned int run_sidplayer(void);
 #endif
 #endif
 
@@ -732,21 +734,24 @@ void core1_main(void)
     if (!emulator_running && starting_emulator) {
       starting_emulator = false;
       emulator_running = true;
-      start_emulator();
+      start_cynthcart();
+    }
+    if (emulator_running && !starting_emulator) {
+      run_cynthcart();
     }
     #endif
 
     #if defined(ONBOARD_EMULATOR) && defined(ONBOARD_SIDPLAYER)
     if (sidplayer_start) {
       sidplayer_start = false;
-      start_sidplayer();
+      start_sidplayer(sidplayer_log_timings);
       sidplayer_playing = true;
     }
     #endif
 
     #if defined(ONBOARD_EMULATOR) && defined(ONBOARD_SIDPLAYER)
     if (sidplayer_playing) {
-      run_emulator();
+      run_sidplayer();
     }
     #endif
 

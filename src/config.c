@@ -119,6 +119,7 @@ static int sidfile_size;
 static int sidbytes_received;
 static bool receiving_sidfile;
 bool sidplayer_start;
+bool sidplayer_log_timings = false;
 #endif /* ONBOARD_SIDPLAYER */
 #endif /* ONBOARD_EMULATOR */
 
@@ -965,11 +966,11 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         offload_ledrunner = true;
         sidplayer_start = true;
       }
-      #endif
       if (buffer[1] == 4) {
-        st = cycled_read_operation(buffer[2], buffer[3]);
-        CFG("[TEST FOUND] %02X\n", st);
+        CFG("SID PLAYER SET LOG TIMINGS TO %d\n",buffer[2]);
+        sidplayer_log_timings = ((buffer[2] == 1) ? true : false);
       }
+      #endif
       if (buffer[1] == 5) {
         uint16_t dcyc = 1000;
         if (buffer[2] != 0 || buffer[3] != 0)
