@@ -468,9 +468,20 @@ void deinit_sidclock(void)
   return;
 }
 
-static int __not_in_flash_func(set_bus_bits)(uint8_t address, uint8_t data)
+inline static int __not_in_flash_func(set_bus_bits)(uint8_t address, bool write)
 {
   /* CFG("[BUS BITS]$%02X:%02X ", address, data); */
+  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+  if (write) {
+    control_word = 0b111000;
+    dir_mask = 0b1111111111111111;  /* Always OUT never IN */
+  } else {
+    data_word = dir_mask = 0;
+    control_word = 0b111001;
+    dir_mask |= 0b1111111100000000;
+  }
+  address = (address & 0x7F);
+  uint8_t data = (write ? sid_memory[(address & 0x7F)] : 0x0);
   switch (address) {
     case 0x00 ... 0x1F:
       if (cfg.one == 0b110 || cfg.one == 0b111) return 0;
@@ -494,17 +505,19 @@ static int __not_in_flash_func(set_bus_bits)(uint8_t address, uint8_t data)
       control_word |= cfg.four;
       break;
   }
+  data_word = (dir_mask << 16) | data_word;
   // CFG("$%02X:%02X $%04X 0b"PRINTF_BINARY_PATTERN_INT32" $%04X 0b"PRINTF_BINARY_PATTERN_INT16"\n",
   //   address, data, data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word));
   return 1;
 }
 
 uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data)
-{ /* WARNING: DEPRECATED AND NO LONGER WORKS */
+{ /* WARNING: DEPRECATED AND NO LONGER WORKS, HERE FOR CODE HISTORY ONLY!! */
   return 0;
   if ((command & 0xF0) != 0x10) {
     return 0; // Sync bit not set, ignore operation
   }
+  sid_memory[(address & 0x7F)] = data;
   int sid_command = (command & 0x0F);
   bool is_read = sid_command == 0x01;
   control_word = data_word = dir_mask = 0;
@@ -512,7 +525,7 @@ uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t ad
   dir_mask |= (is_read ? 0b1111111100000000 : 0b1111111111111111);
   control_word |= (is_read ? 1 : 0);
   vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
-  if (set_bus_bits(address, data) != 1) {
+  if (set_bus_bits(address, true) != 1) {
     return 0;
   }
   data_word = (dir_mask << 16) | data_word;
@@ -573,14 +586,9 @@ uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles)
 uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles)
 {
   delay_word = cycles;
-  control_word = data_word = dir_mask = 0;
-  control_word = 0b111000;
-  dir_mask |= 0b1111111100000000;
-  control_word |= 1;
-  if (set_bus_bits(address, 0x0) != 1) {
+  if (set_bus_bits(address, false) != 1) {
     return 0x00;
   }
-  data_word = (dir_mask << 16) | data_word;
 
   dma_channel_set_read_addr(dma_tx_delay, &delay_word, false);
   dma_channel_set_read_addr(dma_tx_control, &control_word, false);
@@ -602,13 +610,9 @@ uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, ui
 void __no_inline_not_in_flash_func(write_operation)(uint8_t address, uint8_t data)
 {
   sid_memory[(address & 0x7F)] = data;
-  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
-  control_word = 0b111000;
-  dir_mask = 0b1111111111111111;  /* Always OUT never IN */
-  if (set_bus_bits(address, data) != 1) {
+  if (set_bus_bits(address, true) != 1) {
     return;
   }
-  data_word = (dir_mask << 16) | data_word;
 
   pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, PIO_IRQ0));  /* Preset the statemachine IRQ to not wait for a 1 */
   pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, PIO_IRQ1));     /* Preset the statemachine IRQ to not wait for a 1 */
@@ -624,13 +628,9 @@ void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint
 {
   delay_word = cycles;
   sid_memory[(address & 0x7F)] = data;
-  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
-  control_word = 0b111000;
-  dir_mask = 0b1111111111111111;  /* Always OUT never IN */
-  if (set_bus_bits(address, data) != 1) {
+  if (set_bus_bits(address, true) != 1) {
     return;
   }
-  data_word = (dir_mask << 16) | data_word;
 
   dma_channel_set_read_addr(dma_tx_delay, &delay_word, false);
   dma_channel_set_read_addr(dma_tx_control, &control_word, false);
@@ -660,13 +660,9 @@ void __no_inline_not_in_flash_func(cycled_write_operation_nondma)(uint8_t addres
 {
   delay_word = cycles;
   sid_memory[(address & 0x7F)] = data;
-  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
-  control_word = 0b111000;
-  dir_mask = 0b1111111111111111;  /* Always OUT never IN */
-  if (set_bus_bits(address, data) != 1) {
+  if (set_bus_bits(address, true) != 1) {
     return;
   }
-  data_word = (dir_mask << 16) | data_word;
 
   pio_sm_put_blocking(bus_pio, sm_control, control_word);
   pio_sm_put_blocking(bus_pio, sm_data, data_word);
@@ -682,12 +678,9 @@ uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t a
 { /* This is a blocking function! */
   sid_memory[(address & 0x7F)] = data;
   vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
-  control_word = 0b111000;
-  dir_mask = 0b1111111111111111;  /* Always OUT never IN */
-  if (set_bus_bits(address, data) != 1) {
+  if (set_bus_bits(address, true) != 1) {
     return 0;
   }
-  data_word = (dir_mask << 16) | data_word;
 
   dma_channel_set_read_addr(dma_tx_control, &control_word, false);
   dma_channel_set_read_addr(dma_tx_data, &data_word, false);
