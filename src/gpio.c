@@ -31,7 +31,11 @@
 
 
 /* USBSID */
+#ifdef ONBOARD_EMULATOR
+extern uint8_t *sid_memory;
+#else
 extern uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));
+#endif
 extern int paused_state, reset_state;
 
 /* Config */

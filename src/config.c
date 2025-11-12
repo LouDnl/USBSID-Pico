@@ -47,7 +47,11 @@ extern uint8_t *wusb_itf;
 extern uint8_t *write_buffer_p;
 extern double cpu_mhz, cpu_us;
 extern double sid_hz, sid_mhz, sid_us;
+#ifdef ONBOARD_EMULATOR
+extern uint8_t *sid_memory;
+#else
 extern uint8_t sid_memory[];
+#endif
 extern queue_t sidtest_queue;
 extern bool auto_config;
 #ifdef ONBOARD_EMULATOR

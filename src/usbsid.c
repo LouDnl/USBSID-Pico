@@ -40,8 +40,13 @@ uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE] __aligned(
 uint8_t __not_in_flash("usbsid_buffer") sid_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
 uint8_t __not_in_flash("usbsid_buffer") read_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
 uint8_t __not_in_flash("usbsid_buffer") config_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
-uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __aligned(2 * (0x20 * 4));
 uint8_t __not_in_flash("usbsid_buffer") uart_buffer[64] __aligned(2 * 64);
+#ifdef ONBOARD_EMULATOR
+uint8_t __not_in_flash("c64_memory") c64memory[0x10000];
+uint8_t * sid_memory = &c64memory[0xd400];
+#else
+uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __aligned(2 * (0x20 * 4));
+#endif
 
 int usb_connected = 0, usbdata = 0;
 uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
