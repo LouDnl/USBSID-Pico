@@ -51,7 +51,6 @@
 extern RuntimeCFG cfg;
 
 /* GPIO */
-extern uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data);
 extern uint8_t __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
 
