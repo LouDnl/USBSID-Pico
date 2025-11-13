@@ -43,7 +43,9 @@
 #endif
 
 #ifdef ONBOARD_SIDPLAYER
-#include <supremacyprg.h>
+// #include <supremacyprg.h>
+#include <supremacy.h>
+// #include <edgeofdisgrace.h>
 #endif
 
 
@@ -110,7 +112,6 @@ void unset_logging(int logid)
   _set_logging();
   return;
 }
-uint64_t cpu_cycles = 0;
 
 void start_cynthcart(void)
 {
@@ -119,28 +120,10 @@ void start_cynthcart(void)
   return;
 }
 
-void start_emulator(void)
-{
-  apply_clockrate(1,true); /* Fixed to PAL */
-  start_emudore_cynthcart(basic,chargen,kernal,cynthcart,true);
-  return;
-}
-
 void stop_emulator(void)
 {
   stop_emudore();
   return;
-}
-
-unsigned int run_emulator(void)
-{
-  cpu_cycles = run_emulation_cycle();
-  return cpu_cycles;
-}
-
-unsigned int run_sidplayer(void)
-{
-  return run_emulation_cycle();
 }
 
 unsigned int run_cynthcart(void)
@@ -166,13 +149,37 @@ static void set_tune_config()
   return;
 }
 
-void start_sidplayer(void)
+void start_sidplayer()
 { /* BUG: Still has issues */
-  size_t filesize = count_of(supremacyprg); /* 4382 */
-  start_emudore_prgtuneplayer(
+
+  // size_t filesize = count_of(edgeofdisgrace/* supremacyprg */); /* 4382 */
+  // do_timer_logging(dolog);
+  // start_emudore_sidtuneplayer(
+  //   basic,chargen,kernal,
+  //   edgeofdisgrace,filesize,
+  //   false /* true */);
+  size_t filesize = count_of(supremacy); /* 4382 */
+  start_emudore_sidtuneplayer(
     basic,chargen,kernal,
-    supremacyprg,filesize,
-    false);
+    supremacy,filesize,
+    false /* true */);
+  // size_t filesize = count_of(supremacyprg); /* 4382 */
+  // start_emudore_prgtuneplayer(
+  //   basic,chargen,kernal,
+  //   supremacyprg,filesize,
+  //   false /* true */);
+}
+
+unsigned int run_psidplayer(void)
+{
+  return run_specified_cycle(
+    true,  // cpu
+    true,  // cia1
+    true,  // cia2
+    true,  // vic
+    true,  // io
+    false  // cart
+  );
 }
 
 static int init_sidplayer(uint8_t * sidfile)

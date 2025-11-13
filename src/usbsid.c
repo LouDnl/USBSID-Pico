@@ -117,13 +117,12 @@ extern void auto_detect_routine(bool auto_config, bool with_delay);
 /* SID player */
 #ifdef ONBOARD_EMULATOR
 extern bool emulator_running, starting_emulator, stopping_emulator;
-extern void start_emulator(void);
 extern void start_cynthcart(void);
 extern unsigned int run_cynthcart(void);
 #ifdef ONBOARD_SIDPLAYER
 extern bool sidplayer_init, sidplayer_playing, sidplayer_start, sidplayer_log_timings;
-extern void start_sidplayer(bool dolog);
-extern unsigned int run_sidplayer(void);
+extern void start_sidplayer(void);
+extern unsigned int run_psidplayer(void);
 #endif
 #endif
 
@@ -744,14 +743,14 @@ void core1_main(void)
     #if defined(ONBOARD_EMULATOR) && defined(ONBOARD_SIDPLAYER)
     if (sidplayer_start) {
       sidplayer_start = false;
-      start_sidplayer(sidplayer_log_timings);
       sidplayer_playing = true;
+      start_sidplayer(); // WARNING: rp2040 insufficient memory!
     }
     #endif
 
     #if defined(ONBOARD_EMULATOR) && defined(ONBOARD_SIDPLAYER)
     if (sidplayer_playing) {
-      run_sidplayer();
+      run_psidplayer();
     }
     #endif
 
