@@ -99,7 +99,6 @@ extern void read_skpico_configuration(uint8_t base_address);
 /* SID player */
 #ifdef ONBOARD_EMULATOR
 extern bool stop_emulator(void);
-extern void run_emulator(void);
 extern void set_logging(int logid);
 extern void unset_logging(int logid);
 bool emulator_running, starting_emulator, stopping_emulator;
