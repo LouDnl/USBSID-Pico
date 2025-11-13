@@ -461,7 +461,8 @@ extern "C" void start_emudore_sidtuneplayer(
   pl_loadaddr = sidfile_->GetLoadAddress();
   pl_datalength = sidfile_->GetDataLength();
   /* pl_databuffer = sidfile_->GetDataPtr(); */
-  pl_dataoffset = (sidfile_->GetDataOffset() + 2);
+  // pl_dataoffset = (sidfile_->GetDataOffset() + 2);
+  pl_dataoffset = (sidfile_->GetDataOffset());
   // pl_databuffer = binary_+pl_dataoffset;
   pl_playaddr = sidfile_->GetPlayAddress();
   pl_initaddr = sidfile_->GetInitAddress();
@@ -480,10 +481,10 @@ extern "C" void start_emudore_sidtuneplayer(
     nosdl_,isbinary_,havecart_,bankswlog,midi_,
     basic_,chargen_,kernal_,nullptr
   );
-  (void) heapafter();
+  // (void) heapafter();
 
   // logging_enable(0); /* Memory RW */
-  _set_logging(); /* Set c64 logging */
+  // _set_logging(); /* Set c64 logging */
   // c64->mem_->setlogrw(6); /* Enable SID logging */
 
   // unsigned short binsize = 0x109f;
@@ -492,7 +493,7 @@ extern "C" void start_emudore_sidtuneplayer(
   // load_addr = aptr = pl_loadaddr; // $109f
   // 0x007c
   // size_t pos = (0x7C+2); /* pos starts at 2 after reading the load address at 0 and 1 */
-  (void) heapbefore();
+  // (void) heapbefore();
   // while(pos <= binsize) {
     // D("ADDR: $%04x POS: %d VAL: %02X\n",aptr,pos,binary_[pos]);
     // c64->mem_->write_byte(aptr++,binary_[pos++]);
@@ -501,58 +502,65 @@ extern "C" void start_emudore_sidtuneplayer(
   // for (unsigned int i = 0; i < binsize; i++) {
     // c64->mem_->write_byte((load_addr+i),binary_[(0x7C+2)+i]);
   for (unsigned int i = 0; i < pl_datalength; i++) {
-    // c64->mem_->write_byte((pl_loadaddr+i),pl_databuffer[i]);
     c64->mem_->write_byte_no_io((pl_loadaddr+i),binary_[pl_dataoffset+i]);
-    // printf("MEM @ $%04x:$%02X FILE @ $%04x:$%02X\n",
-      // pl_loadaddr+i, c64->mem_->read_byte_no_io((pl_loadaddr+i)),
-      // pl_dataoffset+i, binary_[pl_dataoffset+i]);
   }
-  printf("load: $%04X play: $%04X init: $%04X\n",
-    pl_loadaddr, pl_playaddr, pl_initaddr);
+  printf("load: $%04X play: $%04X init: $%04X\n", pl_loadaddr, pl_playaddr, pl_initaddr);
+  // Cpu::loginstructions = true;
   { /* Init SID player */
-    // install reset vector for microplayer (0x0202)
-    // c64->mem_->write_byte_no_io(0x0007, 0x78);               // 0x78 SEI disable interrupts
-    c64->mem_->write_byte_no_io(0xFFFC, 0x02); /* addr lo */
-    c64->mem_->write_byte_no_io(0xFFFD, 0x02); /* addr hi */
+    D("Starting PSID player\n");
+    uint16_t playerstart = (pl_initaddr+pl_datalength+1);
+    uint8_t p_hi = ((playerstart >> 8) & 0xFF);
+    uint8_t p_lo = (playerstart & 0xFF);
+    printf("playerstart: $%04X p_lo: $%02X p_hi: $%02X\n", playerstart, p_lo, p_hi);
 
-    // install IRQ vector for play routine launcher (0x020C)
-    c64->mem_->write_byte_no_io(0xFFFE, 0x0C); /* addr lo */
-    c64->mem_->write_byte_no_io(0xFFFF, 0x02); /* addr hi */
+    /* install reset vector for microplayer */
+    c64->mem_->write_byte(0xFFFC, p_lo); // lo
+    c64->mem_->write_byte(0xFFFD, p_hi); // hi
 
-    // clear kernel and basic rom from ram
-    // c64->mem_->write_byte_no_io(0x0001, 0x35);
-    c64->pla_->runtime_bank_switching(0x1C); /* Mode 28 */
+    /* install IRQ vector for play routine launcher */
+    c64->mem_->write_byte(0xFFFE, (p_lo+0x13)); // lo
+    c64->mem_->write_byte(0xFFFF, p_hi); // hi
 
-    // install the micro player, 6502 assembly code
-    c64->mem_->write_byte_no_io(0x0202, 0xA9);               // 0xA9 LDA imm load A with the song number
-    c64->mem_->write_byte_no_io(0x0203, 0);                  // 0xNN #NN song number
+    /* clear everything from from ram except IO 'm13' */
+    c64->pla_->switch_banks(13);
 
-    c64->mem_->write_byte_no_io(0x0204, 0x20);               // 0x20 JSR abs jump sub to INIT routine
-    c64->mem_->write_byte_no_io(0x0205, pl_initaddr & 0xFF);        // $xxNN init address lo
-    c64->mem_->write_byte_no_io(0x0206, (pl_initaddr >> 8) & 0xFF); // $NNxx init address hi
+    /* install the micro player, 6502 assembly code */
+    c64->mem_->write_byte(playerstart, 0xA9);                     // 0xA9 LDA imm load A with the song number
+    c64->mem_->write_byte(playerstart+1, 0);                      // 0xNN #NN song number
 
-    c64->mem_->write_byte_no_io(0x0207, 0x58);               // 0x58 CLI enable interrupts
-    c64->mem_->write_byte_no_io(0x0208, 0xEA);               // 0xEA NOP impl
-    c64->mem_->write_byte_no_io(0x0209, 0x4C);               // JMP jump to 0x0208
-    c64->mem_->write_byte_no_io(0x020A, 0x08);               // 0xxxNN address lo
-    c64->mem_->write_byte_no_io(0x020B, 0x02);               // 0xNNxx address hi
+    /* jump to init address */
+    c64->mem_->write_byte(playerstart+2, 0x20);                   // 0x20 JSR abs jump sub to INIT routine
+    c64->mem_->write_byte(playerstart+3, (pl_initaddr & 0xFF));          // 0xxxNN address lo
+    c64->mem_->write_byte(playerstart+4, (pl_initaddr >> 8) & 0xFF);     // 0xNNxx address hi
 
-    c64->mem_->write_byte_no_io(0x020C, 0xEA);               // 0xEA NOP // 0xA9 LDA imm // A = 1
-    c64->mem_->write_byte_no_io(0x020D, 0xEA);               // 0xEA NOP // 0x01 #NN
-    c64->mem_->write_byte_no_io(0x020E, 0xEA);               // 0xEA NOP // 0x78 SEI disable interrupt
-    c64->mem_->write_byte_no_io(0x020F, 0x20);               // 0x20 JSR jump sub to play routine
-    c64->mem_->write_byte_no_io(0x0210, pl_playaddr & 0xFF);        // $xxNN play address lo
-    c64->mem_->write_byte_no_io(0x0211, (pl_playaddr >> 8) & 0xFF); // $NNxx play address hi
-    c64->mem_->write_byte_no_io(0x0212, 0xEA);               // 0xEA NOP // 0x58 CLI enable interrupt
-    c64->mem_->write_byte_no_io(0x0213, 0x40);               // 0x40 RTI return from interrupt
+    c64->mem_->write_byte(playerstart+5, 0x58);                   // 0x58 CLI enable interrupt
+    c64->mem_->write_byte(playerstart+6, 0xEA);                   // 0xEA NOP impl
+    c64->mem_->write_byte(playerstart+7, 0x4C);                   // JMP jump to 0x0006
+    c64->mem_->write_byte(playerstart+8, p_lo+6);                 // 0xxxNN address lo
+    c64->mem_->write_byte(playerstart+9, p_hi);                   // 0xNNxx address hi
+
+    /* play routine launcher */
+    c64->mem_->write_byte(playerstart+0x13, 0xEA);                // 0xEA NOP
+    c64->mem_->write_byte(playerstart+0x14, 0xEA);                // 0xEA NOP
+    c64->mem_->write_byte(playerstart+0x15, 0xEA);                // 0xEA NOP
+    c64->mem_->write_byte(playerstart+0x16, 0x20);                // 0x20 JSR jump sub to play routine
+    c64->mem_->write_byte(playerstart+0x17, (pl_playaddr & 0xFF));       // playaddress lo
+    c64->mem_->write_byte(playerstart+0x18, (pl_playaddr >> 8) & 0xFF);  // playaddress hi
+    c64->mem_->write_byte(playerstart+0x19, 0xEA);                // 0xEA NOP
+    c64->mem_->write_byte(playerstart+0x1A, 0x40);                // 0x40 RTI return from interruptrupt
+
+    for (uint16_t i = playerstart ; i <= playerstart+0x1A ; i++) {
+      printf("addr: $%04X data: $%02X\n",
+        i, c64->mem_->read_byte_no_io(i));
+    }
   }
-  // c64->emulate();
   // delete sidfile_;
   c64->sid_->sid_flush();
   c64->sid_->set_playing(true);
   c64->cpu_->pc(c64->mem_->read_word(Memory::kAddrResetVector));
-  (void) heapafter();
-  if (run_continuously) {c64->start();};
+  // (void) heapafter();
+  // C64::log_timings = true;
+  // if (run_continuously) {c64->start();};
   return;
 }
 #endif /* ONBOARD_SIDPLAYER */
