@@ -38,7 +38,6 @@
 #include <sidfile.h>
 static const char *chiptype_s[4] = {"Unknown", "MOS6581", "MOS8580", "MOS6581 and MOS8580"};
 static const char *clockspeed_s[5] = {"Unknown", "PAL", "NTSC", "PAL and NTSC", "DREAN"};
-extern uint8_t c64memory[0x10000];
 #endif
 
 #ifdef ANALYSE_STACKUSAGE
@@ -59,6 +58,9 @@ extern "C" {
 }
 
 #ifdef ONBOARD_EMULATOR
+/* Shared memory */
+extern uint8_t c64memory[0x10000];
+
 /* constants */
 static const uint16_t kBasicPrgStart = 0x0801;
 static const uint16_t kBasicTxtTab   = 0x002b;
