@@ -1076,13 +1076,16 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case SID_PLAYER_START:
       CFG("[SID_PLAYER_START] %d\n", sidplayer_init);
       unmute_sid(); /* Must unmute before play start or some tunes will be silent */
-      if (sidplayer_init) sidplayer_playing = true;
+      if (sidplayer_init) {
+        offload_ledrunner = true;
+        sidplayer_playing = true;
+      }
       sidplayer_init = false;
       break;
     case SID_PLAYER_STOP:
       CFG("[SID_PLAYER_STOP]\n");
+      if (sidplayer_playing) stop_emulator();
       sidplayer_playing = false;
-      reset_sidplayer();
       if (usbsid_config.socketOne.clonetype != 2
           && usbsid_config.socketTwo.clonetype != 2) {
         reset_sid(); /* Breaking for tunes on SKPico */

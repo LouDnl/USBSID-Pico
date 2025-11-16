@@ -58,7 +58,7 @@ void logging_disable(int logid);
 void start_emudore_sidtuneplayer(
   uint8_t * basic_, uint8_t * chargen_,
   uint8_t * kernal_, uint8_t * binary_,
-  size_t binsize_, bool run_continuously
+  size_t binsize_, int tuneno, bool run_continuously
 );
 void start_emudore_prgtuneplayer(
   uint8_t * basic_, uint8_t * chargen_,

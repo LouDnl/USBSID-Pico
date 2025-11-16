@@ -73,7 +73,7 @@ extern void start_emudore_prgtuneplayer(
 extern void start_emudore_sidtuneplayer(
   uint8_t * basic_, uint8_t * chargen_,
   uint8_t * kernal_, uint8_t * binary_,
-  size_t binsize_, bool run_continuously
+  size_t binsize_, int tuneno, bool run_continuously
 );
 extern unsigned int run_emulation_cycle(void);
 extern unsigned int run_specified_cycle(
@@ -89,6 +89,7 @@ extern void logging_disable(int logid);
 #endif
 
 #ifdef ONBOARD_SIDPLAYER
+extern bool isrsid(void);
 /* Declare variables */
 bool sidplayer_init = false, sidplayer_playing = false;
 
@@ -161,7 +162,7 @@ void start_sidplayer()
   size_t filesize = count_of(supremacy); /* 4382 */
   start_emudore_sidtuneplayer(
     basic,chargen,kernal,
-    supremacy,filesize,
+    supremacy,filesize,0,
     false /* true */);
   // size_t filesize = count_of(supremacyprg); /* 4382 */
   // start_emudore_prgtuneplayer(
@@ -172,14 +173,18 @@ void start_sidplayer()
 
 unsigned int run_psidplayer(void)
 {
-  return run_specified_cycle(
-    true,  // cpu
-    true,  // cia1
-    true,  // cia2
-    true,  // vic
-    true,  // io
-    false  // cart
-  );
+  if (!isrsid()) {
+    return run_specified_cycle(
+      true,   // cpu
+      true,   // cia1
+      false,  // cia2
+      false,  // vic
+      false,  // io
+      false   // cart
+    );
+  } else {
+    run_emulation_cycle();
+  }
 }
 
 static int init_sidplayer(uint8_t * sidfile)
@@ -189,7 +194,12 @@ static int init_sidplayer(uint8_t * sidfile)
 
 int load_sidtune(uint8_t * sidfile, int sidfilesize, char tuneno)
 {
-  return 0;
+  size_t filesize = sidfilesize;
+  start_emudore_sidtuneplayer(
+    basic,chargen,kernal,
+    sidfile,filesize,tuneno,
+    false /* true */);
+  return 1;
 }
 
 int load_sidtune_fromflash(int sidflashid, char tuneno)
