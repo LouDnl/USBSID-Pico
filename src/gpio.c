@@ -53,6 +53,9 @@ extern uint16_t vu;
 /* Declare variables */
 PIO bus_pio = pio0;
 
+/* Declare global variables */
+bool is_muted; /* Global muting state */
+
 /* Declare local variables */
 static uint sm_control, offset_control;
 static uint sm_data, offset_data;
@@ -482,6 +485,7 @@ inline static int __not_in_flash_func(set_bus_bits)(uint8_t address, bool write)
   }
   address = (address & 0x7F);
   uint8_t data = (write ? sid_memory[(address & 0x7F)] : 0x0);
+  if (is_muted && ((address & 0x1F) == 0x18)) data &= 0xF0; /* Mask volume register to 0 if muted */
   switch (address) {
     case 0x00 ... 0x1F:
       if (cfg.one == 0b110 || cfg.one == 0b111) return 0;
@@ -702,6 +706,7 @@ uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t a
 void unmute_sid(void)
 {
   DBG("[UNMUTE]\n");
+  /* is_muted = false; */ /* Is globally handled from usbsid.c */
   for (int i = 0; i < cfg.numsids; i++) {
     uint8_t addr = ((0x20 * i) + 0x18);
     if ((volume_state[i] & 0xF) == 0) volume_state[i] = (volume_state[i] & 0xF0) | 0x0E;
@@ -721,6 +726,7 @@ void mute_sid(void)
     cycled_write_operation(addr, (volume_state[i] & 0xF0), 0);  /* Volume to 0 */
     DBG("[%d] $%02X:%02X\n", i, addr, (volume_state[i] & 0xF0));
   }
+  /* is_muted = true; */ /* Is globally handled from usbsid.c */
   return;
 }
 

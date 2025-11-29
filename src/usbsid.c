@@ -93,6 +93,7 @@ extern void clear_bus_all(void);
 extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
 extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
 extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
+extern bool is_muted;
 
 /* Uart */
 #ifdef USE_PIO_UART
@@ -323,9 +324,11 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
       case MUTE:
         DBG("[MUTE_SID]\n");
         mute_sid();
+        if (sid_buffer[1] == 1) is_muted = true;
         break;
       case UNMUTE:
         DBG("[UNMUTE_SID]\n");
+        if (sid_buffer[1] == 1) is_muted = false;
         unmute_sid();
         break;
       case RESET_SID:
