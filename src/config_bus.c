@@ -216,9 +216,11 @@ void apply_bus_config(bool quiet) // ISSUE: FINISH
   cfg.addrmask[2] = addrmask_default[cfg.ids[2]];
   cfg.addrmask[3] = addrmask_default[cfg.ids[3]];
 
+  if (!quiet) {
   for (int id = 0; id < 4; id++) {
-    CFG("[TEST0] ID:%d IDS:%d SIDID:%d TYPE:%02X ADDR:%02X MASK:%02X ADDRMASK:%02X\n",
-      id, cfg.ids[id], cfg.sidid[id], cfg.sidtype[id], cfg.sidaddr[id], cfg.sidmask[cfg.ids[id]], cfg.addrmask[cfg.ids[id]]);
+      CFG("[TEST0] ID:%d IDS:%d SIDID:%d TYPE:%02X ADDR:%02X MASK:%02X ADDRMASK:%02X\n",
+        id, cfg.ids[id], cfg.sidid[id], cfg.sidtype[id], cfg.sidaddr[id], cfg.sidmask[cfg.ids[id]], cfg.addrmask[cfg.ids[id]]);
+    }
   }
 
   /* Mirrored is easy */
@@ -246,7 +248,7 @@ void apply_bus_config(bool quiet) // ISSUE: FINISH
     cfg.three_mask = cfg.ids[2] != 4 ? cfg.addrmask[cfg.sidid[cfg.ids[2]]] : addrmask_default[cfg.ids[2]];
     cfg.four_mask  = cfg.ids[3] != 4 ? cfg.addrmask[cfg.sidid[cfg.ids[3]]] : addrmask_default[cfg.ids[3]];
 
-    CFG("[TEST 1] ONE:%02X ONE:%02X TWO:%02X TWO:%02X THREE:%02X THREE:%02X FOUR:%02X FOUR:%02X\n",
+    if (!quiet) CFG("[TEST 1] ONE:%02X ONE:%02X TWO:%02X TWO:%02X THREE:%02X THREE:%02X FOUR:%02X FOUR:%02X\n",
       cfg.one, cfg.one_mask, cfg.two, cfg.two_mask, cfg.three, cfg.three_mask, cfg.four, cfg.four_mask);
     /* EVERYTHING WORKS UP TO HERE BUT IGNORES SOCKET SETTINGS */
 
@@ -272,7 +274,7 @@ void apply_bus_config(bool quiet) // ISSUE: FINISH
 
     }
 
-    CFG("[TEST 2] ONE:%02X ONE:%02X TWO:%02X TWO:%02X THREE:%02X THREE:%02X FOUR:%02X FOUR:%02X\n",
+    if (!quiet) CFG("[TEST 2] ONE:%02X ONE:%02X TWO:%02X TWO:%02X THREE:%02X THREE:%02X FOUR:%02X FOUR:%02X\n",
       cfg.one, cfg.one_mask, cfg.two, cfg.two_mask, cfg.three, cfg.three_mask, cfg.four, cfg.four_mask);
   }
 

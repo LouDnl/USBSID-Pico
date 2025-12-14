@@ -36,7 +36,7 @@ extern uint8_t *sid_memory;
 #else
 extern uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));
 #endif
-extern int paused_state, reset_state;
+extern bool paused_state, reset_state;
 
 /* Config */
 extern void verify_clockrate(void);
@@ -703,6 +703,46 @@ uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t a
   return cycles;
 }
 
+/**
+ * @brief Set the globally used sid_memory to all zeroes
+ */
+void clear_sid_memory(void)
+{
+  memset(sid_memory, 0, count_of(sid_memory));
+  return;
+}
+
+/**
+ * @brief Clears the internally used volume state
+ */
+void clear_volume_state(void)
+{
+  memset(volume_state, 0, 4);
+  return;
+}
+
+/**
+ * @brief Set the reset state to true or false
+ *
+ * @param state Boolean
+ */
+void set_reset_state(bool state)
+{
+  reset_state = state;
+  return;
+}
+
+/**
+ * @brief Set the paused state to true or false
+ *
+ * @param state Boolean
+ */
+void set_paused_state(bool state)
+{
+  paused_state = state;
+  return;
+}
+
 void unmute_sid(void)
 {
   DBG("[UNMUTE]\n");
@@ -732,7 +772,7 @@ void mute_sid(void)
 
 void enable_sid(bool unmute)
 {
-  paused_state = 0;
+  set_paused_state(false);
   gpio_put(RES, 1);
   if (unmute) unmute_sid();
   return;
@@ -740,7 +780,7 @@ void enable_sid(bool unmute)
 
 void disable_sid(void)
 {
-  paused_state = 1;
+  set_paused_state(true);
   mute_sid();
   gpio_put(CS1, 1);
   gpio_put(CS2, 1);
@@ -772,19 +812,19 @@ void pause_sid(void)
 void pause_sid_withmute(void)
 {
   DBG("[PAUSE STATE PRE] %d\n", paused_state);
-  if (paused_state == 0) mute_sid();
-  if (paused_state == 1) unmute_sid();
+  if (!paused_state) mute_sid();
+  if (paused_state) unmute_sid();
   gpio_put(CS1, 1);
   gpio_put(CS2, 1);
-  paused_state = !paused_state;
+  set_paused_state(!paused_state);
   DBG("[PAUSE STATE POST] %d\n", paused_state);
   return;
 }
 
 void reset_sid(void)
 {
-  reset_state = 1;
-  paused_state = 0;
+  set_reset_state(true);
+  set_paused_state(false);
   memset(volume_state, 0, 4);
   memset(sid_memory, 0, count_of(sid_memory));
   gpio_put(RES, 0);
@@ -792,7 +832,7 @@ void reset_sid(void)
     cycled_delay_operation(10);  /* 10x PHI(02) cycles as per datasheet for REAL SIDs only */
   }
   gpio_put(RES, 1);
-  reset_state = 0;
+  set_reset_state(false);
   return;
 }
 
@@ -807,12 +847,12 @@ void clear_sid_registers(int sidno)
 
 void reset_sid_registers(void)
 { /* NOTICE: CAUSES ISSUES IF USED RIGHT BEFORE PLAYING */
-  reset_state = 1;
-  paused_state = 0;
+  set_reset_state(true);
+  set_paused_state(false);
   for (int sid = 0; sid < cfg.numsids; sid++) {
     clear_sid_registers(sid);
   }
-  reset_state = 0;
+  set_reset_state(false);
   return;
 }
 

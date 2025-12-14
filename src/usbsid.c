@@ -57,7 +57,7 @@ char cdc = 'C', asid = 'A', midi = 'M', sysex = 'S', wusb = 'W', uart = 'U';
 bool web_serial_connected = false;
 
 double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
-int paused_state = 0, reset_state = 0;
+bool paused_state = false, reset_state = false;
 bool auto_config = false;
 bool offload_ledrunner = false;
 

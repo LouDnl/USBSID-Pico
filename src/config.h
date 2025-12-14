@@ -304,7 +304,7 @@ enum
   READ_SOCKETCFG   = 0x37,  /* Read socket config as bytes */
   RELOAD_CONFIG    = 0x38,  /* Reload and apply stored config from flash */
   READ_NUMSIDS     = 0x39,  /* Returns the number of SIDs in byte 0 */
-  READ_FMOPLSID    = 0x3A,  /* Returns the sidno for FMOpl 1~4, 0 is disable  */
+  READ_FMOPLSID    = 0x3A,  /* Returns the sidno for FMOpl 1~4, 0 is disable */
 
   SINGLE_SID       = 0x40,  /* Single SID Socket One */
   DUAL_SID         = 0x41,  /* Dual SID Socket One */
@@ -316,7 +316,7 @@ enum
   DUAL_SOCKET2     = 0x47,  /* Two SID's in socket Two, Socket One disabled */
 
   SET_CLOCK        = 0x50,  /* Change SID clock frequency by array id */
-  DETECT_SIDS      = 0x51,  /* Try to detect the SID types per socket ~ routines see below */
+  DETECT_SIDS      = 0x51,  /* Try to detect the SID types per socket ~ routines see sid_detection.c */
   TEST_ALLSIDS     = 0x52,  /* Runs a very long test on all SID's */
   TEST_SID1        = 0x53,  /* Runs a very long test on SID 1 */
   TEST_SID2        = 0x54,  /* Runs a very long test on SID 2 */
@@ -346,6 +346,13 @@ enum
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
   TEST_FN2         = 0x9A,  /* TODO: Remove before v1 release */
   TEST_FN3         = 0x9B,  /* TODO: Remove before v1 release */
+
+  /* Hardware SID clone configuration related */
+  FPGASID          = 0xA0,  /* Config initiator byte for FPGASID */
+  SKPICO           = 0xA1,  /* Config initiator byte for SIDKICK-pico */
+  ARMSID           = 0xA2,  /* Config initiator byte for ARMSID */
+  PDSID            = 0xA3,  /* Holds the reset line for 5 seconds to change SID type on a PDSID */
+
 #ifdef ONBOARD_EMULATOR
   /* Internal SID player */
   UPLOAD_SID_START = 0xD0,  /* Start command for USBSID to go into receiving mode */
