@@ -26,7 +26,6 @@
 #include "globals.h"
 #include "config.h"
 #include "usbsid.h"
-#include "gpio.h"
 #include "midi.h"  /* needed for struct midi_machine */
 #include "sid.h"
 #include "logging.h"
@@ -40,8 +39,13 @@ uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE] __aligned(
 uint8_t __not_in_flash("usbsid_buffer") sid_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
 uint8_t __not_in_flash("usbsid_buffer") read_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
 uint8_t __not_in_flash("usbsid_buffer") config_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
-uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __aligned(2 * (0x20 * 4));
 uint8_t __not_in_flash("usbsid_buffer") uart_buffer[64] __aligned(2 * 64);
+#ifdef ONBOARD_EMULATOR
+uint8_t __not_in_flash("c64_memory") c64memory[0x10000];
+uint8_t * sid_memory = &c64memory[0xd400];
+#else
+uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __aligned(2 * (0x20 * 4));
+#endif
 
 int usb_connected = 0, usbdata = 0;
 uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
@@ -52,7 +56,7 @@ char cdc = 'C', asid = 'A', midi = 'M', sysex = 'S', wusb = 'W', uart = 'U';
 bool web_serial_connected = false;
 
 double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
-int paused_state = 0, reset_state = 0;
+bool paused_state = false, reset_state = false;
 bool auto_config = false;
 bool offload_ledrunner = false;
 
@@ -88,6 +92,7 @@ extern void clear_bus_all(void);
 extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
 extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
 extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
+extern bool is_muted;
 
 /* Uart */
 #ifdef USE_PIO_UART
@@ -112,11 +117,12 @@ extern void auto_detect_routine(bool auto_config, bool with_delay);
 /* SID player */
 #ifdef ONBOARD_EMULATOR
 extern bool emulator_running, starting_emulator, stopping_emulator;
-extern void start_emulator(void);
+extern void start_cynthcart(void);
+extern unsigned int run_cynthcart(void);
 #ifdef ONBOARD_SIDPLAYER
-extern bool sidplayer_init, sidplayer_playing, sidplayer_start;
-extern unsigned int run_emulator(void);
+extern bool sidplayer_init, sidplayer_playing, sidplayer_start, sidplayer_log_timings;
 extern void start_sidplayer(void);
+extern unsigned int run_psidplayer(void);
 #endif
 #endif
 
@@ -317,9 +323,11 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
       case MUTE:
         DBG("[MUTE_SID]\n");
         mute_sid();
+        if (sid_buffer[1] == 1) is_muted = true;
         break;
       case UNMUTE:
         DBG("[UNMUTE_SID]\n");
+        if (sid_buffer[1] == 1) is_muted = false;
         unmute_sid();
         break;
       case RESET_SID:
@@ -727,21 +735,24 @@ void core1_main(void)
     if (!emulator_running && starting_emulator) {
       starting_emulator = false;
       emulator_running = true;
-      start_emulator();
+      start_cynthcart();
+    }
+    if (emulator_running && !starting_emulator) {
+      run_cynthcart();
     }
     #endif
 
     #if defined(ONBOARD_EMULATOR) && defined(ONBOARD_SIDPLAYER)
     if (sidplayer_start) {
       sidplayer_start = false;
-      start_sidplayer();
       sidplayer_playing = true;
+      start_sidplayer(); // WARNING: rp2040 insufficient memory!
     }
     #endif
 
     #if defined(ONBOARD_EMULATOR) && defined(ONBOARD_SIDPLAYER)
     if (sidplayer_playing) {
-      run_emulator();
+      run_psidplayer();
     }
     #endif
 
@@ -766,8 +777,8 @@ int main()
 {
   /* Set system clockspeed */
   #if PICO_RP2040
-  /* System clock @ 125MHz */
-  set_sys_clock_pll(1500000000, 6, 2);
+  /* System clock @ MAX SPEED!! ARRRR 200MHz */
+  set_sys_clock_khz(200000, true);
   #elif PICO_RP2350
   /* System clock @ 150MHz */
   set_sys_clock_pll(1500000000, 5, 2);

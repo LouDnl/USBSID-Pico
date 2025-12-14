@@ -39,7 +39,6 @@
 
 /* Queues */
 typedef struct {
-  // void sid_test(int sidno, char test, char wf)
   void (*func)(int,char,char);
   int s;
   char t;
@@ -365,13 +364,6 @@ static const uint32_t musical_scale_values[96] =
 
 /* 12 musical note notations */
 static const char notes[12][2] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "H"};
-
-/* TODO */
-
-typedef struct SID {
- uint8_t addr;
- uint8_t registers[31];
-} SID;
 
 
 #ifdef __cplusplus

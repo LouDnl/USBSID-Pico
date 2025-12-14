@@ -1427,6 +1427,8 @@ void print_help(void)
   printf("  -boot,    --bootloader        : Reboot USBSID-Pico to the bootloader for firmware upload\n");
   printf("  -skpico   --sidkickpico       : Enter SIDKICK-pico config mode\n");
   printf("  -config   --config-command    : Send custom config command\n");
+  printf("  -mute                         : Mute all SID's\n");
+  printf("  -unmute                       : Umute all SID's\n");
   printf("--[TEST SIDS]--------------------------------------------------------------------------------------------------------\n");
   printf("  -sidtest N                    : Run SID test routine on available SID's\n");
   printf("                                  0: All, 1: 0x00, 2: 0x20, 3: 0x40, 4: 0x60\n");
@@ -1736,6 +1738,18 @@ void config_usbsidpico(int argc, char **argv)
       if (argc >= 7)  d = strtol(argv[param_count++], NULL, 16);
       printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", cmd, a, b, c, d);
       write_config_command(cmd, a, b, c, d);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-mute")) {
+      printf("Muting all SID's\n");
+      uint8_t buf[5] = { ((COMMAND << 6) | MUTE), 1, 0, 0, 0 };
+      write_chars(buf, count_of(buf));
+      break;
+    }
+    if (!strcmp(argv[param_count], "-unmute")) {
+      printf("Unmuting all SID's\n");
+      uint8_t buf[5] = { ((COMMAND << 6) | UNMUTE), 1, 0, 0, 0 };
+      write_chars(buf, count_of(buf));
       break;
     }
     if (!strcmp(argv[param_count], "-control")) {

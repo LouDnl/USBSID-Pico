@@ -88,19 +88,20 @@ void midi_init(void)
 }
 
 #ifdef ONBOARD_EMULATOR
-static inline void emulator_queue_init(void)
+void emulator_queue_init(void)
 {
   /* emudore */
-  queue_init(&cynthcart_queue, sizeof(cynthcart_queue_entry_t), 16); /* 16 entries */
+  queue_init(&cynthcart_queue, sizeof(cynthcart_queue_entry_t), 128); /* 128 entries as buffer */
 }
-static inline void emulator_queue_deinit(void)
+
+inline void emulator_queue_deinit(void)
 {
   /* emudore */
   queue_free(&cynthcart_queue);
   reset_sid();
 }
 
-static inline void handle_emulater_data(void)
+inline void handle_emulater_data(void)
 {
   for (size_t e = 0; e < midimachine.index; e++) {
     /* Create queue entry */
@@ -113,7 +114,7 @@ static inline void handle_emulater_data(void)
   return;
 }
 
-static inline void emulator_enable(void)
+inline void emulator_enable(void)
 {
   emulator_queue_init();
   emulator_running = false;
@@ -122,7 +123,7 @@ static inline void emulator_enable(void)
   return;
 }
 
-static inline void emulator_disable(void)
+void emulator_disable(void)
 {
   emulator_running = false;
   stopping_emulator = true;
@@ -132,13 +133,13 @@ static inline void emulator_disable(void)
   return;
 }
 
-static inline void emulator_reset(void)
+inline void emulator_reset(void)
 {
   DBG("[MIDI] Emulator reset not implemented yet!\n");
   return;
 }
 
-static inline void handle_emulator_cc(void)
+inline void handle_emulator_cc(void)
 {
   if (midimachine.streambuffer[1] == midi_ccvalues_defaults.CC_CEN) { /* control emulator enable 0x55 (85) */
     if (!emulator_running) {
@@ -161,7 +162,7 @@ static inline void handle_emulator_cc(void)
 
 /* Processes a 1 byte incoming midi buffer
  * Figures out if we're receiving midi or sysex */
-void midi_buffer_task(uint8_t buffer)
+inline void midi_buffer_task(uint8_t buffer)
 {
   if (midimachine.index != 0) {
     if (midimachine.type != SYSEX) MIDBG(" [B%d]$%02x#%03d", midimachine.index, buffer, buffer);
@@ -266,7 +267,8 @@ void midi_buffer_task(uint8_t buffer)
                 handle_emulater_data();
               } else { /* Boring midi ;-) */
               #endif
-                process_midi(midimachine.streambuffer, midimachine.index);
+                /* process_midi(midimachine.streambuffer, midimachine.index); */ // BUG: DISABLED
+                /* This function causes strange behaviour on SIDs after use */
               #ifdef ONBOARD_EMULATOR
               }
               #endif

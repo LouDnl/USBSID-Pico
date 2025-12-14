@@ -53,7 +53,7 @@ endif()
 
 ### Enable / Disable build with embedded emulator for Midi
 set(ONBOARD_EMULATOR 0 CACHE STRING "ONBOARD_EMULATOR")
-set(ONBOARD_SIDPLAYER 0) # Not functional yet!
+set(ONBOARD_SIDPLAYER 0 CACHE STRING "ONBOARD_SIDPLAYER")
 
 ### Enable/ Disable build with PIO Uart on unused pins 26/27
 set(USE_PIO_UART 0)
@@ -81,14 +81,16 @@ set(USE_PIO_UART 0)
 
 ### Build steps log level
 set(CMAKE_MESSAGE_LOG_LEVEL ${BUILD_DEBUGGING})
+message(DEBUG "LOG_LEVEL is ${CMAKE_MESSAGE_LOG_LEVEL}")
+
 message(DEBUG "Starting compilation of ${PRODUCT_STRING} firmware version ${PROJECT_VERSION}")
 if(ONBOARD_EMULATOR EQUAL 1)
-  message(DEBUG "Firmware is built with ONBOARD_EMULATOR")
+  message(STATUS "Firmware is built with ONBOARD_EMULATOR")
 endif()
 if(ONBOARD_SIDPLAYER EQUAL 1)
-  message(DEBUG "Firmware is built with ONBOARD_SIDPLAYER")
+  message(STATUS "Firmware is built with ONBOARD_SIDPLAYER")
 endif()
-message(DEBUG "LOG_LEVEL is ${CMAKE_MESSAGE_LOG_LEVEL}")
+
 
 ### Optimization and debugging
 # remember that enabling debugging and disabling optimizations
@@ -303,7 +305,7 @@ list(APPEND PCBVERSIONS
   "1.0"
   "1.3"
 )
-if(${PICO_BOARD} STREQUAL "pico")
+if(${PICO_BOARD} STREQUAL "pico" OR ${PICO_BOARD} STREQUAL "pico2")
   list(APPEND FILENAMES
     ${PROJECT_FILENAME}-v1.0-rgb
     ${PROJECT_FILENAME}-v1.3-rgb
@@ -327,7 +329,10 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/config_socket.c
   ${CMAKE_CURRENT_LIST_DIR}/src/config_logging.c
   ${CMAKE_CURRENT_LIST_DIR}/src/gpio.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/pio.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/dma.c
   ${CMAKE_CURRENT_LIST_DIR}/src/vu.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/bus.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi_handler.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
@@ -425,12 +430,13 @@ set(TARGET_LL
 )
 
 ### Pio files
-set(PIO_BUS ${CMAKE_CURRENT_LIST_DIR}/src/pio/bus_control.pio)
-set(PIO_CLOCK ${CMAKE_CURRENT_LIST_DIR}/src/pio/clock.pio)
-set(PIO_VU ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu.pio)
-set(PIO_RGB ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu_rgb.pio)
+set(PIO_BUS     ${CMAKE_CURRENT_LIST_DIR}/src/pio/bus_control.pio)
+set(PIO_CLOCK   ${CMAKE_CURRENT_LIST_DIR}/src/pio/clock.pio)
+set(PIO_VU      ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu.pio)
+set(PIO_RGB     ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu_rgb.pio)
+set(PIO_COUNTER ${CMAKE_CURRENT_LIST_DIR}/src/pio/clock_counter.pio)
 if(USE_PIO_UART EQUAL 1)
-set(PIO_UART ${CMAKE_CURRENT_LIST_DIR}/src/pio/uart_rx.pio)
+set(PIO_UART    ${CMAKE_CURRENT_LIST_DIR}/src/pio/uart_rx.pio)
 endif()
 
 ### Pico sdk path
@@ -537,6 +543,7 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   if(USE_PIO_UART EQUAL 1)
   pico_generate_pio_header(${BUILD} ${PIO_UART})
   endif()
+  pico_generate_pio_header(${BUILD} ${PIO_COUNTER})
   if(PICOTYPE STREQUAL "RGB")
     pico_generate_pio_header(${BUILD} ${PIO_RGB})
   endif()

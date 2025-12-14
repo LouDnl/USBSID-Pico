@@ -48,6 +48,8 @@ extern void verify_chipdetection_results(bool quiet);
 extern void verify_sid_addr(bool quiet);
 extern void apply_socket_change(bool quiet);
 extern void apply_fmopl_config(bool quiet);
+extern bool check_socket_config_errors(void);
+extern void socket_config_fallback(void);
 
 /* Pre declarations */
 uint8_t detect_sid_version(uint8_t start_addr);
@@ -392,4 +394,9 @@ void auto_detect_routine(bool auto_config, bool with_delay)
   apply_socket_change(true);
 
   CFG("[END AUTO DETECT ROUTINE]\n");
+
+  if (check_socket_config_errors()) {
+    CFG("[AUTO DETECT CONFIG ERROR DETECTED]\n");
+    socket_config_fallback();
+  }
 }

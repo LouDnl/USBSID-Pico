@@ -35,7 +35,10 @@
 /* GPIO */
 extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
-void reset_sid(void);
+extern void clear_sid_memory(void);
+extern void clear_volume_state(void);
+extern void set_reset_state(bool state);
+extern void set_paused_state(bool state);
 
 /* Config */
 extern Config usbsid_config;
@@ -224,4 +227,25 @@ void read_skpico_configuration(uint8_t base_address)
   print_skpico_configuration(base_address, skpico_config);
   CFG("\n");
 
+}
+
+/**
+ * @brief Change Public Domain SID type
+ * This requires a 5 second reset hold
+ * to switch to and or from 6581/8580
+ */
+void switch_pdsid_type(void)
+{
+  set_reset_state(true); // reset_state = 1;
+  set_paused_state(false); // paused_state = 0;
+  clear_volume_state(); // memset(volume_state, 0, 4);
+  clear_sid_memory(); // memset(sid_memory, 0, count_of(sid_memory));
+  CFG("[SID] RST PIN LOW\n");
+  cPIN(RES); // gpio_put(RES, 0);
+  CFG("[SID] SLEEP\n");
+  sleep_ms(6000);
+  CFG("[SID] RST PIN HIGH\n");
+  sPIN(RES); // gpio_put(RES, 1);
+  set_reset_state(false); // reset_state = 0;
+  return;
 }

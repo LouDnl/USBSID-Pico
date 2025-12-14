@@ -57,7 +57,7 @@
 ; so 10 nops is 5 cycles? WTF!?
 ;
 
-.define PUBLIC PHI 22
+.define PUBLIC CLK 22
 .define PUBLIC CONTROL 0  ; 0b000
 .define PUBLIC DATABUS 1  ; 0b001
 .define PUBLIC RASTER  2  ; 0b010
@@ -67,9 +67,9 @@
 .wrap_target
     pull block               ; Pull data from TX fifo, block if no data
     wait 1 irq CONTROL       ; Wait for IRQ signal
-    wait 0 gpio PHI    [24]  ; Wait for clock to go low
+    wait 0 gpio CLK    [24]  ; Wait for clock to go low
     out pins, 3              ; Set control pins (19-21)
-    wait 1 gpio PHI          ; Wait for clock to go high
+    wait 1 gpio CLK          ; Wait for clock to go high
     jmp pin read             ; Jump to read if RW is high
     jmp done                 ; Jump to done if not
 read:
@@ -78,7 +78,7 @@ read:
     in NULL 24               ; Move ISR 24 bits to the right
     push block               ; push ISR in to RX fifo, block if it's full
 done:
-    wait 0 gpio PHI          ; Wait for clock to go low
+    wait 0 gpio CLK          ; Wait for clock to go low
     out pins 3               ; Set control to next 3 bits from TX fifo
 .wrap
 
@@ -88,11 +88,11 @@ done:
 .wrap_target
     pull block               ; Pull data from FIFO, block if no data
     wait 1 irq DATABUS       ; Wait for IRQ signal ~ should trigger exactly 1 cycle after CONTROL
-    wait 0 gpio PHI    [24]  ; Wait for clock to go low
+    wait 0 gpio CLK    [24]  ; Wait for clock to go low
     out pins 16              ; Set data bus pins
     out pindirs 16           ; Set data bus pindirs
-    wait 1 gpio PHI          ; Wait for clock to go high
-    wait 0 gpio PHI          ; Wait for clock to go low
+    wait 1 gpio CLK          ; Wait for clock to go high
+    wait 0 gpio CLK          ; Wait for clock to go low
 .wrap
 
 ; Delay counter program ~ PIO0 SM3
@@ -101,8 +101,8 @@ done:
     pull block               ; Pull data from FIFO, block if no data
     out x 16                 ; Move data into scratch register X
 delay:
-    wait 1 gpio PHI          ; Wait for clock to go high
-    wait 0 gpio PHI          ; Wait for clock to go low
+    wait 1 gpio CLK          ; Wait for clock to go high
+    wait 0 gpio CLK          ; Wait for clock to go low
     jmp x-- delay            ; Decrease X and restart count
     irq set CONTROL          ; Set IRQ and continue
     irq wait DATABUS         ; Set IRQ and wait for its release
@@ -116,8 +116,8 @@ delay:
     mov x osr                ; Copy pulled data into OSR
     out y 16                 ; Move data into scratch register Y
 delay:
-    wait 1 gpio PHI          ; Wait for clock to go high
-    wait 0 gpio PHI          ; Wait for clock to go low
+    wait 1 gpio CLK          ; Wait for clock to go high
+    wait 0 gpio CLK          ; Wait for clock to go low
     jmp y-- delay            ; Decrease X and restart count
     irq set RASTER           ; Set IRQ and continue, don't wait
 .wrap

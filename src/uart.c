@@ -31,7 +31,6 @@
 
 #include "globals.h"
 #include "uart.h"
-#include "gpio.h"
 #include "logging.h"
 
 

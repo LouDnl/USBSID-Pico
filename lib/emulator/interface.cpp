@@ -58,6 +58,9 @@ extern "C" {
 }
 
 #ifdef ONBOARD_EMULATOR
+/* Shared memory */
+extern uint8_t c64memory[0x10000];
+
 /* constants */
 static const uint16_t kBasicPrgStart = 0x0801;
 static const uint16_t kBasicTxtTab   = 0x002b;
@@ -78,6 +81,7 @@ static bool logiorw    = false; /* log io memory reads and writes */
 static bool logplarw   = false; /* log pla memory reads and writes */
 static bool logcrtrw   = false; /* log cart memory reads and writes */
 static bool logsidrw   = false; /* log sid memory reads and writes */
+static bool logsidiorw = false; /* log sid io writes */
 static bool bankswlog  = false; /* log bank switching */
 /* Static IO/Memory variables */
 static uint16_t load_addr, init_addr; /* Zero as signal it hasn't been changed */
@@ -86,12 +90,18 @@ static uint16_t aptr; /* pointer for counting addresses */
 
 #ifdef ONBOARD_SIDPLAYER
 static uint16_t pl_loadaddr;
+static uint16_t pl_lastloadaddr;
 static uint16_t pl_initaddr;
 static uint16_t pl_playaddr;
 static uint16_t pl_datalength;
 static uint8_t *pl_databuffer;
 static uint16_t pl_dataoffset;
 static uint32_t pl_sidspeed;
+static uint8_t pl_start_page;
+static uint8_t pl_max_pages;
+static uint16_t playerstart;
+static uint8_t p_hi;
+static uint8_t p_lo;
 static int pl_songs;
 static int pl_song_number;
 static int pl_sidflags;
@@ -104,6 +114,9 @@ static int pl_raster_lines;
 static int pl_rasterrow_cycles;
 static int pl_frame_cycles;
 static int pl_refresh_rate;
+/* static */ int pl_isrsid;
+int subtune = 0;
+uint8_t * binary_p;
 #endif
 
 /* Machine */
@@ -148,13 +161,14 @@ static uint16_t read_short_be(uint8_t * ptr, uint8_t pos)
 extern "C" void logging_enable(int logid)
 {
   switch(logid) {
-    case 0: logmemrw  = true; break;
-    case 1: logcia1rw = true; break;
-    case 2: logcia2rw = true; break;
-    case 3: logiorw   = true; break;
-    case 4: logplarw  = true; break;
-    case 5: logcrtrw  = true; break;
-    case 6: logsidrw  = true; break;
+    case 0: logmemrw    = true; break;
+    case 1: logcia1rw   = true; break;
+    case 2: logcia2rw   = true; break;
+    case 3: logiorw     = true; break;
+    case 4: logplarw    = true; break;
+    case 5: logcrtrw    = true; break;
+    case 6: logsidrw    = true; break;
+    case 7: logsidiorw  = true; break;
     default: break;
   }
   return;
@@ -166,13 +180,14 @@ extern "C" void logging_enable(int logid)
 extern "C" void logging_disable(int logid)
 {
   switch(logid) {
-    case 0: logmemrw  = false; break;
-    case 1: logcia1rw = false; break;
-    case 2: logcia2rw = false; break;
-    case 3: logiorw   = false; break;
-    case 4: logplarw  = false; break;
-    case 5: logcrtrw  = false; break;
-    case 6: logsidrw  = false; break;
+    case 0: logmemrw    = false; break;
+    case 1: logcia1rw   = false; break;
+    case 2: logcia2rw   = false; break;
+    case 3: logiorw     = false; break;
+    case 4: logplarw    = false; break;
+    case 5: logcrtrw    = false; break;
+    case 6: logsidrw    = false; break;
+    case 7: logsidiorw  = false; break;
     default: break;
   }
   return;
@@ -190,6 +205,7 @@ static void disable_all_logging(void)
  logplarw   = false;
  logcrtrw   = false;
  logsidrw   = false;
+ logsidiorw = false;
  bankswlog  = false;
  return;
 }
@@ -199,13 +215,14 @@ static void disable_all_logging(void)
  */
 extern "C" void _set_logging(void)
 {
-  if(logmemrw) {c64->mem_->setlogrw(0);} else {c64->mem_->unsetlogrw(0);};
-  if(logcia1rw){c64->mem_->setlogrw(1);} else {c64->mem_->unsetlogrw(1);};
-  if(logcia2rw){c64->mem_->setlogrw(2);} else {c64->mem_->unsetlogrw(2);};
-  if(logiorw)  {c64->mem_->setlogrw(3);} else {c64->mem_->unsetlogrw(3);};
-  if(logplarw) {c64->mem_->setlogrw(4);} else {c64->mem_->unsetlogrw(4);};
-  if(logcrtrw) {c64->mem_->setlogrw(5);} else {c64->mem_->unsetlogrw(5);};
-  if(logsidrw) {c64->mem_->setlogrw(6);} else {c64->mem_->unsetlogrw(6);};
+  if(logmemrw)   {c64->mem_->setlogrw(0);} else {c64->mem_->unsetlogrw(0);};
+  if(logcia1rw)  {c64->mem_->setlogrw(1);} else {c64->mem_->unsetlogrw(1);};
+  if(logcia2rw)  {c64->mem_->setlogrw(2);} else {c64->mem_->unsetlogrw(2);};
+  if(logiorw)    {c64->mem_->setlogrw(3);} else {c64->mem_->unsetlogrw(3);};
+  if(logplarw)   {c64->mem_->setlogrw(4);} else {c64->mem_->unsetlogrw(4);};
+  if(logcrtrw)   {c64->mem_->setlogrw(5);} else {c64->mem_->unsetlogrw(5);};
+  if(logsidrw)   {c64->mem_->setlogrw(6);} else {c64->mem_->unsetlogrw(6);};
+  if(logsidiorw) {c64->mem_->setlogrw(7);} else {c64->mem_->unsetlogrw(7);};
 }
 
 /**
@@ -228,6 +245,7 @@ extern "C" void start_emudore_cynthcart(
     nosdl_,isbinary_,havecart_,bankswlog,midi_,
     basic_,chargen_,kernal_,binary_
   );
+  C64::is_cynthcart = true;
   (void) heapafter();
 
   _set_logging(); /* Set c64 logging */
@@ -295,10 +313,15 @@ extern "C" bool stop_emudore(void)
       c64->disable_looping();
     }
     D("Stopping c64\n");
-    delete c64;
     disable_all_logging();
+    C64::log_timings = false;
+    C64::is_cynthcart = false;
+    C64::is_rsid = false;
+    _set_logging();
+    delete c64;
     c64 = nullptr;
     (void) heapafter();
+    memset(c64memory, 0, 0x10000);
     return true;
   }
   (void) heapafter();
@@ -320,7 +343,7 @@ extern "C" bool disable_looping(void)
 }
 
 #ifdef ONBOARD_SIDPLAYER
-static void print_sid_info()
+static void print_sid_info(void)
 {
   cout << "\n< Sid Info >" << endl;
   cout << "---------------------------------------------" << endl;
@@ -353,10 +376,12 @@ static void print_sid_info()
   }
   cout << "---------------------------------------------" << endl;
   cout << "Data Offset        : $" << setfill('0') << setw(4) << hex << sidfile_->GetDataOffset() << endl;
-  cout << "Image length       : $" << hex << sidfile_->GetInitAddress() << " - $" << hex << (sidfile_->GetInitAddress() - 1) + sidfile_->GetDataLength() << endl;
+  cout << "Image length       : $" << hex << sidfile_->GetInitAddress() << " - $" << hex << pl_lastloadaddr << endl;
   cout << "Load Address       : $" << hex << sidfile_->GetLoadAddress() << endl;
   cout << "Init Address       : $" << hex << sidfile_->GetInitAddress() << endl;
   cout << "Play Address       : $" << hex << sidfile_->GetPlayAddress() << endl;
+  cout << "Start Page         : $" << hex << sidfile_->GetStartPage() << endl;
+  cout << "Max Pages          : $" << hex << sidfile_->GetMaxPages() << endl;
   cout << "---------------------------------------------" << endl;
   cout << "Song Speed(s)      : $" << hex << pl_curr_sidspeed << " $0x" << hex << pl_sidspeed << endl;//" 0b" << bitset<32>{pl_sidspeed} << endl;
   cout << "Timer              : " << (pl_curr_sidspeed == 1 ? "CIA1" : "Clock") << endl;
@@ -376,7 +401,7 @@ extern "C" void start_emudore_prgtuneplayer(
     return;
   }
   (void) heapbefore();
-  midi_ = true;
+  midi_ = false; /* No need when playing PRG SID tunes! ;-) */
   c64 = new C64(
     nosdl_,isbinary_,havecart_,bankswlog,midi_,
     basic_,chargen_,kernal_,binary_
@@ -419,52 +444,388 @@ extern "C" void start_emudore_prgtuneplayer(
   }
 
   (void) heapafter();
+  // C64::log_timings = true;
   if (run_continuously) {c64->start();};
   return;
 }
 
-/**
- * @brief start emudore SID tune player
- */
-extern "C" void start_emudore_sidtuneplayer(
-  uint8_t * basic_, uint8_t * chargen_,
-  uint8_t * kernal_, uint8_t * binary_,
-  size_t binsize_, bool run_continuously)
-{
-  (void) getFreeStack();
-  (void) heapbefore();
+extern "C" int reloc65(char** buf, int* fsize, int addr);
 
-  sidfile_ = new SidFile();
-  if(sidfile_->ParsePtr(binary_,binsize_)) {
-    DBG("[EMU] Error parsing sidfile!\n");
-    delete sidfile_;
-    return;
+uint16_t find_free_page(void)
+{
+  /* Start and end pages. */
+  int startp = (pl_loadaddr >> 8);
+  int endp = (pl_lastloadaddr >> 8);
+
+  /* Used memory ranges. */
+  unsigned int used[] = {
+      0x00,
+      0x03,
+      0xa0,
+      0xbf,
+      0xd0,
+      0xff,
+      0x00,
+      0x00
+  };        /* calculated below */
+
+  unsigned int pages[256];
+  unsigned int last_page = 0;
+  unsigned int i, page, tmp;
+
+  if (pl_start_page == 0x00) {
+    fprintf(stdout, "No PSID freepages set, recalculating\n");
+  } else {
+    fprintf(stdout, "Calculating first free page\n");
   }
+
+  /* finish initialization */
+  used[6] = startp; used[7] = endp;
+
+  /* Mark used pages in table. */
+  memset(pages, 0, sizeof(pages));
+  for (i = 0; i < sizeof(used) / sizeof(*used); i += 2) {
+      for (page = used[i]; page <= used[i + 1]; page++) {
+          pages[page] = 1;
+      }
+  }
+
+  /* Find largest free range. */
+  pl_max_pages = 0x00;
+  for (page = 0; page < sizeof(pages) / sizeof(*pages); page++) {
+      if (!pages[page]) {
+          continue;
+      }
+      tmp = page - last_page;
+      if (tmp > pl_max_pages) {
+          pl_start_page = last_page;
+          pl_max_pages = tmp;
+      }
+      last_page = page + 1;
+  }
+
+  if (pl_max_pages == 0x00) {
+      pl_start_page = 0xff;
+  }
+  return (pl_start_page << 8);
+}
+
+inline int psid_set_cbm80(uint16_t vec, uint16_t addr)
+{
+    unsigned int i;
+    uint8_t cbm80[] = { 0x00, 0x00, 0x00, 0x00, 0xc3, 0xc2, 0xcd, 0x38, 0x30 };
+
+    cbm80[0] = vec & 0xff;
+    cbm80[1] = vec >> 8;
+
+    for (i = 0; i < sizeof(cbm80); i++) {
+        /* make backup of original content at 0x8000 */
+        c64->mem_->write_byte_no_io((uint16_t)(addr + i), c64->mem_->read_byte_no_io((uint16_t)(0x8000 + i)));
+        /* copy header */
+        c64->mem_->write_byte_no_io((uint16_t)(0x8000 + i), cbm80[i]);
+    }
+
+    return i;
+}
+
+inline void psid_init_driver(void) /* RSID ONLY */
+{
+  c64->pla_->switch_banks(c64->pla_->m13);  /* TEST */
+
+  // PSID_LOAD_FILE
+  {
+    if (pl_sidversion >= 2) {
+      pl_sidflags = pl_sidflags;
+      pl_start_page = sidfile_->GetStartPage();
+      pl_max_pages = sidfile_->GetMaxPages();
+    } else {
+      pl_sidflags = 0;
+      pl_start_page = 0;
+      pl_max_pages = 0;
+    }
+    if ((subtune < 0) || (subtune > pl_songs)) {
+      fprintf(stdout, "Default tune out of range (%d of %d ?), using 1 instead.\n", subtune, pl_songs);
+      subtune = 1;
+    } else printf("subtune: %d\n",subtune);
+
+    /* Relocation setup. */
+    if (pl_start_page == 0x00) {
+      find_free_page();
+    }
+
+    if (pl_start_page == 0xff || pl_max_pages < 2) {
+      fprintf(stdout, "No space for driver.\n");
+      exit(1);
+    }
+
+  }
+
+  // PSID_INIT_DRIVER
+  {
+    uint8_t psid_driver[] = {
+  #include "psiddrv.h"
+    };
+    char *psid_reloc = (char *)psid_driver;
+    int psid_size;
+
+    uint16_t reloc_addr;
+    uint16_t addr;
+    int i;
+    int sync; // FIXED TO PAL
+    int sid2loc, sid3loc;
+
+    for (addr = 0; addr < 0x0800; addr++) {
+        c64->mem_->write_byte_no_io(addr, (uint8_t)0x00);
+    }
+
+    reloc_addr = pl_start_page << 8;
+    psid_size = sizeof(psid_driver);
+    fprintf(stdout, "PSID free pages: $%04x-$%04x\n",
+            reloc_addr, (reloc_addr + (pl_max_pages << 8)) - 1U);
+
+    if (!reloc65((char **)&psid_reloc, &psid_size, reloc_addr)) {
+        fprintf(stderr, "Relocation.\n");
+        // psid_set_tune(-1);
+        return;
+    }
+
+    for (i = 0; i < psid_size; i++) {
+        c64->mem_->write_byte_no_io((uint16_t)(reloc_addr + i), psid_reloc[i]);
+    }
+
+    /* Load SID data into memory */
+    for (unsigned int i = 0; i < pl_datalength; i++) {
+      c64->mem_->write_byte_no_io((pl_loadaddr+i),binary_p[pl_dataoffset+i]);
+      if (i <= 8) printf("byte %d addr: $%04X data: $%02X\n", i, (pl_loadaddr+i), c64->mem_->read_byte_no_io(pl_loadaddr+i));
+    }
+
+    /* Skip JMP and CBM80 reset vector. */
+    addr = reloc_addr + 3 + 9 + 9;
+
+    /* Store parameters for PSID player. */
+    c64->mem_->write_byte_no_io(addr++, (uint8_t)(0));
+    c64->mem_->write_byte_no_io(addr++, (uint8_t)(pl_songs));
+    c64->mem_->write_byte_no_io(addr++, (uint8_t)(pl_loadaddr & 0xff));
+    c64->mem_->write_byte_no_io(addr++, (uint8_t)(pl_loadaddr >> 8));
+    c64->mem_->write_byte_no_io(addr++, (uint8_t)(pl_initaddr & 0xff));
+    c64->mem_->write_byte_no_io(addr++, (uint8_t)(pl_initaddr >> 8));
+    c64->mem_->write_byte_no_io(addr++, (uint8_t)(pl_playaddr & 0xff));
+    c64->mem_->write_byte_no_io(addr++, (uint8_t)(pl_playaddr >> 8));
+    c64->mem_->write_byte_no_io(addr++, (uint8_t)(pl_curr_sidspeed & 0xff));
+    c64->mem_->write_byte_no_io(addr++, (uint8_t)((pl_curr_sidspeed >> 8) & 0xff));
+    c64->mem_->write_byte_no_io(addr++, (uint8_t)((pl_curr_sidspeed >> 16) & 0xff));
+    c64->mem_->write_byte_no_io(addr++, (uint8_t)(pl_curr_sidspeed >> 24));
+    // c64->mem_->write_byte_no_io(addr++, (uint8_t)((int)sync == MACHINE_SYNC_PAL ? 1 : 0));
+    c64->mem_->write_byte_no_io(addr++, (uint8_t)1);  // SYNC PAL
+    c64->mem_->write_byte_no_io(addr++, (uint8_t)(pl_lastloadaddr & 0xff));
+    c64->mem_->write_byte_no_io(addr++, (uint8_t)(pl_lastloadaddr >> 8));
+  }
+
+  // PSID_INIT_TUNE
+  {
+    int start_song = subtune;
+    int sync, sid_model;
+    int i;
+    uint16_t reloc_addr;
+    uint16_t addr;
+    int speedbit;
+    char* irq;
+    char irq_str[20];
+    const char csidflag[4][8] = { "UNKNOWN", "6581", "8580", "ANY"};
+    reloc_addr = pl_start_page << 8;
+    fprintf(stdout, "Driver=$%04X, Image=$%04X-$%04X, Init=$%04X, Play=$%04X\n",
+            reloc_addr, pl_loadaddr,
+            (unsigned int)(pl_loadaddr + pl_datalength - 1),
+            pl_initaddr, pl_playaddr);
+
+    if (start_song == 0) {
+      start_song = subtune;
+    } else if (start_song < (subtune - 1) || start_song > pl_songs) {
+      fprintf(stdout, "Tune out of range.\n");
+      start_song = subtune;
+    }
+    printf("start_song: %d\n",start_song);
+    /* Check tune speed. */
+    speedbit = 1;
+    for (i = 1; i < start_song && i < 32; i++) {
+        speedbit <<= 1;
+    }
+
+    /* Store parameters for PSID player. */
+    if (1 /* install_driver_hook */) {
+        /* Skip JMP. */
+        addr = reloc_addr + 3 + 9;
+
+        /* CBM80 reset vector. */
+        addr += psid_set_cbm80((uint16_t)(reloc_addr + 9), addr);
+
+        c64->mem_->write_byte_no_io(addr, (uint8_t)(start_song));
+    }
+    /* put song number into address 780/1/2 (A/X/Y) for use by BASIC tunes */
+    c64->mem_->write_byte_no_io(780, (uint8_t)(start_song - 1));
+    c64->mem_->write_byte_no_io(781, (uint8_t)(start_song - 1));
+    c64->mem_->write_byte_no_io(782, (uint8_t)(start_song - 1));
+    /* force flag in c64 memory, many sids reads it and must be set AFTER the sid flag is read */
+    // c64->mem_->write_byte_no_io((uint16_t)(0x02a6), (uint8_t)(sync == MACHINE_SYNC_NTSC ? 0 : 1));
+    c64->mem_->write_byte_no_io((uint16_t)(0x02a6), (uint8_t)1); // FORCE PAL
+    // c64->cpu_->pc(psid->load_addr);
+    // c64->cpu_->pc((unsigned int)(psid->load_addr + pl_datalength - 1));
+    c64->cpu_->pc(pl_initaddr);
+    // c64->cpu_->pc(pl_playaddr);
+    // c64->cpu_->pc(reloc_addr);
+    // c64->cpu_->reset();
+    // c64->cpu_->irq();
+  }
+}
+
+inline void load_Psidplayer(void)
+{ /* Init SID player */
+  D("Starting PSID player\n");
+  uint16_t playerstart = playerstart =
+    (pl_loadaddr <= 0x1000)
+    ? (pl_initaddr+pl_datalength+1)
+    : (pl_loadaddr-28);
+  // uint16_t playerstart = (pl_initaddr+pl_datalength+1);
+  uint8_t p_hi = ((playerstart >> 8) & 0xFF);
+  uint8_t p_lo = (playerstart & 0xFF);
+  printf("playerstart: $%04X p_lo: $%02X p_hi: $%02X\n", playerstart, p_lo, p_hi);
+
+  /* install reset vector for microplayer */
+  c64->mem_->write_byte(0xFFFC, p_lo); // lo
+  c64->mem_->write_byte(0xFFFD, p_hi); // hi
+
+  /* install IRQ vector for play routine launcher */
+  c64->mem_->write_byte(0xFFFE, (p_lo+0x13)); // lo
+  c64->mem_->write_byte(0xFFFF, p_hi); // hi
+
+  /* clear everything from from ram except IO 'm13' */
+  c64->pla_->switch_banks(c64->pla_->m13);
+
+  /* install the micro player, 6502 assembly code */
+  c64->mem_->write_byte(playerstart, 0xA9);                     // 0xA9 LDA imm load A with the song number
+  c64->mem_->write_byte(playerstart+1, pl_song_number);         // 0xNN #NN song number
+
+  /* jump to init address */
+  c64->mem_->write_byte(playerstart+2, 0x20);                   // 0x20 JSR abs jump sub to INIT routine
+  c64->mem_->write_byte(playerstart+3, (pl_initaddr & 0xFF));       // 0xxxNN address lo
+  c64->mem_->write_byte(playerstart+4, (pl_initaddr >> 8) & 0xFF);  // 0xNNxx address hi
+
+  c64->mem_->write_byte(playerstart+5, 0x58);                   // 0x58 CLI enable interrupt
+  c64->mem_->write_byte(playerstart+6, 0xEA);                   // 0xEA NOP impl
+  c64->mem_->write_byte(playerstart+7, 0x4C);                   // JMP jump to 0x0006
+  c64->mem_->write_byte(playerstart+8, (p_lo+6));               // 0xxxNN address lo
+  c64->mem_->write_byte(playerstart+9, p_hi);                   // 0xNNxx address hi
+
+  /* play routine launcher */
+  c64->mem_->write_byte(playerstart+0x13, 0xEA);                // 0xEA NOP
+  c64->mem_->write_byte(playerstart+0x14, 0xEA);                // 0xEA NOP
+  c64->mem_->write_byte(playerstart+0x15, 0xEA);                // 0xEA NOP
+  c64->mem_->write_byte(playerstart+0x16, 0x20);                // 0x20 JSR jump sub to play routine
+  c64->mem_->write_byte(playerstart+0x17, (pl_playaddr & 0xFF));       // playaddress lo
+  c64->mem_->write_byte(playerstart+0x18, (pl_playaddr >> 8) & 0xFF);  // playaddress hi
+  c64->mem_->write_byte(playerstart+0x19, 0xEA);                // 0xEA NOP
+  c64->mem_->write_byte(playerstart+0x1A, 0x40);                // 0x40 RTI return from interruptrupt
+
+  for (uint16_t i = playerstart ; i <= playerstart+0x1A ; i++) {
+    printf("addr: $%04X data: $%02X\n",
+      i, c64->mem_->read_byte_no_io(i));
+  }
+}
+
+inline void preload_sid(void)
+{
   pl_songs = sidfile_->GetNumOfSongs();
-  pl_song_number = sidfile_->GetFirstSong(); /* TODO: FIX N FINISH ;) */
+  pl_song_number = subtune;//sidfile_->GetFirstSong(); /* TODO: FIX N FINISH ;) */
   pl_sidflags = sidfile_->GetSidFlags();
   pl_sidspeed = sidfile_->GetSongSpeed(pl_song_number); // + 1);
-  pl_curr_sidspeed = pl_sidspeed & (1 << pl_song_number); // ? 1 : 0;  // 1 ~ 60Hz, 2 ~ 50Hz
+  pl_curr_sidspeed = (pl_sidspeed & (1 << pl_song_number)); // ? 1 : 0;  // 1 ~ 60Hz, 2 ~ 50Hz
   pl_chiptype = sidfile_->GetChipType(1);
   pl_clockspeed = sidfile_->GetClockSpeed();
   pl_sidversion = sidfile_->GetSidVersion();
   pl_clock_speed = clockSpeed[pl_clockspeed];
   pl_raster_lines = scanLines[pl_clockspeed];
   pl_rasterrow_cycles = scanlinesCycles[pl_clockspeed];
-  pl_frame_cycles = pl_raster_lines * pl_rasterrow_cycles;
+  pl_frame_cycles = (pl_raster_lines * pl_rasterrow_cycles);
   pl_refresh_rate = refreshRate[pl_clockspeed];
   pl_loadaddr = sidfile_->GetLoadAddress();
+  pl_lastloadaddr = ((sidfile_->GetLoadAddress() - 1) + sidfile_->GetDataLength());
   pl_datalength = sidfile_->GetDataLength();
   /* pl_databuffer = sidfile_->GetDataPtr(); */
-  pl_dataoffset = (sidfile_->GetDataOffset() + 2);
+  pl_dataoffset = (sidfile_->GetDataOffset() + 2); // skip first two load address bytes
+  // pl_dataoffset = (sidfile_->GetDataOffset());
   // pl_databuffer = binary_+pl_dataoffset;
   pl_playaddr = sidfile_->GetPlayAddress();
   pl_initaddr = sidfile_->GetInitAddress();
+  pl_start_page = sidfile_->GetStartPage();
+  pl_max_pages = sidfile_->GetMaxPages();
+  pl_isrsid = (sidfile_->GetSidType() == "RSID");
+  C64::is_rsid = pl_isrsid;
+}
 
-  (void) heapafter();
-  (void) getFreeStack();
+inline bool do_sid(uint8_t * binary_, size_t binsize_)
+{
+  sidfile_ = new SidFile();
+  if(sidfile_->ParsePtr(binary_,binsize_)) {
+    DBG("[EMU] Error parsing sidfile!\n");
+    delete sidfile_;
+    return false;
+  }
+  binary_p = binary_;
+  preload_sid();
+  return true;
+}
+
+inline bool load_sid(void)
+{
   print_sid_info();
   delete sidfile_;
+  printf("load: $%04X play: $%04X init: $%04X\n", pl_loadaddr, pl_playaddr, pl_initaddr);
+
+  if (!pl_isrsid) {
+    /* Load SID data into memory */
+    for (unsigned int i = 0; i < pl_datalength; i++) {
+      c64->mem_->write_byte_no_io((pl_loadaddr+i),binary_p[pl_dataoffset+i]);
+      if (i <= 8) printf("byte %d addr: $%04X data: $%02X\n", i, (pl_loadaddr+i), c64->mem_->read_byte_no_io(pl_loadaddr+i));
+    }
+    load_Psidplayer();
+  } else {
+    psid_init_driver();
+  }
+  c64->sid_->sid_flush();
+  c64->sid_->set_playing(true);
+  if (!pl_isrsid) {
+    c64->cpu_->pc(c64->mem_->read_word_no_io(Memory::kAddrResetVector));
+    c64->cpu_->irq();
+  }
+  return true;
+}
+
+bool callbackfn(void)
+{
+  if (load_sid())
+    c64->callback(nullptr);
+  return true;
+}
+
+extern "C" bool isrsid(void) { return (bool)pl_isrsid; }
+
+/**
+ * @brief start emudore SID tune player
+ */
+extern "C" void start_emudore_sidtuneplayer(
+  // BUG: THE SID PLAYER STARTS TOO FAST FOR THE MACHINE TO FINISH BOOTING!!
+  // TODO: THIS MUST COME FROM A CALLBACK! :)
+  uint8_t * basic_, uint8_t * chargen_,
+  uint8_t * kernal_, uint8_t * binary_,
+  size_t binsize_, int tuneno, bool run_continuously)
+{
+
+  (void) getFreeStack();
+  (void) heapbefore();
+  subtune = tuneno;
+
+  do_sid(binary_, binsize_);
+
   if (c64 != nullptr) {
     D("Emudore already running!\n");
     return;
@@ -475,79 +836,16 @@ extern "C" void start_emudore_sidtuneplayer(
     nosdl_,isbinary_,havecart_,bankswlog,midi_,
     basic_,chargen_,kernal_,nullptr
   );
-  (void) heapafter();
 
-  // logging_enable(0); /* Memory RW */
-  _set_logging(); /* Set c64 logging */
-  // c64->mem_->setlogrw(6); /* Enable SID logging */
-
-  // unsigned short binsize = 0x109f;
-
-  // load_addr = aptr = read_short_le(binary_,0);
-  // load_addr = aptr = pl_loadaddr; // $109f
-  // 0x007c
-  // size_t pos = (0x7C+2); /* pos starts at 2 after reading the load address at 0 and 1 */
-  (void) heapbefore();
-  // while(pos <= binsize) {
-    // D("ADDR: $%04x POS: %d VAL: %02X\n",aptr,pos,binary_[pos]);
-    // c64->mem_->write_byte(aptr++,binary_[pos++]);
-  // }
-  /* Load SID data into memory */
-  // for (unsigned int i = 0; i < binsize; i++) {
-    // c64->mem_->write_byte((load_addr+i),binary_[(0x7C+2)+i]);
-  for (unsigned int i = 0; i < pl_datalength; i++) {
-    // c64->mem_->write_byte((pl_loadaddr+i),pl_databuffer[i]);
-    c64->mem_->write_byte_no_io((pl_loadaddr+i),binary_[pl_dataoffset+i]);
-    // printf("MEM @ $%04x:$%02X FILE @ $%04x:$%02X\n",
-      // pl_loadaddr+i, c64->mem_->read_byte_no_io((pl_loadaddr+i)),
-      // pl_dataoffset+i, binary_[pl_dataoffset+i]);
+  if(!pl_isrsid) {
+    c64->callback(callbackfn);
+  } else {
+    load_sid();
   }
-  printf("load: $%04X play: $%04X init: $%04X\n",
-    pl_loadaddr, pl_playaddr, pl_initaddr);
-  { /* Init SID player */
-    // install reset vector for microplayer (0x0202)
-    // c64->mem_->write_byte_no_io(0x0007, 0x78);               // 0x78 SEI disable interrupts
-    c64->mem_->write_byte_no_io(0xFFFC, 0x02); /* addr lo */
-    c64->mem_->write_byte_no_io(0xFFFD, 0x02); /* addr hi */
 
-    // install IRQ vector for play routine launcher (0x020C)
-    c64->mem_->write_byte_no_io(0xFFFE, 0x0C); /* addr lo */
-    c64->mem_->write_byte_no_io(0xFFFF, 0x02); /* addr hi */
-
-    // clear kernel and basic rom from ram
-    // c64->mem_->write_byte_no_io(0x0001, 0x35);
-    c64->pla_->runtime_bank_switching(0x1C); /* Mode 28 */
-
-    // install the micro player, 6502 assembly code
-    c64->mem_->write_byte_no_io(0x0202, 0xA9);               // 0xA9 LDA imm load A with the song number
-    c64->mem_->write_byte_no_io(0x0203, 0);                  // 0xNN #NN song number
-
-    c64->mem_->write_byte_no_io(0x0204, 0x20);               // 0x20 JSR abs jump sub to INIT routine
-    c64->mem_->write_byte_no_io(0x0205, pl_initaddr & 0xFF);        // $xxNN init address lo
-    c64->mem_->write_byte_no_io(0x0206, (pl_initaddr >> 8) & 0xFF); // $NNxx init address hi
-
-    c64->mem_->write_byte_no_io(0x0207, 0x58);               // 0x58 CLI enable interrupts
-    c64->mem_->write_byte_no_io(0x0208, 0xEA);               // 0xEA NOP impl
-    c64->mem_->write_byte_no_io(0x0209, 0x4C);               // JMP jump to 0x0208
-    c64->mem_->write_byte_no_io(0x020A, 0x08);               // 0xxxNN address lo
-    c64->mem_->write_byte_no_io(0x020B, 0x02);               // 0xNNxx address hi
-
-    c64->mem_->write_byte_no_io(0x020C, 0xEA);               // 0xEA NOP // 0xA9 LDA imm // A = 1
-    c64->mem_->write_byte_no_io(0x020D, 0xEA);               // 0xEA NOP // 0x01 #NN
-    c64->mem_->write_byte_no_io(0x020E, 0xEA);               // 0xEA NOP // 0x78 SEI disable interrupt
-    c64->mem_->write_byte_no_io(0x020F, 0x20);               // 0x20 JSR jump sub to play routine
-    c64->mem_->write_byte_no_io(0x0210, pl_playaddr & 0xFF);        // $xxNN play address lo
-    c64->mem_->write_byte_no_io(0x0211, (pl_playaddr >> 8) & 0xFF); // $NNxx play address hi
-    c64->mem_->write_byte_no_io(0x0212, 0xEA);               // 0xEA NOP // 0x58 CLI enable interrupt
-    c64->mem_->write_byte_no_io(0x0213, 0x40);               // 0x40 RTI return from interrupt
-  }
-  // c64->emulate();
-  // delete sidfile_;
-  c64->sid_->sid_flush();
-  c64->sid_->set_playing(true);
-  c64->cpu_->pc(c64->mem_->read_word(Memory::kAddrResetVector));
   (void) heapafter();
-  if (run_continuously) {c64->start();};
+  (void) getFreeStack();
+
   return;
 }
 #endif /* ONBOARD_SIDPLAYER */

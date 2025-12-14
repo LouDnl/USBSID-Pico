@@ -46,7 +46,7 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
 * [Changelog](CHANGELOG.md)
 
 # Software support and features
-![USBSID-Pico](images/pcbv1.3-neon.png)  
+![USBSID-Pico](images/pcbv1.3-pdsid.png)  
 See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for more information on how to use supported software!  
 #### SID Playing
 USBSID-Pico supports various ways of playing SID files.
@@ -57,15 +57,15 @@ USBSID-Pico supports various ways of playing SID files.
 - [SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux & Windows with up to 4 SIDs supported (Windows version is buggy).  
 #### C64 emulators
 Several Commodore 64 emulatores have official support  
-[<img src="images/vice.svg" width="20%">](https://github.com/VICE-Team/svn-mirror/releases)
-[<img src="images/jsidplay2.png" width="20%">](https://haendel.ddns.net/~ken/#_latest_beta_versions)
-[<img src="images/denise.png" width="20%">](https://sourceforge.net/projects/deniseemu/)
-- [Vice](https://github.com/VICE-Team/svn-mirror/releases) has official support starting at tag [r45763](https://github.com/VICE-Team/svn-mirror/releases/tag/r45763) and up, up to 3 SIDs are supported in vsid and up to 4 in x64sc.  
-- [JSidplay2](https://haendel.ddns.net/~ken/#_latest_beta_versions) has official support in latest Java beta versions, up to 4 sids.
-- [Denise](https://sourceforge.net/projects/deniseemu/) has official support in [Windows](https://ci.appveyor.com/project/piciji/denise/history) and [Linux](https://sourceforge.net/projects/deniseemu/files/nightlies/) nightly builds and in [code repo](https://bitbucket.org/piciji/denise/src/master/), up to 4 sids.  
+
+| Vice | JSIDPlay2 | Denise | (lib)sidplayfp |  
+|:-:|:-:|:-:|:-:|  
+| [<img src="images/vice.svg" width="100em">](https://github.com/VICE-Team/svn-mirror/releases) | [<img src="images/jsidplay2.png" width="100em">](https://haendel.ddns.net/~ken/#_latest_beta_versions) | [<img src="images/denise.png" width="100em">](https://sourceforge.net/projects/deniseemu/) | [<img src="images/libsidplayfp.png" width="100em">](https://github.com/libsidplayfp/) |
+| from tag [r45763](https://github.com/VICE-Team/svn-mirror/releases) and up | version [4.13](https://sourceforge.net/projects/jsidplay2/files/jsidplay2/4.13/) | version [2.7](https://sourceforge.net/projects/deniseemu/) | player [2.16](https://github.com/libsidplayfp/libsidplayfp/releases/tag/v2.16.0rc)<br>lib [2.16](https://github.com/libsidplayfp/sidplayfp/releases/tag/v2.16.0rc) |  
+| up to 4 SIDs in x64sc<br>up to 3 SIDs in vsid | up to 4 SIDs | up to 4 SIDs | up to 4 SIDs | 
+
 
 And some have unofficial support through forks on my Github
-- Unofficial support is added to a fork of [sidplayfp](https://github.com/LouDnl/sidplayfp-usbsid) which requires a fork of [libsidplayfp](https://github.com/LouDnl/libsidplayfp-usbsid).  
 - Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouDnl/RetroDebugger), up to 4 SIDs are supported.
 
 #### C64 Music trackers
@@ -188,8 +188,8 @@ After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py
 ## Where to buy
 #### My Tindie store
 You can purchase/pre-order (semi) assembled boards minus Pico via my [Tindie store](https://www.tindie.com/stores/loud/)!  
-[<img src="images/tindie.png" width="10%">](https://www.tindie.com/stores/loud/)  
-Partially sponsored by [<img src="images/pcbway.png" width="10%">](images/pcbway.png)
+[<img src="images/tindie.png" width="150em">](https://www.tindie.com/stores/loud/)  
+Partially sponsored by [<img src="images/pcbway.png" width="150em">](images/pcbway.png)
 #### PCBWay
 At a minimum of 5 bare or assembled boards it is also possible to purchase PCB's at PCBWay  
 No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral link](https://pcbway.com/g/2458i7) to register, thanks!  
@@ -280,16 +280,16 @@ the open source KiCad design files and gerbers documents below.
 
 ## PCB Development
 * v1.3b release board<br>
-  [<img src="images/v1.3b-top.png" width="30%">](images/v1.3b-top.png) 
+  [<img src="images/v1.3b-top.png" width="50%">](images/v1.3b-top.png) 
 * v1.2 testboard<br>
-  [<img src="images/v1.2-top.png" width="30%">](images/v1.2-top.png) 
+  [<img src="images/v1.2-top.png" width="50%">](images/v1.2-top.png) 
 * v1.1 unfinished and skipped
 * v1.0 release board<br>
-  [<img src="images/v1.0-top.png" width="30%">](images/v1.0-top.png) 
+  [<img src="images/v1.0-top.png" width="50%">](images/v1.0-top.png) 
 * v0.2 improved testboard<br>
-  [<img src="images/v0.2-top.png" width="30%">](images/v0.2-top.png) 
+  [<img src="images/v0.2-top.png" width="50%">](images/v0.2-top.png) 
 * v0.1 testboard<br>
-  [<img src="images/v0.1-top.png" width="30%">](images/v0.1-top.png) 
+  [<img src="images/v0.1-top.png" width="50%">](images/v0.1-top.png) 
 
 # Examples
 Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-29KQ), [other socials](https://github.com/LouDnl) or the [SHOWCASE](SHOWCASE.md) page to see more examples of the board in action.
@@ -320,12 +320,12 @@ Any code in this repository that is not written by me automatically falls under 
 For for more information about this license please read the LICENSE document in the root of the USBSID-Pico repository.
 
 ### USBSID-Pico v1.3 PCB Hardware License ~ Creative Commons
-<a href="https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/USBSID-Pico-v1.3">USBSID-Pico v1.3 PCB</a> © 2025 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/">Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/nc.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/nd.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;">
+<a href="https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/USBSID-Pico-v1.3">USBSID-Pico v1.3 PCB</a> © 2025 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/">Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/nc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/nd.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;">
 
 ### USBSID-Pico v1.0 PCB Hardware License ~ Creative Commons
-<a href="https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/USBSID-Pico-v1.0">USBSID-Pico v1.0 PCB</a> © 2024 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;">  
+<a href="https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/USBSID-Pico-v1.0">USBSID-Pico v1.0 PCB</a> © 2024 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;">  
 
 # Certification
 ### USBSID-Pico v1.0 PCB OSHWA certification
-[<img src="hardware/USBSID-Pico-v1.0/logos/certification-mark-NL000035-stacked.png" width="25%">](https://certification.oshwa.org/nl000035.html)  
+[<img src="hardware/USBSID-Pico-v1.0/logos/certification-mark-NL000035-stacked.png" width="20%">](https://certification.oshwa.org/nl000035.html)  
 [OSHW] NL000035 | Certified open source hardware | [oshwa.org/cert](https://certification.oshwa.org/nl000035.html)

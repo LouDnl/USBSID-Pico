@@ -113,7 +113,7 @@ void filter_tests(uint8_t addr, uint8_t voices[3], int wf)
 {
   if (!running_tests) { reset_sid_registers(); return; };
   test_operation((sid_registers[MODVOL] + addr), 0x0F);  /* Volume to full */
-  DBG("FILTER TESTS %s\n", (wf == 0 ? "TRIANGLE" : wf == 2 ? "SAWTOOTH" : wf == 3 ? "PULSE" : "NOISE"));
+  DBG("FILTER TESTS %s\n", (wf == 0 ? "TRIANGLE" : wf == 1 ? "SAWTOOTH" : wf == 2 ? "PULSE" : "NOISE"));
   for (int fq = 15; fq <= 45; fq += 15) {
     if (!running_tests) { reset_sid_registers(); return; };
     DBG("HIGH FILTER FREQUENCY = %d\n", fq);
