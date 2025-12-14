@@ -543,6 +543,7 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   if(USE_PIO_UART EQUAL 1)
   pico_generate_pio_header(${BUILD} ${PIO_UART})
   endif()
+  pico_generate_pio_header(${BUILD} ${PIO_COUNTER})
   if(PICOTYPE STREQUAL "RGB")
     pico_generate_pio_header(${BUILD} ${PIO_RGB})
   endif()
