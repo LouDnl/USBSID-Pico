@@ -33,6 +33,8 @@
 !src/pio
 !lib
 !lib/emulator
+!lib/emudore-embedded
+!lib/emudore-embedded/**
 !lib/emulator/flash
 !lib/emulator/sidtunes
 !doc
