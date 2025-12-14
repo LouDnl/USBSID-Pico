@@ -24,7 +24,6 @@
  */
 
 #include "globals.h"
-#include "gpio.h"
 #include "config.h"
 #include "usbsid.h"
 #include "sid.h"

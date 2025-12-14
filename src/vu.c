@@ -26,7 +26,6 @@
 #include <math.h>
 #include "globals.h"
 #include "config.h"
-#include "gpio.h"
 #include "logging.h"
 #include "sid.h"
 #include "vu.pio.h"      /* Vu LED handler */

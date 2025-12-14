@@ -329,7 +329,10 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/config_socket.c
   ${CMAKE_CURRENT_LIST_DIR}/src/config_logging.c
   ${CMAKE_CURRENT_LIST_DIR}/src/gpio.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/pio.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/dma.c
   ${CMAKE_CURRENT_LIST_DIR}/src/vu.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/bus.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi_handler.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid.c

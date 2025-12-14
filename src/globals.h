@@ -34,14 +34,27 @@
 
 /* Default includes */
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
+
 /* Default Pico includes */
 #include "pico/stdlib.h"
+#include "pico/types.h"
 #if PICO_RP2350
 #include "hardware/structs/powman.h"
 #endif
 
+/* Hardware api's */
+#include "hardware/gpio.h"   /* General Purpose Input/Output (GPIO) API */
+#include "hardware/pio.h"    /* Programmable I/O (PIO) API */
+#include "hardware/dma.h"    /* DMA Controller API */
+#include "hardware/pwm.h"    /* Hardware Pulse Width Modulation (PWM) API */
+#include "hardware/irq.h"    /* Hardware interrupt handling */
+#include "hardware/structs/iobank0.h"
+
+/* project headers to always include */
 #include "macros.h"
+#include "gpio.h"
 
 
 /* Compile time variable settings */

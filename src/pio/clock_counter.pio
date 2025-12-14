@@ -1,0 +1,42 @@
+;
+; USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board
+; for interfacing one or two MOS SID chips and/or hardware SID emulators over
+; (WEB)USB with your computer, phone or ASID supporting player
+;
+; cycle_counter.pio
+; This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
+; File author: LouD
+;
+; Copyright (c) 2024-2025 LouD
+;
+; This program is free software: you can redistribute it and/or modify
+; it under the terms of the GNU General Public License as published by
+; the Free Software Foundation, version 2.
+;
+; This program is distributed in the hope that it will be useful, but
+; WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+; General Public License for more details.
+;
+; You should have received a copy of the GNU General Public License
+; along with this program. If not, see <http://www.gnu.org/licenses/>.
+;
+
+.define PUBLIC CLK 22
+
+; Infinite cycle counter, wraps at 32bit and starts over
+.program cycle_counter
+.wrap_target
+init:
+    set x 0          ; Set X to 0
+    mov y ~x         ; Set Y to not 0
+    jmp while        ; Start while loop
+incr:
+    wait 0 gpio CLK  ; Wait for clock to go low
+    wait 1 gpio CLK  ; Wait for clock to go high
+    mov isr, ~x      ; Move value of not X into ISR
+    push block       ; Push X register to FIFO and wait for it to be picked up by the DMA
+    jmp x-- while    ; Decrease X and jump to while loop
+while:
+    jmp y-- incr     ; Decrease Y and jump to incr loop
+.wrap

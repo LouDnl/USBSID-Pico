@@ -24,17 +24,12 @@
  */
 
 
-#include "hardware/gpio.h"
-#include "hardware/pio.h"
-
 #include "globals.h"
 #include "config.h"
-#include "gpio.h"
 #include "usbsid.h"
 #include "midi.h"
 #include "sid.h"
 #include "logging.h"
-#include "macros.h"
 
 
 /* Config */

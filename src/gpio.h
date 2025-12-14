@@ -32,49 +32,6 @@
 #endif
 
 
-/* Default includes */
-#include <stdint.h>
-#include <stdio.h>
-
-/* Pico libs */
-#include "pico/stdlib.h"
-#include "pico/types.h"
-
-/* Pico W devices use a GPIO on the WIFI chip for the LED,
- * so when building for Pico W, CYW43_WL_GPIO_LED_PIN will be defined */
-#ifdef CYW43_WL_GPIO_LED_PIN
-#include "pico/cyw43_arch.h"
-#endif
-
-/* Hardware api's */
-#include "hardware/gpio.h"   /* General Purpose Input/Output (GPIO) API */
-#include "hardware/pio.h"    /* Programmable I/O (PIO) API */
-#include "hardware/dma.h"    /* DMA Controller API */
-#include "hardware/pwm.h"    /* Hardware Pulse Width Modulation (PWM) API */
-#include "hardware/irq.h"    /* Hardware interrupt handling */
-#include "hardware/structs/iobank0.h"
-
-/* PIO */
-#include "bus_control.pio.h" /* Busje komt zo! */
-#include "clock.pio.h"       /* TikTak */
-#include "vu.pio.h"          /* Kiem em goan! */
-#if defined(USE_RGB)
-#include "vu_rgb.pio.h"      /* Ik zie regenbogen! */
-#endif
-
-
-/* PIO & Statemachine usage
- * PIO0
- * SM0: SID clock
- * SM1: Control bus
- * SM2: Data bus
- * SM3: Delay timer
- * PIO1
- * SM0: RGB LED control
- * SM1: LED PWM control
- * SM2: Uart RX
- */
-
 /* Uart 0 */
 #define TX 16  /* uart 0 tx */
 #define RX 17  /* uart 0 rx */
@@ -104,11 +61,11 @@
 #define A5 13  /* $D420+ or FM on SKPico */
 
 /* IO bus */
-#define RES 18  /* Reset */
-#define RW  19  /* Read/ Write enable */
-#define CS1 20  /* Chip Select for 1 or 1 & 2 with SKPico */
-#define CS2 21  /* Chip Select for 2 or 3 & 4 with SKPico */
-#define PHI 22  /* Pico 1Mhz PWM out ~ External Clock In */
+#define RES  18  /* Reset */
+#define RW   19  /* Read/ Write enable */
+#define CS1  20  /* Chip Select for 1 or 1 & 2 with Clone SID */
+#define CS2  21  /* Chip Select for 2 or 3 & 4 with Clone SID */
+#define PHI1 22  /* Pico 1Mhz PWM out ~ External Clock In (v1.0 only) */
 
 /* Audio switch (v1.3+ only) */
 #if defined(HAS_AUDIOSWITCH)
@@ -142,13 +99,22 @@
 
 /* Util */
 #define bPIN(P) (1 << P)
-#define sPIN(P) { sio_hw->gpio_set  = (1 << P); }
-#define cPIN(P) { sio_hw->gpio_clr  = (1 << P); }
-#define tPIN(P) { sio_hw->gpio_togl = (1 << P); }
-
-/* IRQ's */
-#define PIO_IRQ0 0
-#define PIO_IRQ1 1
+#if PICO_USE_GPIO_COPROCESSOR
+// #define sPIN(P) { gpio_set_mask(1 << P); } /* gpioc_lo_out_set */
+// #define cPIN(P) { gpio_clr_mask(1 << P); }
+// #define tPIN(P) { gpioc_lo_out_xor(1 << P); }
+#define sPIN(P) { pico_default_asm_volatile ("mcr p0, #2, %0, c0, c0" : : "r" (1ul << P)); } /* gpioc_lo_out_set */
+#define cPIN(P) { pico_default_asm_volatile ("mcr p0, #3, %0, c0, c0" : : "r" (1ul << P)); } /* gpio_clr_mask */
+// #if RP2350
+// #define tPIN(P) { pico_default_asm_volatile ("mcr p0, #5, %0, c0, c0" : : "r" (P)); } /* gpioc_hilo_out_xor(1ull << pin); */
+// #else
+#define tPIN(P) { pico_default_asm_volatile ("mcr p0, #1, %0, c0, c0" : : "r" (1ul << P)); } /* gpioc_lo_out_xor */
+// #endif
+#else
+#define sPIN(P) { sio_hw->gpio_set  = (1ul << P); }
+#define cPIN(P) { sio_hw->gpio_clr  = (1ul << P); }
+#define tPIN(P) { sio_hw->gpio_togl = (1ul << P); } /* BUG: This _can_ cause a hardfault on rp2350 */
+#endif
 
 
 #ifdef __cplusplus

@@ -24,12 +24,8 @@
  */
 
 
-#include "hardware/gpio.h"
-#include "hardware/pio.h"
-
 #include "globals.h"
 #include "config.h"
-#include "gpio.h"
 #include "usbsid.h"
 #include "midi.h"
 #include "sid.h"
@@ -212,22 +208,22 @@ static void autoset_sid_default_address(void)
 static void autoset_sid_id(void)
 { /* NOTE: DO NOT USE, UNTESTED AND UNUSED */
   /* Set SID id's based on above config */
-  cfg.sidid[0] = (cfg.sock_one ? 0 : -1);
-  cfg.sidid[1] = ((cfg.sock_one && cfg.sock_one_dual) ? 1 : -1);
-  cfg.sidid[2] = (cfg.mirrored ? 0
-    : (cfg.sock_two && cfg.sock_one && cfg.sock_one_dual) ? 2
-    : (cfg.sock_two && !cfg.sock_one) ? 0
-    : (cfg.sock_two && cfg.sock_one && !cfg.sock_one_dual) ? 1
-    : -1);
-  cfg.sidid[3] = (cfg.mirrored ? 1
-    : (cfg.sock_two && cfg.sock_two_dual && cfg.sock_one && cfg.sock_one_dual) ? 3
-    : (cfg.sock_two && cfg.sock_two_dual && !cfg.sock_one) ? 1
-    : (cfg.sock_two && cfg.sock_two_dual && cfg.sock_one && !cfg.sock_one_dual) ? 2
-    : -1);
-  usbsid_config.socketOne.sid1.id = cfg.sidid[0];
-  usbsid_config.socketOne.sid2.id = cfg.sidid[1];
-  usbsid_config.socketTwo.sid1.id = cfg.sidid[2];
-  usbsid_config.socketTwo.sid2.id = cfg.sidid[3];
+  // cfg.sidid[0] = (cfg.sock_one ? 0 : -1);
+  // cfg.sidid[1] = ((cfg.sock_one && cfg.sock_one_dual) ? 1 : -1);
+  // cfg.sidid[2] = (cfg.mirrored ? 0
+  //   : (cfg.sock_two && cfg.sock_one && cfg.sock_one_dual) ? 2
+  //   : (cfg.sock_two && !cfg.sock_one) ? 0
+  //   : (cfg.sock_two && cfg.sock_one && !cfg.sock_one_dual) ? 1
+  //   : -1);
+  // cfg.sidid[3] = (cfg.mirrored ? 1
+  //   : (cfg.sock_two && cfg.sock_two_dual && cfg.sock_one && cfg.sock_one_dual) ? 3
+  //   : (cfg.sock_two && cfg.sock_two_dual && !cfg.sock_one) ? 1
+  //   : (cfg.sock_two && cfg.sock_two_dual && cfg.sock_one && !cfg.sock_one_dual) ? 2
+  //   : -1);
+  // usbsid_config.socketOne.sid1.id = cfg.sidid[0];
+  // usbsid_config.socketOne.sid2.id = cfg.sidid[1];
+  // usbsid_config.socketTwo.sid1.id = cfg.sidid[2];
+  // usbsid_config.socketTwo.sid2.id = cfg.sidid[3];
 
   return;
 }
