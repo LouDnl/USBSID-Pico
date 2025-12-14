@@ -430,12 +430,13 @@ set(TARGET_LL
 )
 
 ### Pio files
-set(PIO_BUS ${CMAKE_CURRENT_LIST_DIR}/src/pio/bus_control.pio)
-set(PIO_CLOCK ${CMAKE_CURRENT_LIST_DIR}/src/pio/clock.pio)
-set(PIO_VU ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu.pio)
-set(PIO_RGB ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu_rgb.pio)
+set(PIO_BUS     ${CMAKE_CURRENT_LIST_DIR}/src/pio/bus_control.pio)
+set(PIO_CLOCK   ${CMAKE_CURRENT_LIST_DIR}/src/pio/clock.pio)
+set(PIO_VU      ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu.pio)
+set(PIO_RGB     ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu_rgb.pio)
+set(PIO_COUNTER ${CMAKE_CURRENT_LIST_DIR}/src/pio/clock_counter.pio)
 if(USE_PIO_UART EQUAL 1)
-set(PIO_UART ${CMAKE_CURRENT_LIST_DIR}/src/pio/uart_rx.pio)
+set(PIO_UART    ${CMAKE_CURRENT_LIST_DIR}/src/pio/uart_rx.pio)
 endif()
 
 ### Pico sdk path
