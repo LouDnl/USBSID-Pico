@@ -46,7 +46,7 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
 * [Changelog](CHANGELOG.md)
 
 # Software support and features
-![USBSID-Pico](images/pcbv1.3-neon.png)  
+![USBSID-Pico](images/pcbv1.3-pdsid.png)  
 See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for more information on how to use supported software!  
 #### SID Playing
 USBSID-Pico supports various ways of playing SID files.
@@ -58,15 +58,14 @@ USBSID-Pico supports various ways of playing SID files.
 #### C64 emulators
 Several Commodore 64 emulatores have official support  
 
-| Vice | JSIDPlay2 | Denise |
-|:-:|:-:|:-:|  
-| [<img src="images/vice.svg" width="100em">](https://github.com/VICE-Team/svn-mirror/releases) | [<img src="images/jsidplay2.png" width="100em">](https://haendel.ddns.net/~ken/#_latest_beta_versions) | [<img src="images/denise.png" width="100em">](https://sourceforge.net/projects/deniseemu/) |
-| fomr tag [r45763](https://github.com/VICE-Team/svn-mirror/releases) and up | latest Java [beta](https://haendel.ddns.net/~ken/#_latest_beta_versions) version | version [2.7](https://sourceforge.net/projects/deniseemu/) |
-| up to 4 SIDs in x64sc<br>up to 3 SIDs in vsid | up to 4 SIDs | up to 4 SIDs |
+| Vice | JSIDPlay2 | Denise | (lib)sidplayfp |  
+|:-:|:-:|:-:|:-:|  
+| [<img src="images/vice.svg" width="100em">](https://github.com/VICE-Team/svn-mirror/releases) | [<img src="images/jsidplay2.png" width="100em">](https://haendel.ddns.net/~ken/#_latest_beta_versions) | [<img src="images/denise.png" width="100em">](https://sourceforge.net/projects/deniseemu/) | [<img src="images/libsidplayfp.png" width="100em">](https://github.com/libsidplayfp/) |
+| from tag [r45763](https://github.com/VICE-Team/svn-mirror/releases) and up | version [4.13](https://sourceforge.net/projects/jsidplay2/files/jsidplay2/4.13/) | version [2.7](https://sourceforge.net/projects/deniseemu/) | player [2.16](https://github.com/libsidplayfp/libsidplayfp/releases/tag/v2.16.0rc)<br>lib [2.16](https://github.com/libsidplayfp/sidplayfp/releases/tag/v2.16.0rc) |  
+| up to 4 SIDs in x64sc<br>up to 3 SIDs in vsid | up to 4 SIDs | up to 4 SIDs | up to 4 SIDs | 
 
 
 And some have unofficial support through forks on my Github
-- Unofficial support is added to a fork of [sidplayfp](https://github.com/LouDnl/sidplayfp-usbsid) which requires a fork of [libsidplayfp](https://github.com/LouDnl/libsidplayfp-usbsid).  
 - Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouDnl/RetroDebugger), up to 4 SIDs are supported.
 
 #### C64 Music trackers
