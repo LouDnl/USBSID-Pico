@@ -1,10 +1,8 @@
 ![USBSID-Pico](images/pcbv1.3.jpg)<br>
-![USBSID-Pico](images/usbsid.png)![LouD](images/loud.png)
-# USBSID-Pico
+# [<img src="images/usbsid-logo.png" width="250em">](images/usbsid-logo.png)![LouD](images/loud.png)
 USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board for interfacing one or two MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer, phone, ASID supporting player or USB midi controller.  
 
 # This is USBSID-Pico! :)
-
 | **“Raster Bar” (8-bit)** | **Van Halen's Jump<br>dual SID in Stereo!** | **Next Level** | **Outerversal<br>dual SID in Stereo!** |
 |:-:|:-:|:-:|:-:|
 | [<img src="https://img.youtube.com/vi/nh0SxO1y6I0/0.jpg" width=75%>](https://www.youtube.com/watch?v=nh0SxO1y6I0)<br><small><sub>by LukHash</sub></small> | [<img src="https://img.youtube.com/vi/lzvkWlDq2TM/0.jpg" width=75%>](https://www.youtube.com/watch?v=lzvkWlDq2TM)<br><small><sub>by Nordischsound</sub></small> | [<img src="https://img.youtube.com/vi/ER8v2g7TlwA/0.jpg" width=75%>](https://www.youtube.com/watch?v=ER8v2g7TlwA)<br><small><sub>by Performers</sub> | [<img src="https://img.youtube.com/vi/h2ThT3TWZEw/0.jpg" width=75%>](https://www.youtube.com/watch?v=h2ThT3TWZEw)<br><small><sub>by Abyxus</sub></small> |
@@ -13,14 +11,31 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
 |:-:|:-:|:-:|:-:|
 | [<img src="https://img.youtube.com/vi/7hiAkLAqsiI/0.jpg" width=75%>](https://www.youtube.com/watch?v=7hiAkLAqsiI)<br><small><sub>by Censor Design</sub></small> | [<img src="https://img.youtube.com/vi/4gckiwzOW9U/0.jpg" width=75%>](https://www.youtube.com/watch?v=4gckiwzOW9U)<br><small><sub>by Censor Design</sub></small> | [<img src="https://img.youtube.com/vi/q4Fg7V2DYCI/0.jpg" width=75%>](https://www.youtube.com/watch?v=q4Fg7V2DYCI)<br><small><sub>by Censor Design</sub> | [<img src="https://img.youtube.com/vi/RTtmsbH4jC0/0.jpg" width=75%>](https://www.youtube.com/watch?v=RTtmsbH4jC0)<br><small><sub>by Censor Design</sub></small> |
 
-# Index
+# Swag!
+Do you like swag!? I sure do!! [greyandslate](https://bsky.app/profile/greyandslate.bsky.social) created these great t-shirt designs which are available for purchase in his [Etsy shop](https://greyandslate.etsy.com/?search_query=usbsid), link below.  
+**Use coupon code USBSID15 for a 15% discount!**  
+Shop link: [https://greyandslate.etsy.com/?search_query=usbsid](https://greyandslate.etsy.com/?search_query=usbsid)  
+[<img src="images/tees/usbsid-pico-tshirt-sids_logo.jpg" width="250em">](https://www.etsy.com/nl/listing/4426327828/usbsid-pico-met-mos-sid-chips-t-shirt?etsrc=sdt)
+[<img src="images/tees/usbsid-pico-tshirt-board_logo.jpg" width="250em">](https://www.etsy.com/nl/listing/4426318364/retrocomputing-t-shirt-usbsid-pico-sid?etsrc=sdt)<br>
+[<img src="images/tees/usbsid-pico-tshirt-logo.jpg" width="250em">](https://www.etsy.com/nl/listing/4426327960/t-shirt-usbsid-pico-logo-chiptune?etsrc=sdt)
+[<img src="images/tees/usbsid-pico-tshirt-board.jpg" width="250em">](https://www.etsy.com/nl/listing/4426320773/usbsid-pico-chiptune-board-t-shirt-met?etsrc=sdt)
 
+# Index
 * [Software support & Features](#software-support-and-features)
   * [Software manual](doc/USBSID-Pico-software-manual.adoc) [PDF](doc/USBSID-Pico-software-manual.pdf)
+  * [SID Playing](#sid-playing)
+  * [C64 emulators](#c64-emulators)
+  * [C64 Music trackers](#c64-music-trackers)
+  * [Amiga](#amiga)
+  * [Driver code](#driver-code)
+  * [Midi](#midi)
 * [Questions & Support](#questions-and-support)
 * [Project status](#project-status)
   * [Known issues](#known-issues)
   * [Code status](#code-status)
+  * [Supported platforms](#supported-platforms)
+  * [Linux Udev rules](#linux-udev-rules)
+  * [Windows driver](#windows-driver)
 * [Firmware](#firmware)
   * [Configuring your board's firmware](#configuring-your-boards-firmware)
     * [Testing your board](#testing-your-board)
@@ -30,10 +45,10 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
   * [How to configure your board](doc/USBSID-Pico-firmware-manual.adoc) [(PDF)](doc/USBSID-Pico-firmware-manual.pdf)
   * [Building](#building)
 * [Hardware](#hardware)
+  * [Where to buy](#where-to-buy)
   * [PCB usage information](#pcb-usage-information)
     * [PCB revision v1.0 manual](#pcb-revision-v10-manual)
     * [PCB revision v1.3 manual](#pcb-revision-v13-manual)
-  * [Where to buy](#where-to-buy)
   * [Cases](#cases)
   * [PCB Features](#pcb-features)
   * [Open source design files, schematic and BOM](#open-source-design-files-schematic-and-bom)
@@ -189,7 +204,7 @@ After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py
 #### My Tindie store
 You can purchase/pre-order (semi) assembled boards minus Pico via my [Tindie store](https://www.tindie.com/stores/loud/)!  
 [<img src="images/tindie.png" width="150em">](https://www.tindie.com/stores/loud/)  
-Partially sponsored by [<img src="images/pcbway.png" width="150em">](images/pcbway.png)
+Sponsored by [<img src="images/pcbway.png" width="150em">](images/pcbway.png)
 #### PCBWay
 At a minimum of 5 bare or assembled boards it is also possible to purchase PCB's at PCBWay  
 No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral link](https://pcbway.com/g/2458i7) to register, thanks!  
