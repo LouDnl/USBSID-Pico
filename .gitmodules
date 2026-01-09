@@ -1,21 +1,3 @@
-[submodule "examples/sidberry"]
-  path = examples/sidberry
-  url = https://github.com/LouDnl/SidBerry
-[submodule "examples/vice"]
-  path = examples/vice
-  url = https://github.com/LouDnl/Vice-USBSID.git
-[submodule "examples/retrodebugger"]
-  path = examples/retrodebugger
-  url = git@github.com:LouDnl/RetroDebugger.git
-[submodule "examples/USBSID-Pico-driver"]
-  path = examples/USBSID-Pico-driver
-  url = https://github.com/LouDnl/USBSID-Pico-driver.git
 [submodule "examples/config-tool/inih"]
   path = examples/config-tool/inih
   url = https://github.com/benhoyt/inih.git
-[submodule "examples/libsidplayfp"]
-  path = examples/libsidplayfp
-  url = https://github.com/LouDnl/libsidplayfp-usbsid.git
-[submodule "examples/sidplayfp"]
-  path = examples/sidplayfp
-  url = https://github.com/LouDnl/sidplayfp-usbsid.git
