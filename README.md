@@ -75,10 +75,9 @@ Several Commodore 64 emulatores have official support
 
 | Vice | JSIDPlay2 | Denise | (lib)sidplayfp |  
 |:-:|:-:|:-:|:-:|  
-| [<img src="images/vice.svg" width="100em">](https://github.com/VICE-Team/svn-mirror/releases) | [<img src="images/jsidplay2.png" width="100em">](https://haendel.ddns.net/~ken/#_latest_beta_versions) | [<img src="images/denise.png" width="100em">](https://sourceforge.net/projects/deniseemu/) | [<img src="images/libsidplayfp.png" width="100em">](https://github.com/libsidplayfp/) |
-| from tag [r45763](https://github.com/VICE-Team/svn-mirror/releases) and up | version [4.13](https://sourceforge.net/projects/jsidplay2/files/jsidplay2/4.13/) | version [2.7](https://sourceforge.net/projects/deniseemu/) | player [2.16](https://github.com/libsidplayfp/libsidplayfp/releases/tag/v2.16.0rc)<br>lib [2.16](https://github.com/libsidplayfp/sidplayfp/releases/tag/v2.16.0rc) |  
-| up to 4 SIDs in x64sc<br>up to 3 SIDs in vsid | up to 4 SIDs | up to 4 SIDs | up to 4 SIDs | 
-
+| [<img src="images/vice.svg" width="100em">](https://github.com/VICE-Team/svn-mirror/releases/tag/3.10.0) | [<img src="images/jsidplay2.png" width="100em">](https://haendel.ddns.net/~ken/#_latest_beta_versions) | [<img src="images/denise.png" width="100em">](https://sourceforge.net/projects/deniseemu/) | [<img src="images/libsidplayfp.png" width="100em">](https://github.com/libsidplayfp/) |
+| version [3.10.0](https://github.com/VICE-Team/svn-mirror/releases/tag/3.10.0) | version [4.13](https://sourceforge.net/projects/jsidplay2/files/jsidplay2/4.13/) | version [2.7](https://sourceforge.net/projects/deniseemu/) | player [2.16](https://github.com/libsidplayfp/libsidplayfp/releases/tag/v2.16.0rc)<br>lib [2.16](https://github.com/libsidplayfp/sidplayfp/releases/tag/v2.16.0rc) |  
+| up to 4 SIDs in x64sc<br>up to 3 SIDs in vsid | up to 4 SIDs | up to 4 SIDs | up to 4 SIDs |  
 
 And some have unofficial support through forks on my Github
 - Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouDnl/RetroDebugger), up to 4 SIDs are supported.
@@ -159,7 +158,8 @@ Android: USB Midi, WebUSB & ASID (in webbrowser) SID Play
 Amiga: PlaySID library
 
 #### Linux Udev rules
-See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for udev rule installation information!
+See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for udev rule installation information!  
+An example rule file can be found [here](examples/udev-rules/69-usbsid-permissions.rules).
 
 #### Windows driver
 See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for driver installation information!
@@ -188,7 +188,7 @@ The firmware is still in development so features might change, be added or remov
 - Two SID sockets with up to 4 SID's (e.g. SKPico) supported
   - Socket one address range $00 ~ $7F (default $00 ~ $1F) auto based on configuration settings
   - Socket two address range $00 ~ $7F (default $40 ~ $7F) auto based on configuration settings
-  - Configurable via [config-tool](repo/examples/config-tool) for Linux and Windows
+  - Configurable via [config-tool](examples/config-tool) for Linux and Windows
 - Onboard LED acts as VU meter calculated by the voices of SID1 (Pico & Pico2 only)
 - Onboard RGB LED acts as second VU meter calculated by the voices of SID1 (default)
   - Requires Black Pico clone board with RGB LED onboard!
