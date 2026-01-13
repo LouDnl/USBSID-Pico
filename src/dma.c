@@ -108,6 +108,7 @@ void setup_dmachannels(void)
     //#endif
     dma_channel_configure(dma_tx_delay, &tx_config_delay, &bus_pio->txf[sm_delay], NULL, 1, false);
   }
+  #if RP2350 /* Not endless transfer not supported on rp2040 */
   { /* dma rx clock counter ~ should be an endless updating item */
     dma_channel_config clkcnt_config_data = dma_channel_get_default_config(dma_clkcnt_control);
     channel_config_set_transfer_data_size(&clkcnt_config_data, DMA_SIZE_32);
@@ -128,6 +129,7 @@ void setup_dmachannels(void)
       // false
     );
   }
+  #endif
 
   CFG("[DMA CHANNELS CLAIMED] C:%d TX:%d RX:%d D:%d CNT:%d\n",
     dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay, dma_clkcnt_control);
@@ -170,7 +172,11 @@ void setup_vu_dma(void)
  * @returns uint32_t */
 uint32_t clockcycles(void)
 {
+  #if RP2350
   return (uint32_t)clkcnt_word;
+  #else
+  return 0; /* Not supported on rp2040 */
+  #endif
 }
 
 /**
