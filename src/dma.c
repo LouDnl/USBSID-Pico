@@ -108,7 +108,7 @@ void setup_dmachannels(void)
     //#endif
     dma_channel_configure(dma_tx_delay, &tx_config_delay, &bus_pio->txf[sm_delay], NULL, 1, false);
   }
-  #if RP2350 /* Not endless transfer not supported on rp2040 */
+  #if RP2350 /* NOTE: endless transfer not supported on rp2040 */
   { /* dma rx clock counter ~ should be an endless updating item */
     dma_channel_config clkcnt_config_data = dma_channel_get_default_config(dma_clkcnt_control);
     channel_config_set_transfer_data_size(&clkcnt_config_data, DMA_SIZE_32);
