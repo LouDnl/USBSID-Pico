@@ -6,7 +6,7 @@
   url = https://github.com/LouDnl/Vice-USBSID.git
 [submodule "examples/retrodebugger"]
   path = examples/retrodebugger
-  url = git@github.com:LouDnl/RetroDebugger.git
+	url = https://github.com/LouDnl/RetroDebugger.git
 [submodule "examples/USBSID-Pico-driver"]
   path = examples/USBSID-Pico-driver
   url = https://github.com/LouDnl/USBSID-Pico-driver.git
