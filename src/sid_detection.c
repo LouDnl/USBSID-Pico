@@ -7,7 +7,7 @@
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
- * Copyright (c) 2024-2025 LouD
+ * Copyright (c) 2024-2026 LouD
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -335,6 +335,7 @@ void auto_detect_routine(bool auto_config, bool with_delay)
   if (auto_config) {
     CFG("[SID] SET AUTO CONFIG DEFAULT VALUES\n");
     usbsid_config.mirrored = false;           /* Yeah let's just disable that for now okay? */
+    usbsid_config.fauxstereo = false;         /* Yeah let's just disable that for now okay? */
 
     /* Socket One */
     usbsid_config.socketOne.enabled = true;   /* start enabled */
