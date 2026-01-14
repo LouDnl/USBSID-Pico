@@ -56,7 +56,8 @@ char cdc = 'C', asid = 'A', midi = 'M', sysex = 'S', wusb = 'W', uart = 'U';
 bool web_serial_connected = false;
 
 double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
-bool paused_state = false, reset_state = false;
+bool paused_state = false;
+volatile bool reset_state = false;
 bool auto_config = false;
 bool offload_ledrunner = false;
 
@@ -254,7 +255,7 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
   uint8_t command = ((sid_buffer[0] & PACKET_TYPE) >> 6);
   uint8_t subcommand = (sid_buffer[0] & COMMAND_MASK);
   uint8_t n_bytes = (sid_buffer[0] & BYTE_MASK);
-  while (reset_state == 1) { asm("nop"); };  /* Stall if in reset state */
+  while (reset_state) /* Stall if in reset state */ ;
 
   if (command == CYCLED_WRITE) {
     // n_bytes = (n_bytes == 0) ? 4 : n_bytes; /* if byte count is zero, this is a single write packet */

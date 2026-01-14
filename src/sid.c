@@ -36,7 +36,8 @@ extern uint8_t *sid_memory;
 #else
 extern uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));
 #endif
-extern bool paused_state, reset_state;
+extern bool paused_state;
+extern volatile bool reset_state;
 extern int usbdata;
 
 /* config.c */
