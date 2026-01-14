@@ -188,7 +188,7 @@ uint32_t clockcycles(void)
  */
 void clockcycle_delay(uint32_t n_cycles)
 { /* ISSUE: Will crap out if delay cycles wrap around __UINT32_MAX__ */
-  if (unlikely(n_cycles == 0)) return;
+  if __us_unlikely(n_cycles == 0) return;
   uint32_t now, end;
   now = end = clockcycles();
   // if ((end + n_cycles) > __UINT32_MAX__) // TODO: Finish

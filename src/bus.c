@@ -76,7 +76,7 @@ inline static int __not_in_flash_func(set_bus_bits)(uint8_t address, bool write)
 {
   /* CFG("[BUS BITS]$%02X:%02X ", address, data); */
   vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
-  if (likely(write)) {
+  if __us_likely(write) {
     control_word = 0b111000;
     dir_mask = 0b1111111111111111;  /* Always OUT never IN */
   } else {
@@ -89,23 +89,23 @@ inline static int __not_in_flash_func(set_bus_bits)(uint8_t address, bool write)
   if (is_muted && ((address & 0x1F) == 0x18)) data &= 0xF0; /* Mask volume register to 0 if muted */
   switch (address) {
     case 0x00 ... 0x1F:
-      if (unlikely(cfg.one == 0b110 || cfg.one == 0b111)) return 0;
+      if __us_unlikely(cfg.one == 0b110 || cfg.one == 0b111) return 0;
       data_word = (cfg.one_mask == 0x3f ? ((address & 0x1F) + 0x20) : (address & 0x1F)) << 8 | data;
       control_word |= cfg.one;
       break;
     case 0x20 ... 0x3F:
-      if (unlikely(cfg.two == 0b110 || cfg.two == 0b111)) return 0;
+      if __us_unlikely(cfg.two == 0b110 || cfg.two == 0b111) return 0;
       data_word = (cfg.two_mask == 0x3f ? ((address & 0x1F) + 0x20) : address & 0x1F) << 8 | data;
       control_word |= cfg.two;
       break;
     case 0x40 ... 0x5F:
-      if (unlikely(cfg.three == 0b110 || cfg.three == 0b111)) return 0;
+      if __us_unlikely(cfg.three == 0b110 || cfg.three == 0b111) return 0;
       /* Workaround for addresses in this range, mask doesn't work properly */
       data_word = (cfg.three_mask == 0x3f ? ((address & 0x1F) + 0x20) : (address & 0x1F)) << 8 | data;
       control_word |= cfg.three;
       break;
     case 0x60 ... 0x7F:
-      if (unlikely(cfg.four == 0b110 || cfg.four == 0b111)) return 0;
+      if __us_unlikely(cfg.four == 0b110 || cfg.four == 0b111) return 0;
       data_word = (cfg.four_mask == 0x3f ? ((address & 0x1F) + 0x20) : (address & 0x1F)) << 8 | data;
       control_word |= cfg.four;
       break;
@@ -119,7 +119,7 @@ inline static int __not_in_flash_func(set_bus_bits)(uint8_t address, bool write)
 uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data)
 { /* WARNING: DEPRECATED AND NO LONGER WORKS, HERE FOR CODE HISTORY ONLY!! */
   return 0;
-  if (unlikely((command & 0xF0) != 0x10)) {
+  if __us_unlikely((command & 0xF0) != 0x10) {
     return 0; // Sync bit not set, ignore operation
   }
   sid_memory[(address & 0x7F)] = data;
@@ -130,7 +130,7 @@ uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t ad
   dir_mask |= (is_read ? 0b1111111100000000 : 0b1111111111111111);
   control_word |= (is_read ? 1 : 0);
   vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
-  if (unlikely(set_bus_bits(address, true) != 1)) {
+  if __us_unlikely(set_bus_bits(address, true) != 1) {
     return 0;
   }
   data_word = (dir_mask << 16) | data_word;
@@ -170,7 +170,7 @@ uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t ad
 
 uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles)
 { /* This is a blocking function! */
-  if (unlikely(cycles == 0)) return 0; /* No point in waiting zero cycles */
+  if __us_unlikely(cycles == 0) return 0; /* No point in waiting zero cycles */
   delay_word = cycles;
   pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ0));  /* Clear the statemachine IRQ before starting */
   pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ1));  /* Clear the statemachine IRQ before starting */
@@ -191,7 +191,7 @@ uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles)
 uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles)
 {
   delay_word = cycles;
-  if (unlikely(set_bus_bits(address, false) != 1)) {
+  if __us_unlikely(set_bus_bits(address, false) != 1) {
     return 0x00;
   }
 
@@ -215,7 +215,7 @@ uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, ui
 void __no_inline_not_in_flash_func(write_operation)(uint8_t address, uint8_t data)
 {
   sid_memory[(address & 0x7F)] = data;
-  if (unlikely(set_bus_bits(address, true) != 1)) {
+  if __us_unlikely(set_bus_bits(address, true) != 1) {
     return;
   }
 
@@ -265,7 +265,7 @@ void __no_inline_not_in_flash_func(cycled_write_operation_nondma)(uint8_t addres
 {
   delay_word = cycles;
   sid_memory[(address & 0x7F)] = data;
-  if (unlikely(set_bus_bits(address, true) != 1)) {
+  if __us_unlikely(set_bus_bits(address, true) != 1) {
     return;
   }
 
@@ -283,7 +283,7 @@ uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t a
 { /* This is a blocking function! */
   sid_memory[(address & 0x7F)] = data;
   vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
-  if (unlikely(set_bus_bits(address, true) != 1)) {
+  if __us_unlikely(set_bus_bits(address, true) != 1) {
     return 0;
   }
 

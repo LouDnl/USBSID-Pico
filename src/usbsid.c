@@ -56,7 +56,6 @@ char cdc = 'C', asid = 'A', midi = 'M', sysex = 'S', wusb = 'W', uart = 'U';
 bool web_serial_connected = false;
 
 double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
-bool paused_state = false, reset_state = false;
 bool auto_config = false;
 bool offload_ledrunner = false;
 
@@ -107,6 +106,9 @@ extern void led_runner(void);
 /* MCU */
 extern void mcu_reset(void);
 extern void mcu_jump_to_bootloader(void);
+
+/* SID */
+extern bool get_reset_state(void);
 
 /* SID tests */
 extern bool running_tests;
@@ -254,11 +256,11 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
   uint8_t command = ((sid_buffer[0] & PACKET_TYPE) >> 6);
   uint8_t subcommand = (sid_buffer[0] & COMMAND_MASK);
   uint8_t n_bytes = (sid_buffer[0] & BYTE_MASK);
-  while (reset_state == 1) { asm("nop"); };  /* Stall if in reset state */
+  if __us_unlikely(get_reset_state() && (command != COMMAND)) { return; };  /* Drop incoming data if in reset state */
 
-  if (command == CYCLED_WRITE) {
+  if __us_likely(command == CYCLED_WRITE) {
     // n_bytes = (n_bytes == 0) ? 4 : n_bytes; /* if byte count is zero, this is a single write packet */
-    if (n_bytes == 0) {
+    if __us_unlikely(n_bytes == 0) {
       cycled_write_operation(sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
       WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
       IODBG("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
@@ -267,9 +269,9 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
     }
     return;
   };
-  if (command == WRITE) {
+  if __us_likely(command == WRITE) {
     // n_bytes = (n_bytes == 0) ? 2 : n_bytes; /* if byte count is zero, this is a single write packet */
-    if (n_bytes == 0) {
+    if __us_likely(n_bytes == 0) {
       cycled_write_operation(sid_buffer[1], sid_buffer[2], 6);  /* Add 6 cycles to each write for LDA(2) & STA(4) */
       WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], 6);
       IODBG("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], 6);
@@ -278,7 +280,7 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
     }
     return;
   };
-  if (command == READ) {  /* READING CAN ONLY HANDLE ONE AT A TIME, PERIOD. */
+  if __us_unlikely(command == READ) {  /* READING CAN ONLY HANDLE ONE AT A TIME, PERIOD. */
     IODBG("[I %d] [%c] $%02X:%02X\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2]);
     write_buffer[0] = cycled_read_operation(sid_buffer[1], 0);  /* write the address to the SID and read the data back */
     switch (rtype) {  /* write the result to the USB client */
@@ -321,12 +323,12 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
         pause_sid();
         break;
       case MUTE:
-        DBG("[MUTE_SID]\n");
+        DBG("[MUTE_SID] %d\n",sid_buffer[1]);
         mute_sid();
         if (sid_buffer[1] == 1) is_muted = true;
         break;
       case UNMUTE:
-        DBG("[UNMUTE_SID]\n");
+        DBG("[UNMUTE_SID] %d\n",sid_buffer[1]);
         if (sid_buffer[1] == 1) is_muted = false;
         unmute_sid();
         break;

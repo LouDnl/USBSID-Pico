@@ -92,11 +92,11 @@
 #endif
 
 /* Optimizations */
-#ifndef likely
-#define likely(x)       __builtin_expect(!!(x), 1)
+#ifndef __us_likely
+#define __us_likely(x)       (__builtin_expect(!!(x), 1))
 #endif
-#ifndef unlikely
-#define unlikely(x)     __builtin_expect(!!(x), 0)
+#ifndef __us_unlikely
+#define __us_unlikely(x)     (__builtin_expect(!!(x), 0))
 #endif
 
 

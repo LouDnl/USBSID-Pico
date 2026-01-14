@@ -36,7 +36,6 @@ extern uint8_t *sid_memory;
 #else
 extern uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));
 #endif
-extern bool paused_state, reset_state;
 extern int usbdata;
 
 /* config.c */
@@ -50,7 +49,8 @@ extern uint16_t vu;
 extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
 extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 
-/* locals */
+/* (hot) locals */
+static bool paused_state, reset_state;
 static uint8_t volume_state[4] = {0};
 
 
@@ -102,6 +102,15 @@ void set_reset_state(bool state)
 }
 
 /**
+ * @brief Get the reset state value
+ *
+ */
+bool get_reset_state(void)
+{
+  return reset_state;
+}
+
+/**
  * @brief Set the paused state to true or false
  *
  * @param state Boolean
@@ -110,6 +119,15 @@ void set_paused_state(bool state)
 {
   paused_state = state;
   return;
+}
+
+/**
+ * @brief Get the paused state value
+ *
+ */
+bool get_paused_state(void)
+{
+  return paused_state;
 }
 
 /**
