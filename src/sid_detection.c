@@ -335,7 +335,6 @@ void auto_detect_routine(bool auto_config, bool with_delay)
   if (auto_config) {
     CFG("[SID] SET AUTO CONFIG DEFAULT VALUES\n");
     usbsid_config.mirrored = false;           /* Yeah let's just disable that for now okay? */
-    usbsid_config.fauxstereo = false;         /* Yeah let's just disable that for now okay? */
 
     /* Socket One */
     usbsid_config.socketOne.enabled = true;   /* start enabled */
