@@ -965,11 +965,8 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       }
       if (buffer[1] == 1) {
         CFG("STOP EMULATOR\n");
-        #ifdef ONBOARD_SIDPLAYER
-        sidplayer_playing = false;
-        #endif
         stopping_emulator = true;
-        stop_emulator();
+        stop_cynthcart();
       }
       if (buffer[1] == 2) { /* 9A 2 n on/off(0) */
         if (buffer[3] == 0) {
@@ -979,7 +976,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         }
       }
       #endif
-      #if defined(ONBOARD_EMULATOR) && defined(ONBOARD_SIDPLAYER)
+      #if defined(ONBOARD_SIDPLAYER)
       if (buffer[1] == 3) {
         CFG("START SID PLAYER\n");
         offload_ledrunner = true;
