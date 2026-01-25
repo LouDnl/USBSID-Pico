@@ -238,8 +238,20 @@ void reset_sid(void)
   return;
 }
 
+/**
+ * @brief Clear SID register / reset registers
+ * @note https://csdb.dk/forums/?roomid=11&topicid=85713&showallposts=1
+ * @note thanks Wilfred for pointing this out!
+ * @param sidno
+ */
 void clear_sid_registers(int sidno)
-{ /* NOTICE: CAUSES ISSUES IF USED RIGHT BEFORE PLAYING */
+{
+  for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
+    cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0xff, 0);
+  }
+  for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
+    cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0x08, 0);
+  }
   for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
     cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0x0, 0);
   }
@@ -247,8 +259,13 @@ void clear_sid_registers(int sidno)
   return;
 }
 
+/**
+ * @brief Reset registers on everyo installed SID
+ * @note SIDKICK-pico v0.1 might have issues
+ *
+ */
 void reset_sid_registers(void)
-{ /* NOTICE: CAUSES ISSUES IF USED RIGHT BEFORE PLAYING */
+{
   set_reset_state(true);
   set_paused_state(false);
   for (int sid = 0; sid < cfg.numsids; sid++) {
