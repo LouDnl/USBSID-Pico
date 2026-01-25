@@ -46,7 +46,11 @@ extern RuntimeCFG cfg;
 extern uint16_t vu;
 
 /* bus.c */
+#if PICO_RP2350
+extern void clockcycle_delay(uint32_t n_cycles);
+#else
 extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
+#endif
 extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 
 /* (hot) locals */
@@ -227,12 +231,15 @@ void reset_sid(void)
   set_paused_state(false);
   memset(volume_state, 0, 4);
   memset(sid_memory, 0, count_of(sid_memory));
-  // set_gpio(RES, 0);
   cPIN(RES);
   if (cfg.chip_one == 0 || cfg.chip_two == 0) {
-    cycled_delay_operation(10);  /* 10x PHI1(02) cycles as per datasheet for REAL SIDs only */
+    /* 10x PHI1(02) cycles as per datasheet for REAL SIDs only */
+#if PICO_RP2350
+    clockcycle_delay(10);
+#else
+    cycled_delay_operation(10);
+#endif
   }
-  // set_gpio(RES, 1);
   sPIN(RES);
   set_reset_state(false);
   return;
