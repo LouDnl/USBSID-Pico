@@ -30,7 +30,6 @@
 #include <iostream>
 #include <string.h>
 
-#include <interface.h>
 #include <c64.h>
 #include <memory.h>
 #include <reloc65.h>
@@ -207,14 +206,12 @@ extern "C" void start_emudore_cynthcart(
     D("Emudore already running!\n");
     return;
   }
-  (void) heapbefore();
   midi_ = true;
   c64_ = new C64(
     nosdl_,isbinary_,havecart_,bankswlog,midi_,
     basic_,chargen_,kernal_,binary_
   );
   C64::is_cynthcart = true;
-  (void) heapafter();
 
   _set_logging(); /* Set c64 logging */
 
@@ -222,7 +219,6 @@ extern "C" void start_emudore_cynthcart(
 
   load_addr = aptr = read_short_le(binary_,0);
   size_t pos = 2; /* pos starts at 2 after reading the load address at 0 and 1 */
-  (void) heapbefore();
   while(pos <= binsize) {
     // D("ADDR: $%04x POS: %d VAL: %02X\n",aptr,pos,binary_[pos]);
     c64_->mem_->write_byte_no_io(aptr++,binary_[pos++]);
@@ -251,7 +247,6 @@ extern "C" void start_emudore_cynthcart(
     c64_->cpu_->pc(init_addr);
   }
 
-  (void) heapafter();
   if (run_continuously) {c64_->start();};
   return;
 }
@@ -275,7 +270,6 @@ extern "C" unsigned int run_specified_cycle(
 extern "C" bool stop_emudore(void)
 {
   D("Stopping emudore\n");
-  (void) heapbefore();
   if (c64_ != nullptr) {
     if (c64_->is_looping()) {
       D("Disabling emudore loop\n");
@@ -288,11 +282,9 @@ extern "C" bool stop_emudore(void)
     C64::is_rsid = false;
     _set_logging();
     delete c64_;
-    (void) heapafter();
     memset(c64memory, 0, 0x10000);
     return true;
   }
-  (void) heapafter();
   return false;
 }
 
