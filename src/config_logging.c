@@ -39,14 +39,14 @@ extern char *project_version;
 extern char *pcb_version;
 
 /* String constants for logging */
-const char *sidtypes[5] = { "UNKNOWN", "N/A", "MOS8580", "MOS6581", "FMOpl" };
-const char *chiptypes[2] = { "Real", "Clone" };
-const char *clonetypes[6] = { "Disabled", "Other", "SKPico", "ARMSID", "FPGASID", "RedipSID" };
-const char *int_ext[2] = { "Internal", "External" };
-const char *enabled[2] = { "Disabled", "Enabled" };
-const char *true_false[2] = { "False", "True" };
-const char *single_dual[2] = { "Dual SID", "Single SID" };
-const char *mono_stereo[2] = { "Mono", "Stereo" };
+const char __in_flash("usbsid_vars") *sidtypes[5] = { "UNKNOWN", "N/A", "MOS8580", "MOS6581", "FMOpl" };
+const char __in_flash("usbsid_vars") *chiptypes[2] = { "Real", "Clone" };
+const char __in_flash("usbsid_vars") *clonetypes[6] = { "Disabled", "Other", "SKPico", "ARMSID", "FPGASID", "RedipSID" };
+const char __in_flash("usbsid_vars") *int_ext[2] = { "Internal", "External" };
+const char __in_flash("usbsid_vars") *enabled[2] = { "Disabled", "Enabled" };
+const char __in_flash("usbsid_vars") *true_false[2] = { "False", "True" };
+const char __in_flash("usbsid_vars") *single_dual[2] = { "Dual SID", "Single SID" };
+const char __in_flash("usbsid_vars") *mono_stereo[2] = { "Mono", "Stereo" };
 
 
 void print_cfg(const uint8_t *buf, size_t len)

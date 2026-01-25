@@ -52,7 +52,7 @@ extern char *sidtypes[5];
 
 /* Init local variables */
 static uint8_t skpico_config[64] = {0xFF};
-static const char * error_type[1] = {"ERROR"};
+static const char __in_flash("usbsid_vars") * error_type[1] = { "ERROR" };
 
 
 void print_fpgasid_sidconfig(int slot, int sidno, uint8_t * configarray)

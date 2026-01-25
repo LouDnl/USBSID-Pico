@@ -162,8 +162,8 @@ void apply_clockrate(int n_clock, bool suspend_sids);
 Config usbsid_config;
 RuntimeCFG cfg;
 bool first_boot = false;
-const char *project_version = PROJECT_VERSION;
-const char *pcb_version = PCB_VERSION;
+const char __in_flash("usbsid_vars") *project_version = PROJECT_VERSION;
+const char __in_flash("usbsid_vars") *pcb_version = PCB_VERSION;
 
 /* Declare local variables */
 /* 0x15 (16) max before starting at 0 flash sector erase */

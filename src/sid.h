@@ -362,9 +362,10 @@ static const uint32_t musical_scale_values[96] =
   0x102F0,  // 95   B7    3951.06   66288
 };
 
+#if 0 /* Unused */
 /* 12 musical note notations */
-static const char notes[12][2] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "H"};
-
+static const char __in_flash("usbsid_vars") * const char notes[12][2] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "H"};
+#endif
 
 #ifdef __cplusplus
   }

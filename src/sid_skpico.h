@@ -68,7 +68,7 @@ static const uint8_t skpico_default_config[64] = {                   /* Default 
   0,0,
 };
 
-static const char * config_names[64] = {
+static const char __in_flash("skpico_vars") *config_names[64] = {
   "CFG_SID1_TYPE",       //  0   //  1  // 0 ... 3  // 6581, 8580, 8580+digiboost, none
   "CFG_SID1_DIGIBOOST",  //  1   // 12  // 0 ... 15, 0x0 ... 0xF
   "CFG_REGISTER_READ",   //  2   //  1  // Always 1
@@ -94,13 +94,13 @@ static const char * config_names[64] = {
   "CFG_DIGIDETECT",      // 61   //  0  // 0 ... 1
   "","",                 // 62 -> 63
 };
-static const char * sid_types[5] = {
+static const char __in_flash("skpico_vars") *sid_types[5] = {
   "6581", "8580", "8580+digiboost", "none", "FMopl"
 };
-static const char * sid2_address[6] = {
+static const char __in_flash("skpico_vars") *sid2_address[6] = {
   "CS", "A5", "A8", "A5|A8", "A8", "A8"
 };
-static const char * clock_speed[3] = {
+static const char __in_flash("skpico_vars") *clock_speed[3] = {
   "985248", "1022727", "1023440"
 };
 static const size_t s_config_names = count_of(config_names);
