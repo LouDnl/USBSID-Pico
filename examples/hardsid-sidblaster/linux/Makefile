@@ -36,7 +36,7 @@ TARGET_INCLUDE_DIR := /usr/local/include
 TARGET_INCLUDE_DIR_LL := /usr/local/include/linux
 TARGET_INCLUDE_DIR_L := /usr/include/linux
 
-BUILD_DIR := ./build
+BUILD_DIR := ./output
 SRC_DIRS := ./src
 
 # Specific cpplibs
