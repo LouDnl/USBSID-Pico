@@ -135,7 +135,6 @@ typedef struct Config {
   uint16_t raster_rate;        /* raster rate identifier based on clockspeed ~ not configurable */
   Socket   socketOne;          /* 1 */
   Socket   socketTwo;          /* 2 */
-  bool     mirrored : 1;       /* act as socket 1 */
   struct {
     bool enabled : 1;
     bool idle_breathe : 1;
@@ -156,7 +155,7 @@ typedef struct Config {
     bool enabled : 1;
   } Asid;                       /* 7 */
   struct {
-    uint8_t sid_states[4][32];  /* Stores states of each SID ~ 4 sids max */
+    // uint8_t sid_states[4][32];  /* Stores states of each SID ~ 4 sids max */
     bool enabled : 1;
   } Midi;                       /* 8 */
   struct {
@@ -167,23 +166,18 @@ typedef struct Config {
   bool lock_clockrate : 1;      /* lock the set clockspeed from being changed */
   bool stereo_en : 1;           /* audio switch is off (mono) or on (stereo) ~ (PCB v1.3+ only) */
   bool lock_audio_sw : 1;       /* lock the audio switch into it's current stateand prevent it from being changed ~ (PCB v1.3+ only) */
+  bool mirrored : 1;       /* act as socket 1 */
+  bool fauxstereo : 1;     /* faux stereo effect */
 } Config;
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
   .magic = MAGIC_SMOKE, \
   .default_config = 1, \
   .config_saveid = 0, \
-  .external_clock = false, \
   .clock_rate = DEFAULT, \
   .refresh_rate = HZ_DEFAULT, \
   .raster_rate = R_DEFAULT, \
-  .lock_clockrate = false, \
-  .stereo_en = false, \
-  .lock_audio_sw = false, \
-  .mirrored = false, \
   .socketOne = { \
-    .enabled = true, \
-    .dualsid = false, \
     .chiptype = 0x0,  /* real */ \
     .clonetype = 0x0, /* disabled */ \
     .sid1 = { \
@@ -196,10 +190,10 @@ typedef struct Config {
       .addr = 0xFF, \
       .type = 0,  /* n/a */ \
     }, \
-  }, \
-  .socketTwo = { \
     .enabled = true, \
     .dualsid = false, \
+  }, \
+  .socketTwo = { \
     .chiptype = 0x0,  /* real */ \
     .clonetype = 0x0, /* disabled */ \
     .sid1 = { \
@@ -212,16 +206,18 @@ typedef struct Config {
       .addr = 0xFF, \
       .type = 0,  /* n/a */ \
     }, \
+    .enabled = true, \
+    .dualsid = false, \
   }, \
   .LED = { \
     .enabled = true, \
     .idle_breathe = LED_PWM \
   }, \
   .RGBLED = { \
-    .enabled = RGB_ENABLED, \
-    .idle_breathe = RGB_ENABLED, \
     .brightness = (RGB_ENABLED ? 0x7F : 0),  /* Half of max brightness or disabled if no RGB LED */ \
     .sid_to_use = (RGB_ENABLED ? 1 : -1), \
+    .enabled = RGB_ENABLED, \
+    .idle_breathe = RGB_ENABLED, \
   }, \
   .Cdc = { \
     .enabled = true \
@@ -236,9 +232,15 @@ typedef struct Config {
     .enabled = true \
   }, \
   .FMOpl = { \
-    .enabled = false, \
     .sidno = 0, \
+    .enabled = false, \
   }, \
+  .external_clock = false, \
+  .lock_clockrate = false, \
+  .stereo_en = false, \
+  .lock_audio_sw = false, \
+  .mirrored = false, \
+  .fauxstereo = false, \
 } \
 
 static const Config usbsid_default_config = USBSID_DEFAULT_CONFIG_INIT;
@@ -275,7 +277,7 @@ typedef struct RuntimeCFG {
   uint8_t sidid[4];    /* config_bus.c:apply_bus_config() */
   /* contains the sid address in configured sid order */
   uint8_t sidaddr[4];  /* config_bus.c:apply_bus_config() */ // NOTE: UNUSED, FOR FUTURE USE
-  /* Contains the */
+  /* contains the sid address masks */
   uint8_t sidmask[4];  /* config_bus.c:apply_bus_config() */
   uint8_t addrmask[4]; /* config_bus.c:apply_bus_config() */
 
@@ -353,7 +355,7 @@ enum
   ARMSID           = 0xA2,  /* Config initiator byte for ARMSID */
   PDSID            = 0xA3,  /* Holds the reset line for 5 seconds to change SID type on a PDSID */
 
-#ifdef ONBOARD_EMULATOR
+#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
   /* Internal SID player */
   UPLOAD_SID_START = 0xD0,  /* Start command for USBSID to go into receiving mode */
   UPLOAD_SID_DATA  = 0xD1,  /* Init byte for each packet containing data */
@@ -361,7 +363,7 @@ enum
   UPLOAD_SID_SIZE  = 0xD3,  /* Packet containing the actual file size */
 
   /* Internal SID player */
-  SID_PLAYER_LOAD  = 0xE0,  /* Load SID file into SID player memory and initialize internal SID player */
+  SID_PLAYER_TUNE  = 0xE0,  /* Load SID file into SID player memory and initialize internal SID player */
   SID_PLAYER_START = 0xE1,  /* Start SID file play */
   SID_PLAYER_STOP  = 0xE2,  /* Stop SID file play */
   SID_PLAYER_PAUSE = 0xE3,  /* Pause/Unpause SID file play */

@@ -42,7 +42,7 @@ extern char *mono_stereo[2];
  * Partly copied from and inspired by SKPico code by frenetic
  * see: https://github.com/frntc/SIDKick-pico
  */
-#if RP2350
+#if PICO_RP2350
 register uint32_t b asm( "r13" );
 #else
 register uint32_t b asm( "r10" );

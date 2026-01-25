@@ -40,8 +40,8 @@ uint8_t __not_in_flash("usbsid_buffer") sid_buffer[MAX_BUFFER_SIZE] __aligned(2 
 uint8_t __not_in_flash("usbsid_buffer") read_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
 uint8_t __not_in_flash("usbsid_buffer") config_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
 uint8_t __not_in_flash("usbsid_buffer") uart_buffer[64] __aligned(2 * 64);
-#ifdef ONBOARD_EMULATOR
-uint8_t __not_in_flash("c64_memory") c64memory[0x10000];
+#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER) // TEST
+uint8_t __not_in_flash("c64_memory") c64memory[0x10000] = {0};
 uint8_t * sid_memory = &c64memory[0xd400];
 #else
 uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __aligned(2 * (0x20 * 4));
@@ -121,12 +121,16 @@ extern void auto_detect_routine(bool auto_config, bool with_delay);
 extern bool emulator_running, starting_emulator, stopping_emulator;
 extern void start_cynthcart(void);
 extern unsigned int run_cynthcart(void);
-#ifdef ONBOARD_SIDPLAYER
+#endif /* ONBOARD_EMULATOR */
+#if defined(ONBOARD_SIDPLAYER)
 extern bool sidplayer_init, sidplayer_playing, sidplayer_start, sidplayer_log_timings;
+extern uint8_t __not_in_flash("usbsid_sidfile") sidfile[0xFFFF]; /* Temporary buffer to store incoming data */
+extern int sidfile_size;
+extern char tuneno;
+extern int load_sidtune(uint8_t * sidfile, int sidfilesize, char subt);
 extern void start_sidplayer(void);
 extern unsigned int run_psidplayer(void);
-#endif
-#endif
+#endif /* ONBOARD_SIDPLAYER */
 
 /* Midi */
 extern void midi_init(void);
@@ -680,7 +684,6 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
  * Core 1 -> continue startup
  * Core 1 -> enter while loop
  */
-
 void core1_main(void)
 {
   /* Set core locking for flash saving ~ note this makes SIO_IRQ_PROC1 unavailable */
@@ -707,7 +710,7 @@ void core1_main(void)
   /* Init queues */
   queue_init(&sidtest_queue, sizeof(sidtest_queue_entry_t), 1);  /* 1 entry deep */
   #ifdef WRITE_DEBUG  /* Only init this queue when needed */
-  queue_init(&logging_queue, sizeof(writelogging_queue_entry_t), 16);  /* 16 entries deep */
+  queue_init(&logging_queue, sizeof(writelogging_queue_entry_t), 16384);  /* 16384 entries deep so we don't skip any writes */
   #endif
 
   /* Initialize PIO Uart */
@@ -722,15 +725,28 @@ void core1_main(void)
   sem_acquire_blocking(&core0_init);
 
   while (1) {
-    /* Check SID test queue */
-    if (running_tests) {
-      sidtest_queue_entry_t s_entry;
-      if (queue_try_remove(&sidtest_queue, &s_entry)) {
-        s_entry.func(s_entry.s, s_entry.t, s_entry.wf);
-      }
+#if ONBOARD_SIDPLAYER
+    if (sidplayer_init) {
+      sidplayer_init = false;
+      sidplayer_start = false;
+      sidplayer_playing = false;
+      offload_ledrunner = true;
+      load_sidtune(sidfile, sidfile_size, tuneno);
+      sidplayer_start = true;
     }
 
-    #ifdef ONBOARD_EMULATOR
+    if (sidplayer_start) {
+      sidplayer_init = false;
+      sidplayer_start = false;
+      sidplayer_playing = true;
+      start_sidplayer(); // WARNING: rp2040 insufficient memory!
+    }
+    if (sidplayer_playing) {
+      run_psidplayer();
+    }
+#endif /* ONBOARD_SIDPLAYER */
+
+#ifdef ONBOARD_EMULATOR
     /* BUG: If not running directly after boot
      * or after stopped and then started again
      * the sound is distorted */
@@ -742,34 +758,30 @@ void core1_main(void)
     if (emulator_running && !starting_emulator) {
       run_cynthcart();
     }
-    #endif
+#endif /* ONBOARD_EMULATOR */
 
-    #if defined(ONBOARD_EMULATOR) && defined(ONBOARD_SIDPLAYER)
-    if (sidplayer_start) {
-      sidplayer_start = false;
-      sidplayer_playing = true;
-      start_sidplayer(); // WARNING: rp2040 insufficient memory!
+    /* Check SID test queue */
+    if (running_tests) {
+      sidtest_queue_entry_t s_entry;
+      if (queue_try_remove(&sidtest_queue, &s_entry)) {
+        s_entry.func(s_entry.s, s_entry.t, s_entry.wf);
+      }
     }
-    #endif
-
-    #if defined(ONBOARD_EMULATOR) && defined(ONBOARD_SIDPLAYER)
-    if (sidplayer_playing) {
-      run_psidplayer();
-    }
-    #endif
 
     if (!offload_ledrunner) {
       led_runner();
     }
 
-    #ifdef WRITE_DEBUG  /* Only run this queue when needed */
+#ifdef WRITE_DEBUG  /* Only run this queue when needed */
     if (usbdata == 1) {
       writelogging_queue_entry_t l_entry;
       if (queue_try_remove(&logging_queue, &l_entry)) {
-        DBG("[CORE2] [WRITE %c:%02d/%02d] $%02X:%02X %u\n", l_entry.dtype, l_entry.n, l_entry.s, l_entry.reg, l_entry.val, l_entry.cycles);
+        DBG("[CORE2 %5u] [WRITE %c:%02d/%02d] $%02X:%02X %u\n",
+          queue_get_level(&logging_queue),
+          l_entry.dtype, l_entry.n, l_entry.s, l_entry.reg, l_entry.val, l_entry.cycles);
       }
     }
-    #endif
+#endif
   }
   /* Point of no return, this should never be reached */
   return;
@@ -778,13 +790,15 @@ void core1_main(void)
 int main()
 {
   /* Set system clockspeed */
-  #if PICO_RP2040
+#if PICO_RP2040
   /* System clock @ MAX SPEED!! ARRRR 200MHz */
   set_sys_clock_khz(200000, true);
-  #elif PICO_RP2350
+  /* System clock @ 125MHz */
+  // set_sys_clock_pll(1500000000, 6, 2);
+#elif PICO_RP2350
   /* System clock @ 150MHz */
   set_sys_clock_pll(1500000000, 5, 2);
-  #endif
+#endif
 
   /* Init TinyUSB */
   tusb_rhport_init_t dev_init = {

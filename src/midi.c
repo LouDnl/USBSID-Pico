@@ -61,7 +61,7 @@ extern bool emulator_running,
   starting_emulator,
   stopping_emulator,
   offload_ledrunner;
-extern bool stop_emulator(void);
+extern bool stop_cynthcart(void);
 queue_t cynthcart_queue;
 #endif
 
@@ -127,7 +127,7 @@ void emulator_disable(void)
 {
   emulator_running = false;
   stopping_emulator = true;
-  stop_emulator();
+  stop_cynthcart();
   offload_ledrunner = false;
   emulator_queue_deinit();
   return;
