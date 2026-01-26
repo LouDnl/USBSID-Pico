@@ -50,6 +50,9 @@ extern void apply_clockrate(int n_clock, bool suspend_sids);
 extern void mute_sid(void);
 extern void unmute_sid(void);
 
+/* sid.c */
+void reset_sid_registers(void);
+
 #ifdef ONBOARD_EMULATOR
 /* interface.h */
 extern void start_emudore_cynthcart(
@@ -82,6 +85,7 @@ void unset_logging(int logid)
 
 void start_cynthcart(void)
 {
+  reset_sid_registers();
   apply_clockrate(1,true); /* Fixed to PAL */
   start_emudore_cynthcart(
     basic,
@@ -95,6 +99,7 @@ void start_cynthcart(void)
 void stop_cynthcart(void)
 {
   stop_emudore();
+  reset_sid_registers();
   return;
 }
 
