@@ -40,10 +40,14 @@ uint8_t __not_in_flash("usbsid_buffer") sid_buffer[MAX_BUFFER_SIZE] __aligned(2 
 uint8_t __not_in_flash("usbsid_buffer") read_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
 uint8_t __not_in_flash("usbsid_buffer") config_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);
 uint8_t __not_in_flash("usbsid_buffer") uart_buffer[64] __aligned(2 * 64);
-#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER) // TEST
+
+#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
+/* Use full 64KB memory for C64 emulator and SID player */
 uint8_t __not_in_flash("c64_memory") c64memory[0x10000] = {0};
+/* Pointer to SID address range in memory */
 uint8_t * sid_memory = &c64memory[0xd400];
 #else
+/* 128 Bytes 'Memory' storage for SID registers */
 uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __aligned(2 * (0x20 * 4));
 #endif
 
