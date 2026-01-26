@@ -35,8 +35,7 @@
 !lib/emulator
 !lib/emudore-embedded
 !lib/emudore-embedded/**
-!lib/emulator/flash
-!lib/emulator/sidtunes
+!lib/emulator/roms
 !doc
 !doc/images
 !doc/images/firmware
