@@ -360,7 +360,7 @@ if(ONBOARD_SIDPLAYER EQUAL 1)
   # NOTICE: SIDPLAYER REQUIRES FULL OPTIMIZATIONS!!
   set(COMPILE_OPTS ${COMPILE_OPTS} -O3)
   ## Set sidplayer list directory
-  set(USPLAYER_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/usplayer)
+  set(USPLAYER_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player)
 
   ### Build psiddrv header
   add_custom_command(
