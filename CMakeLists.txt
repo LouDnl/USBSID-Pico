@@ -96,9 +96,11 @@ endif()
 # remember that enabling debugging and disabling optimizations
 # will weird out tune playing and reading from and writing to
 # SKPico will stop functioning
+# *3 is required for onboard siplayer but can cause desync
+# with DMA read_address and chain_to()
 set(DEBUG_SYMBOLS 0)      # 0 default, 1 debug symbols & debug build enabled
 set(DEBUGGING 0)          # 0 default, 1~3 equals -g1~3
-set(OPTIMIZATIONS 2)      # 2 default, 2 ~ -O1 for debugging *3 causes desync with DMA read_address and chain_to!()
+set(OPTIMIZATIONS 3)      # 2 default, 2 ~ -O1 for debugging
 set(WARNINGS_ONLY 0)      # 0 default, 0 error on warnings
 set(TUSB_DEBUG 0)         # 0 default, 0~3 non verbose to very verbose
 set(ANALYSE_STACKUSAGE 0) # 0 default, 1 enabled, 0 disabled
