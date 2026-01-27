@@ -355,41 +355,95 @@ set(TARGET_INCLUDE_DIRS PRIVATE
   ${TINYUSB_PATH}/src
 )
 
-### Emulator compilation additions
+### Embedded player stuffs
+if(ONBOARD_SIDPLAYER EQUAL 1)
+  # NOTICE: SIDPLAYER REQUIRES FULL OPTIMIZATIONS!!
+  set(COMPILE_OPTS ${COMPILE_OPTS} -O3)
+  ## Set sidplayer list directory
+  set(USPLAYER_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/usplayer)
+
+  ### Build psiddrv header
+  add_custom_command(
+    OUTPUT psiddrv.h
+    COMMAND $(MAKE) all
+    WORKING_DIRECTORY ${USPLAYER_LIST_DIR}/src/psiddrv/
+  )
+  add_custom_target(
+    RSIDDriver ALL
+    DEPENDS psiddrv.h
+  )
+
+  ### Add some fancy shmancy necromancy
+  set(PICO_CXX_ENABLE_EXCEPTIONS 1)
+  set(COMPILE_OPTS ${COMPILE_OPTS} -DEMBEDDED=1)
+  add_compile_definitions(ONBOARD_SIDPLAYER=1)
+  add_compile_definitions(RCUTILS_NO_64_ATOMIC=OFF)
+
+  ### Where it's at
+  set(SOURCEFILES
+    ${SOURCEFILES}
+    ${USPLAYER_LIST_DIR}/src/c64/mmu.cpp
+    ${USPLAYER_LIST_DIR}/src/c64/mos6510_cpu.cpp
+    ${USPLAYER_LIST_DIR}/src/c64/mos6526_cia.cpp
+    ${USPLAYER_LIST_DIR}/src/c64/mos6560_6561_vic.cpp
+    ${USPLAYER_LIST_DIR}/src/c64/mos6581_8580_sid.cpp
+    ${USPLAYER_LIST_DIR}/src/c64/mos906114_pla.cpp
+    ${USPLAYER_LIST_DIR}/src/psid/sidfile.cpp
+    ${USPLAYER_LIST_DIR}/src/psiddrv/psid.cpp
+    ${USPLAYER_LIST_DIR}/src/psiddrv/reloc65.c
+    ${USPLAYER_LIST_DIR}/src/util/timer.cpp
+    ${USPLAYER_LIST_DIR}/src/util/wrappers.cpp
+    ${USPLAYER_LIST_DIR}/src/emulation.cpp
+    ${USPLAYER_LIST_DIR}/src/microsid.cpp
+    ${USPLAYER_LIST_DIR}/src/prgrunner.cpp
+    ${USPLAYER_LIST_DIR}/src/usplayer.cpp
+    ${USPLAYER_LIST_DIR}/src/vsidpsid.cpp
+  )
+  ### What it wants
+  set(TARGET_INCLUDE_DIRS
+    ${TARGET_INCLUDE_DIRS}
+    ${USPLAYER_LIST_DIR}/src/
+    ${USPLAYER_LIST_DIR}/src/c64
+    ${USPLAYER_LIST_DIR}/src/psid
+    ${USPLAYER_LIST_DIR}/src/psiddrv
+    ${USPLAYER_LIST_DIR}/src/roms
+    ${USPLAYER_LIST_DIR}/src/util
+    ${USPLAYER_LIST_DIR}/src/tunes
+  )
+endif()
+
+### Embedded emulator compilation additions
 if(ONBOARD_EMULATOR EQUAL 1)
-    set(COMPILE_OPTS ${COMPILE_OPTS} -DEMBEDDED=1)
-    add_compile_definitions(ONBOARD_EMULATOR=1)
-    if(ONBOARD_SIDPLAYER EQUAL 1)
-      add_compile_definitions(ONBOARD_SIDPLAYER=1)
-    endif()
-    set(EMULATOR_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emulator)
-    set(EMUDORE_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emudore-embedded)
-    set(SOURCEFILES
-      ${SOURCEFILES}
-      ${EMULATOR_LIST_DIR}/emudore_emulator.c
-      ${EMULATOR_LIST_DIR}/interface.cpp
-      ${EMUDORE_LIST_DIR}/src/sidfile.cpp
-      ${EMUDORE_LIST_DIR}/src/cpu.cpp
-      ${EMUDORE_LIST_DIR}/src/memory.cpp
-      ${EMUDORE_LIST_DIR}/src/c64.cpp
-      ${EMUDORE_LIST_DIR}/src/cia1.cpp
-      ${EMUDORE_LIST_DIR}/src/cia2.cpp
-      ${EMUDORE_LIST_DIR}/src/io.cpp
-      ${EMUDORE_LIST_DIR}/src/vic.cpp
-      ${EMUDORE_LIST_DIR}/src/sidadapter.cpp
-      ${EMUDORE_LIST_DIR}/src/pla.cpp
-      ${EMUDORE_LIST_DIR}/src/cart.cpp
-      ${EMUDORE_LIST_DIR}/src/cart/MC68B50.cpp
-    )
-    set(TARGET_INCLUDE_DIRS
-      ${TARGET_INCLUDE_DIRS}
-      ${EMUDORE_LIST_DIR}/src
-      ${EMUDORE_LIST_DIR}/src/cart
-      ${EMULATOR_LIST_DIR}
-      ${EMULATOR_LIST_DIR}/flash
-      ${EMULATOR_LIST_DIR}/sidtunes
-    )
-    set(PICO_CXX_ENABLE_EXCEPTIONS 1)
+  set(COMPILE_OPTS ${COMPILE_OPTS} -DEMBEDDED=1)
+  add_compile_definitions(ONBOARD_EMULATOR=1)
+  set(EMULATOR_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emulator)
+  set(EMUDORE_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emudore-embedded)
+  set(SOURCEFILES
+    ${SOURCEFILES}
+    ${EMULATOR_LIST_DIR}/emudore_emulator.c
+    ${EMULATOR_LIST_DIR}/interface.cpp
+    ${EMUDORE_LIST_DIR}/src/sidfile.cpp
+    ${EMUDORE_LIST_DIR}/src/cpu.cpp
+    ${EMUDORE_LIST_DIR}/src/memory.cpp
+    ${EMUDORE_LIST_DIR}/src/c64.cpp
+    ${EMUDORE_LIST_DIR}/src/cia1.cpp
+    ${EMUDORE_LIST_DIR}/src/cia2.cpp
+    ${EMUDORE_LIST_DIR}/src/io.cpp
+    ${EMUDORE_LIST_DIR}/src/vic.cpp
+    ${EMUDORE_LIST_DIR}/src/sidadapter.cpp
+    ${EMUDORE_LIST_DIR}/src/pla.cpp
+    ${EMUDORE_LIST_DIR}/src/cart.cpp
+    ${EMUDORE_LIST_DIR}/src/cart/MC68B50.cpp
+  )
+  set(TARGET_INCLUDE_DIRS
+    ${TARGET_INCLUDE_DIRS}
+    ${EMULATOR_LIST_DIR}
+    ${EMULATOR_LIST_DIR}/roms
+    ${EMUDORE_LIST_DIR}/src
+    ${EMUDORE_LIST_DIR}/src/cart
+  )
+  set(PICO_CXX_ENABLE_EXCEPTIONS 1)
+
 endif()
 
 ### PIO Uart compilation additions
