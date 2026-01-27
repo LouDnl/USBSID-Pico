@@ -811,11 +811,20 @@ int main()
 #if PICO_RP2040
   /* System clock @ MAX SPEED!! ARRRR 200MHz */
   set_sys_clock_khz(200000, true);
+#if 0
   /* System clock @ 125MHz */
-  // set_sys_clock_pll(1500000000, 6, 2);
+  set_sys_clock_pll(1500000000, 6, 2);
+#endif
 #elif PICO_RP2350
+/* Onboard SID player requires atleast 200MHz! */
+#if ONBOARD_SIDPLAYER
+  /* System clock @ 200MHz */
+  set_sys_clock_khz(200000, true);
+#else
   /* System clock @ 150MHz */
   set_sys_clock_pll(1500000000, 5, 2);
+#endif /* ONBOARD_SIDPLAYER */
+#endif /* PICO_RP2350 */
 #endif
 
   /* Init TinyUSB */
