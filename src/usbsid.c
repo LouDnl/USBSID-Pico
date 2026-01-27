@@ -61,7 +61,7 @@ bool web_serial_connected = false;
 
 double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
 bool auto_config = false;
-bool offload_ledrunner = false;
+volatile bool offload_ledrunner = false;
 
 /* Init var pointers for external use */
 uint8_t (*write_buffer_p)[MAX_BUFFER_SIZE] = &write_buffer;
@@ -122,18 +122,27 @@ extern void auto_detect_routine(bool auto_config, bool with_delay);
 
 /* SID player */
 #ifdef ONBOARD_EMULATOR
-extern bool emulator_running, starting_emulator, stopping_emulator;
+extern bool
+  emulator_running,
+  starting_emulator,
+  stopping_emulator;
 extern void start_cynthcart(void);
 extern unsigned int run_cynthcart(void);
 #endif /* ONBOARD_EMULATOR */
 #if defined(ONBOARD_SIDPLAYER)
-extern bool sidplayer_init, sidplayer_playing, sidplayer_start, sidplayer_log_timings;
-extern uint8_t __not_in_flash("usbsid_sidfile") sidfile[0xFFFF]; /* Temporary buffer to store incoming data */
+extern bool
+  sidplayer_init,
+  sidplayer_start,
+  sidplayer_playing,
+  sidplayer_stop;
+extern uint8_t * sidfile; /* Temporary buffer to store incoming data */
 extern int sidfile_size;
 extern char tuneno;
 extern int load_sidtune(uint8_t * sidfile, int sidfilesize, char subt);
-extern void start_sidplayer(void);
-extern unsigned int run_psidplayer(void);
+extern void init_sidplayer(void);
+extern void start_sidplayer(bool loop);
+extern void loop_sidplayer(void);
+extern void stop_sidplayer(void);
 #endif /* ONBOARD_SIDPLAYER */
 
 /* Midi */
@@ -737,23 +746,28 @@ void core1_main(void)
       offload_ledrunner = true;
       load_sidtune(sidfile, sidfile_size, tuneno);
       sidplayer_start = true;
+      free(sidfile);
+      sidfile = NULL;
     }
-
     if (sidplayer_start) {
       sidplayer_init = false;
       sidplayer_start = false;
       sidplayer_playing = true;
-      start_sidplayer(); // WARNING: rp2040 insufficient memory!
+      init_sidplayer(); // WARNING: rp2040 insufficient memory!
+      start_sidplayer(false); /* No auto loop */
+    }
+    if (sidplayer_stop) {
+      stop_sidplayer();
+      sidplayer_stop = false;
+      sidplayer_playing = false;
+      offload_ledrunner = true;
     }
     if (sidplayer_playing) {
-      run_psidplayer();
+      loop_sidplayer();
     }
 #endif /* ONBOARD_SIDPLAYER */
 
 #ifdef ONBOARD_EMULATOR
-    /* BUG: If not running directly after boot
-     * or after stopped and then started again
-     * the sound is distorted */
     if (!emulator_running && starting_emulator) {
       starting_emulator = false;
       emulator_running = true;
