@@ -825,7 +825,6 @@ int main()
   set_sys_clock_pll(1500000000, 5, 2);
 #endif /* ONBOARD_SIDPLAYER */
 #endif /* PICO_RP2350 */
-#endif
 
   /* Init TinyUSB */
   tusb_rhport_init_t dev_init = {
