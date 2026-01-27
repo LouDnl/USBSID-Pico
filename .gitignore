@@ -25,6 +25,7 @@
 !.gitattributes
 !LICENSE
 !CMakeLists.txt
+!send_sid
 
 # folders
 !.github
@@ -57,6 +58,7 @@
 !examples/config-tool/**
 !examples/config-tool/inih
 !examples/config-tool/inih/**
+!examples/send_sid
 !examples/drivers
 !examples/drivers/hardsid-sidblaster
 !examples/drivers/hardsid-sidblaster/**
