@@ -1032,8 +1032,10 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       sidbytes_received = 0;
       sidfile = (uint8_t*)calloc(1, 0x10000); /* allocate 64KB */
       if (sidfile == NULL) {
-        Handle out-of-memory error
-        NOTE: RP2040 has 264KB RAM; 64KB is ~25% of total.
+        /*
+        * Handle out-of-memory error
+        * NOTE: RP2040 has 264KB RAM; 64KB is ~25% of total.
+        */
       }
       break;
     case UPLOAD_SID_DATA:
