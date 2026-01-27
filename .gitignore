@@ -7,6 +7,7 @@
 !*.cpp
 !*.h
 !*.html
+!*.ini
 !*.jpg
 !*.ld
 !*.md
@@ -25,7 +26,10 @@
 !.gitattributes
 !LICENSE
 !CMakeLists.txt
+!cfg_usbsid
+!cfg_usbsid.exe
 !send_sid
+!send_sid.exe
 
 # folders
 !.github
@@ -52,10 +56,8 @@
 !examples
 !examples/cloje64
 !examples/cloje64/**
-!examples/configtool
-!examples/configtool/*
 !examples/config-tool
-!examples/config-tool/**
+!examples/config-tool/ini-examples
 !examples/config-tool/inih
 !examples/config-tool/inih/**
 !examples/send_sid
