@@ -135,13 +135,15 @@ jobs:
               pico_board: pico,
               pico_platform: rp2040,
               withemulator: 0,
+              withsidplayer: 0,
             }
           - {
               buildname: Pico_W,
-              directory: pico_w,
+              directory: picow,
               pico_board: pico_w,
               pico_platform: rp2040,
               withemulator: 0,
+              withsidplayer: 0,
             }
           - {
               buildname: Pico2,
@@ -149,13 +151,15 @@ jobs:
               pico_board: pico2,
               pico_platform: rp2350-arm-s,
               withemulator: 0,
+              withsidplayer: 0,
             }
           - {
               buildname: Pico2_W,
-              directory: pico2_w,
+              directory: pico2w,
               pico_board: pico2_w,
               pico_platform: rp2350-arm-s,
               withemulator: 0,
+              withsidplayer: 0,
             }
           - {
               buildname: Pico_Emulator,
@@ -163,6 +167,7 @@ jobs:
               pico_board: pico,
               pico_platform: rp2040,
               withemulator: 1,
+              withsidplayer: 0,
             }
           - {
               buildname: Pico2_Emulator,
@@ -170,6 +175,7 @@ jobs:
               pico_board: pico2,
               pico_platform: rp2350-arm-s,
               withemulator: 1,
+              withsidplayer: 0,
             }
           - {
               buildname: Pico_W_Emulator,
@@ -177,6 +183,7 @@ jobs:
               pico_board: pico_w,
               pico_platform: rp2040,
               withemulator: 1,
+              withsidplayer: 0,
             }
           - {
               buildname: Pico2_W_Emulator,
@@ -184,7 +191,25 @@ jobs:
               pico_board: pico2_w,
               pico_platform: rp2350-arm-s,
               withemulator: 1,
+              withsidplayer: 0,
             }
+          - {
+              buildname: Pico2_SIDplayer,
+              directory: pico2_sp,
+              pico_board: pico2,
+              pico_platform: rp2350-arm-s,
+              withemulator: 0,
+              withsidplayer: 1,
+            }
+          - {
+              buildname: Pico2_W_SIDplayer,
+              directory: pico2_w_sp,
+              pico_board: pico2_w,
+              pico_platform: rp2350-arm-s,
+              withemulator: 0,
+              withsidplayer: 1,
+            }
+
       fail-fast: false
     steps:
       - name: 🗒️ Set tag output
@@ -210,6 +235,30 @@ jobs:
         if: ${{ env.ACT }}
         run: |
           sudo apt-get update && sudo apt-get install curl build-essential cmake -y
+
+      - name: Install SID player xa dependency
+        if: ${{matrix.withsidplayer == 1 }}
+        run: |
+          sudo apt-get update && sudo apt-get install -y xa65
+
+      - name: Checkout bin2h source
+        if: ${{matrix.withsidplayer == 1 }}
+        uses: actions/checkout@v4
+        with:
+          repository: elnormous/bin2h
+          path: bin2h-src
+
+      - name: Build and add to PATH
+        if: ${{matrix.withsidplayer == 1 }}
+        run: |
+          cd bin2h-src
+          make
+          # Add the current directory containing the built 'bin2h' to the runner's PATH
+          echo "$(pwd)" >> $GITHUB_PATH
+
+      - name: Verify installation
+        if: ${{matrix.withsidplayer == 1 }}
+        run: bin2h --help
 
       - name: 🗒️ Check GCC Version
         id: compiler-version
@@ -296,6 +345,13 @@ jobs:
           repository: loudnl/emudore-embedded
           path: master/lib/emudore-embedded
 
+      - name: 📇 Checkout USBSID-Player
+        if: ${{matrix.withsidplayer == 1 }}
+        uses: actions/checkout@v4
+        with:
+          repository: loudnl/usbsid-player
+          path: master/lib/usbsid-player
+
       - name: 🏭 Create build directory
         run: |
           mkdir -p ${{github.workspace}}/master/build_${{matrix.directory}}
@@ -304,7 +360,15 @@ jobs:
         run: |
           unset PICO_PLATFORM
           unset PICO_BOARD
-          cmake -S master -B ${{github.workspace}}/master/build_${{matrix.directory}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DPICO_PLATFORM=${{matrix.pico_platform}} -DPICO_BOARD=${{matrix.pico_board}} -Dpicotool_DIR=${{github.workspace}}/picotool/picotool -DONBOARD_EMULATOR=${{matrix.withemulator}} $extra_arg
+          cmake -S master \
+            -B ${{github.workspace}}/master/build_${{matrix.directory}} \
+            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -DPICO_PLATFORM=${{matrix.pico_platform}} \
+            -DPICO_BOARD=${{matrix.pico_board}} \
+            -Dpicotool_DIR=${{github.workspace}}/picotool/picotool \
+            -DONBOARD_EMULATOR=${{matrix.withemulator}} \
+            -DONBOARD_SIDPLAYER=${{matrix.withsidplayer}} \
+            $extra_arg
 
       - name: 🏭 Build ${{matrix.buildname}}
         run: |
