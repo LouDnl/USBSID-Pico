@@ -127,7 +127,7 @@ jobs:
       - name: Install dependencies
         if: ${{matrix.withsidplayer == 1 }}
         run: |
-          sudo apt-get update sudo apt-get install -y xa65
+          sudo apt-get update && sudo apt-get install -y xa65
 
       - name: 🗒️ Check GCC Version
         id: compiler-version
