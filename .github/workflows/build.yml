@@ -124,10 +124,29 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install curl build-essential cmake -y
 
-      - name: Install dependencies
+      - name: Install SID player xa dependency
         if: ${{matrix.withsidplayer == 1 }}
         run: |
           sudo apt-get update && sudo apt-get install -y xa65
+
+      - name: Checkout bin2h source
+        if: ${{matrix.withsidplayer == 1 }}
+        uses: actions/checkout@v4
+        with:
+          repository: elnormous/bin2h
+          path: bin2h-src
+
+      - name: Build and add to PATH
+        if: ${{matrix.withsidplayer == 1 }}
+        run: |
+          cd bin2h-src
+          make
+          # Add the current directory containing the built 'bin2h' to the runner's PATH
+          echo "$(pwd)" >> $GITHUB_PATH
+
+      - name: Verify installation
+        if: ${{matrix.withsidplayer == 1 }}
+        run: bin2h --help
 
       - name: 🗒️ Check GCC Version
         id: compiler-version
