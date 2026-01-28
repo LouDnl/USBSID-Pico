@@ -12,6 +12,7 @@ on:
   push:
     paths:
       - "src/**"
+      - "lib/**"
       - ".github/workflows/build.yml"
       - "CMakeLists.txt"
     # Only run on dev branch
