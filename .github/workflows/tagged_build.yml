@@ -1,5 +1,9 @@
 name: USBSID-Pico Tagged Build
 
+permissions:
+  contents: write
+  actions: write
+
 env:
   BUILD_THREADS: 4
   BUILD_TYPE: Release
