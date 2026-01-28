@@ -14,6 +14,8 @@ on:
     branches: [dev]
   # Allows you to run this workflow manually from the Actions tab when needed
   workflow_dispatch:
+  # Enables calling from other workflows
+  workflow_call:
 
 jobs:
   build-tools:
