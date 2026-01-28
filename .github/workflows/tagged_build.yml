@@ -429,6 +429,8 @@ jobs:
     needs: create_release
     if: startsWith(github.ref, 'refs/tags/d')
     uses: ./.github/workflows/buildtools.yml
+    with:
+      force_run: true  # This overrides the 'if' logic in the child
 
   # Final job to collect everything and upload to the release
   upload-tools:
