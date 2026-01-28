@@ -442,8 +442,10 @@ jobs:
       - name: Download Tools Artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: '(cfg_usbsid*|send_sid*)'
+          pattern: '*'
           path: tools-output
+          # Download all artifacts to a single directory
+          merge-multiple: true
       - name: Upload to Release
         uses: actions/github-script@v7
         with:
