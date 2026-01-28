@@ -66,7 +66,7 @@ jobs:
         run: |
           pushd master/examples/${{ matrix.directory }}
           ls -lhai
-          rm ${{ matrix.buildname }}
+          rm ${{ matrix.buildname }} || true
           popd
 
       - name: Configure and build ${{ matrix.buildname }}
