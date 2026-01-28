@@ -65,15 +65,15 @@ jobs:
       - name: Remove pre-built binaries
         run: |
           pushd master/examples/${{ matrix.directory }}
-          ls -lhai *.dll ${{ matrix.buildname }}*
-          rm ${{ matrix.buildname }} ${{ matrix.buildname }}.exe
+          ls -lhai
+          rm ${{ matrix.buildname }}
           popd
 
       - name: Configure and build ${{ matrix.buildname }}
         run: |
           pushd master/examples/${{ matrix.directory }}
           cmake -S . -B build && cmake --build build -j$(nproc)
-          ls -lhai *.dll ${{ matrix.buildname }}*
+          ls -lhai
           popd
 
       - name: Upload
