@@ -26,10 +26,13 @@
 !.gitattributes
 !LICENSE
 !CMakeLists.txt
+# tool files
 !cfg_usbsid
 !cfg_usbsid.exe
 !send_sid
 !send_sid.exe
+!libusb-1.0.sll
+!libwinpthread-1.dll
 
 # folders
 !.github
