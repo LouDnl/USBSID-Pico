@@ -421,12 +421,14 @@ jobs:
             });
 
   build-tools:
+    name: Build Tools
     if: startsWith(github.ref, 'refs/tags/d')
     uses: ./.github/workflows/buildtools.yml
     needs: create_release
 
   # Final job to collect everything and upload to the release
-  upload-build-tools:
+  upload-tools:
+    name: Upload tools
     needs: [create_release, build-tools]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/d')
@@ -455,7 +457,7 @@ jobs:
 
   publish_release:
     name: Publish Release
-    needs: [create_release, build, upload-build-tools]
+    needs: [create_release, build, upload-tools]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/d')
     steps:

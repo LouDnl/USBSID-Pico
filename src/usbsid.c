@@ -26,7 +26,7 @@
 #include "globals.h"
 #include "config.h"
 #include "usbsid.h"
-#include "midi.h"  /* needed for struct midi_machine */
+#include "midi.h"
 #include "sid.h"
 #include "logging.h"
 
