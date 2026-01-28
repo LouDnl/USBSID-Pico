@@ -40,8 +40,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          # Forces checkout of the branch head instead of a specific commit SHA
+          ref: ${{ github.ref }}
           submodules: true
-          path: master
+          path: repo
 
       - name: Install dependencies (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
@@ -64,14 +66,14 @@ jobs:
 
       - name: Remove pre-built binaries
         run: |
-          pushd master/examples/${{ matrix.directory }}
+          pushd repo/examples/${{ matrix.directory }}
           ls -lhai
           rm ${{ matrix.buildname }} || true
           popd
 
       - name: Configure and build ${{ matrix.buildname }}
         run: |
-          pushd master/examples/${{ matrix.directory }}
+          pushd repo/examples/${{ matrix.directory }}
           cmake -S . -B build && cmake --build build -j$(nproc)
           ls -lhai
           popd
@@ -81,6 +83,6 @@ jobs:
         with:
           name: ${{ matrix.buildname }}-${{ matrix.os }}
           path: |
-            master/examples/${{ matrix.directory }}/${{ matrix.buildname }}
-            ${{ matrix.os == 'windows-2022' && format('master/examples/{0}/*.dll', matrix.directory) || '' }}
+            repo/examples/${{ matrix.directory }}/${{ matrix.buildname }}
+            ${{ matrix.os == 'windows-2022' && format('repo/examples/{0}/*.dll', matrix.directory) || '' }}
           if-no-files-found: ignore
