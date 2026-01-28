@@ -31,7 +31,7 @@
 !cfg_usbsid.exe
 !send_sid
 !send_sid.exe
-!libusb-1.0.sll
+!libusb-1.0.dll
 !libwinpthread-1.dll
 
 # folders
