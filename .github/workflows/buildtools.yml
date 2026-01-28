@@ -17,7 +17,7 @@ on:
 
 jobs:
   build-tools:
-    name: Build config-tool and send_sid
+    name: Tools
     if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -25,13 +25,13 @@ jobs:
       matrix:
         include:
           - { os: ubuntu-latest, shell: bash,
-              directory: config-tool, buildname: cfg_tool }
+              directory: config-tool, buildname: cfg_usbsid }
           - { os: ubuntu-latest, shell: bash,
               directory: send_sid, buildname: send_sid }
           - { os: windows-2022,  shell: 'msys2 {0}',
-              directory: config-tool, buildname: cfg_tool }
+              directory: config-tool, buildname: cfg_usbsid }
           - { os: windows-2022,  shell: 'msys2 {0}',
-              directory: config-tool, buildname: cfg_tool }
+              directory: send_sid, buildname: send_sid }
     defaults:
       run:
         shell: ${{ matrix.shell }}
