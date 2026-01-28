@@ -1,0 +1,78 @@
+name: USBSID-Pico Build Tools
+
+env:
+  BUILD_THREADS: 4
+  BUILD_TYPE: Release
+
+on:
+  push:
+    paths:
+      - "src/examples/config-tool/**"
+      - "src/examples/send_sid/**"
+      - ".github/workflows/buildtools.yml"
+    # Only run on dev branch
+    branches: [dev]
+  # Allows you to run this workflow manually from the Actions tab when needed
+  workflow_dispatch:
+
+jobs:
+  build-tools:
+    name: Build config-tool and send_sid
+    runs-on: ${{ matrix.os }}
+    if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-2022]
+        include:
+          - {
+              buildname: cfg_tool,
+              directory: config-tool,
+            }
+          - {
+              buildname: send_sid,
+              directory: send_sid,
+            }
+
+      fail-fast: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          path: master
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config cmake build-essential libusb-1.0-0 libusb-1.0-0-dev
+
+      - name: Set up MSYS2 (Windows)
+        if: matrix.os == 'windows-2022'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-libusb
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-pkg-config
+            mingw-w64-x86_64-ninja
+
+      # Unified Build Step
+      - name: Configure and Build
+        shell: ${{ matrix.os == 'windows-2022' && 'msys2 {0}' || 'bash' }}
+        run: |
+          pushd master/examples/${{ matrix.directory }}
+          cmake -S . -B build && cmake --build build -j$(nproc)
+          popd
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.os }}
+          path: |
+            master/examples/${{ matrix.directory }}/${{ matrix.buildname }}
+            master/examples/${{ matrix.directory }}/${{ matrix.buildname }}.exe
