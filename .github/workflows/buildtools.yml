@@ -20,7 +20,11 @@ on:
 jobs:
   build-tools:
     name: Tools
-    if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
+    # Allow if it's NOT a tag OR if it's being called by another workflow/manual dispatch
+    if: >
+      github.event_name == 'workflow_call' ||
+      github.event_name == 'workflow_dispatch' ||
+      !startsWith(github.ref, 'refs/tags/')
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
