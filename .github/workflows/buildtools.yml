@@ -29,9 +29,9 @@ jobs:
           - { os: ubuntu-latest, shell: bash,
               directory: send_sid, buildname: send_sid }
           - { os: windows-2022,  shell: 'msys2 {0}',
-              directory: config-tool, buildname: cfg_usbsid }
+              directory: config-tool, buildname: cfg_usbsid.exe }
           - { os: windows-2022,  shell: 'msys2 {0}',
-              directory: send_sid, buildname: send_sid }
+              directory: send_sid, buildname: send_sid.exe }
     defaults:
       run:
         shell: ${{ matrix.shell }}
@@ -62,12 +62,18 @@ jobs:
             mingw-w64-x86_64-pkg-config
             mingw-w64-x86_64-ninja
 
+      - name: Remove pre-built binaries
+        run: |
+          pushd master/examples/${{ matrix.directory }}
+          ls -lhai *.dll ${{ matrix.buildname }}*
+          rm ${{ matrix.buildname }} ${{ matrix.buildname }}.exe
+          popd
+
       - name: Configure and build ${{ matrix.buildname }}
         run: |
           pushd master/examples/${{ matrix.directory }}
           cmake -S . -B build && cmake --build build -j$(nproc)
-          pwd
-          ls -lhai
+          ls -lhai *.dll ${{ matrix.buildname }}*
           popd
 
       - name: Upload
@@ -76,5 +82,5 @@ jobs:
           name: ${{ matrix.buildname }}-${{ matrix.os }}
           path: |
             master/examples/${{ matrix.directory }}/${{ matrix.buildname }}
-            master/examples/${{ matrix.directory }}/${{ matrix.buildname }}.exe
+            ${{ matrix.os == 'windows-2022' && format('master/examples/{0}/*.dll', matrix.directory) || '' }}
           if-no-files-found: ignore
