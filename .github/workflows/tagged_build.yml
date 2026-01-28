@@ -421,6 +421,7 @@ jobs:
             });
 
   build-tools:
+    if: startsWith(github.ref, 'refs/tags/d')
     uses: ./.github/workflows/buildtools.yml
     needs: create_release
 
@@ -428,6 +429,7 @@ jobs:
   upload-build-tools:
     needs: [create_release, build-tools]
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/d')
     steps:
       - name: Download Tools Artifacts
         uses: actions/download-artifact@v4
