@@ -369,6 +369,10 @@ enum
   SID_PLAYER_PAUSE = 0xE3,  /* Pause/Unpause SID file play */
   SID_PLAYER_NEXT  = 0xE4,  /* Next SID subtune play */
   SID_PLAYER_PREV  = 0xE5,  /* Previous SID subtune play */
+
+  /* Filetypes we can receive and process */
+  SID_FILE         = 0x01,
+  PRG_FILE         = 0x02,
 #endif
 };
 

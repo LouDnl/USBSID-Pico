@@ -130,19 +130,25 @@ extern void start_cynthcart(void);
 extern unsigned int run_cynthcart(void);
 #endif /* ONBOARD_EMULATOR */
 #if defined(ONBOARD_SIDPLAYER)
-extern bool
-  sidplayer_init,
-  sidplayer_start,
-  sidplayer_playing,
-  sidplayer_stop;
+volatile bool sidplayer_init = false;
+volatile bool sidplayer_start = false;
+volatile bool sidplayer_playing = false;
+volatile bool sidplayer_stop = false;
+volatile bool sidplayer_next = false;
+volatile bool sidplayer_prev = false;
+
 extern uint8_t * sidfile; /* Temporary buffer to store incoming data */
 extern int sidfile_size;
 extern char tuneno;
-extern int load_sidtune(uint8_t * sidfile, int sidfilesize, char subt);
+extern bool is_prg;
+extern void load_prg(uint8_t * binary_, size_t binsize_, bool loop);
+extern void load_sidtune(uint8_t * sidfile, int sidfilesize, char subt);
 extern void init_sidplayer(void);
 extern void start_sidplayer(bool loop);
 extern void loop_sidplayer(void);
 extern void stop_sidplayer(void);
+extern void next_subtune(void);
+extern void previous_subtune(void);
 #endif /* ONBOARD_SIDPLAYER */
 
 /* Midi */
@@ -744,7 +750,11 @@ void core1_main(void)
       sidplayer_start = false;
       sidplayer_playing = false;
       offload_ledrunner = true;
-      load_sidtune(sidfile, sidfile_size, tuneno);
+      if (is_prg) {
+        load_prg(sidfile, sidfile_size, false); /* Load PRG without auto looping */
+      } else {
+        load_sidtune(sidfile, sidfile_size, tuneno);
+      }
       sidplayer_start = true;
       free(sidfile);
       sidfile = NULL;
@@ -753,8 +763,10 @@ void core1_main(void)
       sidplayer_init = false;
       sidplayer_start = false;
       sidplayer_playing = true;
-      init_sidplayer(); // WARNING: rp2040 insufficient memory!
-      start_sidplayer(false); /* No auto loop */
+      if (!is_prg) {
+        init_sidplayer(); // WARNING: rp2040 insufficient memory!
+        start_sidplayer(false); /* No auto loop */
+      }
     }
     if (sidplayer_stop) {
       stop_sidplayer();
@@ -762,8 +774,22 @@ void core1_main(void)
       sidplayer_playing = false;
       offload_ledrunner = true;
     }
+    if __us_unlikely (sidplayer_next && !sidplayer_playing) {
+      next_subtune();
+      sleep_us(20000);
+      sidplayer_next = false;
+      sidplayer_playing = true;
+    }
+    if __us_unlikely (!sidplayer_playing && sidplayer_prev) {
+      previous_subtune();
+      sidplayer_prev = false;
+      sidplayer_playing = true;
+    }
     if (sidplayer_playing) {
       loop_sidplayer();
+      if __us_unlikely (sidplayer_next || sidplayer_prev) {
+        sidplayer_playing = false;
+      }
     }
 #endif /* ONBOARD_SIDPLAYER */
 
