@@ -347,7 +347,7 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c
 )
 
-### Header folders to include
+### Header directories to include
 set(TARGET_INCLUDE_DIRS PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}
   ${CMAKE_CURRENT_LIST_DIR}/src
@@ -361,6 +361,12 @@ if(ONBOARD_SIDPLAYER EQUAL 1)
   set(COMPILE_OPTS ${COMPILE_OPTS} -O3)
   ## Set sidplayer list directory
   set(USPLAYER_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player)
+
+  ### Adjust filenames for user interpretation
+  foreach(FILENAME ${FILENAMES})
+    list(APPEND FILENAMES_tmp "${FILENAME}_sp")
+  endforeach()
+  set(FILENAMES ${FILENAMES_tmp})
 
   ### Build psiddrv header
   add_custom_command(
@@ -418,6 +424,13 @@ if(ONBOARD_EMULATOR EQUAL 1)
   add_compile_definitions(ONBOARD_EMULATOR=1)
   set(EMULATOR_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emulator)
   set(EMUDORE_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emudore-embedded)
+
+  ### Adjust filenames for user interpretation
+  foreach(FILENAME ${FILENAMES})
+    list(APPEND FILENAMES_tmp "${FILENAME}_em")
+  endforeach()
+  set(FILENAMES ${FILENAMES_tmp})
+
   set(SOURCEFILES
     ${SOURCEFILES}
     ${EMULATOR_LIST_DIR}/emudore_emulator.c
