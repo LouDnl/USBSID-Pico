@@ -217,6 +217,7 @@ jobs:
             }
 
       fail-fast: false
+
     steps:
       - name: 🗒️ Set tag output
         id: vars
@@ -243,7 +244,7 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install curl build-essential cmake -y
 
-      - name: Install SID player xa dependency
+      - name: Install USBSID-Player xa dependency
         if: ${{matrix.withsidplayer == 1 }}
         run: |
           sudo apt-get update && sudo apt-get install -y xa65
