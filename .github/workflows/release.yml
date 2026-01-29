@@ -1,5 +1,9 @@
 name: USBSID-Pico Release
 
+permissions:
+  contents: write
+  actions: write
+
 env:
   BUILD_THREADS: 4
   BUILD_TYPE: Release
@@ -15,6 +19,8 @@ on:
       - 'v(\d|\.|-|[A-Z])+' # Only if the tag contains 'v0.0.0' etc
   # Allows you to run this workflow manually from the Actions tab when needed
   workflow_dispatch:
+  # Enables calling from other workflows
+  workflow_call:
 
 jobs:
   release:
@@ -22,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    needs: build
+    needs: [build, upload-tools]
     # job will only start if there is a new tag
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -97,6 +103,7 @@ jobs:
               pico_board: pico,
               pico_platform: rp2040,
               withemulator: 0,
+              withsidplayer: 0,
             }
           - {
               buildname: Pico_W,
@@ -104,6 +111,7 @@ jobs:
               pico_board: pico_w,
               pico_platform: rp2040,
               withemulator: 0,
+              withsidplayer: 0,
             }
           - {
               buildname: Pico2,
@@ -111,6 +119,7 @@ jobs:
               pico_board: pico2,
               pico_platform: rp2350-arm-s,
               withemulator: 0,
+              withsidplayer: 0,
             }
           - {
               buildname: Pico2_W,
@@ -118,6 +127,7 @@ jobs:
               pico_board: pico2_w,
               pico_platform: rp2350-arm-s,
               withemulator: 0,
+              withsidplayer: 0,
             }
           - {
               buildname: Pico_Emulator,
@@ -125,6 +135,7 @@ jobs:
               pico_board: pico,
               pico_platform: rp2040,
               withemulator: 1,
+              withsidplayer: 0,
             }
           - {
               buildname: Pico2_Emulator,
@@ -132,6 +143,7 @@ jobs:
               pico_board: pico2,
               pico_platform: rp2350-arm-s,
               withemulator: 1,
+              withsidplayer: 0,
             }
           - {
               buildname: Pico_W_Emulator,
@@ -139,6 +151,7 @@ jobs:
               pico_board: pico_w,
               pico_platform: rp2040,
               withemulator: 1,
+              withsidplayer: 0,
             }
           - {
               buildname: Pico2_W_Emulator,
@@ -146,6 +159,23 @@ jobs:
               pico_board: pico2_w,
               pico_platform: rp2350-arm-s,
               withemulator: 1,
+              withsidplayer: 0,
+            }
+          - {
+              buildname: Pico2_SIDplayer,
+              directory: pico2_sp,
+              pico_board: pico2,
+              pico_platform: rp2350-arm-s,
+              withemulator: 0,
+              withsidplayer: 1,
+            }
+          - {
+              buildname: Pico2_W_SIDplayer,
+              directory: pico2_w_sp,
+              pico_board: pico2_w,
+              pico_platform: rp2350-arm-s,
+              withemulator: 0,
+              withsidplayer: 1,
             }
 
       fail-fast: false
@@ -164,6 +194,30 @@ jobs:
         if: ${{ env.ACT }}
         run: |
           sudo apt-get update && sudo apt-get install curl build-essential cmake -y
+
+      - name: Install USBSID-Player xa dependency
+        if: ${{matrix.withsidplayer == 1 }}
+        run: |
+          sudo apt-get update && sudo apt-get install -y xa65
+
+      - name: Checkout bin2h source
+        if: ${{matrix.withsidplayer == 1 }}
+        uses: actions/checkout@v4
+        with:
+          repository: elnormous/bin2h
+          path: bin2h-src
+
+      - name: Build and add to PATH
+        if: ${{matrix.withsidplayer == 1 }}
+        run: |
+          cd bin2h-src
+          make
+          # Add the current directory containing the built 'bin2h' to the runner's PATH
+          echo "$(pwd)" >> $GITHUB_PATH
+
+      - name: Verify installation
+        if: ${{matrix.withsidplayer == 1 }}
+        run: bin2h --help
 
       - name: 🗒️ Check GCC Version
         id: compiler-version
@@ -250,6 +304,13 @@ jobs:
           repository: loudnl/emudore-embedded
           path: master/lib/emudore-embedded
 
+      - name: 📇 Checkout USBSID-Player
+        if: ${{matrix.withsidplayer == 1 }}
+        uses: actions/checkout@v4
+        with:
+          repository: loudnl/usbsid-player
+          path: master/lib/usbsid-player
+
       - name: 🏭 Create build directory
         run: |
           mkdir -p ${{github.workspace}}/master/build_${{matrix.directory}}
@@ -258,9 +319,17 @@ jobs:
         run: |
           unset PICO_PLATFORM
           unset PICO_BOARD
-          cmake -S master -B ${{github.workspace}}/master/build_${{matrix.directory}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DPICO_PLATFORM=${{matrix.pico_platform}} -DPICO_BOARD=${{matrix.pico_board}} -Dpicotool_DIR=${{github.workspace}}/picotool/picotool -DONBOARD_EMULATOR=${{matrix.withemulator}} $extra_arg
+          cmake -S master \
+            -B ${{github.workspace}}/master/build_${{matrix.directory}} \
+            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -DPICO_PLATFORM=${{matrix.pico_platform}} \
+            -DPICO_BOARD=${{matrix.pico_board}} \
+            -Dpicotool_DIR=${{github.workspace}}/picotool/picotool \
+            -DONBOARD_EMULATOR=${{matrix.withemulator}} \
+            -DONBOARD_SIDPLAYER=${{matrix.withsidplayer}} \
+            $extra_arg
 
-      - name: 🏭 Build ${{matrix.name}}
+      - name: 🏭 Build ${{matrix.buildname}}
         run: |
           cmake --build ${{github.workspace}}/master/build_${{matrix.directory}} --config ${{env.BUILD_TYPE}} -j ${{env.BUILD_THREADS}}
 
@@ -287,3 +356,35 @@ jobs:
         with:
           name: releasebuild-usbsid${{matrix.directory}}
           path: ${{github.workspace}}/master/dist
+
+  build-tools:
+    name: Build Tools
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/buildtools.yml
+    with:
+      force_run: true  # This overrides the 'if' logic in the child
+
+  # Final job to collect everything and upload to the release
+  upload-tools:
+    name: Upload tools
+    needs: build-tools
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download Tools Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*'
+          path: tools-output
+          merge-multiple: true
+
+      - name: Zip tools
+        # -r for recursive, -j to junk paths so files are at the zip root
+        run: zip -r -j tools.zip ./tools-output
+
+      - name: Upload tools zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: releasebuild-usbsidtools
+          path: tools.zip
