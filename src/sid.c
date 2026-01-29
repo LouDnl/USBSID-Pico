@@ -7,7 +7,7 @@
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
- * Copyright (c) 2024-2025 LouD
+ * Copyright (c) 2024-2026 LouD
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -36,7 +36,6 @@ extern uint8_t *sid_memory;
 #else
 extern uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));
 #endif
-extern bool paused_state, reset_state;
 extern int usbdata;
 
 /* config.c */
@@ -47,16 +46,21 @@ extern RuntimeCFG cfg;
 extern uint16_t vu;
 
 /* bus.c */
+#if PICO_RP2350
+extern void clockcycle_delay(uint32_t n_cycles);
+#else
 extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
+#endif
 extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 
-/* locals */
+/* (hot) locals */
+static bool paused_state, reset_state;
 static uint8_t volume_state[4] = {0};
 
 
 static void log_memory(uint8_t * sid_memory)
 {
-  printf("[%c:%d][PWM]$%04x[V1]$%02X%02X$%02X%02X$%02X$%02X$%02X[V2]$%02X%02X$%02X%02X$%02X$%02X$%02X[V3]$%02X%02X$%02X%02X$%02X$%02X$%02X[FC]$%02x%02x$%02x[VOL]$%02x\n",
+  DBG("[%c:%d][PWM]$%04x[V1]$%02X%02X$%02X%02X$%02X$%02X$%02X[V2]$%02X%02X$%02X%02X$%02X$%02X$%02X[V3]$%02X%02X$%02X%02X$%02X$%02X$%02X[FC]$%02x%02x$%02x[VOL]$%02x\n",
     dtype, usbdata, vu,
     sid_memory[0x01], sid_memory[0x00], sid_memory[0x03], sid_memory[0x02], sid_memory[0x04], sid_memory[0x05], sid_memory[0x06],
     sid_memory[0x08], sid_memory[0x07], sid_memory[0x0A], sid_memory[0x09], sid_memory[0x0B], sid_memory[0x0C], sid_memory[0x0D],
@@ -102,6 +106,15 @@ void set_reset_state(bool state)
 }
 
 /**
+ * @brief Get the reset state value
+ *
+ */
+bool get_reset_state(void)
+{
+  return reset_state;
+}
+
+/**
  * @brief Set the paused state to true or false
  *
  * @param state Boolean
@@ -110,6 +123,15 @@ void set_paused_state(bool state)
 {
   paused_state = state;
   return;
+}
+
+/**
+ * @brief Get the paused state value
+ *
+ */
+bool get_paused_state(void)
+{
+  return paused_state;
 }
 
 /**
@@ -209,19 +231,34 @@ void reset_sid(void)
   set_paused_state(false);
   memset(volume_state, 0, 4);
   memset(sid_memory, 0, count_of(sid_memory));
-  // set_gpio(RES, 0);
   cPIN(RES);
   if (cfg.chip_one == 0 || cfg.chip_two == 0) {
-    cycled_delay_operation(10);  /* 10x PHI1(02) cycles as per datasheet for REAL SIDs only */
+    /* 10x PHI1(02) cycles as per datasheet for REAL SIDs only */
+#if PICO_RP2350
+    clockcycle_delay(10);
+#else
+    cycled_delay_operation(10);
+#endif
   }
-  // set_gpio(RES, 1);
   sPIN(RES);
   set_reset_state(false);
   return;
 }
 
+/**
+ * @brief Clear SID register / reset registers
+ * @note https://csdb.dk/forums/?roomid=11&topicid=85713&showallposts=1
+ * @note thanks Wilfred for pointing this out!
+ * @param sidno
+ */
 void clear_sid_registers(int sidno)
-{ /* NOTICE: CAUSES ISSUES IF USED RIGHT BEFORE PLAYING */
+{
+  for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
+    cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0xff, 0);
+  }
+  for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
+    cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0x08, 0);
+  }
   for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
     cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0x0, 0);
   }
@@ -229,8 +266,13 @@ void clear_sid_registers(int sidno)
   return;
 }
 
+/**
+ * @brief Reset registers on everyo installed SID
+ * @note SIDKICK-pico v0.1 might have issues
+ *
+ */
 void reset_sid_registers(void)
-{ /* NOTICE: CAUSES ISSUES IF USED RIGHT BEFORE PLAYING */
+{
   set_reset_state(true);
   set_paused_state(false);
   for (int sid = 0; sid < cfg.numsids; sid++) {

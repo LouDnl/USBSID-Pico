@@ -7,7 +7,7 @@
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
- * Copyright (c) 2024-2025 LouD
+ * Copyright (c) 2024-2026 LouD
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -34,15 +34,15 @@
 
 #define FPGASID_IDENTIFIER 0xF51D
 
-static const char * slots[2] = { "A", "B" };
-static const char * extinsource[4] = { "analog input", "disabled", "other SID", "digifix (8580)" };
-static const char * readback[4] = { "bitrotation 6581", "always read value", "always read $00", "bitrotation 8580" };
-static const char * regdelay[2] = { "6581", "8580" };
-static const char * mixedwave[2] = { "6581", "8580" };
-static const char * crunchydac[2] = { "on (6581)", "off (8580)" };
-static const char * filtermode[2] = { "6581", "8580" };
-static const char * outputmode[2] = { "dual output over SID1 & SID2 channels -> stereo", "dual output over SID1 channel -> mono mix" };
-static const char * sid2addr[5] = { "$D400 ", "$DE00 ", "$D500 ", "$D420 ", "" };
+static const char __in_flash("fpgasid_vars") *slots[2] = { "A", "B" };
+static const char __in_flash("fpgasid_vars") *extinsource[4] = { "analog input", "disabled", "other SID", "digifix (8580)" };
+static const char __in_flash("fpgasid_vars") *readback[4] = { "bitrotation 6581", "always read value", "always read $00", "bitrotation 8580" };
+static const char __in_flash("fpgasid_vars") *regdelay[2] = { "6581", "8580" };
+static const char __in_flash("fpgasid_vars") *mixedwave[2] = { "6581", "8580" };
+static const char __in_flash("fpgasid_vars") *crunchydac[2] = { "on (6581)", "off (8580)" };
+static const char __in_flash("fpgasid_vars") *filtermode[2] = { "6581", "8580" };
+static const char __in_flash("fpgasid_vars") *outputmode[2] = { "dual output over SID1 & SID2 channels -> stereo", "dual output over SID1 channel -> mono mix" };
+static const char __in_flash("fpgasid_vars") *sid2addr[5] = { "$D400 ", "$DE00 ", "$D500 ", "$D420 ", "" };
 
 #ifdef __cplusplus
   }

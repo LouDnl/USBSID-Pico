@@ -42,13 +42,6 @@
 #include <cynthcart.h>
 #endif
 
-#ifdef ONBOARD_SIDPLAYER
-// #include <supremacyprg.h>
-#include <supremacy.h>
-// #include <edgeofdisgrace.h>
-#endif
-
-
 /* config.c */
 extern RuntimeCFG cfg;
 extern void apply_clockrate(int n_clock, bool suspend_sids);
@@ -57,6 +50,8 @@ extern void apply_clockrate(int n_clock, bool suspend_sids);
 extern void mute_sid(void);
 extern void unmute_sid(void);
 
+/* sid.c */
+void reset_sid_registers(void);
 
 #ifdef ONBOARD_EMULATOR
 /* interface.h */
@@ -65,41 +60,15 @@ extern void start_emudore_cynthcart(
   uint8_t * kernal_, uint8_t * binary_,
   bool run_continuously
 );
-extern void start_emudore_prgtuneplayer(
-  uint8_t * basic_, uint8_t * chargen_,
-  uint8_t * kernal_, uint8_t * binary_,
-  size_t binsize_, bool run_continuously
-);
-extern void start_emudore_sidtuneplayer(
-  uint8_t * basic_, uint8_t * chargen_,
-  uint8_t * kernal_, uint8_t * binary_,
-  size_t binsize_, int tuneno, bool run_continuously
-);
-extern unsigned int run_emulation_cycle(void);
+extern bool stop_emudore(void);
 extern unsigned int run_specified_cycle(
+  bool callback,
   bool cpu, bool cia1, bool cia2,
   bool vic, bool io,   bool cart);
-
-extern bool stop_emudore(void);
-extern bool is_looping(void);
-extern bool disable_looping(void);
 extern void _set_logging(void);
 extern void logging_enable(int logid);
 extern void logging_disable(int logid);
-#endif
 
-#ifdef ONBOARD_SIDPLAYER
-extern bool isrsid(void);
-/* Declare variables */
-bool sidplayer_init = false, sidplayer_playing = false;
-
-/* Declare local variables */
-static int sidfile_size = 0;
-static int subtune = 0;
-#endif
-
-
-#ifdef ONBOARD_EMULATOR
 void set_logging(int logid)
 {
   logging_enable(logid);
@@ -116,20 +85,28 @@ void unset_logging(int logid)
 
 void start_cynthcart(void)
 {
+  reset_sid_registers();
   apply_clockrate(1,true); /* Fixed to PAL */
-  start_emudore_cynthcart(basic,chargen,kernal,cynthcart,false);
+  start_emudore_cynthcart(
+    basic,
+    chargen,
+    kernal,
+    cynthcart,
+    false);
   return;
 }
 
-void stop_emulator(void)
+void stop_cynthcart(void)
 {
   stop_emudore();
+  reset_sid_registers();
   return;
 }
 
 unsigned int run_cynthcart(void)
 {
   return run_specified_cycle(
+    false, // callback
     true,  // cpu
     true,  // cia1
     false, // cia2
@@ -139,92 +116,4 @@ unsigned int run_cynthcart(void)
   );
 }
 
-#ifdef ONBOARD_SIDPLAYER
-static void print_tune_info()
-{
-  return;
-}
-
-static void set_tune_config()
-{
-  return;
-}
-
-void start_sidplayer()
-{ /* BUG: Still has issues */
-
-  // size_t filesize = count_of(edgeofdisgrace/* supremacyprg */); /* 4382 */
-  // do_timer_logging(dolog);
-  // start_emudore_sidtuneplayer(
-  //   basic,chargen,kernal,
-  //   edgeofdisgrace,filesize,
-  //   false /* true */);
-  size_t filesize = count_of(supremacy); /* 4382 */
-  start_emudore_sidtuneplayer(
-    basic,chargen,kernal,
-    supremacy,filesize,0,
-    false /* true */);
-  // size_t filesize = count_of(supremacyprg); /* 4382 */
-  // start_emudore_prgtuneplayer(
-  //   basic,chargen,kernal,
-  //   supremacyprg,filesize,
-  //   false /* true */);
-}
-
-unsigned int run_psidplayer(void)
-{
-  if (!isrsid()) {
-    return run_specified_cycle(
-      true,   // cpu
-      true,   // cia1
-      false,  // cia2
-      false,  // vic
-      false,  // io
-      false   // cart
-    );
-  } else {
-    run_emulation_cycle();
-  }
-}
-
-static int init_sidplayer(uint8_t * sidfile)
-{
-  return 0;
-}
-
-int load_sidtune(uint8_t * sidfile, int sidfilesize, char tuneno)
-{
-  size_t filesize = sidfilesize;
-  start_emudore_sidtuneplayer(
-    basic,chargen,kernal,
-    sidfile,filesize,tuneno,
-    false /* true */);
-  return 1;
-}
-
-int load_sidtune_fromflash(int sidflashid, char tuneno)
-{
-  return 0;
-}
-
-void reset_sidplayer(void)
-{
-  return;
-}
-
-void next_subtune(void)
-{
-  return;
-}
-
-void previous_subtune(void)
-{
-  return;
-}
-
-uint16_t playtime(void)
-{
-  return 0;
-}
-#endif /* ONBOARD_SIDPLAYER */
 #endif /* ONBOARD_EMULATOR */

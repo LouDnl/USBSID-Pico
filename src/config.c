@@ -7,7 +7,7 @@
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
- * Copyright (c) 2024-2025 LouD
+ * Copyright (c) 2024-2026 LouD
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -50,7 +50,8 @@ extern uint8_t sid_memory[];
 #endif
 extern queue_t sidtest_queue;
 extern bool auto_config;
-#ifdef ONBOARD_EMULATOR
+#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
+/* Offload Vu to Cora1 when running C64 on Core2 */
 extern bool offload_ledrunner;
 #endif
 
@@ -96,29 +97,28 @@ extern void switch_pdsid_type(void);
 
 /* SID player */
 #ifdef ONBOARD_EMULATOR
-extern bool stop_emulator(void);
+extern bool stop_cynthcart(void); /* TODO: Remove double declaration */
 extern void set_logging(int logid);
 extern void unset_logging(int logid);
-bool emulator_running, starting_emulator, stopping_emulator;
-
-#ifdef ONBOARD_SIDPLAYER
-extern int load_sidtune(uint8_t * sidfile, int sidfilesize, char subt);
-extern int load_sidtune_fromflash(int sidflashid, char tuneno);
-extern void reset_sidplayer(void);
-extern void next_subtune(void);
-extern void previous_subtune(void);
-extern uint16_t playtime(void);
-extern bool sidplayer_init, sidplayer_playing;
+bool
+  emulator_running,
+  starting_emulator,
+  stopping_emulator;
+#endif /* ONBOARD_EMULATOR */
+#if defined(ONBOARD_SIDPLAYER)
+extern bool
+  sidplayer_init,
+  sidplayer_start,
+  sidplayer_playing,
+  sidplayer_stop;
 
 /* SID player locals */
-uint8_t __not_in_flash("usbsid_sidfile") sidfile[0xFFFF]; /* Temporary buffer to store incoming data */
-static int sidfile_size;
+uint8_t * sidfile = NULL; /* Temporary buffer to store incoming data */
+int sidfile_size;
+char tuneno;
 static int sidbytes_received;
 static bool receiving_sidfile;
-bool sidplayer_start;
-bool sidplayer_log_timings = false;
 #endif /* ONBOARD_SIDPLAYER */
-#endif /* ONBOARD_EMULATOR */
 
 /* Config BUS */
 extern void apply_bus_config(bool quiet);
@@ -162,8 +162,8 @@ void apply_clockrate(int n_clock, bool suspend_sids);
 Config usbsid_config;
 RuntimeCFG cfg;
 bool first_boot = false;
-const char *project_version = PROJECT_VERSION;
-const char *pcb_version = PCB_VERSION;
+const char __in_flash("usbsid_vars") *project_version = PROJECT_VERSION;
+const char __in_flash("usbsid_vars") *pcb_version = PCB_VERSION;
 
 /* Declare local variables */
 /* 0x15 (16) max before starting at 0 flash sector erase */
@@ -177,6 +177,10 @@ static uint8_t p_version_array[MAX_BUFFER_SIZE];
 /* Config magic verification storage */
 static uint32_t cm_verification;
 
+
+#ifdef ONBOARD_EMULATOR
+uint8_t get_numsids(void) { return (uint8_t)cfg.numsids; };
+#endif
 
 void read_config(Config* config)
 {
@@ -960,11 +964,8 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       }
       if (buffer[1] == 1) {
         CFG("STOP EMULATOR\n");
-        #ifdef ONBOARD_SIDPLAYER
-        sidplayer_playing = false;
-        #endif
         stopping_emulator = true;
-        stop_emulator();
+        stop_cynthcart();
       }
       if (buffer[1] == 2) { /* 9A 2 n on/off(0) */
         if (buffer[3] == 0) {
@@ -972,17 +973,6 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         } else {
           set_logging((int)buffer[2]);
         }
-      }
-      #endif
-      #if defined(ONBOARD_EMULATOR) && defined(ONBOARD_SIDPLAYER)
-      if (buffer[1] == 3) {
-        CFG("START SID PLAYER\n");
-        offload_ledrunner = true;
-        sidplayer_start = true;
-      }
-      if (buffer[1] == 4) {
-        CFG("SID PLAYER SET LOG TIMINGS TO %d\n",buffer[2]);
-        sidplayer_log_timings = ((buffer[2] == 1) ? true : false);
       }
       #endif
       if (buffer[1] == 5) {
@@ -1035,11 +1025,18 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       CFG("[TOGGLE PDSID TYPE]\n");
       switch_pdsid_type();
       break;
-    #if defined(ONBOARD_EMULATOR) && defined(ONBOARD_SIDPLAYER)
+    #if defined(ONBOARD_SIDPLAYER)
     case UPLOAD_SID_START:
       CFG("[UPLOAD_SID_START]\n");
       receiving_sidfile = true;
       sidbytes_received = 0;
+      sidfile = (uint8_t*)calloc(1, 0x10000); /* allocate 64KB */
+      if (sidfile == NULL) {
+        /*
+        * Handle out-of-memory error
+        * NOTE: RP2040 has 264KB RAM; 64KB is ~25% of total.
+        */
+      }
       break;
     case UPLOAD_SID_DATA:
       if (sidbytes_received == 0) CFG("[UPLOAD_SID_DATA]\n");
@@ -1063,69 +1060,45 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       sidfile_size = (buffer[1]<<8|buffer[2]);
       DBG("Received SID file size: %u\n", sidfile_size);
       break;
-    case SID_PLAYER_LOAD:
-      CFG("[SID_PLAYER_LOAD] %d\n", buffer[1]);
+    case SID_PLAYER_TUNE:
+      CFG("[SID_PLAYER_TUNE] %d\n", buffer[1]);
       CFG("[CONFIG BUFFER SIZE] %d\n", count_of(buffer));
-      char tuneno = buffer[2]; /* Should be 0 if not supplied */
+      tuneno = buffer[2]; /* Should be 0 if not supplied */
       CFG("[SUBTUNE] %d\n", tuneno);
-      sidplayer_init = false;
-      switch (buffer[1]) {
-        case 0: /* From buffer */
-          if (load_sidtune(sidfile, sidfile_size, tuneno)) {
-            sidplayer_init = true;
-          }
-          break;
-        case 1: /* Supremacy */
-          if (load_sidtune_fromflash(1, tuneno)) {
-            sidplayer_init = true;
-          }
-          break;
-        case 2: /* Afterburner */
-          if (load_sidtune_fromflash(2, tuneno)) {
-            sidplayer_init = true;
-          }
-          break;
-        case 3: /* Edge of Disgrace */
-          if (load_sidtune_fromflash(3, tuneno)) {
-            sidplayer_init = true;
-          }
-          break;
-        default:
-          sidplayer_init = false;
-          break;
-      }
-      break;
+      unmute_sid(); /* Must unmute before play start or some tunes will be silent */
+      sidplayer_init = true;
     case SID_PLAYER_START:
       CFG("[SID_PLAYER_START] %d\n", sidplayer_init);
-      unmute_sid(); /* Must unmute before play start or some tunes will be silent */
       if (sidplayer_init) {
         offload_ledrunner = true;
-        sidplayer_playing = true;
+        sidplayer_start = true;
       }
       sidplayer_init = false;
       break;
     case SID_PLAYER_STOP:
       CFG("[SID_PLAYER_STOP]\n");
-      if (sidplayer_playing) stop_emulator();
-      sidplayer_playing = false;
-      if (usbsid_config.socketOne.clonetype != 2
-          && usbsid_config.socketTwo.clonetype != 2) {
-        reset_sid(); /* Breaking for tunes on SKPico */
-      } else {
-        mute_sid();
+      if (sidplayer_playing) {
+        sidplayer_stop = true;
       }
+      /* Deinit all sidplayer variables */
+      sidplayer_init = false;
+      sidplayer_start = false;
+      /* SID resets are handled in the emulator */
       break;
     case SID_PLAYER_PAUSE:
+    CFG("[SID_PLAYER_PAUSE]\n");
       sidplayer_playing = !sidplayer_playing;
       break;
     case SID_PLAYER_NEXT:
+    CFG("[SID_PLAYER_NEXT]\n");
       sidplayer_playing = false;
-      next_subtune();
+      // next_subtune();  // TODO: Finish
       sidplayer_playing = true;
       break;
     case SID_PLAYER_PREV:
+    CFG("[SID_PLAYER_PREV]\n");
       sidplayer_playing = false;
-      previous_subtune();
+      // previous_subtune();  // TODO: Finish
       sidplayer_playing = true;
       break;
     #endif

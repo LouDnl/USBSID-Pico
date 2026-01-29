@@ -7,7 +7,7 @@
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
- * Copyright (c) 2024-2025 LouD
+ * Copyright (c) 2024-2026 LouD
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -42,7 +42,7 @@ extern char *mono_stereo[2];
  * Partly copied from and inspired by SKPico code by frenetic
  * see: https://github.com/frntc/SIDKick-pico
  */
-#if RP2350
+#if PICO_RP2350
 register uint32_t b asm( "r13" );
 #else
 register uint32_t b asm( "r10" );

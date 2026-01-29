@@ -7,7 +7,7 @@
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
- * Copyright (c) 2024-2025 LouD
+ * Copyright (c) 2024-2026 LouD
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -35,6 +35,8 @@
 /* GPIO */
 extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
 extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
+
+/* SID */
 extern void clear_sid_memory(void);
 extern void clear_volume_state(void);
 extern void set_reset_state(bool state);
@@ -50,7 +52,7 @@ extern char *sidtypes[5];
 
 /* Init local variables */
 static uint8_t skpico_config[64] = {0xFF};
-static const char * error_type[1] = {"ERROR"};
+static const char __in_flash("usbsid_vars") * error_type[1] = { "ERROR" };
 
 
 void print_fpgasid_sidconfig(int slot, int sidno, uint8_t * configarray)
@@ -181,44 +183,44 @@ void print_skpico_configuration(uint8_t base_address, uint8_t * configarray)
 {
 
   CFG("\n");
-  printf("[SIDKICK-pico @ 0x%02X CONFIG]\n", base_address);
+  CFG("[SIDKICK-pico @ 0x%02X CONFIG]\n", base_address);
   for (size_t i = 0; i < 64; i++) {
     if (i >= 4 && i <= 7) continue;
     if (i >= 13 && i <= 56) continue;
     if (i == 62 || i == 63) continue;
     if (i == 0 || i == 8) {
-      printf("[%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_sid_types) ? (char*)sid_types[configarray[i]] : (char*)error_type[0]);
+      CFG("[%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_sid_types) ? (char*)sid_types[configarray[i]] : (char*)error_type[0]);
       continue;
     }
     if (i == 10) {
-      printf("[%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_sid2_address) ? (char*)sid2_address[configarray[i]] : (char*)error_type[0]);
+      CFG("[%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_sid2_address) ? (char*)sid2_address[configarray[i]] : (char*)error_type[0]);
       continue;
     }
     if (i == 59) {
-      printf("[%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_clock_speed) ? (char*)clock_speed[configarray[i]] : (char*)error_type[0]);
+      CFG("[%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_clock_speed) ? (char*)clock_speed[configarray[i]] : (char*)error_type[0]);
       continue;
     }
-    printf("[%02ld] %s: %02X\n", i, config_names[i], configarray[i]);
+    CFG("[%02ld] %s: %02X\n", i, config_names[i], configarray[i]);
   }
-  printf("[PRINT CFG SETTINGS END]\n");
+  CFG("[PRINT CFG SETTINGS END]\n");
 }
 
 void read_skpico_configuration(uint8_t base_address)
 {
   /* Enter config mode */
   cycled_write_operation((init_configmode[0] + base_address), init_configmode[1], 6);
-  /* printf("[W]$%02X:%02X\n", (init_configmode[0] + base_address), init_configmode[1]); */
+  /* CFG("[W]$%02X:%02X\n", (init_configmode[0] + base_address), init_configmode[1]); */
 
   /* Read config from SKPico */
   for (int i = 0; i <= 63; ++i) {
     sleep_us(1);
     skpico_config[i] = cycled_read_operation((0x1D + base_address), 0);
-    /* printf("[R%d]$%02X:%02X\n", i, (0x1D + base_address), skpico_config[i]); */
+    /* CFG("[R%d]$%02X:%02X\n", i, (0x1D + base_address), skpico_config[i]); */
   }
 
   /* Exit config mode */
   cycled_write_operation((config_exit[0] + base_address), config_exit[1], 6);
-  /* printf("[W]$%02X:%02X\n", (config_exit[0] + base_address), config_exit[1]); */
+  /* CFG("[W]$%02X:%02X\n", (config_exit[0] + base_address), config_exit[1]); */
 
   CFG("\n");
   CFG("[SKPICO RECEIVED BUFFER]\n");

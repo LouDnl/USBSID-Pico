@@ -7,7 +7,7 @@
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
- * Copyright (c) 2024-2025 LouD
+ * Copyright (c) 2024-2026 LouD
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -197,7 +197,7 @@ void sync_pios(bool at_boot) // TODO: SYNC COUNTER PIO WITH BUS PIO
   // pio_clkdiv_restart_sm_multi_mask(clkcnt_pio, 0, 0b0011, 0);
   pio_clkdiv_restart_sm_multi_mask(clkcnt_pio, 0, 0b1000, 0);
   #endif
-  if (likely(!at_boot)) {
+  if __us_likely(!at_boot) {
     pio_sm_clear_fifos(bus_pio, sm_clock); // TODO: TEST!
     pio_sm_clear_fifos(bus_pio, sm_control);
     pio_sm_clear_fifos(bus_pio, sm_data);
@@ -301,7 +301,7 @@ void setup_sidclock(void)
   /* Run only if PCB version 1.0 */
   if ((strcmp(pcb_version, "1.0") == 0)) {
     /* Detect optional external crystal */
-    if (likely(detect_clocksignal() == 0)) {
+    if __us_likely(detect_clocksignal() == 0) {
       usbsid_config.external_clock = false;
       gpio_deinit(PHI1); /* Disable PHI1 as gpio */
       init_sidclock();
