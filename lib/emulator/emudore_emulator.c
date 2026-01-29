@@ -3,14 +3,14 @@
  * for interfacing one or two MOS SID chips and/or hardware SID emulators over
  * (WEB)USB with your computer, phone or ASID supporting player
  *
- * emulator_emodure.c
+ * emodure_emulator.c
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
  * Any licensing conditions from the above named source automatically
  * apply to this code
   *
- * Copyright (c) 2024-2025 LouD
+ * Copyright (c) 2024-2026 LouD
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

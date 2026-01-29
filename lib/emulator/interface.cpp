@@ -10,7 +10,7 @@
  * Any licensing conditions from the above named source automatically
  * apply to this code
   *
- * Copyright (c) 2024-2025 LouD
+ * Copyright (c) 2024-2026 LouD
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
