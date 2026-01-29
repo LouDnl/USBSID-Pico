@@ -1,0 +1,50 @@
+= *USBSID-Player manual*
+:author: LouD
+:description: This document contains information about the embedded USBSID-Player and how to use it
+:url-repo: https://www.github.com/LouDnl/USBSID-Pico
+:revdate: {localdate}
+:hide-uri-scheme:
+:toc:
+:toclevels: 4
+:toc-placement!:
+
+Author: {author} - generated on {revdate}
+
+toc::[]
+[%always]
+<<<
+
+== Disclaimer
+include::disclaimer.adoc[]
+
+
+== What!?
+Yes you read that right, USBSID-Player is embedded on USBSID-Pico and allows you to play PSID, RSID, PRG or P00 chiptunes without the need of an emulator on your computer!
+
+
+== Firmwares with embedded USBSID-Player
+Starting with firmware version v0.6.0-BETA firmwares ending with `_sp` have an embedded emulator that can play PSID and RSID tunes and PSID64 PRG/P00 files. +
+For example `usbsidpico2-v1.0_sp.uf2` or `usbsidpico2-v1.3-rgb_sp.uf2` +
+This USBSID-Player is still in active development and some tunes might not work or play at all. +
+The embedded USBSID-Player requires more then 256KB RAM and an overclocked CPU which makes this firmware only available for rp2350 Pico2 boards. +
+
+
+== Usage
+To play SID tunes and run PRG/P00 PSID64 files _on_ USBSID-Pico you will need the `send_sid` tool that is available in the `tools.zip` starting with firmware release v0.6.0-BETA and up. +
+The help menu is self explanatory.
+
+
+== Future plans
+When all bugs are squashed and more tunes are supported a website will be made available where you can 'send' files from to the onboard SID player
+
+
+== Development
+More information about USBSID-Player is available on the https://github.com/LouDnl/USBSID-Player[github repo]
+
+
+== License
+include::license-software.adoc[]
+
+include::license-hardware.adoc[]
+
+Author: {author} - generated on {revdate}

@@ -1,0 +1,55 @@
+= *USBSID-Pico Cynthcart manual*
+:author: LouD
+:description: This document contains information about the embedded emulator running Cynthart and how to use it
+:url-repo: https://www.github.com/LouDnl/USBSID-Pico
+:revdate: {localdate}
+:hide-uri-scheme:
+:toc:
+:toclevels: 4
+:toc-placement!:
+
+Author: {author} - generated on {revdate}
+
+toc::[]
+[%always]
+<<<
+
+== Disclaimer
+include::disclaimer.adoc[]
+
+
+== Thank you
+First off thanks go out to Paul Slocum for creating Cynthcart and Mario Ballano for creating emudore. +
+(The onboard emulator is called 'adorable' and is a fork of 'emudore')
+
+
+== Firmwares with Cynthcart embedded
+Starting with firmware version v0.6.0-BETA firmwares ending with `_em` have an embedded emulator running Cynthcart. +
+For example `usbsidpico-v1.0_em.uf2` or `usbsidpico2-rgb-v1.3_em.uf2`
+
+
+== Usage
+To start the emulator and Cynthcart you will need an USB-midi connection to USBSID=Pico.
+
+=== CC messages
+85 (0x55) ~ Enable Cynthcart +
+86 (0x56) ~ Disable Cynthcart +
+87 (0x57) ~ Reset Cynthcart
+
+=== Cynthcart control
+For all other midi CC messages to control Cynthcart please refer to the Cynthcart manual. +
+Page two in https://github.com/PaulSlocum/cynthcart/blob/master/manual/cynthcart2.0.1.pdf [cynthcart2.0.1.pdf] or https://github.com/PaulSlocum/cynthcart/blob/master/manual/cynthcart2.0.1_5x7.pdf[cynthcart2.0.1_5x7.pdf] +
+On the right side of https://github.com/PaulSlocum/cynthcart/blob/master/manual/keyboardReferenceCharts/cynthcartCommandChart1.pdf[cynthcartCommandChart1.pdf] +
+Or on the bottom of https://github.com/PaulSlocum/cynthcart/blob/master/manual/keyboardReferenceCharts/cynthcartCommandChart2.pdf[cynthcartCommandChart2.pdf]
+
+
+== Development
+More information about adorable (emudore-embedded) is available on the https://github.com/LouDnl/emudore-embedded[github repo]
+
+
+== License
+include::license-software.adoc[]
+
+include::license-hardware.adoc[]
+
+Author: {author} - generated on {revdate}

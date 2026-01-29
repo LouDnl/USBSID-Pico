@@ -217,6 +217,7 @@ jobs:
             }
 
       fail-fast: false
+
     steps:
       - name: 🗒️ Set tag output
         id: vars
@@ -243,7 +244,7 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install curl build-essential cmake -y
 
-      - name: Install SID player xa dependency
+      - name: Install USBSID-Player xa dependency
         if: ${{matrix.withsidplayer == 1 }}
         run: |
           sudo apt-get update && sudo apt-get install -y xa65
@@ -444,24 +445,24 @@ jobs:
         with:
           pattern: '*'
           path: tools-output
-          # Download all artifacts to a single directory
           merge-multiple: true
-      - name: Upload to Release
+
+      - name: Zip tools
+        # -r for recursive, -j to junk paths so files are at the zip root
+        run: zip -r -j tools.zip ./tools-output
+
+      - name: Upload tools zip for Release
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const path = 'tools-output';
-            const files = fs.readdirSync(path);
-            for (const file of files) {
-              await github.rest.repos.uploadReleaseAsset({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                release_id: '${{ needs.create_release.outputs.release_id }}',
-                name: file,
-                data: fs.readFileSync(`${path}/${file}`)
-              });
-            }
+            await github.rest.repos.uploadReleaseAsset({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: '${{ needs.create_release.outputs.release_id }}',
+              name: 'tools.zip',
+              data: fs.readFileSync('tools.zip')
+            });
 
   publish_release:
     name: Publish Release

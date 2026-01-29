@@ -110,12 +110,14 @@ extern bool
   sidplayer_init,
   sidplayer_start,
   sidplayer_playing,
-  sidplayer_stop;
-
+  sidplayer_stop,
+  sidplayer_next,
+  sidplayer_prev;
 /* SID player locals */
 uint8_t * sidfile = NULL; /* Temporary buffer to store incoming data */
 int sidfile_size;
 char tuneno;
+volatile bool is_prg = false; /* Default to SID file */
 static int sidbytes_received;
 static bool receiving_sidfile;
 #endif /* ONBOARD_SIDPLAYER */
@@ -1027,9 +1029,10 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       break;
     #if defined(ONBOARD_SIDPLAYER)
     case UPLOAD_SID_START:
-      CFG("[UPLOAD_SID_START]\n");
+      CFG("[UPLOAD_SID_START %d]\n",buffer[1]);
       receiving_sidfile = true;
       sidbytes_received = 0;
+      is_prg = ((buffer[1] == PRG_FILE) ? true : false);
       sidfile = (uint8_t*)calloc(1, 0x10000); /* allocate 64KB */
       if (sidfile == NULL) {
         /*
@@ -1091,15 +1094,11 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       break;
     case SID_PLAYER_NEXT:
     CFG("[SID_PLAYER_NEXT]\n");
-      sidplayer_playing = false;
-      // next_subtune();  // TODO: Finish
-      sidplayer_playing = true;
+      sidplayer_next = true;
       break;
     case SID_PLAYER_PREV:
     CFG("[SID_PLAYER_PREV]\n");
-      sidplayer_playing = false;
-      // previous_subtune();  // TODO: Finish
-      sidplayer_playing = true;
+      sidplayer_prev = true;
       break;
     #endif
     default:

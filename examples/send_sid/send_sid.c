@@ -31,6 +31,9 @@
 #include <stdint.h> // `UINT64_MAX`
 #include <stdio.h>  // `printf()`
 #include <string.h> // `strerror(errno)`
+#include <stdbool.h>
+#include <ctype.h>
+
 #include <libusb.h>
 
 /* Compile with:
@@ -68,9 +71,17 @@ enum {
   SID_PLAYER_PAUSE = 0xE3,  /* Pause/Unpause SID file play */
   SID_PLAYER_NEXT  = 0xE4,  /* Next SID subtune play */
   SID_PLAYER_PREV  = 0xE5,  /* Previous SID subtune play */
+
+  FROM_STDIN       = 0x00,  /* Read data from stdin */
+  SID_FILE         = 0x01,  /* File is SID */
+  PRG_FILE         = 0x02,  /* File is PRG */
 };
 
-
+/**
+ * @brief Initialize a connection with USBSID-Pico
+ *
+ * @return int
+ */
 int usbsid_init(void)
 {
   if (devh != NULL) {
@@ -132,6 +143,10 @@ out:
   return rc;
 }
 
+/**
+ * @brief Close the connection with USBSID-Pico
+ *
+ */
 void usbsid_close(void)
 {
   for (int if_num = 0; if_num < 2; if_num++) {
@@ -145,6 +160,12 @@ void usbsid_close(void)
   return;
 }
 
+/**
+ * @brief Write data to USBSID-Pico
+ *
+ * @param data
+ * @param size
+ */
 void write_chars(unsigned char * data, int size)
 {
   int actual_length;
@@ -154,23 +175,79 @@ void write_chars(unsigned char * data, int size)
   return;
 }
 
-static void send_sid(FILE* input_s)
+/**
+ * @brief Helper function to find the last occurrence of a character
+ *
+ * @param str
+ * @param c
+ * @return char*
+ */
+char* find_last_of(char *str, char c) {
+  char *last = NULL;
+  char *p = str;
+  while (*p != '\0') {
+    if (*p == c) {
+      last = p;
+    }
+    p++;
+  }
+  return last;
+}
+
+/**
+ * @brief Helper function to get the substring after the last dot and convert to lowercase
+ *
+ * @param fname
+ * @return char*
+ */
+char* get_extension_and_tolower(const char* fname) {
+  char *ext_start = find_last_of((char*)fname, '.');
+
+  if (ext_start != NULL) {
+    /* Calculate the length of the extension */
+    size_t len = strlen(ext_start + 1);
+    /* Allocate memory for the extension (including null terminator) */
+    char *ext = malloc(len + 1);
+    if (ext == NULL) {
+      perror("malloc failed");
+      exit(EXIT_FAILURE);
+    }
+    /* Copy the extension */
+    strcpy(ext, ext_start + 1);
+
+    /* Transform to lowercase in place */
+    for (char *p = ext; *p; ++p) {
+      *p = tolower((unsigned char)*p);
+    }
+    return ext;
+  }
+  return NULL; /* No extension found */
+}
+
+/**
+ * @brief Send input file to USBSID-Pico
+ *
+ * @param input_f
+ * @param filetype
+ */
+static void send_sid(FILE* input_f, int filetype)
 {
   int byte;
   unsigned int i = 0U;
   unsigned char buff[64] = {0};
   static int bytecount = 2;
 
-  fseek(input_s, 0L, SEEK_END);
-  unsigned int file_size = ftell(input_s);
-  rewind(input_s);
+  fseek(input_f, 0L, SEEK_END);
+  unsigned int file_size = ftell(input_f);
+  rewind(input_f);
 
   buff[0] = (PACKET_TYPE|CONFIG);
   buff[1] = UPLOAD_SID_START;
+  buff[2] = (filetype);
   write_chars(buff, 64);
 
   buff[1] = UPLOAD_SID_DATA;
-  while ((byte = getc(input_s)) != EOF) {
+  while ((byte = getc(input_f)) != EOF) {
     buff[bytecount++] = byte;
     if (bytecount == 64 || i == (file_size - 1)) {
       bytecount = 2;
@@ -195,28 +272,46 @@ static void send_sid(FILE* input_s)
   return;
 }
 
+/**
+ * @brief Print help to stdout
+ *
+ */
 void print_help(void)
 {
- fprintf(stdout, "*** Usage ***\n");
- fprintf(stdout, "\n");
- fprintf(stdout, "-help / -h: Show this information\n");
- fprintf(stdout, "-sid sidfile.sid: send sidfile.sid to USBSID-Pico to start play\n");
- fprintf(stdout, "  -t N: provide subtune number together with sid to set subtune (defaults to 1))\n");
-//  fprintf(stdout, "* -start: start play\n");
- fprintf(stdout, "-stop: stop play\n");
-//  fprintf(stdout, "* -pause: pause play\n");
- fprintf(stdout, "-next: play next subtune\n");
- fprintf(stdout, "-prev: play previous subtune\n");
- fprintf(stdout, "*\n");
- fprintf(stdout, "Play SID file from local storage\n");
- fprintf(stdout, "./send_sid -sid /path/to/sidfile.sid -subtune 1\n");
- fprintf(stdout, "\n");
- fprintf(stdout, "Play SID file directly from internet storage\n");
- fprintf(stdout, "SID=Wavemode_Mainpart.sid ;\\\n");
- fprintf(stdout, "  curl -sS 'https://deepsid.chordian.net/hvsc/_SID%%20Happens/'$SID |\\\n");
- fprintf(stdout, "  ./send_sid -sid -\n");
+  fprintf(stdout, "*** Usage ***\n");
+  fprintf(stdout, "\n");
+  fprintf(stdout, "-help / -h: Show this information\n");
+  fprintf(stdout, "  sidfile.sid: send sidfile.sid to USBSID-Pico to start play\n");
+  fprintf(stdout, "  sidtune.prg: send sidtune.prg to USBSID-Pico to start play (psid64 preferred!)\n");
+  fprintf(stdout, "  -sid -: to read _SID_ file data from stdin instead of sidfile.sid (PRG not supported yet!)\n");
+  fprintf(stdout, "  -t N: provide subtune number together with sid to set subtune (defaults to 1))\n");
+  //  fprintf(stdout, "* -start: start play\n");
+  fprintf(stdout, "-stop: stop play\n");
+  //  fprintf(stdout, "* -pause: pause play\n");
+  fprintf(stdout, "-next: play next subtune\n");
+  fprintf(stdout, "-prev: play previous subtune\n");
+  fprintf(stdout, "\n");
+  fprintf(stdout, "Play SID file from local storage\n");
+  fprintf(stdout, "./send_sid /path/to/sidfile.sid -t 1\n");
+  fprintf(stdout, "\n");
+  fprintf(stdout, "Play PRG file from local storage\n");
+  fprintf(stdout, "./send_sid /path/to/sidfile.prg\n");
+  fprintf(stdout, "\n");
+  fprintf(stdout, "Play SID file directly from internet storage\n");
+  fprintf(stdout, "SID=Wavemode_Mainpart.sid ;\\\n");
+  fprintf(stdout, "  curl -sS 'https://deepsid.chordian.net/hvsc/_SID%%20Happens/'$SID |\\\n");
+  fprintf(stdout, "  ./send_sid -sid -\n");
+
+  return;
 }
 
+/**
+ * @brief Main entrypoint
+ *
+ * @param argc
+ * @param argv
+ * @return int
+ */
 int main(int argc, char* argv[])
 {
   int result = EXIT_FAILURE;
@@ -234,35 +329,68 @@ int main(int argc, char* argv[])
     return EXIT_SUCCESS;
   }
 
-  usbsid_init();
+  bool sentfile = false;
+  bool sidfile = false;
+  bool prgfile = false;
 
-  for(int arg = 0; arg < argc; arg++) {
-    if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help") || !strcmp(argv[1], "-") || !strcmp(argv[1], "--")) {
-      print_help();
-      return EXIT_SUCCESS;
-    }
+  if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help") || !strcmp(argv[1], "-") || !strcmp(argv[1], "--")) {
+    print_help();
+    return EXIT_SUCCESS;
+  }
 
-    if(!strcmp(argv[arg], "-sid") || !strcmp(argv[arg], "sid")) {
+  if (usbsid_init()) {
+    goto exit;
+  }
 
-      if(strchr(argv[arg+1], '.') != NULL) {
-        filename = argv[arg+1];
+  for(int arg = 1; arg < argc; arg++) {
+
+    /* Make sure we're treating a file, it must have a dot in it */
+    if(strchr(argv[arg], '.') != NULL) {
+      /* Get the filename from the arguments */
+      const char *filename = argv[arg];
+      /* Get the extension and convert to lowercase */
+      char *ext = get_extension_and_tolower(filename);
+      if (strcmp(ext, "sid") == 0) {
+        sidfile = true;
+        prgfile = false;
+      } else if (strcmp(ext, "prg") == 0) {
+        sidfile = false;
+        prgfile = true;
+      } else if (strcmp(ext, "p00") == 0) {
+        sidfile = false;
+        prgfile = true;
+      } else {
+        fprintf(stderr, "Failed to open input file: %s\n",ext);
+        goto exit;
+      }
+      {
         fprintf(stdout, "Sending: %s\n",filename);
         input_f = fopen(filename, "rb");
-
-        if (!input_f)
-        {
+        if (!input_f) {
           fprintf(stderr, "Failed to open input file\n");
           goto exit;
         }
-        {
-          fprintf(stdout, "Stopping current playback, if any!\n");
-          configbuff[1] = SID_PLAYER_STOP;
-          write_chars(configbuff, 5);
-        }
-        send_sid(input_f ? input_f : stdin);
-      } else {
-        send_sid(stdin);
       }
+      {
+        fprintf(stdout, "Stopping current playback, if any!\n");
+        configbuff[1] = SID_PLAYER_STOP;
+        write_chars(configbuff, 5);
+      }
+      send_sid((input_f ? input_f : stdin), (sidfile ? SID_FILE : prgfile ? PRG_FILE : FROM_STDIN));
+      sentfile = true;
+    }
+
+    if(!strcmp(argv[arg], "-sid") || !strcmp(argv[arg], "sid")) { /* Receive from stdin */
+      fprintf(stdout, "Sending from stdin\n");
+      {
+        fprintf(stdout, "Stopping current playback, if any!\n");
+        configbuff[1] = SID_PLAYER_STOP;
+        write_chars(configbuff, 5);
+      }
+      send_sid(stdin, FROM_STDIN);
+      sentfile = true;
+    }
+    if (sentfile) {
       {
         fprintf(stdout, "Setting subtune to ");
         configbuff[1] = SID_PLAYER_LOAD;
@@ -274,7 +402,7 @@ int main(int argc, char* argv[])
             configbuff[3] = (configbuff[3] != 0 ? (configbuff[3] - 1) : configbuff[3]);
           }
         }
-        fprintf(stdout, "%d\n", configbuff[3]);
+        fprintf(stdout, "%d\n", (configbuff[3] + 1));
         write_chars(configbuff, 5);
       }
       {
@@ -282,6 +410,7 @@ int main(int argc, char* argv[])
         configbuff[1] = SID_PLAYER_START;
         write_chars(configbuff, 5);
       }
+      goto done;
     }
     if(!strcmp(argv[arg], "-stop") || !strcmp(argv[arg], "stop")) {
       fprintf(stdout, "Stopping playback\n");
