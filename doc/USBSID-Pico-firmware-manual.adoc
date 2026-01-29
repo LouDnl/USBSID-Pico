@@ -24,14 +24,36 @@ Each PCB revision is the firmware designator, please check your PCB revision, th
 Firmware filenames contain the PCB revision number e.g. `usbsidpico-rgb-v1.X.uf2` is for PCB revision `v1.0` and for use with a black clone Pico containing an RGB LED.
 
 == Firmware naming
-Below are the filenames used for each Pico board type, take great care in selecting the correct file for you Pico! +
-**WARNING!** Do _NOT_ use the **RGB** firmware for any of the (non black) rp2040 or rp2350 Pico boards that do not contain an RGB LED. +
-The 1.X in each filename equals for the PCB revision as mentioned under firmware types. Don't worry if you use the incorrect revision, this causes no harm. +
-`usbsidpico-v1.X.uf2` for Pico1 regular green rp2040 Pico boards. +
-`usbsidpico-rgb-v1.X.uf2` for Pico1 black clone rp2040 Pico boards with RGB LED onboard. +
-`usbsidpico_w-v1.X.uf2` for PicoW regular green rp2040 PicoW boards. +
-`usbsidpico2-v1.X.uf2` for Pico2 regular green rp2350 Pico2 boards. +
-`usbsidpico2_w-v1.X.uf2` for Pico2W regular green rp2350 Pico2W boards. +
+Below are the filenames used for each Pico and board type, take great care in selecting the correct file for you Pico! +
+**WARNING!** Do _NOT_ use the **RGB** firmware for any of the (non black) rp2040 or (non black) rp2350 Pico boards that do not contain an RGB LED, this can break your Pico! +
+
+=== Board revision
+The 1.X in each filename equals for the PCB revision as mentioned under firmware types. Don't worry if you flash a firmware for the incorrect PCB revision, this causes no harm. +
+
+=== Firmwares for the rp2040 Pico1
+Firmware naming suited for the pico 1 always start with `usbsidpico-` +
+`usbsidpico-v1.X.uf2` for regular green rp2040 Pico boards. +
+`usbsidpico-rgb-v1.X.uf2` for black clone rp2040 Pico boards with RGB LED onboard. +
+`usbsidpico_w-v1.X.uf2` for regular green rp2040 PicoW boards.
+
+=== Firmwares for the rp2350 Pico2
+Firmware naming suited for the pico 2 always start with `usbsidpico2-` +
+`usbsidpico2-v1.X.uf2` for regular green rp2350 Pico2 boards. +
+`usbsidpico2-rgb-v1.X.uf2` for black clone rp2350 Pico2 boards with RGB LED onboard. +
+`usbsidpico2_w-v1.X.uf2` for regular green rp2350 Pico2W boards.
+
+=== Firmwares with Cynthcart embedded
+Starting with firmware version v0.6.0-BETA firmwares ending with `_em` have an embedded emulator running Cynthcart. +
+For example `usbsidpico-v1.0_em.uf2` or `usbsidpico2-rgb-v1.3_em.uf2` +
+See the `USBSID-Pico-Cynthcart-manual` file for more information.
+
+=== Firmwares with embedded USBSID-Player
+Starting with firmware version v0.6.0-BETA firmwares ending with `_sp` have an embedded emulator that can play PSID and RSID tunes and PSID64 PRG/P00 files. +
+For example `usbsidpico2-v1.0_sp.uf2` or `usbsidpico2-v1.3-rgb_sp.uf2` +
+This USBSID-Player is still in active development and some tunes might not work or play at all. +
+The embedded USBSID-Player requires more then 256KB RAM and an overclocked CPU which makes this firmware only available for rp2350 Pico2 boards. +
+See the `USBSID-Player-manual` file for more information.
+
 
 == How to flash your Pico
 **NOTE**: +
@@ -88,11 +110,11 @@ Python3 -> https://www.python.org/downloads/[Download] +
 TkInter -> https://tkdocs.com/tutorial/install.html[Installation guide] +
 And either one of the Linux or Windows CLI downloads below
 
-==== Linux downloads
-https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/cfg_usbsid[Download executable]
+==== Linux / Windows downloads
+The latest version of the config tool is available in a zip file called `tools.zip` from release v0.6.0-BETA and up
 
 ==== Windows downloads
-https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/cfg_usbsid.exe[Download executable] +
+If the DLL's are missing from the zip file you can always download them from here: +
 https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/libusb-1.0.dll[Download DLL 1] +
 https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/libwinpthread-1.dll[Download DLL 2]
 

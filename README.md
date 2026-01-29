@@ -40,6 +40,8 @@ Shop link: [https://greyandslate.etsy.com/?search_query=usbsid](https://greyands
   * [Configuring your board's firmware](#configuring-your-boards-firmware)
     * [Testing your board](#testing-your-board)
   * [Firmware features](#firmware-features)
+    * [Embedded Cynthcart](doc/USBSID-Pico-Cynthcart-manual.adoc) [(PDF)](doc/USBSID-Pico-Cynthcart-manual.pdf)
+    * [Embedded USBSID-Player](doc/USBSID-Player-manual.adoc) [(PDF)](doc/USBSID-Player-manual.pdf)
   * [Firmware types and naming](doc/USBSID-Pico-firmware-manual.adoc) [(PDF)](doc/USBSID-Pico-firmware-manual.pdf)
   * [How to flash new firmware](doc/USBSID-Pico-firmware-manual.adoc) [(PDF)](doc/USBSID-Pico-firmware-manual.pdf)
   * [How to configure your board](doc/USBSID-Pico-firmware-manual.adoc) [(PDF)](doc/USBSID-Pico-firmware-manual.pdf)
@@ -185,6 +187,12 @@ The firmware is still in development so features might change, be added or remov
   - Play SID files in your (midi supporting) browser via [IneSID](https://inesid.fazibear.me/) by Fazibear
 - Midi device support over USB
   - Use your USBSID-Pico as Synth with your Midi controller
+- Cynthcart embedded (special firmwares only)
+  - Starting with firmware version v0.6.0-BETA and up some firmwares have Cynthcart as midi input  
+    See the [USBSID-Pico Cynthcart manual](doc/USBSID-Pico-Cynthcart-manual.pdf) for more information!
+- Embedded USBSID-Player for playing PSID, RSID, PRG or P00 files without a computer operated emulator!
+  - Starting with firmware version v0.6.0-BETA and up some firmwares have USBSID-Player embedded  
+    See the [USBSID-Player manual](doc/USBSID-Player-manual.pdf) for more information!
 - Two SID sockets with up to 4 SID's (e.g. SKPico) supported
   - Socket one address range $00 ~ $7F (default $00 ~ $1F) auto based on configuration settings
   - Socket two address range $00 ~ $7F (default $40 ~ $7F) auto based on configuration settings
