@@ -342,7 +342,7 @@ int usbsid_init(void)
     }
 
     for (int if_num = 0; if_num < 2; if_num++) {
-        if (libusb_kernel_driver_active(devh, if_num)) {
+        if (libusb_kernel_driver_active(devh, if_num) == 1) {
             libusb_detach_kernel_driver(devh, if_num);
         }
         rc = libusb_claim_interface(devh, if_num);
@@ -354,20 +354,20 @@ int usbsid_init(void)
     }
 
     rc = libusb_control_transfer(devh, 0x21, 0x22, ACM_CTRL_DTR | ACM_CTRL_RTS, 0, NULL, 0, 0);
-    if (rc < 0) {
+    if (rc != 0 && rc != 7) {
         fprintf(stderr, "Error configuring line state during control transfer: %d, %s: %s\n",
             rc, libusb_error_name(rc), libusb_strerror(rc));
         goto out;
     }
 
     rc = libusb_control_transfer(devh, 0x21, 0x20, 0, 0, encoding, count_of(encoding), 0);
-    if (rc < 0 || rc != 7) {
+    if (rc != 0 && rc != 7) {
         fprintf(stderr, "Error configuring line encoding during control transfer: %d, %s: %s\n",
             rc, libusb_error_name(rc), libusb_strerror(rc));
         goto out;
     }
 
-    usid_dev = (rc > 0 && rc == 7) ? 0 : -1;
+    usid_dev = (rc == 0 || rc == 7) ? 0 : -1;
 
     if (usid_dev < 0)
     {
@@ -385,6 +385,7 @@ int usbsid_init(void)
 out:;
   if (devh != NULL)
     usbsid_close();
+  rc = -1;
   return rc;
 }
 
@@ -1247,7 +1248,7 @@ void config_skpico(int argc, char **argv)
       skpico_write_config(debug);
 
       printf("Start saving default config\n");
-      sleep(0.5);
+      sleep(1);
       skpico_save_config(debug);
 
       printf("Extend config mode\n");
@@ -1373,7 +1374,7 @@ void config_skpico(int argc, char **argv)
       skpico_write_config(debug);
 
       printf("Start saving config\n");
-      sleep(0.5);
+      sleep(1);
       skpico_save_config(debug);
 
       printf("Extend config mode\n");
@@ -1384,7 +1385,7 @@ void config_skpico(int argc, char **argv)
       skpico_read_config(debug);
       skpico_end_config_mode(debug);
 
-      sleep(0.5);
+      sleep(1);
       goto exit;
       break;
     }
@@ -1721,7 +1722,7 @@ void config_usbsidpico(int argc, char **argv)
       }
       if (argc > 8) {
         uint8_t test_buffer[64] = {0};
-        test_buffer[0] = ((COMMAND << 6) | 18);
+        test_buffer[0] = ((COMMAND << 6) | CONFIG);
         test_buffer[1] = WRITE_CONFIG;
         int tb_count = 2;
         for (int i = 2; i < argc; i++) {

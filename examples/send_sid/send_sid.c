@@ -103,7 +103,7 @@ int usbsid_init(void)
   }
 
   for (int if_num = 0; if_num < 2; if_num++) {
-    if (libusb_kernel_driver_active(devh, if_num)) {
+    if (libusb_kernel_driver_active(devh, if_num) == 1) {
       libusb_detach_kernel_driver(devh, if_num);
     }
     rc = libusb_claim_interface(devh, if_num);
@@ -140,6 +140,7 @@ out:
   if (devh != NULL)
   libusb_close(devh);
   libusb_exit(NULL);
+  rc = -1;
   return rc;
 }
 
