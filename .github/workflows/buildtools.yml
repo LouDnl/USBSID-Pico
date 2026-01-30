@@ -7,8 +7,8 @@ env:
 on:
   push:
     paths:
-      - "src/examples/config-tool/**"
-      - "src/examples/send_sid/**"
+      - "examples/config-tool/**"
+      - "examples/send_sid/**"
       - ".github/workflows/buildtools.yml"
     # Only run on dev branch
     branches: [dev]
