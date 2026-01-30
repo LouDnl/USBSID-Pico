@@ -84,7 +84,7 @@ jobs:
           tag: ${{ env.SOURCE_TAG }}
           name: ${{ env.SOURCE_TAG }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: "release/*.uf2"
+          artifacts: "release/*.uf2,release/*.zip"
           prerelease: false
           removeArtifacts: true
           generateReleaseNotes: true
@@ -375,7 +375,7 @@ jobs:
       - name: Download Tools Artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: '*'
+          pattern: 'tools-*'
           path: tools-output
           merge-multiple: true
 

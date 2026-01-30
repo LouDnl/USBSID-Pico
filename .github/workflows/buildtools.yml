@@ -91,7 +91,7 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.buildname }}-${{ matrix.os }}
+          name: tools-${{ matrix.buildname }}-${{ matrix.os }}
           path: |
             repo/examples/${{ matrix.directory }}/${{ matrix.buildname }}
             ${{ matrix.os == 'windows-2022' && format('repo/examples/{0}/*.dll', matrix.directory) || '' }}
