@@ -360,7 +360,12 @@ if(ONBOARD_SIDPLAYER EQUAL 1)
   # NOTICE: SIDPLAYER REQUIRES FULL OPTIMIZATIONS!!
   set(COMPILE_OPTS ${COMPILE_OPTS} -O3)
   ## Set sidplayer list directory
-  set(USPLAYER_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player)
+  if(NOT ${EMUDIR} STREQUAL "")
+    set(USPLAYER_LIST_DIR ${EMUDIR})
+  else()
+    set(USPLAYER_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player)
+  endif()
+  message(DEBUG "USPLAYER_LIST_DIR is set to ${USPLAYER_LIST_DIR}")
 
   ### Adjust filenames for user interpretation
   foreach(FILENAME ${FILENAMES})
@@ -423,7 +428,12 @@ if(ONBOARD_EMULATOR EQUAL 1)
   set(COMPILE_OPTS ${COMPILE_OPTS} -DEMBEDDED=1)
   add_compile_definitions(ONBOARD_EMULATOR=1)
   set(EMULATOR_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emulator)
-  set(EMUDORE_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emudore-embedded)
+  if(NOT ${EMUDIR} STREQUAL "")
+    set(EMUDORE_LIST_DIR ${EMUDIR})
+  else()
+    set(EMUDORE_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emudore-embedded)
+  endif()
+  message(DEBUG "EMUDORE_LIST_DIR is set to ${EMUDORE_LIST_DIR}")
 
   ### Adjust filenames for user interpretation
   foreach(FILENAME ${FILENAMES})
