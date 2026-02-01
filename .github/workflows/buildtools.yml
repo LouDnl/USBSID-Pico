@@ -86,12 +86,11 @@ jobs:
             mingw-w64-x86_64-pkg-config
             mingw-w64-x86_64-ninja
 
-      - name: Install dependencies (MacOs)
-        if: matrix.os == 'macos-14' || matrix.os == 'macos-15-intel'
-        run: |
-          brew update
-          brew install pkg-config cmake ninja libusb
-          echo "brew_prefix=$(brew --prefix)" >> $GITHUB_OUTPUT
+      # - name: Install dependencies (MacOs)
+      #   if: matrix.os == 'macos-14' || matrix.os == 'macos-15-intel'
+      #   run: |
+      #     brew update
+      #     brew install pkg-config cmake ninja libusb
 
       - name: Remove pre-built binaries
         run: |
