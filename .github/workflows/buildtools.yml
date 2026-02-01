@@ -21,6 +21,10 @@ on:
         type: boolean
         default: false
 
+concurrency:
+  group: Dev build
+  cancel-in-progress: true
+
 jobs:
   build-tools:
     name: Tools
@@ -38,10 +42,18 @@ jobs:
               directory: config-tool, buildname: cfg_usbsid }
           - { os: ubuntu-latest, shell: bash,
               directory: send_sid, buildname: send_sid }
-          - { os: windows-2022,  shell: 'msys2 {0}',
+          - { os: windows-2022, shell: 'msys2 {0}',
               directory: config-tool, buildname: cfg_usbsid.exe }
-          - { os: windows-2022,  shell: 'msys2 {0}',
+          - { os: windows-2022, shell: 'msys2 {0}',
               directory: send_sid, buildname: send_sid.exe }
+          - { os: macos-14, shell: 'bash',
+              directory: config-tool, buildname: cfg_usbsid_macos14 }
+          - { os: macos-14, shell: 'bash',
+              directory: send_sid, buildname: send_sid_macos14 }
+          - { os: macos-15-intel, shell: 'bash',
+              directory: config-tool, buildname: cfg_usbsid_macos15intel }
+          - { os: macos-15-intel, shell: 'bash',
+              directory: send_sid, buildname: send_sid_macos15intel }
     defaults:
       run:
         shell: ${{ matrix.shell }}
@@ -74,6 +86,13 @@ jobs:
             mingw-w64-x86_64-pkg-config
             mingw-w64-x86_64-ninja
 
+      - name: Install dependencies (MacOs)
+        if: matrix.os == 'macos-14' || matrix.os == 'macos-15-intel'
+        run: |
+          brew update
+          brew install pkg-config cmake ninja libusb
+          echo "brew_prefix=$(brew --prefix)" >> $GITHUB_OUTPUT
+
       - name: Remove pre-built binaries
         run: |
           pushd repo/examples/${{ matrix.directory }}
@@ -84,7 +103,7 @@ jobs:
       - name: Configure and build ${{ matrix.buildname }}
         run: |
           pushd repo/examples/${{ matrix.directory }}
-          cmake -S . -B build && cmake --build build -j$(nproc)
+          cmake -S . -B build -DEXECUTABLE=${{ matrix.buildname }} && cmake --build build -j$(nproc)
           ls -lhai
           popd
 
