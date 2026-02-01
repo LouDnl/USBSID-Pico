@@ -30,6 +30,7 @@ cmake_minimum_required(VERSION 3.17)
 
 ### Project magic sprinkles
 set(PROJECT_NAME send_sid)
+set(EXECUTABLE ${PROJECT_NAME} CACHE STRING "EXECUTABLE")
 
 ### Project type
 project(${PROJECT_NAME} C ASM)
@@ -71,18 +72,18 @@ set(TARGET_INCLUDE_DIRS PRIVATE
 )
 
 ### Compile time
-add_executable(${PROJECT_NAME} ${SOURCEFILES})
+add_executable(${EXECUTABLE} ${SOURCEFILES})
 ### Copy build output to main directory
 add_custom_command(TARGET
-  ${PROJECT_NAME}
+  ${EXECUTABLE}
   POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PROJECT_NAME}> ${CMAKE_CURRENT_LIST_DIR})
+  COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${EXECUTABLE}> ${CMAKE_CURRENT_LIST_DIR})
 ### Remove build output from build directory
 add_custom_command(TARGET
-  ${PROJECT_NAME}
+  ${EXECUTABLE}
   POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E rm $<TARGET_FILE:${PROJECT_NAME}>)
+  COMMAND ${CMAKE_COMMAND} -E rm $<TARGET_FILE:${EXECUTABLE}>)
 
-target_include_directories(${PROJECT_NAME} ${TARGET_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} ${TARGET_LL})
-target_sources(${PROJECT_NAME} PUBLIC ${SOURCEFILES})
+target_include_directories(${EXECUTABLE} ${TARGET_INCLUDE_DIRS})
+target_link_libraries(${EXECUTABLE} ${TARGET_LL})
+target_sources(${EXECUTABLE} PUBLIC ${SOURCEFILES})
