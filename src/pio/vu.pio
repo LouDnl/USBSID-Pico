@@ -28,7 +28,10 @@
 ; along with this program. If not, see <http://www.gnu.org/licenses/>.
 ;
 
+
+; LED there be light! ~ PIO1 SM1
 .program vu
+
 .side_set 1 opt
 
     pull noblock    side 0 ; Pull from FIFO to OSR if available, else copy X to OSR.

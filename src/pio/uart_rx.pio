@@ -26,6 +26,8 @@
 ; along with this program. If not, see <http://www.gnu.org/licenses/>.
 ;
 
+
+; Uart RX on steroids ~ PIO2 SM0
 .program uart_rx
 
 ; Slightly more fleshed-out 8n1 UART receiver which handles framing errors and
