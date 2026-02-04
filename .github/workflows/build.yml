@@ -21,7 +21,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: Dev build
+  group: dev-firmware-build
   cancel-in-progress: true
 
 jobs:

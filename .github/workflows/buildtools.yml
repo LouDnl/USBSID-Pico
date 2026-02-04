@@ -22,7 +22,7 @@ on:
         default: false
 
 concurrency:
-  group: Dev build
+  group: dev-tools-build
   cancel-in-progress: true
 
 jobs:
