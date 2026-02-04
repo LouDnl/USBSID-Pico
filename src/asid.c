@@ -250,6 +250,39 @@ void handle_asid_writeorder_config(uint8_t* buffer)
   default_order = false;
 }
 
+inline void set_asid_env(int refresh_rate, int speed_multiplier, int custom_speed, int buffering, uint16_t framedelta_us)
+{
+  (void)speed_multiplier; /* Not used */
+  (void)custom_speed;     /* Not used */
+  (void)buffering;        /* Not used */
+
+  { /* apply the new clock_rate based on the refresh_rate if applicable */
+    extern void apply_clockrate(int n_clock, bool suspend_sids);
+    apply_clockrate(
+      ((refresh_rate == 0)
+      ? 1   /* PAL */
+      : 2), /* NTSC */
+      true);
+  }
+
+  if (write_ordered) {
+    CFG("[ASID] Init buffer queue, timer and irq\n");
+    extern Config usbsid_config;
+    extern void init_buffer_pio(void);
+    extern void set_buffer_rate(uint16_t rate);
+    extern void asid_ring_init(void);
+
+    asid_ring_init();
+    init_buffer_pio();
+    if (framedelta_us != 0) { /* Above zero means always use framedelta_us */
+      set_buffer_rate(framedelta_us);
+    } else {
+      set_buffer_rate(usbsid_config.refresh_rate);
+    }
+  }
+  return;
+}
+
 void handle_asid_envmessage(uint8_t* buffer)
 { /* SID environment is only logged and not used for now */
   /* Incoming buffer skips first 3 bytes and
@@ -284,6 +317,7 @@ void handle_asid_envmessage(uint8_t* buffer)
   */
   uint16_t framedelta_us = ((buffer[1] & 0x7F) | (buffer[2] & 0x7F) << 7 | ((buffer[3] & 0x03) << 14));
   DBG("[ASID] Framedelta: %d\n", framedelta_us);
+  set_asid_env(refresh_rate, speed_multiplier, custom_speed, buffering, framedelta_us);
 }
 
 void handle_asid_typemessage(uint8_t* buffer)
