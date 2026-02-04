@@ -44,7 +44,7 @@
 const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT;
 
 /* GPIO */
-extern uint8_t __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint8_t cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
 extern void reset_sid(void);
 
 /* Midi handler */
