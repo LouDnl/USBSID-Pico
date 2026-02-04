@@ -1440,6 +1440,7 @@ void print_help(void)
   printf("--[PRESETS]---------------------------------------------------------------------------------------------------------\n");
   printf("  (add '-q' before any of the preset commands for a quick change and apply the config without saving and rebooting)\n");
   printf("  -single,  --single-sid        : Socket 1 enabled @ single SID, Socket 2 disabled\n");
+  printf("  -single2, --single-sid-s2     : Socket 1 disabled, Socket 2 enabled @ single SID\n");
   printf("  -dual,    --dual-sid          : Socket 1 enabled @ single SID, Socket 2 enabled @ single SID\n");
   printf("  -duals1,  --dual-sid-socket1  : Socket 1 enabled @ dual SID, Socket 2 disabled\n");
   printf("  -duals2,  --dual-sid-socket2  : Socket 1 disabled, Socket 2 enabled @ dual SID\n");
@@ -1585,8 +1586,13 @@ void config_usbsidpico(int argc, char **argv)
       quickchange = 1;
     };
     if (!strcmp(argv[param_count], "-single") || !strcmp(argv[param_count], "--single-sid")) {
-      printf("Set USBSID-Pico config to single SID\n");
+      printf("Set USBSID-Pico config to single SID @ Socket One\n");
       write_config_command(SINGLE_SID, quickchange, 0, 0, 0);
+      goto exit;
+    }
+    if (!strcmp(argv[param_count], "-single2") || !strcmp(argv[param_count], "--single-sid-s2")) {
+      printf("Set USBSID-Pico config to single SID @ Socket Two\n");
+      write_config_command(SINGLE_SID, quickchange, 1, 0, 0);
       goto exit;
     }
     if (!strcmp(argv[param_count], "-dual") || !strcmp(argv[param_count], "--dual-sid")) {
