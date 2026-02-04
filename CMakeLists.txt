@@ -338,6 +338,7 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/midi.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi_handler.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/asid_buffer.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sysex.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid_cloneconfig.c

@@ -57,6 +57,7 @@ extern uint16_t vu;
 
 /* Some locals, rural and such */
 static bool default_order = false;
+static bool default_order_on_start = false;
 bool write_ordered = false;
 struct asid_regpair_t {  /* thanks to thomasj */
   uint8_t index;
@@ -68,18 +69,26 @@ struct asid_regpair_t asid_to_writeorder[NO_SID_REGISTERS_ASID] = {};  /* thanks
 void reset_asid_to_writeorder(void)
 {
   DBG("[ASID] RESET WRITEORDER REGISTERS\n");
+  if (write_ordered) {
+    /* inline extern as only used here */
+    extern void asid_ring_deinit(void);
+    extern void stop_buffer_pio(void);
+    asid_ring_deinit();
+    stop_buffer_pio();
+  }
   write_ordered = false;
   for (int i = 0; i < NO_SID_REGISTERS_ASID; i++) {
     asid_to_writeorder[i].index = i;
     asid_to_writeorder[i].wait_us = 0;
   }
-  default_order = (default_order == false ? true : default_order);
+  default_order = true;
+  default_order_on_start = (default_order == false ? true : default_order);
 }
 
 void asid_init(void)
 {
   DBG("[%s]\n", __func__);
-  if (!default_order) reset_asid_to_writeorder();  /* Set defaults once on first write */
+  if (!default_order_on_start) reset_asid_to_writeorder();  /* Set defaults once on boot */
 }
 
 /* Pling, plong, ploink!? */
@@ -199,7 +208,6 @@ void handle_writeordered_asid_message(uint8_t sid, uint8_t* buffer)
         }
         writeOrder[chip][asid_to_writeorder[reg].index].reg = asid_sid_registers[mask * 7 + bit];
         writeOrder[chip][asid_to_writeorder[reg].index].data = register_value;
-        // TODO: FIX Pico2 writes
         /* Pico 2 requires at least 10 cycles between writes
          * or it will be too damn fast! So if wait_us is lower then 10 we use 10 cycles
          * and do this for other Pico's aswell */
@@ -210,14 +218,15 @@ void handle_writeordered_asid_message(uint8_t sid, uint8_t* buffer)
       }
     }
   }
-
+  /* inline extern as only used here */
+  extern void asid_ring_write(uint8_t reg, uint8_t val, uint16_t c);
   for (size_t pos = 0; pos < NO_SID_REGISTERS_ASID; pos++) {
     if (writeOrder[chip][pos].wait_us != 0xff) {
-      /* Perform write including wait cycles */
-      cycled_write_operation((writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us);
-
+      /* Push data to ASID ringbuffer */
+      asid_ring_write((writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us);
       WRITEDBG(dtype, pos, NO_SID_REGISTERS_ASID, (writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us);
-      /* DBG("[ASID2 %d] $%02X:%02X %u\n", pos, (writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us); */
+    } else {
+      asid_ring_write(0xffu,0xffu,0xffffu);
     }
   }
   for (size_t pos = 0; pos < NO_SID_REGISTERS_ASID; pos++) {
@@ -238,9 +247,10 @@ void handle_asid_writeorder_config(uint8_t* buffer)
     asid_to_writeorder[i].wait_us = cycles;
     CFG("[ASID WRITE ORDER %d] {%02u,%02u}\n", i, asid_to_writeorder[i].index, asid_to_writeorder[i].wait_us);
   }
+  default_order = false;
 }
 
-void handle_asid_envmessage(uint8_t* buffer) /* TODO: Update clock settings on the fly when env differs from config */
+void handle_asid_envmessage(uint8_t* buffer)
 { /* SID environment is only logged and not used for now */
   /* Incoming buffer skips first 3 bytes and
      starts at SETTINGS
@@ -272,7 +282,7 @@ void handle_asid_envmessage(uint8_t* buffer) /* TODO: Update clock settings on t
     bits1-0: framedelta uS (MSB)
     bits6-2: 5 bits (reserved)
   */
-  uint16_t framedelta_us = (buffer[1] & 0x7F) | (buffer[2] & 0x7F) << 7 | (buffer[3] & 0x03) << 14;
+  uint16_t framedelta_us = ((buffer[1] & 0x7F) | (buffer[2] & 0x7F) << 7 | ((buffer[3] & 0x03) << 14));
   DBG("[ASID] Framedelta: %d\n", framedelta_us);
 }
 
@@ -315,7 +325,7 @@ void decode_asid_message(uint8_t* buffer, int size)
     case 0x4F:  /* Display characters */
       break;
     case 0x4E:  /* SID 1 */
-      if (!default_order) reset_asid_to_writeorder();  /* Set defaults once on first write */
+      if (!default_order_on_start) reset_asid_to_writeorder();  /* Set defaults once on first write of not set yet */
       if (!write_ordered) handle_asid_message(0, &buffer[3]);
       else handle_writeordered_asid_message(0, &buffer[3]);
       break;
