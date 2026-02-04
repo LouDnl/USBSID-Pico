@@ -413,22 +413,22 @@ int main(int argc, char* argv[])
       }
       goto done;
     }
-    if(!strcmp(argv[arg], "-stop") || !strcmp(argv[arg], "stop")) {
+    if(!strcmp(argv[arg], "-stop") || !strcmp(argv[arg], "stop") || !strcmp(argv[arg], "s")) {
       fprintf(stdout, "Stopping playback\n");
       configbuff[1] = SID_PLAYER_STOP;
       write_chars(configbuff, 5);
     }
-    if(!strcmp(argv[arg], "-pause")) {
+    if(!strcmp(argv[arg], "-pause") || !strcmp(argv[arg], "pause") || !strcmp(argv[arg], "p")) {
       fprintf(stdout, "(Un)Pausing playback\n");
       configbuff[1] = SID_PLAYER_PAUSE;
       write_chars(configbuff, 5);
     }
-    if(!strcmp(argv[arg], "-next")) {
+    if(!strcmp(argv[arg], "-next") || !strcmp(argv[arg], "next")|| !strcmp(argv[arg], "n")) {
       fprintf(stdout, "Playing next subtune\n");
       configbuff[1] = SID_PLAYER_NEXT;
       write_chars(configbuff, 5);
     }
-    if(!strcmp(argv[arg], "-prev")) {
+    if(!strcmp(argv[arg], "-prev") || !strcmp(argv[arg], "prev") || !strcmp(argv[arg], "b")) {
       fprintf(stdout, "Playing previous subtune\n");
       configbuff[1] = SID_PLAYER_PREV;
       write_chars(configbuff, 5);
