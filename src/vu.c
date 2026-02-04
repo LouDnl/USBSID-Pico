@@ -39,7 +39,7 @@ extern Config usbsid_config;  /* usbsid.c */
 #ifdef ONBOARD_EMULATOR
 extern uint8_t *sid_memory;
 #else
-extern uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));  /* usbsid.c */
+extern uint8_t sid_memory[(0x20 * 4)];  /* usbsid.c */
 #endif
 extern int usbdata;     /* usbsid.c */
 extern int numsids;     /* config.c */

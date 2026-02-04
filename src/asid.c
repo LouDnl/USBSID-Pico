@@ -48,7 +48,7 @@ extern RuntimeCFG cfg;
 extern char *sidtypes[5];
 
 /* GPIO */
-extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
+extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
 extern void pause_sid(void);
 extern void reset_sid(void);
 

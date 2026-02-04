@@ -51,8 +51,8 @@
 extern RuntimeCFG cfg;
 
 /* GPIO */
-extern uint8_t __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
-extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
+extern uint8_t cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint16_t cycled_delay_operation(uint16_t cycles);
 
 /* Initialize variables */
 extern const midi_ccvalues midi_ccvalues_defaults; /* midi.c */

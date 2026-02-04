@@ -34,7 +34,7 @@
 #ifdef ONBOARD_EMULATOR
 extern uint8_t *sid_memory;
 #else
-extern uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));
+extern uint8_t sid_memory[(0x20 * 4)];
 #endif
 extern int usbdata;
 
@@ -46,12 +46,8 @@ extern RuntimeCFG cfg;
 extern uint16_t vu;
 
 /* bus.c */
-#if PICO_RP2350
 extern void clockcycle_delay(uint32_t n_cycles);
-#else
-extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
-#endif
-extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
+extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
 
 /* (hot) locals */
 static bool paused_state, reset_state;
@@ -234,11 +230,7 @@ void reset_sid(void)
   cPIN(RES);
   if (cfg.chip_one == 0 || cfg.chip_two == 0) {
     /* 10x PHI1(02) cycles as per datasheet for REAL SIDs only */
-#if PICO_RP2350
     clockcycle_delay(10);
-#else
-    cycled_delay_operation(10);
-#endif
   }
   sPIN(RES);
   set_reset_state(false);
@@ -249,7 +241,7 @@ void reset_sid(void)
  * @brief Clear SID register / reset registers
  * @note https://csdb.dk/forums/?roomid=11&topicid=85713&showallposts=1
  * @note thanks Wilfred for pointing this out!
- * @param sidno
+ * @param int sidno
  */
 void clear_sid_registers(int sidno)
 {

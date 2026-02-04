@@ -56,9 +56,9 @@ extern bool offload_ledrunner;
 #endif
 
 /* GPIO */
-extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
-extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
-extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
+extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
+extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint16_t cycled_delay_operation(uint16_t cycles);
 extern void reset_sid(void);
 extern void restart_bus(void);
 extern void restart_bus_clocks(void);
@@ -1237,8 +1237,8 @@ void apply_clockrate(int n_clock, bool suspend_sids)
         }
         CFG("[CONFIG] [CLOCK FROM]%d [CLOCK TO]%d\n", usbsid_config.clock_rate, clockrates[n_clock]);
         usbsid_config.clock_rate = clockrates[n_clock];
-        usbsid_config.refresh_rate = refreshrates[n_clock]; /* Experimental */
-        usbsid_config.raster_rate = rasterrates[n_clock]; /* Experimental */
+        usbsid_config.refresh_rate = refreshrates[n_clock]; /* Used by ASID */
+        usbsid_config.raster_rate = rasterrates[n_clock]; /* Used by the Vu and the ASID buffer */
         /* Cycled write buffer vars */
         sid_hz = usbsid_config.clock_rate;
         sid_mhz = (sid_hz / 1000 / 1000);

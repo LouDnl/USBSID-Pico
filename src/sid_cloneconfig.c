@@ -33,8 +33,8 @@
 
 
 /* GPIO */
-extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
-extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
+extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
 
 /* SID */
 extern void clear_sid_memory(void);

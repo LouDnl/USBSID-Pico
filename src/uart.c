@@ -28,29 +28,28 @@
  */
 
 #ifdef USE_PIO_UART
+#if PICO_RP2350
 
 #include "globals.h"
 #include "uart.h"
 #include "logging.h"
 
 
-/* USBSID */
-extern uint8_t __not_in_flash("usbsid_buffer") uart_buffer[64];
-
-/* GPIO */
-extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
-extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
-extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
-extern uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
-extern void reset_sid(void);
-
-/* USBSID */
+/* usbsid.c */
+extern uint8_t uart_buffer[64];
 extern int usbdata;
 extern char ntype, dtype, uart;
 extern bool offload_ledrunner;
 
+/* gpio.c */
+extern uint16_t cycled_delay_operation(uint16_t cycles);
+extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
+extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint16_t cycled_delayed_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
+extern void reset_sid(void);
+
 /* Locals */
-static PIO uart_pio = pio1;
+static PIO uart_pio = pio2;
 static uint sm_uartrx;
 static int8_t pioirq_uartrx;
 static queue_t fifo_uartrx;
@@ -236,4 +235,5 @@ void deinit_uart(void)
   return;
 }
 
+#endif /* PICO_RP2350 */
 #endif /* USE_PIO_UART */

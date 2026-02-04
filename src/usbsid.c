@@ -92,9 +92,9 @@ extern void reset_sid_registers(void);
 extern void enable_sid(bool unmute);
 extern void disable_sid(void);
 extern void clear_bus_all(void);
-extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
-extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
-extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint16_t cycled_delay_operation(uint16_t cycles);
+extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
+extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
 extern bool is_muted;
 
 /* Uart */
@@ -918,7 +918,7 @@ int main()
   /* Check for default config bit
    * NOTE: This cannot be run from Core 1! */
   if (!auto_config) detect_default_config();
-  if (auto_config) {  /* ISSUE: NOT WORKING ON RP2350 */
+  if (auto_config) {  /* NOTE: Does not work on rp2350 */
     auto_detect_routine(auto_config, true);  /* Double tap! */
     save_config_ext();
     auto_config = false;
