@@ -239,6 +239,7 @@ void reset_sid(void)
 
 /**
  * @brief Clear SID register / reset registers
+ *        6 cycle delay for each write to simulate LDA (2) + STA (4)
  * @note https://csdb.dk/forums/?roomid=11&topicid=85713&showallposts=1
  * @note thanks Wilfred for pointing this out!
  * @param int sidno
@@ -246,13 +247,13 @@ void reset_sid(void)
 void clear_sid_registers(int sidno)
 {
   for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
-    cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0xff, 0);
+    cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0xff, 6);
   }
   for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
-    cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0x08, 0);
+    cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0x08, 6);
   }
   for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
-    cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0x0, 0);
+    cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0x0, 6);
   }
   memset(sid_memory, 0, (4 * 0x20));
   return;
