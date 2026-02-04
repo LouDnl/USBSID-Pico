@@ -38,7 +38,7 @@
 #ifdef ONBOARD_EMULATOR
 extern uint8_t *sid_memory;
 #else
-extern uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));
+extern uint8_t sid_memory[(0x20 * 4)];
 #endif
 
 /* config.c */
@@ -61,7 +61,7 @@ extern void sync_pios(bool at_boot);
 extern void stop_pios(void);
 
 /* globals */
-bool is_muted; /* Global muting state */
+volatile bool is_muted; /* Global muting state */
 
 /* Direct Pio IRQ access */
 volatile const uint32_t *IRQState = &pio0_hw->irq;
@@ -71,7 +71,12 @@ uint8_t control_word, read_data;
 uint16_t delay_word;
 uint32_t data_word, dir_mask;
 
-
+/**
+ * @brief Set the bits going to the PIO databus based on provided address
+ *
+ * @param uint8_t address
+ * @param bool write
+ */
 inline static int __not_in_flash_func(set_bus_bits)(uint8_t address, bool write)
 {
   /* CFG("[BUS BITS]$%02X:%02X ", address, data); */
@@ -116,8 +121,17 @@ inline static int __not_in_flash_func(set_bus_bits)(uint8_t address, bool write)
   return 1;
 }
 
+/**
+ * @brief Write data to or read data from the databus
+ * @note uses PIO0 SM0, SM1, SM2 & SM3
+ * WARNING: DEPRECATED AND NO LONGER WORKS, HERE FOR CODE HISTORY ONLY!!
+ *
+ * @param uint8_t command
+ * @param uint8_t address
+ * @param uint8_t data
+ */
 uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t address, uint8_t data)
-{ /* WARNING: DEPRECATED AND NO LONGER WORKS, HERE FOR CODE HISTORY ONLY!! */
+{
   return 0;
   if __us_unlikely((command & 0xF0) != 0x10) {
     return 0; // Sync bit not set, ignore operation
@@ -168,6 +182,13 @@ uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t ad
   return 0;
 }
 
+/**
+ * @brief Cycle delay function
+ *        blocks for supplied number of cycles (65535 max)
+ * @note uses DMA & PIO0 SM0 & SM3
+ *
+ * @param uint16_t cycles
+ */
 uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles)
 { /* This is a blocking function! */
   if __us_unlikely(cycles == 0) return 0; /* No point in waiting zero cycles */
@@ -188,30 +209,14 @@ uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles)
   return 0;
 }
 
-uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles)
-{
-  delay_word = cycles;
-  if __us_unlikely(set_bus_bits(address, false) != 1) {
-    return 0x00;
-  }
-
-  dma_channel_set_read_addr(dma_tx_delay, &delay_word, false);
-  dma_channel_set_read_addr(dma_tx_control, &control_word, false);
-  dma_channel_set_read_addr(dma_tx_data, &data_word, false);
-  dma_channel_set_write_addr(dma_rx_data, &read_data, false);
-  dma_hw->multi_channel_trigger = (
-      1u << dma_tx_delay    /* Delay cycles DMA transfer */
-  //#if PICO_PIO_VERSION > 0  /* rp2040 only for now, see notice in setup_dmachannels */
-    | 1u << dma_tx_control  /* Control lines RW, CS1 & CS2 DMA transfer */
-    | 1u << dma_tx_data     /* Data & Address DMA transfer */
-  //#endif
-    | 1u << dma_rx_data     /* Read data DMA transfer */
-  );
-  dma_channel_wait_for_finish_blocking(dma_rx_data);  /* Wait for data */
-  sid_memory[(address & 0x7F)] = (read_data & 0xFF);
-  return (read_data & 0xFF);
-}
-
+/**
+ * @brief Write data to the bus at address
+ *        does not wait for the PIO write to finish
+ * @note uses PIO0 SM0, SM1 & SM2
+ *
+ * @param uint8_t address
+ * @param uint8_t data
+ */
 void __no_inline_not_in_flash_func(write_operation)(uint8_t address, uint8_t data)
 {
   sid_memory[(address & 0x7F)] = data;
@@ -229,6 +234,80 @@ void __no_inline_not_in_flash_func(write_operation)(uint8_t address, uint8_t dat
   return;
 }
 
+/**
+ * @brief Write data to the bus at address
+ *        The PIO bus waits n cycles before the write occurs
+ *        does not wait for the PIO write to finish
+ * @note uses PIO0 SM0, SM1, SM2 & SM3
+ *
+ * @param uint8_t address
+ * @param uint8_t data
+ * @param uint16_t cycles
+ */
+void __no_inline_not_in_flash_func(cycled_write_operation_nondma)(uint8_t address, uint8_t data, uint16_t cycles)
+{
+  delay_word = cycles;
+  sid_memory[(address & 0x7F)] = data;
+  if __us_unlikely(set_bus_bits(address, true) != 1) {
+    return;
+  }
+
+  pio_sm_put_blocking(bus_pio, sm_control, control_word);
+  pio_sm_put_blocking(bus_pio, sm_data, data_word);
+  pio_sm_put_blocking(bus_pio, sm_delay, delay_word);
+
+  GPIODBG("[WC]$%04x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16" $%02X:%02X(%u %u)\n",
+    data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word),
+    address, data, cycles, delay_word);
+  return;
+}
+
+/**
+ * @brief Write data to the bus at address
+ *        The function waits n cycles before the write
+ *        occurs by using `cycled_delay_operation`
+ *        and then waits for the DMA to finish blocking
+ * @note uses DMA & PIO0 SM0, SM1, SM2 & SM3
+ *
+ * @param uint8_t address
+ * @param uint8_t data
+ * @param uint16_t cycles
+ */
+uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t address, uint8_t data, uint16_t cycles)
+{ /* This is a blocking function! */
+  sid_memory[(address & 0x7F)] = data;
+  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+  if __us_unlikely(set_bus_bits(address, true) != 1) {
+    return 0;
+  }
+
+  dma_channel_set_read_addr(dma_tx_control, &control_word, false);
+  dma_channel_set_read_addr(dma_tx_data, &data_word, false);
+
+  cycled_delay_operation(cycles); /* Replaces the delay DMA */
+  pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, PIO_IRQ0));  /* Preset the statemachine IRQ to not wait for a 1 */
+  pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, PIO_IRQ1));     /* Preset the statemachine IRQ to not wait for a 1 */
+  pio_sm_exec(bus_pio, sm_data, pio_encode_wait_pin(true, PHI1));
+  pio_sm_exec(bus_pio, sm_control, pio_encode_wait_pin(true, PHI1));
+  dma_hw->multi_channel_trigger = (
+    1u << dma_tx_control  /* Control lines RW, CS1 & CS2 DMA transfer */
+    | 1u << dma_tx_data     /* Data & Address DMA transfer */
+  );
+  dma_channel_wait_for_finish_blocking(dma_tx_control);
+
+  return cycles;
+}
+
+/**
+ * @brief Write data to the bus at address
+ *        and then waits for the DMA to finish blocking
+ *        The PIO bus waits n cycles before the write occurs
+ * @note uses DMA & PIO0 SM0, SM1, SM2 & SM3
+ *
+ * @param uint8_t address
+ * @param uint8_t data
+ * @param uint16_t cycles
+ */
 void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles)
 {
   delay_word = cycles;
@@ -261,49 +340,47 @@ void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint
   return;
 }
 
-void __no_inline_not_in_flash_func(cycled_write_operation_nondma)(uint8_t address, uint8_t data, uint16_t cycles)
+/**
+ * @brief Read data from the bus at address
+ *        and then waits for the DMA to finish blocking
+ *        The PIO bus waits n cycles before the read occurs
+ * @note uses DMA & PIO0 SM0, SM1, SM2 & SM3
+ *
+ * @param uint8_t address
+ * @param uint16_t cycles
+ */
+uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles)
 {
   delay_word = cycles;
-  sid_memory[(address & 0x7F)] = data;
-  if __us_unlikely(set_bus_bits(address, true) != 1) {
-    return;
+  if __us_unlikely(set_bus_bits(address, false) != 1) {
+    return 0x00;
   }
 
-  pio_sm_put_blocking(bus_pio, sm_control, control_word);
-  pio_sm_put_blocking(bus_pio, sm_data, data_word);
-  pio_sm_put_blocking(bus_pio, sm_delay, delay_word);
-
-  GPIODBG("[WC]$%04x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16" $%02X:%02X(%u %u)\n",
-    data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word),
-    address, data, cycles, delay_word);
-  return;
-}
-
-uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t address, uint8_t data, uint16_t cycles)
-{ /* This is a blocking function! */
-  sid_memory[(address & 0x7F)] = data;
-  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
-  if __us_unlikely(set_bus_bits(address, true) != 1) {
-    return 0;
-  }
-
+  dma_channel_set_read_addr(dma_tx_delay, &delay_word, false);
   dma_channel_set_read_addr(dma_tx_control, &control_word, false);
   dma_channel_set_read_addr(dma_tx_data, &data_word, false);
-
-  cycled_delay_operation(cycles); /* Replaces the delay DMA */
-  pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, PIO_IRQ0));  /* Preset the statemachine IRQ to not wait for a 1 */
-  pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, PIO_IRQ1));     /* Preset the statemachine IRQ to not wait for a 1 */
-  pio_sm_exec(bus_pio, sm_data, pio_encode_wait_pin(true, PHI1));
-  pio_sm_exec(bus_pio, sm_control, pio_encode_wait_pin(true, PHI1));
+  dma_channel_set_write_addr(dma_rx_data, &read_data, false);
   dma_hw->multi_channel_trigger = (
-    1u << dma_tx_control  /* Control lines RW, CS1 & CS2 DMA transfer */
+      1u << dma_tx_delay    /* Delay cycles DMA transfer */
+  //#if PICO_PIO_VERSION > 0  /* rp2040 only for now, see notice in setup_dmachannels */
+    | 1u << dma_tx_control  /* Control lines RW, CS1 & CS2 DMA transfer */
     | 1u << dma_tx_data     /* Data & Address DMA transfer */
+  //#endif
+    | 1u << dma_rx_data     /* Read data DMA transfer */
   );
-  dma_channel_wait_for_finish_blocking(dma_tx_control);
-
-  return cycles;
+  dma_channel_wait_for_finish_blocking(dma_rx_data);  /* Wait for data */
+  sid_memory[(address & 0x7F)] = (read_data & 0xFF);
+  return (read_data & 0xFF);
 }
 
+/**
+ * @brief Restart the PIO bus by unclaiming
+ *        the DMA channels, stopping the PIO
+ *        statemachines and then restarting
+ *        everything
+ *        Synchronizes the PIO statemachines
+ *        afterwards
+ */
 void restart_bus(void)
 {
   CFG("[RESTART BUS START]\n");
