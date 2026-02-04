@@ -653,8 +653,13 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       }
       break;
     case SINGLE_SID:
-      CFG("[CMD] SINGLE_SID\n");
-      set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, false, false, usbsid_config.socketTwo.chiptype, false);
+      int single_socket = ((buffer[2] == 1) ? 2 : 0);
+      CFG("[CMD] SINGLE_SID SOCKET %d\n", single_socket);
+      if (single_socket == 2) {
+        set_socket_config(buffer[1], false, false, usbsid_config.socketOne.chiptype, true, false, usbsid_config.socketTwo.chiptype, false);
+      } else {
+        set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, false, false, usbsid_config.socketTwo.chiptype, false);
+      }
       break;
     case MIRRORED_SID:
       CFG("[CMD] MIRRORED_SID\n");
