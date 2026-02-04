@@ -54,6 +54,7 @@ extern uint16_t vu;
 /* dma.c */
 extern void setup_dmachannels(void);
 extern void unclaim_dma_channels(void);
+extern volatile uint32_t cycle_count_word;
 
 /* pio.c */
 extern void setup_piobus(void);
@@ -395,5 +396,40 @@ void restart_bus(void)
   /* sync pios */
   sync_pios(false);
   CFG("[RESTART BUS END]\n");
+  return;
+}
+
+/**
+ * @brief Returns the amount of C64 cpu clock
+ *        cycles counted by the counter SM and updated
+ *        by a continous running DMA channel
+ *
+ * @note rp2350 uses a single DMA channel and native endless transfer
+ * @note rp2040 uses a two chained DMA channels for endless transfer
+ *
+ * @returns uint32_t */
+uint32_t clockcycles(void)
+{
+  return (uint32_t)cycle_count_word;
+}
+
+/**
+ * @brief Delay for n PHI1 clockcycles
+ *        Will do a cycled delay with cycle counter
+ * @note rp2350 uses a single DMA channel and native endless transfer
+ * @note rp2040 uses a two chained DMA channels for endless transfer
+ *
+ * NOTICE: Will crap out if delay cycles wrap around __UINT32_MAX__ after ~71 minutes
+ *
+ * @param uint32_t n_cycles
+ */
+void clockcycle_delay(uint32_t n_cycles)
+{ /*  */
+  if __us_unlikely(n_cycles == 0) return;
+  int32_t now, end;
+  now = end = clockcycles();
+  do {
+    end = clockcycles();
+  } while (end < (now + n_cycles));
   return;
 }
