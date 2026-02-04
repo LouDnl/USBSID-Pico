@@ -54,12 +54,6 @@ uint sm_delay, offset_delay;     /* pio0 */
 uint sm_clkcnt, offset_clkcnt;   /* pio1 */
 float sidclock_frequency, busclock_frequency;
 
-/* Clock cycle counter */
-#if 0 && PICO_RP2350 && !USE_PIO_UART /* Only on rp2350 for testing and when not using PIO Uart */
-PIO sid2_pio = pio2;
-uint sm_clock2, offset_clock2;
-#endif
-
 /* Shiny things */
 #if defined(PICO_DEFAULT_LED_PIN)
 PIO led_pio = pio1;
@@ -162,7 +156,7 @@ void setup_piobus(void)
     pio_sm_set_enabled(bus_pio, sm_data, true);
   }
 
-  { /* delay counter */
+  { /* delay cycle counter */
     sm_delay = 3;  /* PIO0 SM3 */
     pio_sm_claim(bus_pio, sm_delay);
     offset_delay = pio_add_program(bus_pio, &delay_timer_program);
@@ -186,19 +180,19 @@ void setup_piobus(void)
   return;
 }
 
-void sync_pios(bool at_boot) // TODO: SYNC COUNTER PIO WITH BUS PIO
+void sync_pios(bool at_boot)
 { /* Sync PIO's */
   #if PICO_PIO_VERSION == 0
   CFG("[RESTART PIOS] Pico & Pico_w\n");
   pio_sm_restart(bus_pio, 0b1111);
-  #elif PICO_PIO_VERSION > 0  // NOTE: rp2350 only
+  #elif PICO_PIO_VERSION > 0  /* NOTE: rp2350 only */
   CFG("[SYNC PIOS] Pico2\n");
   pio_clkdiv_restart_sm_multi_mask(bus_pio, 0, 0b1111, 0);
-  // pio_clkdiv_restart_sm_multi_mask(clkcnt_pio, 0, 0b0011, 0);
+  // pio_clkdiv_restart_sm_multi_mask(clkcnt_pio, 0, 0b0011, 0); /* TODO: SYNC COUNTER PIO WITH BUS PIO */
   pio_clkdiv_restart_sm_multi_mask(clkcnt_pio, 0, 0b1000, 0);
   #endif
   if __us_likely(!at_boot) {
-    pio_sm_clear_fifos(bus_pio, sm_clock); // TODO: TEST!
+    pio_sm_clear_fifos(bus_pio, sm_clock);
     pio_sm_clear_fifos(bus_pio, sm_control);
     pio_sm_clear_fifos(bus_pio, sm_data);
     pio_sm_clear_fifos(bus_pio, sm_delay);
@@ -213,13 +207,10 @@ void restart_bus_clocks(void)
   busclock_frequency = (float)pico_hz / (usbsid_config.clock_rate * 32) / 2;  /* Clock frequency is 8 times the SID clock */
   sidclock_frequency = (float)pico_hz / usbsid_config.clock_rate / 2;
   pio_sm_set_clkdiv(bus_pio, sm_clock, sidclock_frequency);
-#if 0 && PICO_RP2350 && !USE_PIO_UART /* Only on rp2350 for testing and when not using PIO Uart */
-  pio_sm_set_clkdiv(sid2_pio, sm_clock2, sidclock_frequency);
-#endif
-  pio_sm_set_clkdiv(clkcnt_pio, sm_clkcnt, busclock_frequency);
   pio_sm_set_clkdiv(bus_pio, sm_control, busclock_frequency);
   pio_sm_set_clkdiv(bus_pio, sm_data, busclock_frequency);
   pio_sm_set_clkdiv(bus_pio, sm_delay, busclock_frequency);
+  pio_sm_set_clkdiv(clkcnt_pio, sm_clkcnt, busclock_frequency);
 
   CFG("[PI CLK]@%luMHz [DIV]@%.2f [BUS CLK]@%.2f [CFG SID CLK]%d\n",
     (pico_hz / 1000 / 1000),
@@ -262,7 +253,7 @@ void init_sidclock(void)
   uint32_t pico_hz = clock_get_hz(clk_sys);
   sidclock_frequency = (float)pico_hz / usbsid_config.clock_rate / 2;
 
-  CFG("[SID CLK INIT] START\n");
+  CFG("[SID] CLK INIT START\n");
   CFG("[PI CLK]@%luMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n",
     (pico_hz / 1000 / 1000),
     sidclock_frequency,
@@ -272,23 +263,8 @@ void init_sidclock(void)
   sm_clock = 0;  /* PIO0 SM0 */
   pio_sm_claim(bus_pio, sm_clock);
   clock_program_init(bus_pio, sm_clock, offset_clock, PHI1, sidclock_frequency);
-  CFG("[SID CLK INIT] FINISHED\n");
+  CFG("[SID] CLK INIT FINISHED\n");
 
-/* DISABLED */
-#if 0 && PICO_RP2350 && !USE_PIO_UART /* Only on rp2350 for testing and when not using PIO Uart */
-  CFG("[SID CLK2 INIT] START\n");
-  CFG("[PI CLK]@%luMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n",
-    (pico_hz / 1000 / 1000),
-    sidclock_frequency,
-    ((float)pico_hz / sidclock_frequency / 2),
-    (int)usbsid_config.clock_rate);
-  offset_clock2 = pio_add_program(sid2_pio, &clock_program);
-  sm_clock2 = 0;  /* PIO2 SM0 */
-  pio_sm_claim(sid2_pio, sm_clock2);
-  clock_program_init(sid2_pio, sm_clock2, offset_clock2, PHI2, sidclock_frequency);
-  // clock_program_init(sid2_pio, sm_clock2, offset_clock2, PHI2, sidclock_frequency);
-  CFG("[SID CLK2 INIT] FINISHED\n");
-#endif
   return;
 }
 
@@ -324,10 +300,8 @@ void setup_sidclock(void)
 /* De-init nMHz square wave output */
 void deinit_sidclock(void)
 {
-  CFG("[DE-INIT CLOCK]\n");
+  CFG("[SID] CLK DE-INIT\n");
   clock_program_deinit(bus_pio, sm_clock, offset_clock, clock_program);
-#if 0 && PICO_RP2350 && !USE_PIO_UART /* Only on rp2350 for testing and when not using PIO Uart */
-  clock_program_deinit(sid2_pio, sm_clock2, offset_clock2, clock_program);
-#endif
+
   return;
 }
