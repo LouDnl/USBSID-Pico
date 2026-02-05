@@ -430,6 +430,6 @@ void clockcycle_delay(uint32_t n_cycles)
   now = end = clockcycles();
   do {
     end = clockcycles();
-  } while (end < (now + n_cycles));
+  } while ((uint32_t)(end - now) < n_cycles);
   return;
 }
