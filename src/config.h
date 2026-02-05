@@ -133,6 +133,7 @@ typedef struct Config {
   uint32_t clock_rate;         /* clock speed identifier */
   uint16_t refresh_rate;       /* refresh rate identifier based on clockspeed ~ not configurable */
   uint16_t raster_rate;        /* raster rate identifier based on clockspeed ~ not configurable */
+  uint16_t faux_delay_us;      /* Default delay in microseconds */
   Socket   socketOne;          /* 1 */
   Socket   socketTwo;          /* 2 */
   struct {
@@ -167,7 +168,7 @@ typedef struct Config {
   bool stereo_en : 1;           /* audio switch is off (mono) or on (stereo) ~ (PCB v1.3+ only) */
   bool lock_audio_sw : 1;       /* lock the audio switch into it's current stateand prevent it from being changed ~ (PCB v1.3+ only) */
   bool mirrored : 1;       /* act as socket 1 */
-  bool fauxstereo : 1;     /* faux stereo effect */
+  bool fauxstereo : 1;          /* faux stereo effect */
 } Config;
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
@@ -177,6 +178,7 @@ typedef struct Config {
   .clock_rate = DEFAULT, \
   .refresh_rate = HZ_DEFAULT, \
   .raster_rate = R_DEFAULT, \
+  .faux_delay_us = 2500, \
   .socketOne = { \
     .chiptype = 0x0,  /* real */ \
     .clonetype = 0x0, /* disabled */ \
@@ -281,12 +283,16 @@ typedef struct RuntimeCFG {
   uint8_t sidmask[4];  /* config_bus.c:apply_bus_config() */
   uint8_t addrmask[4]; /* config_bus.c:apply_bus_config() */
 
+  /* faux stereo delay us */
+  uint16_t faux_delay;     /* config_socket.c:apply_socket_config() */
+
   /* Check values */
   bool sock_one : 1;       /* config_socket.c:apply_socket_config() */
   bool sock_two : 1;       /* config_socket.c:apply_socket_config() */
   bool sock_one_dual : 1;  /* config_socket.c:apply_socket_config() */
   bool sock_two_dual : 1;  /* config_socket.c:apply_socket_config() */
   bool mirrored : 1;       /* config_socket.c:apply_socket_config() */
+  bool fauxstereo : 1;     /* config_socket.c:apply_socket_config() */
   bool fmopl_enabled : 1;  /* config_socket.c:apply_fmopl_config() */
 
 } RuntimeCFG;
@@ -316,6 +322,8 @@ enum
   MIRRORED_SID     = 0x45,  /* Socket Two is linked to Socket One */
   DUAL_SOCKET1     = 0x46,  /* Two SID's in socket One, Socket Two disabled */
   DUAL_SOCKET2     = 0x47,  /* Two SID's in socket Two, Socket One disabled */
+  FAUX_STEREO      = 0x48,  /* Socket Two is linked to Socket One but with a delay */
+  FAUX_DELAY       = 0x49,  /* Set n microseconds delay for faux Stereo */
 
   SET_CLOCK        = 0x50,  /* Change SID clock frequency by array id */
   DETECT_SIDS      = 0x51,  /* Try to detect the SID types per socket ~ routines see sid_detection.c */

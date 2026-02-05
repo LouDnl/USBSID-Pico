@@ -178,9 +178,13 @@ static int import_ini(void* user, const char* section, const char* name, const c
     p = value_position(value, sidtypes);
     if (p != 666) ini_config->socketTwo.sid2type = p;
   }
-  if (MATCH("socketTwo", "act_as_one")) {
+  if (MATCH("socketTwo", "mirrored")) {
     p = value_position(value, truefalse);
-    if (p != 666) ini_config->socketTwo.act_as_one = p;
+    if (p != 666) ini_config->mirrored = p;
+  }
+  if (MATCH("socketTwo", "fauxstereo")) {
+    p = value_position(value, truefalse);
+    if (p != 666) ini_config->fauxstereo = p;
   }
   if (MATCH("LED", "enabled")) {
     p = value_position(value, truefalse);
@@ -270,7 +274,8 @@ void write_config_ini(Config * config, char * filename)
     fprintf(f, "sid1type = %s\n", sidtypes[config->socketTwo.sid1type]);
     fprintf(f, "sid2type = %s\n", sidtypes[config->socketTwo.sid2type]);
     fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
-    fprintf(f, "act_as_one = %s\n", truefalse[config->socketTwo.act_as_one]);
+    fprintf(f, "mirrored = %s\n", truefalse[config->mirrored]);
+    fprintf(f, "fauxstereo = %s\n", truefalse[config->fauxstereo]);
     fprintf(f, "\n");
     fprintf(f, "[LED]\n");
     fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
@@ -468,7 +473,8 @@ void write_config(Config * config)
   write_config_command(SET_CONFIG,0x2,0x3,config->socketTwo.clonetype,0);
   write_config_command(SET_CONFIG,0x2,0x4,config->socketTwo.sid1type,0);
   write_config_command(SET_CONFIG,0x2,0x5,config->socketTwo.sid2type,0);
-  write_config_command(SET_CONFIG,0x2,0x6,config->socketTwo.act_as_one,0);
+  write_config_command(SET_CONFIG,0x2,0x6,config->mirrored,0);
+  write_config_command(SET_CONFIG,0x2,0x7,config->fauxstereo,0);
 
   /* LED */
   write_config_command(SET_CONFIG,0x3,0x0,config->LED.enabled,0);
@@ -599,7 +605,7 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
         usbsid_config.socketTwo.dualsid = buff[i];
         break;
       case 22:
-        usbsid_config.socketTwo.act_as_one = buff[i];
+        usbsid_config.mirrored = buff[i];
         break;
       case 23:
         usbsid_config.socketTwo.chiptype = buff[i];
@@ -655,6 +661,15 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
       case 58:
         usbsid_config.lock_audio_sw = buff[i];
         break;
+      case 59:
+        usbsid_config.fauxstereo = buff[i];
+        break;
+      case 60:
+        usbsid_config.faux_delay_us = (buff[i] << 8);
+        break;
+      case 61:
+        usbsid_config.faux_delay_us |= buff[i];
+        break;
       default:
         break;
     }
@@ -687,7 +702,8 @@ void set_socketcfg_from_buffer(const uint8_t * buff, size_t len)
   usbsid_config.socketTwo.sid1type   = (socket_config[7] >> 4) & 0xF;
   usbsid_config.socketTwo.sid2type   = (socket_config[7] & 0xF);
 
-  usbsid_config.socketTwo.act_as_one = (socket_config[8] & 0xF);
+  usbsid_config.mirrored = (socket_config[8] & 0xF);
+  usbsid_config.fauxstereo = ((socket_config[8] & 0xF0) >> 4);
 
   return;
 }
@@ -722,8 +738,11 @@ void print_config(void)
    sidtypes[usbsid_config.socketTwo.sid1type],
     sidtypes[usbsid_config.socketTwo.sid2type]);
   printf("[CONFIG] [SOCKET TWO AS ONE] %s\n",
-    truefalse[(int)usbsid_config.socketTwo.act_as_one]);
-
+    truefalse[(int)usbsid_config.mirrored]);
+  printf("[CONFIG] [SOCKET TWO AS FAUX STEREO] %s\n",
+    truefalse[(int)usbsid_config.fauxstereo]);
+  printf("[CONFIG] [SOCKET TWO FAUX STEREO DELAY] %u\n",
+    usbsid_config.faux_delay_us);
   printf("[CONFIG] [LED] %s, Idle breathe? %s\n",
     enabled[(int)usbsid_config.LED.enabled],
     truefalse[(int)usbsid_config.LED.idle_breathe]);
@@ -878,12 +897,15 @@ void apply_default_socket_settings(void)
 
 void print_socket_config(void)
 {
-  int sock_one = 0, sock_two = 0, sids_one = 0, sids_two = 0, numsids = 0, act_as_one = 0;
+  int sock_one = 0, sock_two = 0,
+    sids_one = 0, sids_two = 0,
+    numsids = 0, mirrored = 0, fauxstereo = 0;
   uint8_t one = 0, two = 0, three = 0, four = 0;
   uint8_t one_mask = 0, two_mask = 0, three_mask = 0, four_mask = 0;
   apply_default_socket_settings();
 
-  act_as_one = usbsid_config.socketTwo.act_as_one;
+  mirrored = usbsid_config.mirrored;
+  fauxstereo = usbsid_config.fauxstereo;
 
   sock_one = usbsid_config.socketOne.enabled;
   sock_two = usbsid_config.socketTwo.enabled;
@@ -895,9 +917,15 @@ void print_socket_config(void)
   printf("[CONFIG] Calculating socket settings\n");
   /* one == 0x00, two == 0x20, three == 0x40, four == 0x60 */
   /* act-as-one enabled overrules all settings */
-  if (act_as_one) {                    /* act-as-one enabled overrules all settings */
+  if (mirrored && !fauxstereo) {     /* act-as-one enabled overrules all settings */
     one = two = 0;                     /* CS1 low, CS2 low */
     three = four = 0;                  /* CS1 low, CS2 low */
+  } else if (fauxstereo && !mirrored) { /* Assumes we have a SID in socket One and Two */
+    one = 0b100;                     /* CS1 low, CS2 high */
+    two = 0b010;                     /* CS1 high, CS2 low */
+    three = four = 0b110;
+    one_mask = two_mask = 0x1F;
+    three_mask = four_mask = 0x0;
   } else {
     if (sock_one && !sock_two) {       /* SocketOne enabled, SocketTwo disabled */
       one = 0b100;                     /* CS1 low, CS2 high */
@@ -964,10 +992,11 @@ void print_socket_config(void)
     }
   }
 
-  printf("[SOCK_ONE EN] %s [SOCK_TWO EN] %s [ACT_AS_ONE] %s\n[NO SIDS] [SOCK_ONE] #%d [SOCK_TWO] #%d [TOTAL] #%d\n",
+  printf("[SOCK_ONE EN] %s [SOCK_TWO EN] %s [MIRRORED] %s [FAUX STEREO] %s\n[NO SIDS] [SOCK_ONE] #%d [SOCK_TWO] #%d [TOTAL] #%d\n",
     (sock_one ? truefalse[0] : truefalse[1]),
     (sock_two ? truefalse[0] : truefalse[1]),
-    (act_as_one ? truefalse[0] : truefalse[1]),
+    (mirrored ? truefalse[0] : truefalse[1]),
+    (fauxstereo ? truefalse[0] : truefalse[1]),
     sids_one, sids_two, numsids);
 
   printf("[BUS CONFIG]\n[ONE]   %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n[TWO]   %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n[THREE] %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n[FOUR]  %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n",
@@ -995,7 +1024,9 @@ void print_socket_config(void)
     sidtypes[usbsid_config.socketTwo.sid1type],
     sidtypes[usbsid_config.socketTwo.sid2type]);
   printf("[CONFIG] [SOCKET TWO AS ONE] %s\n",
-    truefalse[usbsid_config.socketTwo.act_as_one]);
+    truefalse[usbsid_config.mirrored]);
+  printf("[CONFIG] [SOCKET FAUX STEREO] %s\n",
+    truefalse[usbsid_config.fauxstereo]);
 }
 
 /* -----SIDKICK-pico----- */
@@ -1448,6 +1479,8 @@ void print_help(void)
   printf("  -triple2, --triple-sid2       : Socket 1 enabled @ single SID, Socket 2 enabled @ dual SID\n");
   printf("  -quad,    --quad-sid          : Socket 1 enabled @ dual SID, Socket 2 enabled @ dual SID\n");
   printf("  -mirrored,--mirrored-sid      : Socket 1&2 enabled @ single SID, each socket receives the same writes\n");
+  printf("  -faux,    --faux-stereo       : Socket 1&2 enabled @ single SID, same as mirrored, socket two is a bit delayed\n");
+  printf("  -fauxus N,--faux-stereo-us N  : Set the n amount of microseconds for the faux stereo delay (defaults to 2500)\n");
   printf("--[BASICS]----------------------------------------------------------------------------------------------------------\n");
   printf("  -v,       --version           : Read and print USBSID-Pico firmware version\n");
   printf("  -r,       --read-config       : Read and print USBSID-Pico config settings\n");
@@ -1517,6 +1550,8 @@ void print_help(void)
          sidtypes[0], sidtypes[1], sidtypes[2], sidtypes[3], sidtypes[4]);
   printf("                                  (Available for 'Clone' chiptype only!)\n");
   printf("  -a1 N,    --as-one N          : Socket 2 mirrors socket 1 (Socket 2 setting only!)\n");
+  printf("                                  Enabled (1) or Disabled (0)\n");
+  printf("  -fs N,    --faux-stereo       : Socket 2 mirrors socket 1 with a small delay (Socket 2 setting only!)\n");
   printf("                                  Enabled (1) or Disabled (0)\n");
   printf("--------------------------------------------------------------------------------------------------------------------\n");
 }
@@ -1628,6 +1663,22 @@ void config_usbsidpico(int argc, char **argv)
     if (!strcmp(argv[param_count], "-mirrored") || !strcmp(argv[param_count], "--mirrored-sid")) {
       printf("Set USBSID-Pico config to single -> dual mirrored SID\n");
       write_config_command(MIRRORED_SID, quickchange, 0 ,0 ,0);
+      goto exit;
+    }
+    if (!strcmp(argv[param_count], "-faux") || !strcmp(argv[param_count], "--faux-stereo")) {
+      printf("Set USBSID-Pico config to single -> dual faux stereo SID\n");
+      write_config_command(FAUX_STEREO, quickchange, 0 ,0 ,0);
+      goto exit;
+    }
+    if (!strcmp(argv[param_count], "-fauxus") || !strcmp(argv[param_count], "--faux-stereo-us")) {
+      param_count++;
+      int faux_delay_us = atoi(argv[param_count]);
+      if(faux_delay_us < 100) {
+        printf("%d is not a high enough microsecond delay rate! A minimal delay of 100 is required.\n", faux_delay_us);
+        goto exit;
+      }
+      printf("Set USBSID-Pico config faux stereo microsecond delay %d\n", faux_delay_us);
+      write_config_command(FAUX_DELAY, ((faux_delay_us & 0xff00u) >> 8), (faux_delay_us & 0xffu) ,0 ,0);
       goto exit;
     }
 
@@ -2015,7 +2066,8 @@ void config_usbsidpico(int argc, char **argv)
               printf("%d ?\n", socket_pointer->clonetype);
               printf("%d ?\n", socket_pointer->sid1type);
               printf("%d ?\n", socket_pointer->sid2type);
-              if (socket == 2) printf("%d ?\n", usbsid_config.socketTwo.act_as_one);
+              if (socket == 2) printf("%d ?\n", usbsid_config.mirrored);
+              if (socket == 2) printf("%d ?\n", usbsid_config.fauxstereo);
               goto exit;
             }
 
@@ -2030,9 +2082,26 @@ void config_usbsidpico(int argc, char **argv)
                 printf("%d is not an enable option!\n", asone);
                 goto exit;
               }
-              printf("Set SocketTwo act-as-one from %s to: %s\n", enabled[usbsid_config.socketTwo.act_as_one], enabled[asone]);
-              usbsid_config.socketTwo.act_as_one = asone;
-              write_config_command(SET_CONFIG, 0x2, 0x6, usbsid_config.socketTwo.act_as_one, 0);
+              printf("Set SocketTwo mirrored from %s to: %s\n", enabled[usbsid_config.mirrored], enabled[asone]);
+              usbsid_config.mirrored = asone;
+              write_config_command(SET_CONFIG, 0x2, 0x6, usbsid_config.mirrored, 0);
+              continue;
+            }
+
+            if (socket == 2 && (!strcmp(argv[p], "-fs") || !strcmp(argv[p], "--faux-stereo"))) {
+              p++;
+              if (argv[p] == NULL) {
+                printf ("No argument supplied for option '%s'\n", argv[--p]);
+                goto exit;
+              }
+              int faux = atoi(argv[p]);
+              if (faux >= count_of(enabled)) {
+                printf("%d is not an enable option!\n", faux);
+                goto exit;
+              }
+              printf("Set SocketTwo faux stereo from %s to: %s\n", enabled[usbsid_config.fauxstereo], enabled[faux]);
+              usbsid_config.fauxstereo = faux;
+              write_config_command(SET_CONFIG, 0x2, 0x6, usbsid_config.fauxstereo, 0);
               continue;
             }
 

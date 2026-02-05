@@ -92,6 +92,7 @@ extern void reset_sid_registers(void);
 extern void enable_sid(bool unmute);
 extern void disable_sid(void);
 extern void clear_bus_all(void);
+extern void bus_lock_init(void);
 extern uint16_t cycled_delay_operation(uint16_t cycles);
 extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
 extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
@@ -165,6 +166,20 @@ midi_machine midimachine;
 queue_t sidtest_queue;
 queue_t logging_queue;
 
+/* Faux stereo magic sprinkles */
+#define FAUX_RING_SIZE 128
+#define FAUX_RING_MASK (FAUX_RING_SIZE - 1)
+typedef struct {
+  uint8_t  buffer[64];
+  uint32_t n_bytes;
+  int      nth_byte;
+  uint64_t play_at_us;  /* Absolute time when this should be written to SID 2 */
+} faux_ring_entry_t;
+static faux_ring_entry_t __not_in_flash("usbsid_buffer") faux_ring[FAUX_RING_SIZE] __aligned(2 * FAUX_RING_SIZE);
+static volatile uint16_t faux_head = 0;
+static volatile uint16_t faux_tail = 0;
+static uint8_t faux_itf = CDC_ITF;  /* Interface byte for Core 1 faux writes */
+
 /* Declare local variables */
 static semaphore_t core0_init, core1_init;
 
@@ -224,6 +239,72 @@ void init_logging(void)
   return;
 }
 
+/* FAUX */
+
+static inline void faux_flush(void)
+{
+  faux_head = faux_tail = 0;
+}
+
+void update_address(uint8_t * buffer, int nth_byte, int nbytes)
+{
+  for (int n = 1; n < nbytes; n += nth_byte) {
+    buffer[n] = (buffer[n] & 0x1F) + 0x20;
+  }
+}
+
+static inline void faux_enqueue(uint8_t *buffer, uint32_t n_bytes, int nth_byte)
+{
+  uint16_t next_head = (faux_head + 1) & FAUX_RING_MASK;
+  if (next_head == faux_tail) {
+    return;  /* Ring full, drop entry */
+  }
+  faux_ring_entry_t *entry = &faux_ring[faux_head];
+  memcpy(entry->buffer, buffer, n_bytes);
+  entry->n_bytes = n_bytes;
+  entry->nth_byte = nth_byte;
+  entry->play_at_us = to_us_since_boot(get_absolute_time()) + (uint64_t)cfg.faux_delay;
+  faux_head = next_head;
+}
+
+/* Write faux stereo entries directly with minimum bus delay.
+ * Bypasses process_buffer to skip command dispatch overhead
+ * and uses MIN_CYCLES instead of the original packet timing delays.
+ * SID 2 just needs the register values, not exact 6502 inter-write timing.
+ */
+static void __no_inline_not_in_flash_func(faux_write_buffer)(uint8_t *buffer, uint32_t n_bytes, int step)
+{
+  for (int i = 1; i < (int)n_bytes; i += step) {
+    // CRACKLING SOUND
+    cycled_write_operation(buffer[i], buffer[i + 1], MIN_CYCLES);
+
+    // CRACKLING SOUND
+    // cycled_write_operation(buffer[i], buffer[i + 1], 5);
+
+    // BEST
+    // cycled_write_operation(buffer[i], buffer[i + 1], 25);
+
+    // TOO FAST
+    // cycled_write_operation(buffer[i], buffer[i + 1], 0);
+
+    // TOO SLOW
+    // cycled_write_operation(buffer[i], buffer[i + 1], ((step == 4) ? ((buffer[i + 2] << 8 |  buffer[i + 3]) - 1) : MIN_CYCLES));
+  }
+}
+
+static void faux_process_pending(void)
+{
+  uint64_t now = to_us_since_boot(get_absolute_time());
+  while (faux_tail != faux_head) {
+    faux_ring_entry_t *entry = &faux_ring[faux_tail];
+    if (now < entry->play_at_us) {
+      break;  /* Entries are time-ordered, nothing else is ready */
+    }
+    update_address(entry->buffer, entry->nth_byte, entry->n_bytes);
+    faux_write_buffer(entry->buffer, entry->n_bytes, entry->nth_byte);
+    faux_tail = (faux_tail + 1) & FAUX_RING_MASK;
+  }
+}
 
 /* USB TO HOST */
 
@@ -248,7 +329,7 @@ void webserial_write(uint8_t * itf, uint32_t n)
 
 /* BUFFER HANDLING */
 
-int __no_inline_not_in_flash_func(do_buffer_tick)(int top, int step)
+int __no_inline_not_in_flash_func(do_buffer_tick)(uint8_t *sid_buffer, int top, int step)
 {
   static int i = 1;
   cycled_write_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
@@ -262,17 +343,17 @@ int __no_inline_not_in_flash_func(do_buffer_tick)(int top, int step)
   return 0;
 }
 
-void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
+void __no_inline_not_in_flash_func(buffer_task)(uint8_t *sid_buffer, int n_bytes, int step)
 {
   int state = 0;
   do {
     usbdata = 1;
-    state = do_buffer_tick(n_bytes, step);
+    state = do_buffer_tick(sid_buffer, n_bytes, step);
   } while (state != 1);
 }
 
 /* Process received usb data */
-void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
+void __no_inline_not_in_flash_func(process_buffer)(uint8_t *sid_buffer, uint8_t * itf, uint32_t * n)
 {
   usbdata = 1;
   vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
@@ -288,7 +369,10 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
       WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
       IODBG("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
     } else {
-      buffer_task(n_bytes, 4);
+      buffer_task(sid_buffer, n_bytes, 4);
+      if __us_likely(cfg.fauxstereo) {
+        faux_enqueue(read_buffer, n_bytes, 4);
+      }
     }
     return;
   };
@@ -299,7 +383,10 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
       WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], 6);
       IODBG("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], 6);
     } else {
-      buffer_task(n_bytes, 2);
+      buffer_task(sid_buffer, n_bytes, 2);
+      if __us_likely(cfg.fauxstereo) {
+        faux_enqueue(read_buffer, n_bytes, 2);
+      }
     }
     return;
   };
@@ -356,6 +443,7 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
         unmute_sid();
         break;
       case RESET_SID:
+        faux_flush();
         if (sid_buffer[1] == 0) {
           DBG("[RESET_SID]\n");
           reset_sid();
@@ -415,6 +503,7 @@ void tud_umount_cb(void)
 {
   usb_connected = 0, usbdata = 0, dtype = rtype = ntype;
   DBG("[%s]\n", __func__);
+  faux_flush();
   disable_sid();  /* NOTICE: Testing if this is causing the random lockups */
 }
 
@@ -423,6 +512,7 @@ void tud_suspend_cb(bool remote_wakeup_en)
   /* (void) remote_wakeup_en; */
   DBG("[%s] remote_wakeup_en:%d\n", __func__, remote_wakeup_en);
   usb_connected = 0, usbdata = 0, dtype = rtype = ntype;
+  faux_flush();
 }
 
 void tud_resume_cb(void)
@@ -478,7 +568,7 @@ void cdc_task(void)
       cdcread = tud_cdc_n_read(CDC_ITF, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
       tud_cdc_n_read_flush(CDC_ITF);
       memcpy(sid_buffer, read_buffer, cdcread);
-      process_buffer(cdc_itf, &cdcread);
+      process_buffer(sid_buffer, cdc_itf, &cdcread);
       return;
     }
     return;
@@ -496,7 +586,17 @@ void tud_cdc_rx_cb(uint8_t itf)
     cdcread = tud_cdc_n_read(*cdc_itf, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
     tud_cdc_n_read_flush(*cdc_itf);
     memcpy(sid_buffer, read_buffer, cdcread);
-    process_buffer(cdc_itf, &cdcread);
+    process_buffer(sid_buffer, cdc_itf, &cdcread);
+
+    // /* Faux stereo: enqueue a delayed copy for SID 2 */
+    // if (cfg.fauxstereo) {
+    //   uint8_t command = ((sid_buffer[0] & PACKET_TYPE) >> 6);
+    //   if (command == WRITE || command == CYCLED_WRITE) {
+    //     int nth_byte = (command == WRITE) ? 2 : 4;
+    //     faux_enqueue(read_buffer, cdcread, nth_byte);
+    //   }
+    // }
+
     return;
   }
 #else
@@ -562,7 +662,7 @@ void vendor_task(void)
       webread = tud_vendor_n_read(WUSB_ITF, &read_buffer, MAX_BUFFER_SIZE);
       tud_vendor_n_read_flush(*wusb_itf);
       memcpy(sid_buffer, read_buffer, webread);
-      process_buffer(wusb_itf, &webread);
+      process_buffer(sid_buffer, wusb_itf, &webread);
     return;
   }
   return;
@@ -582,7 +682,17 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
       webread = bufsize;
       memcpy(sid_buffer, buffer, bufsize);
       /* No need to flush since we have no fifo */
-      process_buffer(wusb_itf, &webread);
+      process_buffer(sid_buffer, wusb_itf, &webread);
+
+      /* Faux stereo: enqueue a delayed copy for SID 2 */
+      if (cfg.fauxstereo) {
+        uint8_t command = ((sid_buffer[0] & PACKET_TYPE) >> 6);
+        if (command == WRITE || command == CYCLED_WRITE) {
+          int nth_byte = (command == WRITE) ? 2 : 4;
+          faux_enqueue((uint8_t *)buffer, bufsize, nth_byte);
+        }
+      }
+
     return;
   }
   return;
@@ -744,6 +854,11 @@ void core1_main(void)
   sem_acquire_blocking(&core0_init);
 
   while (1) {
+
+    /* Faux stereo: process delayed writes to SID 2 (spinlock protects bus access) */
+    if (cfg.fauxstereo) {
+      faux_process_pending();
+    }
 #if ONBOARD_SIDPLAYER
     if (sidplayer_init) {
       sidplayer_init = false;
@@ -908,6 +1023,8 @@ int main()
   sync_pios(true);
   /* Init DMA */
   setup_dmachannels();
+  /* Init bus spinlock for cross-core access */
+  bus_lock_init();
   /* Init midi */
   midi_init();
   /* Init ASID */

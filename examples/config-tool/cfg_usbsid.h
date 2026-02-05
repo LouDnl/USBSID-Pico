@@ -85,6 +85,8 @@ enum
   MIRRORED_SID     = 0x45,  /* Socket Two is linked to Socket One */
   DUAL_SOCKET1     = 0x46,  /* Two SID's in socket One, Socket Two disabled */
   DUAL_SOCKET2     = 0x47,  /* Two SID's in socket Two, Socket One disabled */
+  FAUX_STEREO      = 0x48,  /* Socket Two is linked to Socket One but with a delay */
+  FAUX_DELAY       = 0x49,  /* Set n microseconds delay for faux Stereo */
 
   SET_CLOCK        = 0x50,  /* Change SID clock frequency by array id */
   DETECT_SIDS      = 0x51,  /* Try to detect the SID types per socket */
@@ -163,65 +165,57 @@ const char * clonetypes[] = { "Disabled", "Other", "SKPico", "ARMSID", "FPGASID"
 const char * mono_stereo[] = { "Mono", "Stereo" };
 
 /* USBSID-Pico config struct */
+typedef struct Socket {
+  uint8_t chiptype;     /* 0 = real, 1 = clone, 2 = unknown */
+  uint8_t clonetype;    /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
+  uint8_t sid1type;     /* 0 = unknown, 1 = N/A, 2 = MOS8580, 3 = MOS6581, 4 = FMopl */
+  uint8_t sid2type;     /* 0 = unknown, 1 = N/A, 2 = MOS8580, 3 = MOS6581, 4 = FMopl */
+  bool    enabled : 1;  /* enable / disable this socket */
+  bool    dualsid : 1;  /* enable / disable dual SID support for this socket (requires clone) */
+} Socket;
+
 typedef struct Config {
-  bool external_clock : 1;     /* enable / disable external oscillator */
   uint32_t clock_rate;         /* clock speed identifier */
-  bool lock_clockrate : 1;     /* lock the set clockspeed from being changed */
-  struct
-  {
-    bool    enabled : 1;       /* enable / disable this socket */
-    bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
-    uint8_t chiptype;          /* 0 = real, 1 = clone, 2 = unknown */
-    uint8_t clonetype;         /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
-    uint8_t sid1type;          /* 0 = unknown, 1 = n/a, 2 = MOS8580, 3 = MOS6581 */
-    uint8_t sid2type;          /* 0 = unknown, 1 = FMopl, 2 = MOS8580, 3 = MOS6581 */
-  } socketOne;                 /* 1 */
-  struct {
-    bool    enabled : 1;       /* enable / disable this socket */
-    bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
-    bool    act_as_one : 1;    /* act as socket 1 */
-    uint8_t chiptype;          /* 0 = real, 1 = clone, 2 = unknown */
-    uint8_t clonetype;         /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
-    uint8_t sid1type;          /* 0 = unknown, 1 = n/a, 2 = MOS8580, 3 = MOS6581 */
-    uint8_t sid2type;          /* 0 = unknown, 1 = FMopl, 2 = MOS8580, 3 = MOS6581 */
-  } socketTwo;                 /* 2 */
+  uint16_t faux_delay_us;      /* Default delay in microseconds */
+  Socket   socketOne;          /* 1 */
+  Socket   socketTwo;          /* 2 */
   struct {
     bool enabled : 1;
     bool idle_breathe : 1;
   } LED;                       /* 3 */
   struct {
+    uint8_t brightness;
+    int     sid_to_use;        /* 0/-1 = off, 1...4 = sid 1 ... sid 4 */
     bool    enabled : 1;
     bool    idle_breathe : 1;
-    uint8_t brightness;
-    int     sid_to_use;         /* 0/-1 = off, 1...4 = sid 1 ... sid 4 */
-  } RGBLED;                     /* 4 */
+  } RGBLED;                    /* 4 */
   struct {
     bool enabled : 1;
-  } Cdc;                        /* 5 */
+  } Cdc;                       /* 5 */
   struct {
     bool enabled : 1;
-  } WebUSB;                     /* 6 */
+  } WebUSB;                    /* 6 */
   struct {
     bool enabled : 1;
-  } Asid;                       /* 7 */
+  } Asid;                      /* 7 */
   struct {
     bool enabled : 1;
-    uint8_t sid_states[4][32];  /* Stores states of each SID ~ 4 sids max */
-  } Midi;                       /* 8 */
+  } Midi;                      /* 8 */
   struct {
-    bool enabled : 1;           /* Requires a clone SID! */
-    int sidno;                  /* 0 = disabled, saves the sidno of the sid set to FMOpl */
-  } FMOpl;                      /* 9 */
-  bool stereo_en : 1;           /* audio switch is off (mono) or on (stereo) ~ (HW v1.3+ only) */
-  bool lock_audio_sw : 1;       /* lock the audio switch into it's current stateand prevent it from being changed ~ (PCB v1.3+ only) */
+    int sidno;                 /* 0 = disabled, saves the sidno of the sid set to FMOpl */
+    bool enabled : 1;          /* Requires a clone SID! */
+  } FMOpl;                     /* 9 */
+  bool external_clock : 1;     /* enable / disable external oscillator */
+  bool lock_clockrate : 1;     /* lock the set clockspeed from being changed */
+  bool stereo_en : 1;          /* audio switch is off (mono) or on (stereo) ~ (HW v1.3+ only) */
+  bool lock_audio_sw : 1;      /* lock the audio switch into it's current stateand prevent it from being changed ~ (PCB v1.3+ only) */
+  bool mirrored : 1;           /* act as socket 1 */
+  bool fauxstereo : 1;         /* faux stereo effect */
 } Config;
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
-  .external_clock = false, \
   .clock_rate = DEFAULT, \
-  .lock_clockrate = false, \
-  .stereo_en = true,  /* PCB v1.3+ only */ \
-  .lock_audio_sw = false,  /* PCB v1.3+ only */ \
+  .faux_delay_us = 2500, \
   .socketOne = { \
     .enabled = true, \
     .dualsid = false, \
@@ -233,7 +227,6 @@ typedef struct Config {
   .socketTwo = { \
     .enabled = true, \
     .dualsid = false, \
-    .act_as_one = false, \
     .chiptype = 0x0,  /* real */ \
     .clonetype = 0x0, /* disabled */ \
     .sid1type = 0x0,  /* unknown */ \
@@ -265,4 +258,10 @@ typedef struct Config {
     .enabled = false, \
     .sidno = -1, \
   }, \
+  .external_clock = false, \
+  .lock_clockrate = false, \
+  .stereo_en = true,  /* PCB v1.3+ only */ \
+  .lock_audio_sw = false,  /* PCB v1.3+ only */ \
+  .mirrored = false, \
+  .fauxstereo = false, \
 }

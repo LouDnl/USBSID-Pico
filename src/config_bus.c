@@ -55,11 +55,17 @@ void apply_bus_config_OLD(void)
   cfg.sidaddr[3] = usbsid_config.socketTwo.sid2.addr;
 
   /* one == 0x00, two == 0x20, three == 0x40, four == 0x60 */
-  if (cfg.mirrored) {                    /* act-as-one enabled overrules all settings */
+  if (cfg.mirrored && !cfg.fauxstereo) {                    /* act-as-one enabled overrules all settings */
     cfg.one = cfg.two = 0;                     /* CS1 low, CS2 low */
     cfg.three = cfg.four = 0;                  /* CS1 low, CS2 low */
     cfg.one_mask = cfg.two_mask = cfg.three_mask = cfg.four_mask = 0x1F;
     /* No changes to sidtypes */
+  } else if (cfg.fauxstereo && !cfg.mirrored) { /* Assumes we have a SID in socket One and Two */
+    cfg.one = 0b100;                     /* CS1 low, CS2 high */
+    cfg.two = 0b010;                     /* CS1 high, CS2 low */
+    cfg.three = cfg.four = 0b110;
+    cfg.one_mask = cfg.two_mask = 0x1F;
+    cfg.three_mask = cfg.four_mask = 0x0;
   } else {
     if (cfg.sock_one && !cfg.sock_two) {       /* SocketOne enabled, SocketTwo disabled */
       cfg.one = 0b100;                     /* CS1 low, CS2 high */
@@ -219,7 +225,7 @@ void apply_bus_config(bool quiet) // ISSUE: FINISH
   }
 
   /* Mirrored is easy */
-  if (cfg.mirrored) {  /* Mirrored (act-as-one) overrules everything at runtime :) */
+  if (cfg.mirrored && !cfg.fauxstereo) {  /* Mirrored (act-as-one) overrules everything at runtime :) */
     cfg.one = cfg.two = cfg.three = cfg.four = 0;  /* CS1 & CS2 low */
     if ((cfg.sock_one_dual == true) && (cfg.numsids == 2)) {
       cfg.one_mask = cfg.three_mask = 0x1F;
@@ -230,7 +236,14 @@ void apply_bus_config(bool quiet) // ISSUE: FINISH
       cfg.one_mask = cfg.two_mask = cfg.three_mask = cfg.four_mask = 0x1F;  /* Map everything to SID1 */
       cfg.sidtype[1] = cfg.sidtype[2] = cfg.sidtype[3] = cfg.sidtype[0];    /* Map each sidtype to SID1 */
     }
-
+  } else if (cfg.fauxstereo && !cfg.mirrored) { /* Assumes we have a SID in socket One and Two */
+    cfg.one = 0b100;                     /* CS1 low, CS2 high */
+    cfg.two = 0b010;                     /* CS1 high, CS2 low */
+    cfg.three = cfg.four = 0b110;
+    cfg.one_mask = cfg.two_mask = 0x1F;
+    cfg.three_mask = cfg.four_mask = 0x0;
+    cfg.sidtype[2] = cfg.sidtype[0];  /* Map sidtype to SID1 */
+    cfg.sidtype[3] = cfg.sidtype[1];  /* Map sidtype to SID2 */
   } else { /* Now for the tricky part */
 
     /* Set everything from all presets */

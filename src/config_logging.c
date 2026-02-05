@@ -158,6 +158,10 @@ void print_config_settings(void)
     usbsid_config.socketTwo.sid2.addr);
   CFG("[SOCKET TWO AS ONE (MIRRORED)] %s\n",
     true_false[(int)usbsid_config.mirrored]);
+  CFG("[SOCKET TWO AS FAUX STEREO] %s\n",
+    true_false[(int)usbsid_config.fauxstereo]);
+  CFG("[SOCKET TWO FAUX STEREO DELAY] %u\n",
+    usbsid_config.faux_delay_us);
 
   CFG("[LED] %s, Idle breathe? %s\n",
     enabled[(int)usbsid_config.LED.enabled],

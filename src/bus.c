@@ -25,6 +25,7 @@
 
 
 #include "hardware/irq.h"    /* Hardware interrupt handling */
+#include "hardware/sync.h"   /* Hardware spinlock for cross-core bus protection */
 
 #include "globals.h"
 
@@ -71,6 +72,15 @@ volatile const uint32_t *IRQState = &pio0_hw->irq;
 uint8_t control_word, read_data;
 uint16_t delay_word;
 uint32_t data_word, dir_mask;
+
+/* Bus spinlock for cross-core bus access protection */
+static spin_lock_t *bus_spinlock;
+
+void bus_lock_init(void)
+{
+  int lock_num = spin_lock_claim_unused(true);
+  bus_spinlock = spin_lock_init(lock_num);
+}
 
 /**
  * @brief Set the bits going to the PIO databus based on provided address
@@ -193,6 +203,7 @@ uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t ad
 uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles)
 { /* This is a blocking function! */
   if __us_unlikely(cycles == 0) return 0; /* No point in waiting zero cycles */
+  uint32_t irq_state = spin_lock_blocking(bus_spinlock);
   delay_word = cycles;
   pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ0));  /* Clear the statemachine IRQ before starting */
   pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ1));  /* Clear the statemachine IRQ before starting */
@@ -204,9 +215,11 @@ uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles)
       continue;
     pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ0));  /* Clear the statemachine IRQ after finishing */
     pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ1));  /* Clear the statemachine IRQ after finishing */
+    spin_unlock(bus_spinlock, irq_state);
     return cycles;
   }
 
+  spin_unlock(bus_spinlock, irq_state);
   return 0;
 }
 
@@ -311,9 +324,11 @@ uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t a
  */
 void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles)
 {
+  uint32_t irq_state = spin_lock_blocking(bus_spinlock);
   delay_word = cycles;
   sid_memory[(address & 0x7F)] = data;
   if (set_bus_bits(address, true) != 1) {
+    spin_unlock(bus_spinlock, irq_state);
     return;
   }
 
@@ -334,6 +349,7 @@ void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint
    * neither ~ broken play
    */
   dma_channel_wait_for_finish_blocking(dma_tx_control);
+  spin_unlock(bus_spinlock, irq_state);
 
   GPIODBG("[WC]$%04x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16" $%02X:%02X(%u %u)\n",
     data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word),
@@ -352,8 +368,10 @@ void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint
  */
 uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles)
 {
+  uint32_t irq_state = spin_lock_blocking(bus_spinlock);
   delay_word = cycles;
   if __us_unlikely(set_bus_bits(address, false) != 1) {
+    spin_unlock(bus_spinlock, irq_state);
     return 0x00;
   }
 
@@ -370,8 +388,10 @@ uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, ui
     | 1u << dma_rx_data     /* Read data DMA transfer */
   );
   dma_channel_wait_for_finish_blocking(dma_rx_data);  /* Wait for data */
-  sid_memory[(address & 0x7F)] = (read_data & 0xFF);
-  return (read_data & 0xFF);
+  uint8_t result = (read_data & 0xFF);
+  sid_memory[(address & 0x7F)] = result;
+  spin_unlock(bus_spinlock, irq_state);
+  return result;
 }
 
 /**

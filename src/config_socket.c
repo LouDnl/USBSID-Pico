@@ -360,7 +360,7 @@ void apply_fmopl_config(bool quiet)
   }
 }
 
-void set_socket_config(uint8_t cmd, bool s1en, bool s1dual, uint8_t s1chip, bool s2en, bool s2dual, uint8_t s2chip, bool mirror)
+void set_socket_config(uint8_t cmd, bool s1en, bool s1dual, uint8_t s1chip, bool s2en, bool s2dual, uint8_t s2chip, bool mirror, bool fauxstereo)
 {
   usbsid_config.socketOne.enabled = s1en;
   usbsid_config.socketOne.dualsid = s1dual;
@@ -380,10 +380,15 @@ void set_socket_config(uint8_t cmd, bool s1en, bool s1dual, uint8_t s1chip, bool
     if (s2dual)
       usbsid_config.socketOne.sid2.type = (usbsid_config.socketOne.sid2.type == 1 ? 0 : usbsid_config.socketOne.sid2.type);
   }
-  usbsid_config.mirrored = mirror;
-  /* PCB v1.3 will lock Audio to Stereo in mirrored mode :) */
+  usbsid_config.mirrored = mirror; /* Cannot be active if fauxstereo is active */
+  usbsid_config.fauxstereo = fauxstereo; /* Cannot be active if mirrored is active */
+  if (fauxstereo && (usbsid_config.faux_delay_us == 0)) {
+    usbsid_config.faux_delay_us = 10000; /* Default to 10000 cycles */
+  }
+
+  /* PCB v1.3 will lock Audio to Stereo in mirrored & fauxstereo mode :) */
   #if defined(HAS_AUDIOSWITCH)
-  if (mirror) {
+  if (mirror || fauxstereo) {
     usbsid_config.stereo_en = true;
     usbsid_config.lock_audio_sw = true;
   }
@@ -405,12 +410,14 @@ void apply_socket_config(bool quiet)
 {
   if (!quiet) CFG("[CONFIG] Applying socket settings\n");
   cfg.mirrored = usbsid_config.mirrored;
+  cfg.fauxstereo = usbsid_config.fauxstereo;
+  cfg.faux_delay = usbsid_config.faux_delay_us;
 
   cfg.sock_one = usbsid_config.socketOne.enabled;
   cfg.sock_one_dual = usbsid_config.socketOne.dualsid;
   cfg.chip_one = usbsid_config.socketOne.chiptype;  /* Chiptype must be clone for dualsid to work! */
 
-  if (!cfg.mirrored) {
+  if (!cfg.mirrored && !cfg.fauxstereo) {
     cfg.sock_two = usbsid_config.socketTwo.enabled;
     cfg.sock_two_dual = usbsid_config.socketTwo.dualsid;
     cfg.chip_two = usbsid_config.socketTwo.chiptype;  /* Chiptype must be clone for dualsid to work! */
@@ -426,18 +433,20 @@ void apply_socket_config(bool quiet)
     }
   }
 
-  if (!cfg.mirrored) {
+  if (!cfg.mirrored && !cfg.fauxstereo) {
     cfg.sids_one = (cfg.sock_one == true) ? (cfg.sock_one_dual == true) ? 2 : 1 : 0;
     cfg.sids_two = (cfg.sock_two == true) ? (cfg.sock_two_dual == true) ? 2 : 1 : 0;
     cfg.numsids = (cfg.sids_one + cfg.sids_two);
-  } else {
+  } else if (cfg.mirrored && !cfg.fauxstereo) {
     /* Mirrored (act-as-one) overrules everything at runtime :) */
     if (cfg.sock_one_dual == true) {
       cfg.sids_one = cfg.sids_two = cfg.numsids = 2;
     } else {
       cfg.sids_one = cfg.sids_two = cfg.numsids = 1;
     }
-
+  } else if (!cfg.mirrored && cfg.fauxstereo) {
+    /* Faux stereo overrules everything at runtime :) */
+    cfg.sids_one = cfg.sids_two = cfg.numsids = 1;
   }
   return;
 }

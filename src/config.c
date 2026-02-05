@@ -132,7 +132,7 @@ extern void verify_sid_addr(bool quiet);
 extern void apply_socket_config(bool quiet);
 extern void set_sid_addr_id(int socket, int sid, uint8_t addr); // TODO: REMOVE ME!!
 extern void set_sid_id_addr(int socket, int sid, int id); // TODO: REMOVE ME!!
-extern void set_socket_config(uint8_t cmd, bool s1en, bool s1dual, uint8_t s1chip, bool s2en, bool s2dual, uint8_t s2chip, bool mirror);
+extern void set_socket_config(uint8_t cmd, bool s1en, bool s1dual, uint8_t s1chip, bool s2en, bool s2dual, uint8_t s2chip, bool mirror, bool fauxstereo);
 extern uint8_t sidaddr_default[4];
 
 /* Config logging */
@@ -224,6 +224,9 @@ void read_config(Config* config)
   config_array[56] = config->FMOpl.sidno;
   config_array[57] = config->stereo_en;
   config_array[58] = config->lock_audio_sw;
+  config_array[59] = (int)config->fauxstereo;
+  config_array[60] = (uint8_t)((config->faux_delay_us & 0xff00u) >> 8); /* hi byte */
+  config_array[61] = (uint8_t)(config->faux_delay_us & 0xffu);          /* lo byte */
   config_array[63] = 0xFF;  /* Terminator byte */
 
   return;
@@ -244,7 +247,7 @@ void read_socket_config(Config* config)
   socket_config_array[6] = (config->socketTwo.chiptype << 4) | config->socketTwo.clonetype;
   socket_config_array[7] = (config->socketTwo.sid1.type << 4) | config->socketTwo.sid2.type;
 
-  socket_config_array[8] = (int)config->mirrored;
+  socket_config_array[8] = (int)config->mirrored | ((int)config->fauxstereo << 4); /* 20251101 ~ Breaking change! */
 
   socket_config_array[9] = 0xFF;  /* Terminator byte */
 
@@ -531,6 +534,11 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
                 usbsid_config.mirrored = (buffer[3] == 1) ? true : false;
               };
               break;
+            case 7: /* fauxstereo */
+              if (buffer[3] <= 1) { /* 1 or 0 */
+                usbsid_config.fauxstereo = (buffer[3] == 1) ? true : false;
+              };
+              break;
           };
           break;
         case  3:  /* LED */
@@ -656,38 +664,52 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       int single_socket = ((buffer[2] == 1) ? 2 : 0);
       CFG("[CMD] SINGLE_SID SOCKET %d\n", single_socket);
       if (single_socket == 2) {
-        set_socket_config(buffer[1], false, false, usbsid_config.socketOne.chiptype, true, false, usbsid_config.socketTwo.chiptype, false);
+        set_socket_config(buffer[1], false, false, usbsid_config.socketOne.chiptype, true, false, usbsid_config.socketTwo.chiptype, false, false);
       } else {
-        set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, false, false, usbsid_config.socketTwo.chiptype, false);
+        set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, false, false, usbsid_config.socketTwo.chiptype, false, false);
       }
       break;
     case MIRRORED_SID:
       CFG("[CMD] MIRRORED_SID\n");
-      set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, true, false, usbsid_config.socketTwo.chiptype, true);
+      set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, true, false, usbsid_config.socketTwo.chiptype, true, false);
+      break;
+    case FAUX_STEREO:
+      CFG("[CMD] FAUX_STEREO\n");
+      set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, true, false, usbsid_config.socketTwo.chiptype, false, true);
       break;
     case DUAL_SID:
       CFG("[CMD] DUAL_SID\n");
-      set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, true, false, usbsid_config.socketTwo.chiptype, false);
+      set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, true, false, usbsid_config.socketTwo.chiptype, false, false);
       break;
     case DUAL_SOCKET1:
       CFG("[CMD] DUAL_SOCKET 1\n");
-      set_socket_config(buffer[1], true, true, usbsid_config.socketOne.chiptype, false, false, usbsid_config.socketTwo.chiptype, false);
+      set_socket_config(buffer[1], true, true, usbsid_config.socketOne.chiptype, false, false, usbsid_config.socketTwo.chiptype, false, false);
       break;
     case DUAL_SOCKET2:
       CFG("[CMD] DUAL_SOCKET 2\n");
-      set_socket_config(buffer[1], false, false, usbsid_config.socketOne.chiptype, true, true, usbsid_config.socketTwo.chiptype, false);
+      set_socket_config(buffer[1], false, false, usbsid_config.socketOne.chiptype, true, true, usbsid_config.socketTwo.chiptype, false, false);
       break;
     case QUAD_SID:
       CFG("[CMD] QUAD_SID\n");
-      set_socket_config(buffer[1], true, true, 1, true, true, 1, false);
+      set_socket_config(buffer[1], true, true, 1, true, true, 1, false, false);
       break;
     case TRIPLE_SID:
       CFG("[CMD] TRIPLE_SID SOCKET 1\n");
-      set_socket_config(buffer[1], true, true, 1, true, false, usbsid_config.socketTwo.chiptype, false);
+      set_socket_config(buffer[1], true, true, 1, true, false, usbsid_config.socketTwo.chiptype, false, false);
       break;
     case TRIPLE_SID_TWO:
       CFG("[CMD] TRIPLE_SID SOCKET 2\n");
-      set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, true, true, 1, false);
+      set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, true, true, 1, false, false);
+      break;
+    case FAUX_DELAY:
+      CFG("[CMD] FAUX_DELAY\n");
+      uint16_t faux_us = (
+        buffer[1] << 8 |
+        buffer[2]
+      );
+      CFG("FAUX_DELAY SET FROM %u ", usbsid_config.faux_delay_us);
+      usbsid_config.faux_delay_us = (faux_us > 0 ? faux_us : 1000); /* Fallback to default if zero or lower */
+      CFG("TO %u (%u)\n", usbsid_config.faux_delay_us, faux_us);
       break;
     case LOAD_MIDI_STATE:   /* Load from config into midimachine and apply to SIDs */
       // CFG("[CMD] LOAD_MIDI_STATE\n");
