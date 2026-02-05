@@ -238,7 +238,6 @@ typedef struct Config {
   .stereo_en = false, \
   .lock_audio_sw = false, \
   .mirrored = false, \
-  .fauxstereo = false, \
 } \
 
 static const Config usbsid_default_config = USBSID_DEFAULT_CONFIG_INIT;
