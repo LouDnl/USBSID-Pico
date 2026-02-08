@@ -165,8 +165,13 @@ midi_machine midimachine;
 queue_t sidtest_queue;
 queue_t logging_queue;
 
-/* Declare local variables */
-static semaphore_t core0_init, core1_init;
+/* Multicore sync using atomic memory - avoids semaphore spin locks AND
+ * FIFO (which is consumed by flash_safe_execute IRQ handler) */
+static volatile uint32_t core_sync_state = 0;
+#define SYNC_CORE1_STAGE1  0x11  /* Core 1 finished flash_safe_execute_core_init */
+#define SYNC_CORE0_STAGE1  0x01  /* Core 0 finished config loading */
+#define SYNC_CORE1_STAGE2  0x12  /* Core 1 finished queue/uart init */
+#define SYNC_CORE0_STAGE2  0x02  /* Core 0 finished hardware init */
 
 /* WebUSB Description URL */
 static const tusb_desc_webusb_url_t desc_url =
@@ -681,26 +686,23 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
 
 /* MAIN */
 
-/* Semaphore ping pong
+/* Multicore sync using atomic memory (avoids semaphore spin locks AND
+ * FIFO which is consumed by flash_safe_execute IRQ handler)
  *
- * Core 0 -> init semapohre core1_init
  * Core 0 -> launch core 1
- * Core 0 -> wait for core1_init signal
+ * Core 0 -> poll for SYNC_CORE1_STAGE1
  * Core 1 -> init flash safe execute
- * Core 1 -> release semaphore core1_init
- * Core 0 -> continue to load and apply config
- * Core 0 -> init SID clock
- * Core 1 -> init semaphore core0_init
- * Core 1 -> wait for core0_init signal
- * Core 0 -> release semaphore core0_init
- * Core 0 -> wait for core1_init signal
- * Core 1 -> continue startup RGB & Vu
- * Core 1 -> release semaphore core1_init
- * Core 1 -> wait for core0_init signal
- * Core 0 -> continue startup
- * Core 0 -> release semaphore core0_init
+ * Core 1 -> set SYNC_CORE1_STAGE1
+ * Core 1 -> poll for SYNC_CORE0_STAGE1
+ * Core 0 -> load and apply config
+ * Core 0 -> set SYNC_CORE0_STAGE1
+ * Core 0 -> poll for SYNC_CORE1_STAGE2
+ * Core 1 -> init queues and PIO uart
+ * Core 1 -> set SYNC_CORE1_STAGE2
+ * Core 1 -> poll for SYNC_CORE0_STAGE2
+ * Core 0 -> init GPIO, SID clock, PIO, DMA, etc.
+ * Core 0 -> set SYNC_CORE0_STAGE2
  * Core 0 -> enter while loop
- * Core 1 -> continue startup
  * Core 1 -> enter while loop
  */
 void core1_main(void)
@@ -708,23 +710,18 @@ void core1_main(void)
   /* Set core locking for flash saving ~ note this makes SIO_IRQ_PROC1 unavailable */
   flash_safe_execute_core_init();  /* This needs to start before any flash actions take place! */
 
-  /* Workaround to make sure flash_safe_execute is executed
-   * before everything else if a default config is detected
-   * This just ping pongs bootup around with Core 0
-   *
-   * Release core 1 semaphore */
-  sem_release(&core1_init);
+  /* Signal Core 0 we're ready (sync point 1) */
+  usBOOT("<CORE 1> Signaling core0 ready ~ 1\n");
+  __dmb();  /* Memory barrier before write */
+  core_sync_state = SYNC_CORE1_STAGE1;
+  __sev();  /* Signal event to wake Core 0 from WFE */
 
-  /* Create a blocking semaphore with max 1 permit */
-  sem_init(&core0_init, 0, 1);
-  /* Wait for core 0 to signal back */
-  sem_acquire_blocking(&core0_init);
-
-  /* Clear the dirt */
-  memset(sid_memory, 0, sizeof sid_memory);
-
-  /* Start the VU */
-  init_vu();
+  /* Wait for Core 0 to finish config loading */
+  usBOOT("<CORE 1> Waiting for core0 sync ~ 1\n");
+  while (core_sync_state != SYNC_CORE0_STAGE1) {
+    __wfe();  /* Wait for event - low power wait */
+  }
+  __dmb();  /* Memory barrier after read */
 
   /* Init queues */
   queue_init(&sidtest_queue, sizeof(sidtest_queue_entry_t), 1);  /* 1 entry deep */
@@ -737,13 +734,34 @@ void core1_main(void)
   init_uart();
   #endif
 
-  /* Release semaphore when core 1 is started */
-  sem_release(&core1_init);
+  /* Signal Core 0 we're ready (sync point 2) */
+  usBOOT("<CORE 1> Signaling core0 ready ~ 2\n");
+  __dmb();
+  core_sync_state = SYNC_CORE1_STAGE2;
+  __sev();
 
-  /* Wait for core 0 to signal boot finished */
-  sem_acquire_blocking(&core0_init);
+  /* Wait for Core 0 to finish hardware init */
+  usBOOT("<CORE 1> Waiting for core0 sync ~ 2\n");
+  while (core_sync_state != SYNC_CORE0_STAGE2) {
+    __wfe();
+  }
+  __dmb();
 
   while (1) {
+
+    /* Check SID test queue */
+    if (running_tests) {
+      sidtest_queue_entry_t s_entry;
+      if (queue_try_remove(&sidtest_queue, &s_entry)) {
+        s_entry.func(s_entry.s, s_entry.t, s_entry.wf);
+      }
+    }
+
+    /* Blinky blinky? */
+    if (!offload_ledrunner) {
+      led_runner();
+    }
+
 #if ONBOARD_SIDPLAYER
     if (sidplayer_init) {
       sidplayer_init = false;
@@ -804,18 +822,6 @@ void core1_main(void)
     }
 #endif /* ONBOARD_EMULATOR */
 
-    /* Check SID test queue */
-    if (running_tests) {
-      sidtest_queue_entry_t s_entry;
-      if (queue_try_remove(&sidtest_queue, &s_entry)) {
-        s_entry.func(s_entry.s, s_entry.t, s_entry.wf);
-      }
-    }
-
-    if (!offload_ledrunner) {
-      led_runner();
-    }
-
 #ifdef WRITE_DEBUG  /* Only run this queue when needed */
     if (usbdata == 1) {
       writelogging_queue_entry_t l_entry;
@@ -826,6 +832,7 @@ void core1_main(void)
       }
     }
 #endif
+
   }
   /* Point of no return, this should never be reached */
   return;
@@ -842,7 +849,7 @@ int main()
   set_sys_clock_pll(1500000000, 6, 2);
 #endif
 #elif PICO_RP2350
-/* Onboard SID player requires atleast 200MHz! */
+  /* Onboard SID player requires atleast 200MHz! */
 #if ONBOARD_SIDPLAYER
   /* System clock @ 200MHz */
   set_sys_clock_khz(200000, true);
@@ -864,18 +871,18 @@ int main()
   reset_reason();
 
   /* Clear flagged */
-  if (flagged) { auto_config = true; flagged = 0; }  /* BUG: NOT WORKING ON RP2350 */
+  if (flagged) { auto_config = true; flagged = 0; }  /* NOTE: Does not work on rp2350 */
 
-  /* Workaround to make sure flash_safe_execute is executed
-   * before everything else if a default config is detected
-   * This just ping pongs bootup around with Core 1
-   *
-   * Create a blocking semaphore with max 1 permit */
-  sem_init(&core1_init, 0, 1);
-  /* Init core 1 */
+  /* Launch Core 1 and wait for flash_safe_execute_core_init to complete */
+  usBOOT("CORE0 Launching core1\n");
   multicore_launch_core1(core1_main);
-  /* Wait for core 1 to signal back */
-  sem_acquire_blocking(&core1_init);
+
+  /* Wait for Core 1 to signal ready (sync point 1) */
+  usBOOT("CORE0 Waiting for core1 ready ~ 1\n");
+  while (core_sync_state != SYNC_CORE1_STAGE1) {
+    __wfe();  /* Wait for event - low power wait */
+  }
+  __dmb();  /* Insert memory barrier after read */
 
   /* Load config before init of USBSID settings ~ NOTE: This cannot be run from Core 1! */
   load_config(&usbsid_config);
@@ -893,31 +900,58 @@ int main()
     usNFO("[NFO] [C64] %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
     usNFO("[NFO] [C64] REFRESH_RATE %lu Cycles, RASTER_RATE %lu Cycles\n", usbsid_config.refresh_rate, usbsid_config.raster_rate);
   }
-  /* Release core 0 semaphore */
-  sem_release(&core0_init);
-  /* Wait for core one to finish startup */
-  sem_acquire_blocking(&core1_init);
+
+  /* Signal Core 1 to continue (sync point 1) */
+  usBOOT("<CORE 0> Signaling core1 ~ 1\n");
+  __dmb();  /* Insert memory barrier after read */
+  core_sync_state = SYNC_CORE0_STAGE1;
+  __sev();  /* Signal event to wake Core 1 from WFE */
+
+  /* Wait for Core 1 to finish queue/uart init (sync point 2) */
+  usBOOT("<CORE 0> Waiting for core1 ready ~ 2\n");
+  while (core_sync_state != SYNC_CORE1_STAGE2) {
+    __wfe();  /* Wait for event - low power wait */
+  }
+  __dmb();  /* Insert memory barrier after read */
 
   /* Init GPIO */
+  usBOOT("Initializing GPIO\n");
   init_gpio();
   /* Start verification, detect and init sequence of SID clock */
+  usBOOT("Setup SID clock\n");
   setup_sidclock();
   /* Init PIO */
+  usBOOT("Setup PIO bus\n");
   setup_piobus();
   /* Sync PIOS */
+  usBOOT("Synchronize PIO's\n");
   sync_pios(true);
   /* Init DMA */
+  usBOOT("Setup DMA channels\n");
   setup_dmachannels();
+  /* Start the VU */
+  usBOOT("Initialize Vu\n");
+  init_vu();
   /* Init midi */
+  usBOOT("Initialize Midi\n");
   midi_init();
   /* Init ASID */
+  usBOOT("Initialize ASID\n");
   asid_init();
   /* Enable SID chips */
+  usBOOT("Enable SID chips\n");
   enable_sid(false);
+
+  /* Clear the dirt */
+#if !defined(ONBOARD_EMULATOR) || !defined(ONBOARD_SIDPLAYER)
+  memset(sid_memory, 0, sizeof sid_memory);
+#endif
 
   /* Check for default config bit
    * NOTE: This cannot be run from Core 1! */
-  if (!auto_config) detect_default_config();
+  if (!auto_config) {
+    detect_default_config();
+  }
   if (auto_config) {  /* NOTE: Does not work on rp2350 */
     auto_detect_routine(auto_config, true);  /* Double tap! */
     save_config_ext();
@@ -927,8 +961,11 @@ int main()
   /* Print config once at end of boot routine */
   print_config();
 
-  /* Release core 0 semaphore to signal boot finished */
-  sem_release(&core0_init);
+  /* Signal Core 1 to enter main loop (sync point 2) */
+  usBOOT("<CORE 0> Signaling core1 ~ 2\n");
+  __dmb();  /* Memory barrier after read */
+  core_sync_state = SYNC_CORE0_STAGE2;
+  __sev();  /* Signal event to wake Core 1 from WFE */
 
   /* Loop IO tasks forever */
   while (1) {
@@ -939,6 +976,7 @@ int main()
 #ifdef USE_VENDOR_BUFFER
     vendor_task();  /* Only use this if buffering and fifo are enabled */
 #endif
+
     if (offload_ledrunner) {
       led_runner();
     }
