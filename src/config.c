@@ -993,7 +993,6 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         test_before = to_us_since_boot(get_absolute_time());
         uint16_t waited_cycles = cycled_delay_operation(dcyc);
         test_after = to_us_since_boot(get_absolute_time());
-        usCFG("[CFG] DELAY_CYCLES %u = %.4fµs, ACTUAL: %uµs (including get_absolute_time delay)\n",
       }
       if (buffer[1] == 6) {
         detect_fmopl(buffer[2]);
