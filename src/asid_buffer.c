@@ -104,6 +104,8 @@ static const uint16_t RING_SIZE_MAX = (150 * 224);    /* 33600 bytes - maximum s
 static const uint16_t RING_SIZE_STEP = (20 * 224);    /* 4480 bytes - grow/shrink increment */
 volatile uint16_t ring_size = RING_SIZE_DEFAULT;      /* Current effective size */
 static uint16_t ring_size_allocated = 0;              /* Actual allocated size */
+/* TODO: REMOVE ~ TEMPORARY */
+volatile bool in_asid_irq = false;
 
 
 /**
