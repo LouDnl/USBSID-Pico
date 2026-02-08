@@ -40,12 +40,15 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(USBSID_DEBUGGING 1)     # Enable debugging ~ mandatory enable for all other logging types
   set(UART_DEBUGGING 1)       # Enable debugging over uart pins ~ USBCDC must be 0!
   set(USBCDC_DEBUGGING 0)     # Enable debugging over cdc port 2 ~ UART must be 0!
+  set(FILENAME_LOGGING 0)     # Enable logging of source filename
+  set(BOOT_LOGGING 0)         # Enable bootlog in usbsid.c
   set(DEFAULT_DEBUGGING 1)    # Enable debugging in usbsid.c
   set(CONFIG_DEBUGGING 1)     # Enable debugging in config.c
   set(USBIO_DEBUGGING 0)      # Enable debugging in usbsid.c
   set(GPIOBUS_DEBUGGING 0)    # Enable debugging in gpio.c
   set(MIDI_DEBUGGING 0)       # Enable debugging in midi.c
   set(MIDIVOICE_DEBUGGING 0)  # Enable debugging in midi.c
+  set(ASID_DEBUGGING 0)       # Enable debugging in acid.c and asid_buffer.c
   set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
   set(SIDWRITES_DEBUGGING 0)  # Enable logging of SID writes one core 2
   set(EMULATOR_DEBUGGING 0)   # Enable debugging in emulator
@@ -549,14 +552,20 @@ if(USBSID_DEBUGGING EQUAL 1)
   if(DEFAULT_DEBUGGING EQUAL 1)
     add_compile_definitions(USBSID_DEBUG=1)
   endif()
+  if(FILENAME_LOGGING EQUAL 1)
+    add_compile_definitions(LOG_FILENAME=1)
+  endif()
+  if(BOOT_LOGGING EQUAL 1)
+    add_compile_definitions(USBSID_BOOTLOG=1)
+  endif()
+  if(CONFIG_DEBUGGING EQUAL 1)
+    add_compile_definitions(CONFIG_DEBUG=1)
+  endif()
   if(MEMORY_LOGGING EQUAL 1)
     add_compile_definitions(MEM_DEBUG=1)
   endif()
   if(SIDWRITES_DEBUGGING EQUAL 1)
     add_compile_definitions(WRITE_DEBUG=1)
-  endif()
-  if(CONFIG_DEBUGGING EQUAL 1)
-    add_compile_definitions(CONFIG_DEBUG=1)
   endif()
   if(USBIO_DEBUGGING EQUAL 1)
     add_compile_definitions(USBIO_DEBUG=1)
@@ -566,6 +575,9 @@ if(USBSID_DEBUGGING EQUAL 1)
   endif()
   if(MIDIVOICE_DEBUGGING EQUAL 1)
     add_compile_definitions(MIDIVOICE_DEBUG=1)
+  endif()
+  if(ASID_DEBUGGING EQUAL 1)
+    add_compile_definitions(ASID_DEBUG=1)
   endif()
   if(GPIOBUS_DEBUGGING EQUAL 1)
     add_compile_definitions(USBSIDGPIO_DEBUG=1)

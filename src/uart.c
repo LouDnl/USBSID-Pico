@@ -119,11 +119,11 @@ static void async_worker_func(__unused async_context_t *async_context, __unused 
     if (!queue_try_remove(&fifo_uartrx, &uart_buffer[bytes_rxed])) {
       panic("fifo_uartrx empty");
     } else {
-      // DBG("[%d/%d] %02X $%02X:%02X\n",i,bytes_per_rxpacket,uart_buffer[0],uart_buffer[1],uart_buffer[2]);
+      // usDBG("[%d/%d] %02X $%02X:%02X\n",i,bytes_per_rxpacket,uart_buffer[0],uart_buffer[1],uart_buffer[2]);
       if ((uart_buffer[0] == 0xFF && uart_buffer[1] == 0xFF)
           || (uart_buffer[1] == 0xFF && uart_buffer[2] == 0xFF)
           || (uart_buffer[2] == 0xFF && uart_buffer[3] == 0xFF)) {
-        DBG("[UART CONFIG] RESET\n");
+        usDBG("[UART CONFIG] RESET\n");
         memset(uart_buffer, 0, 8);
         bytes_per_rxpacket = 8;
         bytes_rxed = 0;
@@ -150,7 +150,7 @@ static void async_worker_func(__unused async_context_t *async_context, __unused 
           && uart_buffer[6] == 0xEE
           && uart_buffer[7] == 0xFF) { /* Receiving initiator packet */
           bytes_per_rxpacket = (size_t)(uart_buffer[3] << 8 | uart_buffer[4]);
-          DBG("[UART CONFIG] BYTES PER PACKET SET TO %d\n", bytes_per_rxpacket);
+          usDBG("[UART CONFIG] BYTES PER PACKET SET TO %d\n", bytes_per_rxpacket);
           memset(uart_buffer, 0, 8);
           bytes_rxed = 0;
         }

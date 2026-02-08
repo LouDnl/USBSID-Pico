@@ -31,7 +31,6 @@ extern "C" {
 
 
 /* Logging to USB uart */
-
 #ifdef USB_PRINTF
 /* TinyUSB libs */
 #if __has_include("bsp/board_api.h") /* Needed to account for update in tinyUSB */
@@ -58,47 +57,71 @@ do {                                 \
 
 
 /* Logging macro's */
-
-#ifdef MEM_DEBUG
-#define MDBG(...) _US_DBG(__VA_ARGS__)
+#ifdef LOG_FILENAME
+/* Searches for '/' (Unix) or '\' (Windows) */
+#define __FILENAME__ \
+  (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : \
+  strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
+  #define __DBG(fmt, ...) \
+    _US_DBG("[%s:%d] " fmt, __FILENAME__, __LINE__ __VA_OPT__(,) __VA_ARGS__)
 #else
-#define MDBG(...) ((void)0)
+  #define __DBG(...) _US_DBG(__VA_ARGS__)
 #endif
+
+#define usNFO(...) __DBG(__VA_ARGS__) /* Info logging, cannot be turned off */
 
 #ifdef USBSID_DEBUG
-#define DBG(...) _US_DBG(__VA_ARGS__)
+#define usDBG(fmt, ...) __DBG("[DBG] " fmt __VA_OPT__(,) __VA_ARGS__)
 #else
-#define DBG(...) ((void)0)
+#define usDBG(...) ((void)0)
 #endif
 
-#ifdef USBIO_DEBUG
-#define IODBG(...) _US_DBG(__VA_ARGS__)
+#ifdef USBSID_BOOTLOG
+#define usBOOT(fmt, ...) __DBG("[BOOT] " fmt __VA_OPT__(,) __VA_ARGS__)
 #else
-#define IODBG(...) ((void)0)
+#define usBOOT(...) ((void)0)
 #endif
 
 #ifdef CONFIG_DEBUG
-#define CFG(...) _US_DBG(__VA_ARGS__)
+#define usCFG(fmt, ...) __DBG("[CFG] " fmt __VA_OPT__(,) __VA_ARGS__)
 #else
-#define CFG(...) ((void)0)
+#define usCFG(...) ((void)0)
+#endif
+
+#ifdef MEM_DEBUG
+#define usMEM(fmt, ...) __DBG("[MEM] " fmt __VA_OPT__(,) __VA_ARGS__)
+#else
+#define usMEM(...) ((void)0)
+#endif
+
+#ifdef USBIO_DEBUG
+#define usIO(fmt, ...) __DBG("[IO] " fmt __VA_OPT__(,) __VA_ARGS__)
+#else
+#define usIO(...) ((void)0)
 #endif
 
 #ifdef USBSIDGPIO_DEBUG
-#define GPIODBG(...) _US_DBG(__VA_ARGS__)
+#define usGPIO(fmt, ...) __DBG("[GPIO] " fmt __VA_OPT__(,) __VA_ARGS__)
 #else
-#define GPIODBG(...) ((void)0)
+#define usGPIO(...) ((void)0)
 #endif
 
 #ifdef MIDI_DEBUG
-#define MIDBG(...) _US_DBG(__VA_ARGS__)
+#define usMIDI(fmt, ...) __DBG("[MIDI] " fmt __VA_OPT__(,) __VA_ARGS__)
 #else
-#define MIDBG(...) ((void)0)
+#define usMIDI(...) ((void)0)
 #endif
 
 #ifdef MIDIVOICE_DEBUG
-#define MVDBG(...) _US_DBG(__VA_ARGS__)
+#define usMVCE(fmt, ...) __DBG("[MVOICE] " fmt __VA_OPT__(,) __VA_ARGS__)
 #else
-#define MVDBG(...) ((void)0)
+#define usMVCE(...) ((void)0)
+#endif
+
+#ifdef ASID_DEBUG
+#define usASID(fmt, ...) __DBG("[ASID] " fmt __VA_OPT__(,) __VA_ARGS__)
+#else
+#define usASID(...) ((void)0)
 #endif
 
 

@@ -47,7 +47,7 @@ uint64_t mcu_get_unique_id(void)
 
 void mcu_reset(void)
 {
-  CFG("[MCU_RESET]\n");
+  usCFG("[MCU_RESET]\n");
   sleep_ms(100);  // sleep some ms to let commands prior to reset settle or finish
   /* watchdog_enable(1, 1); */
   watchdog_reboot(0, 0, 0);

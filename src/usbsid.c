@@ -184,27 +184,27 @@ static const tusb_desc_webusb_url_t desc_url =
 void reset_reason(void)
 {
 #if PICO_RP2040
-  DBG("[RESET] Button double tapped? %d\n", flagged);
+  usNFO("[RESET] Button double tapped? %d\n", flagged);
   io_rw_32 *rr = (io_rw_32 *) (VREG_AND_CHIP_RESET_BASE + VREG_AND_CHIP_RESET_CHIP_RESET_OFFSET);
   if (*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_POR_BITS)
-    DBG("[RESET] Caused by power-on reset or brownout detection\n");
+    usNFO("[RESET] Caused by power-on reset or brownout detection\n");
   if (*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_RUN_BITS)
-    DBG("[RESET] Caused by RUN pin trigger ~ manual or ISA RESET signal\n");
+    usNFO("[RESET] Caused by RUN pin trigger ~ manual or ISA RESET signal\n");
   if (*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_PSM_RESTART_BITS)
-    DBG("[RESET] Caused by debug port\n");
+    usNFO("[RESET] Caused by debug port\n");
 #elif PICO_RP2350
   /* io_rw_32 *rr = (io_rw_32 *) (POWMAN_BASE + POWMAN_CHIP_RESET_OFFSET); */
-  DBG("[RESET] Button double tapped? %d %X\n", flagged, powman_hw->chip_reset);
+  usNFO("[RESET] Button double tapped? %d %X\n", flagged, powman_hw->chip_reset);
   if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_DP_RESET_REQ_BITS)
-    DBG("[RESET] Caused by arm debugger\n");
+    usNFO("[RESET] Caused by arm debugger\n");
   if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_RESCUE_BITS)
-    DBG("[RESET] Caused by rescure reset from arm debugger\n");
+    usNFO("[RESET] Caused by rescure reset from arm debugger\n");
   if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_RUN_LOW_BITS)
-    DBG("[RESET] Caused by RUN pin trigger ~ manual or ISA RESET signal\n");
+    usNFO("[RESET] Caused by RUN pin trigger ~ manual or ISA RESET signal\n");
   if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_BOR_BITS)
-    DBG("[RESET] Caused by brownout detection\n");
+    usNFO("[RESET] Caused by brownout detection\n");
   if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_POR_BITS)
-    DBG("[RESET] Caused by power-on reset\n");
+    usNFO("[RESET] Caused by power-on reset\n");
 #endif
   return;
 }
@@ -219,7 +219,7 @@ void init_logging(void)
   stdio_uart_init_full(uart0, BAUD_RATE, TX, RX);
   sleep_ms(100);  /* leave time for uart to settle */
   stdio_flush();
-  DBG("\n[%s]\n", __func__);
+  usNFO("[NFO] Uart logging initialized\n");
   #endif
   return;
 }
@@ -230,7 +230,7 @@ void init_logging(void)
 /* Write from device to host */
 void cdc_write(uint8_t * itf, uint32_t n)
 { /* No need to check if write available with current driver code */
-  IODBG("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
+  usIO("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
   tud_cdc_n_write(*itf, write_buffer, n);  /* write n bytes of data to client */
   tud_cdc_n_write_flush(*itf);
   return;
@@ -239,7 +239,7 @@ void cdc_write(uint8_t * itf, uint32_t n)
 /* Write from device to host */
 void webserial_write(uint8_t * itf, uint32_t n)
 { /* No need to check if write available with current driver code */
-  IODBG("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
+  usIO("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
   tud_vendor_write(write_buffer, n);
   tud_vendor_flush();
   return;
@@ -253,7 +253,7 @@ int __no_inline_not_in_flash_func(do_buffer_tick)(int top, int step)
   static int i = 1;
   cycled_write_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   WRITEDBG(dtype, i, top, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
-  IODBG("[I %d] [%c] $%02X:%02X (%u)\n", i, dtype, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
+  usIO("[I %d] [%c] $%02X:%02X (%u)\n", i, dtype, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   if (i+step >= top) {
     i = 1;
     return i;
@@ -286,7 +286,7 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
     if __us_unlikely(n_bytes == 0) {
       cycled_write_operation(sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
       WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
-      IODBG("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
+      usIO("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
     } else {
       buffer_task(n_bytes, 4);
     }
@@ -297,14 +297,14 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
     if __us_likely(n_bytes == 0) {
       cycled_write_operation(sid_buffer[1], sid_buffer[2], 6);  /* Add 6 cycles to each write for LDA(2) & STA(4) */
       WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], 6);
-      IODBG("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], 6);
+      usIO("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], 6);
     } else {
       buffer_task(n_bytes, 2);
     }
     return;
   };
   if __us_unlikely(command == READ) {  /* READING CAN ONLY HANDLE ONE AT A TIME, PERIOD. */
-    IODBG("[I %d] [%c] $%02X:%02X\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2]);
+    usIO("[I %d] [%c] $%02X:%02X\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2]);
     write_buffer[0] = cycled_read_operation(sid_buffer[1], 0);  /* write the address to the SID and read the data back */
     switch (rtype) {  /* write the result to the USB client */
       case 'C':
@@ -314,7 +314,7 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
         webserial_write(itf, BYTES_TO_SEND);
         break;
       default:
-        IODBG("[WRITE ERROR]%c\n", rtype);
+        usIO("[WRITE ERROR]%c\n", rtype);
         break;
     };
     vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
@@ -323,7 +323,7 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
   if (command == COMMAND) {
     switch (subcommand) {
       case CYCLED_READ:
-        IODBG("[I %d] [%c] $%02X %u\n", n_bytes, dtype, sid_buffer[1], (sid_buffer[2] << 8 | sid_buffer[3]));
+        usIO("[I %d] [%c] $%02X %u\n", n_bytes, dtype, sid_buffer[1], (sid_buffer[2] << 8 | sid_buffer[3]));
         write_buffer[0] = cycled_read_operation(sid_buffer[1], (sid_buffer[2] << 8 | sid_buffer[3]));
         switch (rtype) {  /* write the result to the USB client */
           case 'C':
@@ -333,7 +333,7 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
             webserial_write(itf, BYTES_TO_SEND);
             break;
           default:
-            IODBG("[WRITE ERROR]%c\n", rtype);
+            usIO("[WRITE ERROR]%c\n", rtype);
             break;
         };
         vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
@@ -342,44 +342,44 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
         cycled_delay_operation((sid_buffer[1] << 8 | sid_buffer[2]));
         return;
       case PAUSE:
-        DBG("[PAUSE_SID]\n");
+        usDBG("[PAUSE_SID]\n");
         pause_sid();
         break;
       case MUTE:
-        DBG("[MUTE_SID] %d\n",sid_buffer[1]);
+        usDBG("[MUTE_SID] %d\n",sid_buffer[1]);
         mute_sid();
         if (sid_buffer[1] == 1) is_muted = true;
         break;
       case UNMUTE:
-        DBG("[UNMUTE_SID] %d\n",sid_buffer[1]);
+        usDBG("[UNMUTE_SID] %d\n",sid_buffer[1]);
         if (sid_buffer[1] == 1) is_muted = false;
         unmute_sid();
         break;
       case RESET_SID:
         if (sid_buffer[1] == 0) {
-          DBG("[RESET_SID]\n");
+          usDBG("[RESET_SID]\n");
           reset_sid();
         }
         if (sid_buffer[1] == 1) {
-          DBG("[RESET_SID_REGISTERS]\n");
+          usDBG("[RESET_SID_REGISTERS]\n");
           reset_sid_registers();
         }
         break;
       case DISABLE_SID:
-        DBG("[DISABLE_SID]\n");
+        usDBG("[DISABLE_SID]\n");
         disable_sid();
         break;
       case ENABLE_SID:
-        DBG("[ENABLE_SID]\n");
+        usDBG("[ENABLE_SID]\n");
         enable_sid(true);
         break;
       case CLEAR_BUS:
-        DBG("[CLEAR_BUS]\n");
+        usDBG("[CLEAR_BUS]\n");
         clear_bus_all();
         break;
       case CONFIG:
         if (sid_buffer[1] < 0xD0) { /* Don't log incoming buffer to avoid spam above this region */
-          DBG("[CONFIG]\n");
+          usDBG("[CONFIG]\n");
         }
         /* Copy incoming buffer ignoring the command byte */
         memcpy(config_buffer, (sid_buffer + 1), (int)*n - 1);
@@ -387,11 +387,11 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
         memset(config_buffer, 0, count_of(config_buffer));
         break;
       case RESET_MCU:
-        DBG("[RESET_MCU]\n");
+        usDBG("[RESET_MCU]\n");
         mcu_reset();
         break;
       case BOOTLOADER:
-        DBG("[BOOTLOADER]\n");
+        usDBG("[BOOTLOADER]\n");
         mcu_jump_to_bootloader();
         break;
       default:
@@ -407,27 +407,27 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
 
 void tud_mount_cb(void)
 {
-  DBG("[%s]\n", __func__);
+  usDBG("[%s]\n", __func__);
   usb_connected = 1;
 }
 
 void tud_umount_cb(void)
 {
   usb_connected = 0, usbdata = 0, dtype = rtype = ntype;
-  DBG("[%s]\n", __func__);
+  usDBG("[%s]\n", __func__);
   disable_sid();  /* NOTICE: Testing if this is causing the random lockups */
 }
 
 void tud_suspend_cb(bool remote_wakeup_en)
 {
   /* (void) remote_wakeup_en; */
-  DBG("[%s] remote_wakeup_en:%d\n", __func__, remote_wakeup_en);
+  usDBG("[%s] remote_wakeup_en:%d\n", __func__, remote_wakeup_en);
   usb_connected = 0, usbdata = 0, dtype = rtype = ntype;
 }
 
 void tud_resume_cb(void)
 {
-  DBG("[%s]\n", __func__);
+  usDBG("[%s]\n", __func__);
   usb_connected = 1;
 }
 
@@ -509,20 +509,20 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char)
 {
   (void)itf;
   (void)wanted_char;
-  /* DBG("[%s]\n", __func__); */  /* Disabled due to possible uart spam */
+  /* usDBG("[%s]\n", __func__); */  /* Disabled due to possible uart spam */
 }
 
 void tud_cdc_tx_complete_cb(uint8_t itf)
 {
   (void)itf;
-  /* DBG("[%s]\n", __func__); */ /* Disabled due to uart spam */
+  /* usDBG("[%s]\n", __func__); */ /* Disabled due to uart spam */
 }
 
 void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
 {
   /* (void) itf; */
   /* (void) rts; */
-  DBG("[%s] itf:%x, dtr:%d, rts:%d\n", __func__, itf, dtr, rts);
+  usDBG("[%s] itf:%x, dtr:%d, rts:%d\n", __func__, itf, dtr, rts);
 
   if ( dtr ) {
     /* Terminal connected */
@@ -539,14 +539,14 @@ void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* p_line_coding)
 {
   /* (void)itf; */
   /* (void)p_line_coding; */
-  DBG("[%s] itf:%x, bit_rate:%u, stop_bits:%u, parity:%u, data_bits:%u\n", __func__, itf, (int)p_line_coding->bit_rate, p_line_coding->stop_bits, p_line_coding->parity, p_line_coding->data_bits);
+  usDBG("[%s] itf:%x, bit_rate:%u, stop_bits:%u, parity:%u, data_bits:%u\n", __func__, itf, (int)p_line_coding->bit_rate, p_line_coding->stop_bits, p_line_coding->parity, p_line_coding->data_bits);
 }
 
 void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 {
   /* (void)itf; */
   /* (void)duration_ms; */
-  DBG("[%s] its:%x, duration_ms:%x\n", __func__, itf, duration_ms);
+  usDBG("[%s] its:%x, duration_ms:%x\n", __func__, itf, duration_ms);
 }
 
 
@@ -591,7 +591,7 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
 void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
 {
   (void)itf;
-  DBG("[%s] %lu\n", __func__, sent_bytes);
+  usDBG("[%s] %lu\n", __func__, sent_bytes);
 }
 
 
@@ -600,7 +600,7 @@ void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
 /* Handle incoming vendor and webusb data */
 bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const * request)
 {
-  DBG("[%s] stage:%x, rhport:%x, bRequest:0x%x, wValue:%d, wIndex:%x, wLength:%x, bmRequestType:%x, type:%x, recipient:%x, direction:%x\n",
+  usDBG("[%s] stage:%x, rhport:%x, bRequest:0x%x, wValue:%d, wIndex:%x, wLength:%x, bmRequestType:%x, type:%x, recipient:%x, direction:%x\n",
     __func__, stage, rhport,
     request->bRequest, request->wValue, request->wIndex, request->wLength, request->bmRequestType,
     request->bmRequestType_bit.type, request->bmRequestType_bit.recipient, request->bmRequestType_bit.direction);
@@ -612,25 +612,25 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
       break;
     case TUSB_REQ_TYPE_CLASS:     /* 1 */
       if (request->bRequest == WEBUSB_COMMAND) {
-        DBG("request->bRequest == WEBUSB_COMMAND\n");
+        usDBG("request->bRequest == WEBUSB_COMMAND\n");
         if (request->wValue == WEBUSB_RESET) {
-          DBG("request->wValue == WEBUSB_RESET\n");
+          usDBG("request->wValue == WEBUSB_RESET\n");
           // BUG: NO WURKY CURKY
           /* reset_sid_registers(); */ // BUG: Temporary disabled
           reset_sid();  // NOTICE: Temporary until fixed!
           /* unmute_sid(); */
         }
         if (request->wValue == RESET_SID) {
-          DBG("request->wValue == RESET_SID\n");
+          usDBG("request->wValue == RESET_SID\n");
           reset_sid();
         }
         if (request->wValue == PAUSE) {
-          DBG("request->wValue == PAUSE\n");
+          usDBG("request->wValue == PAUSE\n");
           pause_sid();
           mute_sid();
         }
         if (request->wValue == WEBUSB_CONTINUE) {
-          DBG("request->wValue == WEBUSB_CONTINUE\n");
+          usDBG("request->wValue == WEBUSB_CONTINUE\n");
           pause_sid();
           unmute_sid();
         }
@@ -820,7 +820,7 @@ void core1_main(void)
     if (usbdata == 1) {
       writelogging_queue_entry_t l_entry;
       if (queue_try_remove(&logging_queue, &l_entry)) {
-        DBG("[CORE2 %5u] [WRITE %c:%02d/%02d] $%02X:%02X %u\n",
+        usDBG("[CORE2 %5u] [WRITE %c:%02d/%02d] $%02X:%02X %u\n",
           queue_get_level(&logging_queue),
           l_entry.dtype, l_entry.n, l_entry.s, l_entry.reg, l_entry.val, l_entry.cycles);
       }
@@ -889,9 +889,9 @@ int main()
   sid_mhz = (sid_hz / 1000 / 1000);
   sid_us = (1 / sid_mhz);
   if (!auto_config) {
-    CFG("[BOOT PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
-    CFG("[BOOT C64]  %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
-    CFG("[BOOT C64 RATES] REFRESH_RATE %lu Cycles, RASTER_RATE %lu Cycles\n", usbsid_config.refresh_rate, usbsid_config.raster_rate);
+    usNFO("[NFO] [PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
+    usNFO("[NFO] [C64] %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
+    usNFO("[NFO] [C64] REFRESH_RATE %lu Cycles, RASTER_RATE %lu Cycles\n", usbsid_config.refresh_rate, usbsid_config.raster_rate);
   }
   /* Release core 0 semaphore */
   sem_release(&core0_init);

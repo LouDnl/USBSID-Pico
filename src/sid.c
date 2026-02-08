@@ -56,7 +56,7 @@ static uint8_t volume_state[4] = {0};
 
 static void log_memory(uint8_t * sid_memory)
 {
-  DBG("[%c:%d][PWM]$%04x[V1]$%02X%02X$%02X%02X$%02X$%02X$%02X[V2]$%02X%02X$%02X%02X$%02X$%02X$%02X[V3]$%02X%02X$%02X%02X$%02X$%02X$%02X[FC]$%02x%02x$%02x[VOL]$%02x\n",
+  usDBG("[%c:%d][PWM]$%04x[V1]$%02X%02X$%02X%02X$%02X$%02X$%02X[V2]$%02X%02X$%02X%02X$%02X$%02X$%02X[V3]$%02X%02X$%02X%02X$%02X$%02X$%02X[FC]$%02x%02x$%02x[VOL]$%02x\n",
     dtype, usbdata, vu,
     sid_memory[0x01], sid_memory[0x00], sid_memory[0x03], sid_memory[0x02], sid_memory[0x04], sid_memory[0x05], sid_memory[0x06],
     sid_memory[0x08], sid_memory[0x07], sid_memory[0x0A], sid_memory[0x09], sid_memory[0x0B], sid_memory[0x0C], sid_memory[0x0D],
@@ -135,14 +135,14 @@ bool get_paused_state(void)
  */
 void unmute_sid(void)
 {
-  DBG("[UNMUTE]\n");
+  usDBG("[UNMUTE]\n");
   /* is_muted = false; */ /* Is globally handled from usbsid.c */
   for (int i = 0; i < cfg.numsids; i++) {
     uint8_t addr = ((0x20 * i) + 0x18);
     if ((volume_state[i] & 0xF) == 0) volume_state[i] = (volume_state[i] & 0xF0) | 0x0E;
     sid_memory[addr] = volume_state[i];
     cycled_write_operation(((0x20 * i) + 0x18), volume_state[i], 0);  /* Volume back */
-    DBG("[%d] $%02X:%02X\n", i, addr, volume_state[i]);
+    usDBG("[%d] $%02X:%02X\n", i, addr, volume_state[i]);
   }
   return;
 }
@@ -152,12 +152,12 @@ void unmute_sid(void)
  */
 void mute_sid(void)
 {
-  DBG("[MUTE]\n");
+  usDBG("[MUTE]\n");
   for (int i = 0; i < cfg.numsids; i++) {
     uint8_t addr = ((0x20 * i) + 0x18);
     volume_state[i] = sid_memory[addr];
     cycled_write_operation(addr, (volume_state[i] & 0xF0), 0);  /* Volume to 0 */
-    DBG("[%d] $%02X:%02X\n", i, addr, (volume_state[i] & 0xF0));
+    usDBG("[%d] $%02X:%02X\n", i, addr, (volume_state[i] & 0xF0));
   }
   /* is_muted = true; */ /* Is globally handled from usbsid.c */
   return;
@@ -210,14 +210,14 @@ void pause_sid(void)
 
 void pause_sid_withmute(void)
 {
-  DBG("[PAUSE STATE PRE] %d\n", paused_state);
+  usDBG("[PAUSE STATE PRE] %d\n", paused_state);
   if (!paused_state) mute_sid();
   if (paused_state) unmute_sid();
   // set_gpio(CS1, 1);
   // set_gpio(CS2, 1);
   pause_sid();
   set_paused_state(!paused_state);
-  DBG("[PAUSE STATE POST] %d\n", paused_state);
+  usDBG("[PAUSE STATE POST] %d\n", paused_state);
   return;
 }
 

@@ -58,7 +58,7 @@ uint32_t rgb_value = 0;
 
 void setup_dmachannels(void)
 { /* NOTE: Do not manually assign DMA channels, this causes a Panic on the PicoW */
-  CFG("[DMA CHANNELS INIT] START\n");
+  usCFG("[DMA CHANNELS INIT] START\n");
 
   /* NOTICE: DMA read address is disabled for now, it is causing confirmed desync on the rp2040 (rp2350 seems to works, but needs improving) */
   /* NOTICE: DMA chaining on rp2350 causes desync with cycled writes, probably due to RP2350-E8 */
@@ -172,14 +172,14 @@ void setup_dmachannels(void)
   }
 #endif
 #if PICO_RP2350
-  CFG("[DMA CHANNELS CLAIMED] C:%d TX:%d RX:%d D:%d CNT:%d\n",
+  usCFG("[DMA CHANNELS CLAIMED] C:%d TX:%d RX:%d D:%d CNT:%d\n",
     dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay, dma_counter);
 #else
-  CFG("[DMA CHANNELS CLAIMED] C:%d TX:%d RX:%d D:%d CNTA:%d CNTB:%d\n",
+  usCFG("[DMA CHANNELS CLAIMED] C:%d TX:%d RX:%d D:%d CNTA:%d CNTB:%d\n",
     dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay, dma_counter, dma_counter_chain);
 #endif
 
-  CFG("[DMA CHANNELS INIT] FINISHED\n");
+  usCFG("[DMA CHANNELS INIT] FINISHED\n");
   return;
 }
 
@@ -211,7 +211,7 @@ void setup_vu_dma(void)
 
 void stop_dma_channels(void)
 { // TODO: Fix and finish per RP2040-E13 and RP2350-E5
-  // CFG("[STOP DMA CHANNELS]\n");
+  // usCFG("[STOP DMA CHANNELS]\n");
   /* Clear any Interrupt enable bits as per RP2040-E13 */
   // TODO: FINISH
   /* Atomically abort channels */
@@ -231,7 +231,7 @@ void stop_dma_channels(void)
 void start_dma_channels(void)
 { /* NOTE: DO NOT USE, THIS STARTS A TRANSFER IN THE CURRENT CONFIG */
   /* Trigger -> start dma channels all at once */
-  // CFG("[START DMA CHANNELS]\n");
+  // usCFG("[START DMA CHANNELS]\n");
   // dma_hw->multi_channel_trigger = (1 << dma_tx_delay) | (1 << dma_rx_data) | (1 << dma_tx_data) | (1 << dma_tx_control);
   return;
 }

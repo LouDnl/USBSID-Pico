@@ -83,29 +83,29 @@ void test_all_waveforms(uint8_t addr, uint8_t voices[3])
   test_operation((sid_registers[MODVOL] + addr), 0x0F);  /* Volume to full */
   for (int v = 0; v < 3; v++) {
     if (!running_tests) { reset_sid_registers(); return; };
-    DBG("TEST VOICE %d\n", (v + 1));
-    DBG("WAVEFORM TESTS\n");
+    usDBG("TEST VOICE %d\n", (v + 1));
+    usDBG("WAVEFORM TESTS\n");
     test_operation((voices[v] + sid_registers[ATTDEC]), 33);   /* ATTDEC 2*16+1 */
     test_operation((voices[v] + sid_registers[SUSREL]), 242);  /* SUSREL 15*16+2 */
     test_operation((voices[v] + sid_registers[PWMHI]), 8);     /* PWMHI */
 
-    DBG("TRIANGLE TESTING ");
+    usDBG("TRIANGLE TESTING ");
     wave_form_test(voices, v, 17, 16);
-    DBG("COMPLETE\n");
-    DBG("SAWTOOTH TESTING ");
+    usDBG("COMPLETE\n");
+    usDBG("SAWTOOTH TESTING ");
     wave_form_test(voices, v, 33, 32);
-    DBG("COMPLETE\n");
-    DBG("PULSE TESTING ");
+    usDBG("COMPLETE\n");
+    usDBG("PULSE TESTING ");
     wave_form_test(voices, v, 65, 64);
-    DBG("COMPLETE\n");
-    DBG("NOISE TESTING ");
+    usDBG("COMPLETE\n");
+    usDBG("NOISE TESTING ");
     wave_form_test(voices, v, 129, 128);
-    DBG("COMPLETE\n");
+    usDBG("COMPLETE\n");
 
-    DBG("PULSE WIDTH SWEEP TESTING ");
+    usDBG("PULSE WIDTH SWEEP TESTING ");
     test_operation((voices[v] + sid_registers[NOTEHI]), 40);  /* NOTEHI */
     pulse_sweep_test(voices, v, 65, 64);
-    DBG("COMPLETE\n");
+    usDBG("COMPLETE\n");
   }
 }
 
@@ -113,18 +113,18 @@ void filter_tests(uint8_t addr, uint8_t voices[3], int wf)
 {
   if (!running_tests) { reset_sid_registers(); return; };
   test_operation((sid_registers[MODVOL] + addr), 0x0F);  /* Volume to full */
-  DBG("FILTER TESTS %s\n", (wf == 0 ? "TRIANGLE" : wf == 1 ? "SAWTOOTH" : wf == 2 ? "PULSE" : "NOISE"));
+  usDBG("FILTER TESTS %s\n", (wf == 0 ? "TRIANGLE" : wf == 1 ? "SAWTOOTH" : wf == 2 ? "PULSE" : "NOISE"));
   for (int fq = 15; fq <= 45; fq += 15) {
     if (!running_tests) { reset_sid_registers(); return; };
-    DBG("HIGH FILTER FREQUENCY = %d\n", fq);
+    usDBG("HIGH FILTER FREQUENCY = %d\n", fq);
     test_operation(sid_registers[RESFLT], 87);  /* RESFLT 5*16+1+2+4 */
     for (int flt = 1; flt <= 3; flt++) {
       if (!running_tests) { reset_sid_registers(); return; };
-      DBG("%s PASS\n", (flt == 1 ? "LOW" : flt == 2 ? "BAND" : "HIGH"));
+      usDBG("%s PASS\n", (flt == 1 ? "LOW" : flt == 2 ? "BAND" : "HIGH"));
       test_operation(sid_registers[MODVOL], (flt == 1 ? 31 : flt == 2 ? 47 : 79));  /* MODVOL */
       for (int v = 0; v < 3; v++) {
         if (!running_tests) { reset_sid_registers(); return; };
-        DBG("VOICE %d TESTING ", (v + 1));
+        usDBG("VOICE %d TESTING ", (v + 1));
         test_operation((voices[v] + sid_registers[NOTEHI]), fq);   /* NOTEHI */
         test_operation((voices[v] + sid_registers[ATTDEC]), 0);    /* ATTDEC */
         test_operation((voices[v] + sid_registers[SUSREL]), 240);  /* SUSREL */
@@ -136,7 +136,7 @@ void filter_tests(uint8_t addr, uint8_t voices[3], int wf)
           sleep_ms(8);
         }
         test_operation((voices[v] + sid_registers[CONTR]), waveforms[wf]);  /* CONTR */
-        DBG("COMPLETE\n");
+        usDBG("COMPLETE\n");
       }
     }
   }
@@ -146,10 +146,10 @@ void envelope_tests(uint8_t addr, uint8_t voices[3], int wf)
 {
   if (!running_tests) { reset_sid_registers(); return; };
   test_operation((sid_registers[MODVOL] + addr), 0x0F);  /* Volume to full */
-  DBG("A D S R TESTS %s\n", (wf == 0 ? "TRIANGLE" : wf == 1 ? "SAWTOOTH" : wf == 2 ? "PULSE" : "NOISE"));
+  usDBG("A D S R TESTS %s\n", (wf == 0 ? "TRIANGLE" : wf == 1 ? "SAWTOOTH" : wf == 2 ? "PULSE" : "NOISE"));
   for (int v = 0; v < 3; v++) {
     if (!running_tests) { reset_sid_registers(); return; };
-    DBG("VOICE %d A D S R TESTING ", (v + 1));
+    usDBG("VOICE %d A D S R TESTING ", (v + 1));
     test_operation((voices[v] + sid_registers[ATTDEC]), 170);  /* ATTDEC 10*16+10 */
     test_operation((voices[v] + sid_registers[SUSREL]), 58);   /* SUSREL 3*16+10 */
     test_operation((voices[v] + sid_registers[NOTEHI]), 40);   /* NOTEHI */
@@ -158,38 +158,38 @@ void envelope_tests(uint8_t addr, uint8_t voices[3], int wf)
     if (!running_tests) { reset_sid_registers(); return; };
     sleep_ms(3000);
     test_operation((voices[v] + sid_registers[CONTR]), waveforms[wf]);  /* CONTR */
-    DBG("RELEASE ");
+    usDBG("RELEASE ");
     if (!running_tests) { reset_sid_registers(); return; };
     sleep_ms(1000);
-    DBG("COMPLETE\n");
+    usDBG("COMPLETE\n");
     if (!running_tests) { reset_sid_registers(); return; };
     sleep_ms(600);
 
-    DBG("VOICE %d S R TESTING ", (v + 1));
+    usDBG("VOICE %d S R TESTING ", (v + 1));
     test_operation((voices[v] + sid_registers[ATTDEC]), 0);    /* ATTDEC */
     test_operation((voices[v] + sid_registers[SUSREL]), 250);  /* SUSREL 15*16+10 */
     test_operation((voices[v] + sid_registers[CONTR]), (waveforms[wf] + 1));  /* CONTR */
     if (!running_tests) { reset_sid_registers(); return; };
     sleep_ms(600);
     test_operation((voices[v] + sid_registers[CONTR]), waveforms[wf]);  /* CONTR */
-    DBG("RELEASE ");
+    usDBG("RELEASE ");
     if (!running_tests) { reset_sid_registers(); return; };
     sleep_ms(600);
-    DBG("COMPLETE\n");
+    usDBG("COMPLETE\n");
     if (!running_tests) { reset_sid_registers(); return; };
     sleep_ms(600);
 
-    DBG("VOICE %d A D TESTING ", (v + 1));
+    usDBG("VOICE %d A D TESTING ", (v + 1));
     test_operation((voices[v] + sid_registers[ATTDEC]), 170);  /* ATTDEC 10*16+10 */
     test_operation((voices[v] + sid_registers[SUSREL]), 0);    /* SUSREL */
     test_operation((voices[v] + sid_registers[CONTR]), (waveforms[wf] + 1));  /* CONTR */
     if (!running_tests) { reset_sid_registers(); return; };
     sleep_ms(2000);
     test_operation((voices[v] + sid_registers[CONTR]), waveforms[wf]);  /* CONTR */
-    DBG("RELEASE ");
+    usDBG("RELEASE ");
     if (!running_tests) { reset_sid_registers(); return; };
     sleep_ms(600);
-    DBG("COMPLETE\n");
+    usDBG("COMPLETE\n");
     if (!running_tests) { reset_sid_registers(); return; };
     sleep_ms(600);
   }
@@ -199,11 +199,11 @@ void modulation_tests(uint8_t addr, uint8_t voices[3], int wf)
 {
   if (!running_tests) { reset_sid_registers(); return; };
   test_operation((sid_registers[MODVOL] + addr), 0x0F);  /* Volume to full */
-  DBG("RING MODULATION TESTS %s\n", (wf == 0 ? "TRIANGLE" : wf == 1 ? "SAWTOOTH" : wf == 2 ? "PULSE" : "NOISE"));
+  usDBG("RING MODULATION TESTS %s\n", (wf == 0 ? "TRIANGLE" : wf == 1 ? "SAWTOOTH" : wf == 2 ? "PULSE" : "NOISE"));
   for (int v = 0; v < 3; v++) {
     if (!running_tests) { reset_sid_registers(); return; };
     int v2 = (v == 1 ? 0 : v == 2 ? 1 : 2);
-    DBG("VOICE %d WITH VOICE %d ", (v + 1), (v2 + 1));
+    usDBG("VOICE %d WITH VOICE %d ", (v + 1), (v2 + 1));
     test_operation((voices[v] + sid_registers[PWMHI]), 8);     /* PWMHI */
     test_operation((voices[v] + sid_registers[ATTDEC]), 0);    /* ATTDEC */
     test_operation((voices[v] + sid_registers[SUSREL]), 250);  /* SUSREL 15*16+10 */
@@ -215,7 +215,7 @@ void modulation_tests(uint8_t addr, uint8_t voices[3], int wf)
       sleep_ms(24);
     }
     test_operation((voices[v] + sid_registers[CONTR]), 0);   /* CONTR */
-    DBG("COMPLETE\n");
+    usDBG("COMPLETE\n");
   }
 }
 

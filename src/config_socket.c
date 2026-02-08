@@ -92,7 +92,7 @@ void verify_socket_settings(void)
 
 void verify_chipdetection_results(bool quiet)
 { /* Is run only from sid_detection.c:auto_detect_routine after detection in auto_config mode */
-  if (!quiet) CFG("[SID] VERIFY SOCKET DETECTION RESULTS\n");
+  if (!quiet) usCFG("[SID] VERIFY SOCKET DETECTION RESULTS\n");
   /* Socket One */
   if (usbsid_config.socketOne.sid1.type != 0 && usbsid_config.socketOne.sid2.type == 1) {
     /* Unidentified SID as sid2? */
@@ -104,7 +104,7 @@ void verify_chipdetection_results(bool quiet)
       usbsid_config.socketOne.enabled = false; /* Disable the socket */
     }
   }
-  if (!quiet) CFG("[SID] SOCKET ONE CHIPTYPE: %d CLONETYPE: %d ENABLED: %d DUALSID: %d\n",
+  if (!quiet) usCFG("[SID] SOCKET ONE CHIPTYPE: %d CLONETYPE: %d ENABLED: %d DUALSID: %d\n",
     usbsid_config.socketOne.chiptype, usbsid_config.socketOne.clonetype,
     usbsid_config.socketOne.enabled, usbsid_config.socketOne.dualsid);
 
@@ -119,14 +119,14 @@ void verify_chipdetection_results(bool quiet)
       usbsid_config.socketTwo.enabled = false; /* Disable the socket */
     }
   }
-  if (!quiet) CFG("[SID] SOCKET TWO CHIPTYPE: %d CLONETYPE: %d ENABLED: %d DUALSID: %d\n",
+  if (!quiet) usCFG("[SID] SOCKET TWO CHIPTYPE: %d CLONETYPE: %d ENABLED: %d DUALSID: %d\n",
     usbsid_config.socketTwo.chiptype, usbsid_config.socketTwo.clonetype,
     usbsid_config.socketTwo.enabled, usbsid_config.socketTwo.dualsid);
 }
 
 void verify_sid_addr(bool quiet)
 { /* Is run only from sid_detection.c:auto_detect_routine after detection in auto_config mode */
-  if (!quiet) CFG("[SID] REASSIGN SID ADDRESS AND ID BY SOCKET CONFIG\n");
+  if (!quiet) usCFG("[SID] REASSIGN SID ADDRESS AND ID BY SOCKET CONFIG\n");
   /* Socket One */
   if (usbsid_config.socketOne.enabled) {
     if (usbsid_config.socketOne.dualsid) {
@@ -347,11 +347,11 @@ int verify_fmopl_sidno(void)
 
 void apply_fmopl_config(bool quiet)
 { /* TODO: REWORK */
-  if (!quiet) CFG("[CONFIG] Checking for optional FMOpl\n");
+  if (!quiet) usCFG("Checking for optional FMOpl\n");
   /* FMOpl */
   int fmoplsid = verify_fmopl_sidno();
   if (fmoplsid != -1) {
-    if (!quiet) CFG("[CONFIG] FMOpl @ SIDNO %d\n", fmoplsid);
+    if (!quiet) usCFG("FMOpl @ SIDNO %d\n", fmoplsid);
     cfg.fmopl_enabled = usbsid_config.FMOpl.enabled = true;
     usbsid_config.FMOpl.sidno = cfg.fmopl_sid = fmoplsid;
   } else {
@@ -403,7 +403,7 @@ void set_socket_config(uint8_t cmd, bool s1en, bool s1dual, uint8_t s1chip, bool
 
 void apply_socket_config(bool quiet)
 {
-  if (!quiet) CFG("[CONFIG] Applying socket settings\n");
+  if (!quiet) usCFG("Applying socket settings\n");
   cfg.mirrored = usbsid_config.mirrored;
 
   cfg.sock_one = usbsid_config.socketOne.enabled;
@@ -492,7 +492,7 @@ bool check_socket_config_errors(void)
  */
 void socket_config_fallback(void)
 {
-  CFG("[SET DEFAULT FALLBACK SOCKET CONFIG]\n");
+  usCFG("[SET DEFAULT FALLBACK SOCKET CONFIG]\n");
   /* Socket One */
   usbsid_config.socketOne.chiptype = 2;     /* unknown */
   usbsid_config.socketOne.clonetype = 0;    /* disabled */

@@ -69,19 +69,20 @@ void print_fpgasid_sidconfig(int slot, int sidno, uint8_t * configarray)
   int addr3 = ((configarray[1] & 0b1) == 1 ? 3 : 4);
   int addr = ((addr1 + addr2 + addr3) == 0 ? 12 : 4);
 
-  CFG("\n");
-  CFG("[FPGASID CURRENT CONFIG SLOT%s SID %d]\n", slots[slot], sidno);
+  usCFG("\n");
+  usCFG("[FPGASID CURRENT CONFIG SLOT%s SID %d]\n", slots[slot], sidno);
   if (sidno == 1) {
-    CFG("OUTPUT MODE: %s\n", outputmode[outp]);
-    CFG("SID2 ADDRESSES: %s%s%s%s\n", sid2addr[addr], sid2addr[addr1], sid2addr[addr2], sid2addr[addr3]);
+    usCFG("OUTPUT MODE: %s\n", outputmode[outp]);
+    usCFG("SID2 ADDRESSES: %s%s%s%s\n", sid2addr[addr], sid2addr[addr1], sid2addr[addr2], sid2addr[addr3]);
   }
-  CFG("SOURCE EXTIN: %s\n", extinsource[extin]);
-  CFG("REGISTER READ: %s\n", readback[readb]);
-  CFG("REGISTER DELAY: %s\n", regdelay[regd]);
-  CFG("MIXED WAVEFORM: %s\n", mixedwave[mixw]);
-  CFG("CRUNCHY DAC: %s\n", crunchydac[crunch]);
-  CFG("ANALOG FILTER: %s\n", filtermode[fltr]);
-  CFG("DIGIFIX VALUE: %02X\n", configarray[0]);
+  usCFG("SOURCE EXTIN: %s\n", extinsource[extin]);
+  usCFG("REGISTER READ: %s\n", readback[readb]);
+  usCFG("REGISTER DELAY: %s\n", regdelay[regd]);
+  usCFG("MIXED WAVEFORM: %s\n", mixedwave[mixw]);
+  usCFG("CRUNCHY DAC: %s\n", crunchydac[crunch]);
+  usCFG("ANALOG FILTER: %s\n", filtermode[fltr]);
+  usCFG("DIGIFIX VALUE: %02X\n", configarray[0]);
+  usCFG("\n");
 }
 
 void read_fpgasid_configuration(uint8_t base_address)
@@ -89,7 +90,7 @@ void read_fpgasid_configuration(uint8_t base_address)
 
   if (((/* base_address >= 0x0 &&  */base_address < 0x40) && (usbsid_config.socketOne.clonetype != 4))
     || ((base_address >= 0x40 && base_address < 0x80) && (usbsid_config.socketTwo.clonetype != 4))) {
-      CFG("[SID] ERROR INCORRECT ADDRESS (0x%02x) AND CLONETYPE (%d %d)\n",
+      usCFG("[SID] ERROR INCORRECT ADDRESS (0x%02x) AND CLONETYPE (%d %d)\n",
          base_address, usbsid_config.socketOne.clonetype, usbsid_config.socketTwo.clonetype);
     return; /* Do nothing if no FPGASID configured */
   }
@@ -100,7 +101,7 @@ void read_fpgasid_configuration(uint8_t base_address)
   uint8_t sid_two_a[3];
   uint8_t sid_one_b[3];
   uint8_t sid_two_b[3];
-  CFG("[SID] READING CONFIGURATION FROM FPGASID @ 0x%02X\n", base_address);
+  usCFG("[SID] READING CONFIGURATION FROM FPGASID @ 0x%02X\n", base_address);
   /* Enable diag mode */
   cycled_write_operation((0x19 + base_address), 0xEE, 6);  /* Write magic cookie Hi */
   cycled_write_operation((0x1A + base_address), 0xAB, 6);  /* Write magic cookie Lo */
@@ -110,7 +111,7 @@ void read_fpgasid_configuration(uint8_t base_address)
   idHi = cycled_read_operation((0x1 + base_address), 4);      /* Read identify Lo */
   uint16_t fpgasid_id = (idHi << 8 | idLo);
   if (fpgasid_id != FPGASID_IDENTIFIER) {
-    CFG("[SID] ERROR: 0x%04X != 0x%04X FPGASID NOT FOUND @ 0x%02X\n", fpgasid_id, FPGASID_IDENTIFIER, base_address);
+    usCFG("[SID] ERROR: 0x%04X != 0x%04X FPGASID NOT FOUND @ 0x%02X\n", fpgasid_id, FPGASID_IDENTIFIER, base_address);
     return;
   }
 
@@ -150,31 +151,31 @@ void read_fpgasid_configuration(uint8_t base_address)
   cycled_write_operation((0x19 + base_address), 0x0, 6);   /* Clear magic cookie Hi */
   cycled_write_operation((0x1A + base_address), 0x0, 6);   /* Clear magic cookie Lo */
 
-  CFG("\n");
-  CFG("[FPGASID DIAGNOSTIC RESULT]\n");
-  CFG("ID: %04X (FPGASID)\n", fpgasid_id);
-  CFG("CPLD REVISION: %02X\n", cpld);
-  CFG("FPGA REVISION: %02X\n", fpga);
-  CFG("PCA REVISION: %02X\n", pca);
-  CFG("UNIQUE IDENTIFIER: %02X%02X%02X%02X%02X%02X%02X%02X\n",
+  usCFG("\n");
+  usCFG("[FPGASID DIAGNOSTIC RESULT]\n");
+  usCFG("ID: %04X (FPGASID)\n", fpgasid_id);
+  usCFG("CPLD REVISION: %02X\n", cpld);
+  usCFG("FPGA REVISION: %02X\n", fpga);
+  usCFG("PCA REVISION: %02X\n", pca);
+  usCFG("UNIQUE IDENTIFIER: %02X%02X%02X%02X%02X%02X%02X%02X\n",
      unique_id[0], unique_id[1], unique_id[2], unique_id[3], unique_id[4], unique_id[5], unique_id[6], unique_id[7]);
-  CFG("CLOCK FREQUENCY READS: %.3f uS\n", frequency);
-  CFG("SELECT PINS: %02X\n", select_pins);
-  CFG("INDEX CFG A: %02X\n", idxa);
-  CFG("SID 1 A: %02X%02X%02X\n", sid_one_a[0], sid_one_a[1], sid_one_a[2]);
-  CFG("SID 2 A: %02X%02X%02X\n", sid_two_a[0], sid_two_a[1], sid_two_a[2]);
-  CFG("FILTERBIAS A SID1/SID2: %02X\n", flta);
-  CFG("INDEX CFG B: %02X\n", idxb);
-  CFG("SID 1 B: %02X%02X%02X\n", sid_one_b[0], sid_one_b[1], sid_one_b[2]);
-  CFG("SID 2 B: %02X%02X%02X\n", sid_two_b[0], sid_two_b[1], sid_two_b[2]);
-  CFG("FILTERBIAS B SID1/SID2: %02X\n", fltb);
+  usCFG("CLOCK FREQUENCY READS: %.3f uS\n", frequency);
+  usCFG("SELECT PINS: %02X\n", select_pins);
+  usCFG("INDEX CFG A: %02X\n", idxa);
+  usCFG("SID 1 A: %02X%02X%02X\n", sid_one_a[0], sid_one_a[1], sid_one_a[2]);
+  usCFG("SID 2 A: %02X%02X%02X\n", sid_two_a[0], sid_two_a[1], sid_two_a[2]);
+  usCFG("FILTERBIAS A SID1/SID2: %02X\n", flta);
+  usCFG("INDEX CFG B: %02X\n", idxb);
+  usCFG("SID 1 B: %02X%02X%02X\n", sid_one_b[0], sid_one_b[1], sid_one_b[2]);
+  usCFG("SID 2 B: %02X%02X%02X\n", sid_two_b[0], sid_two_b[1], sid_two_b[2]);
+  usCFG("FILTERBIAS B SID1/SID2: %02X\n", fltb);
 
   print_fpgasid_sidconfig(0, 1, sid_one_a);
   print_fpgasid_sidconfig(0, 2, sid_two_a);
   print_fpgasid_sidconfig(1, 1, sid_one_b);
   print_fpgasid_sidconfig(1, 2, sid_two_b);
 
-  CFG("\n");
+  usCFG("\n");
 
   return;
 }
@@ -182,52 +183,54 @@ void read_fpgasid_configuration(uint8_t base_address)
 void print_skpico_configuration(uint8_t base_address, uint8_t * configarray)
 {
 
-  CFG("\n");
-  CFG("[SIDKICK-pico @ 0x%02X CONFIG]\n", base_address);
+  usCFG("\n");
+  usCFG("[SIDKICK-pico @ 0x%02X CONFIG]\n", base_address);
   for (size_t i = 0; i < 64; i++) {
     if (i >= 4 && i <= 7) continue;
     if (i >= 13 && i <= 56) continue;
     if (i == 62 || i == 63) continue;
     if (i == 0 || i == 8) {
-      CFG("[%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_sid_types) ? (char*)sid_types[configarray[i]] : (char*)error_type[0]);
+      usCFG("[%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_sid_types) ? (char*)sid_types[configarray[i]] : (char*)error_type[0]);
       continue;
     }
     if (i == 10) {
-      CFG("[%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_sid2_address) ? (char*)sid2_address[configarray[i]] : (char*)error_type[0]);
+      usCFG("[%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_sid2_address) ? (char*)sid2_address[configarray[i]] : (char*)error_type[0]);
       continue;
     }
     if (i == 59) {
-      CFG("[%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_clock_speed) ? (char*)clock_speed[configarray[i]] : (char*)error_type[0]);
+      usCFG("[%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_clock_speed) ? (char*)clock_speed[configarray[i]] : (char*)error_type[0]);
       continue;
     }
-    CFG("[%02ld] %s: %02X\n", i, config_names[i], configarray[i]);
+    usCFG("[%02ld] %s: %02X\n", i, config_names[i], configarray[i]);
   }
-  CFG("[PRINT CFG SETTINGS END]\n");
+  usCFG("[PRINT CFG SETTINGS END]\n");
+  usCFG("\n");
+
 }
 
 void read_skpico_configuration(uint8_t base_address)
 {
   /* Enter config mode */
   cycled_write_operation((init_configmode[0] + base_address), init_configmode[1], 6);
-  /* CFG("[W]$%02X:%02X\n", (init_configmode[0] + base_address), init_configmode[1]); */
+  /* usCFG("[W]$%02X:%02X\n", (init_configmode[0] + base_address), init_configmode[1]); */
 
   /* Read config from SKPico */
   for (int i = 0; i <= 63; ++i) {
     sleep_us(1);
     skpico_config[i] = cycled_read_operation((0x1D + base_address), 0);
-    /* CFG("[R%d]$%02X:%02X\n", i, (0x1D + base_address), skpico_config[i]); */
+    /* usCFG("[R%d]$%02X:%02X\n", i, (0x1D + base_address), skpico_config[i]); */
   }
 
   /* Exit config mode */
   cycled_write_operation((config_exit[0] + base_address), config_exit[1], 6);
-  /* CFG("[W]$%02X:%02X\n", (config_exit[0] + base_address), config_exit[1]); */
+  /* usCFG("[W]$%02X:%02X\n", (config_exit[0] + base_address), config_exit[1]); */
 
-  CFG("\n");
-  CFG("[SKPICO RECEIVED BUFFER]\n");
+  usCFG("\n");
+  usCFG("[SKPICO RECEIVED BUFFER]\n");
   print_cfg(skpico_config, 64);
 
   print_skpico_configuration(base_address, skpico_config);
-  CFG("\n");
+  usCFG("\n");
 
 }
 
@@ -242,11 +245,11 @@ void switch_pdsid_type(void)
   set_paused_state(false); // paused_state = 0;
   clear_volume_state(); // memset(volume_state, 0, 4);
   clear_sid_memory(); // memset(sid_memory, 0, count_of(sid_memory));
-  CFG("[SID] RST PIN LOW\n");
+  usCFG("[SID] RST PIN LOW\n");
   cPIN(RES); // gpio_put(RES, 0);
-  CFG("[SID] SLEEP\n");
+  usCFG("[SID] SLEEP\n");
   sleep_ms(6000);
-  CFG("[SID] RST PIN HIGH\n");
+  usCFG("[SID] RST PIN HIGH\n");
   sPIN(RES); // gpio_put(RES, 1);
   set_reset_state(false); // reset_state = 0;
   return;

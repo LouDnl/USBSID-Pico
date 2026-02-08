@@ -69,7 +69,7 @@ queue_t cynthcart_queue;
 /* Initialize the midi handlers */
 void midi_init(void)
 {
-  CFG("[MIDI INIT] START\n");
+  usNFO("[MIDI] Init start\n");
 
   /* Set initial stream state and index */
   midimachine.bus = FREE;
@@ -84,7 +84,7 @@ void midi_init(void)
   /* Start the processor of midi buffers */
   midi_processor_init();
 
-  CFG("[MIDI INIT] FINISHED\n");
+  usNFO("[MIDI] Init finished\n");
 }
 
 #ifdef ONBOARD_EMULATOR
@@ -135,7 +135,7 @@ void emulator_disable(void)
 
 inline void emulator_reset(void)
 {
-  DBG("[MIDI] Emulator reset not implemented yet!\n");
+  usMIDI("Emulator reset not implemented yet!\n");
   return;
 }
 
@@ -165,7 +165,7 @@ inline void handle_emulator_cc(void)
 inline void midi_buffer_task(uint8_t buffer)
 {
   if (midimachine.index != 0) {
-    if (midimachine.type != SYSEX) MIDBG(" [B%d]$%02x#%03d", midimachine.index, buffer, buffer);
+    if (midimachine.type != SYSEX) usMIDI(" [B%d]$%02x#%03d", midimachine.index, buffer, buffer);
   }
 
   if (buffer & 0x80) { /* Handle start byte */
@@ -214,7 +214,7 @@ inline void midi_buffer_task(uint8_t buffer)
         dtype = midi; /* Set data type to midi */
         midimachine.midi_bytes = 2;
         if (midimachine.bus != CLAIMED && midimachine.type == NONE) {
-          if (midimachine.index == 0) MIDBG("[M][B%d]$%02x#%03d", midimachine.index, buffer, buffer);
+          if (midimachine.index == 0) usMIDI("[M][B%d]$%02x#%03d", midimachine.index, buffer, buffer);
           midimachine.type = MIDI;
           midimachine.state = RECEIVING;
           midimachine.bus = CLAIMED;
@@ -232,7 +232,7 @@ inline void midi_buffer_task(uint8_t buffer)
         dtype = midi; /* Set data type to midi */
         midimachine.midi_bytes = 3;
         if (midimachine.bus != CLAIMED && midimachine.type == NONE) {
-          if (midimachine.index == 0) MIDBG("[M][B%d]$%02x#%03d", midimachine.index, buffer, buffer);
+          if (midimachine.index == 0) usMIDI("[M][B%d]$%02x#%03d", midimachine.index, buffer, buffer);
           midimachine.type = MIDI;
           midimachine.state = RECEIVING;
           midimachine.bus = CLAIMED;
@@ -253,7 +253,7 @@ inline void midi_buffer_task(uint8_t buffer)
         if (midimachine.type == MIDI) {
           /* if (midimachine.streambuffer[0] >= 0x80 || midimachine.streambuffer[0] <= 0xEF) { */
             if (midimachine.index == midimachine.midi_bytes) {
-              MIDBG("\n");
+              usMIDI("\n");
               dtype = midi; /* Set data type to midi */
 
               /* Do something fancy now */
@@ -282,11 +282,11 @@ inline void midi_buffer_task(uint8_t buffer)
       } else {
         /* Buffer is full, receiving to much data too handle, wait for message to end */
         midimachine.state = WAITING_FOR_END;
-        MIDBG("[EXCESS][IDX]%02d %02x \n", midimachine.index, buffer);
+        usMIDI("[EXCESS][IDX]%02d %02x \n", midimachine.index, buffer);
       }
     } else if (midimachine.state == WAITING_FOR_END) {
       /* Consuming SysEx messages, nothing else to do */
-      MIDBG("[EXCESS][IDX]%02d %02x \n", midimachine.index, buffer);
+      usMIDI("[EXCESS][IDX]%02d %02x \n", midimachine.index, buffer);
     }
   }
 }
