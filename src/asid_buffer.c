@@ -105,23 +105,6 @@ static const uint16_t RING_SIZE_STEP = (20 * 224);    /* 4480 bytes - grow/shrin
 volatile uint16_t ring_size = RING_SIZE_DEFAULT;      /* Current effective size */
 static uint16_t ring_size_allocated = 0;              /* Actual allocated size */
 
-/* TODO: REMOVE ~ TEMPORARY */
-volatile bool log_asid_queue = false;
-volatile bool in_asid_irq = false;
-volatile int __not_in_flash_func(ring_diff_external)(void)
-{
-  return (asid_ringbuffer.ring_write - asid_ringbuffer.ring_read + ring_size) % ring_size;
-}
-volatile uint16_t __not_in_flash_func(ring_head_external)(void)
-{
-  return asid_ringbuffer.ring_write;
-}
-volatile uint16_t __not_in_flash_func(ring_tail_external)(void)
-{
-  return asid_ringbuffer.ring_read;
-}
-/* TODO: REMOVE ~ TEMPORARY */
-
 
 /**
  * Here be magicians
