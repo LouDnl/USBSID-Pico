@@ -43,9 +43,9 @@ jobs:
           - { os: ubuntu-latest, shell: bash,
               directory: send_sid, buildname: send_sid }
           - { os: windows-2022, shell: 'msys2 {0}',
-              directory: config-tool, buildname: cfg_usbsid.exe }
+              directory: config-tool, buildname: cfg_usbsid }
           - { os: windows-2022, shell: 'msys2 {0}',
-              directory: send_sid, buildname: send_sid.exe }
+              directory: send_sid, buildname: send_sid }
           - { os: macos-14, shell: 'bash',
               directory: config-tool, buildname: cfg_usbsid_macos14 }
           - { os: macos-14, shell: 'bash',
