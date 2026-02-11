@@ -221,6 +221,15 @@ void led_runner(void)
       if (n_checks >= MAX_CHECKS) { /* 100 checks */
         n_checks = 0, usbdata = 0, dtype = ntype;  /* NOTE: This sets dtype to 0 which causes buffertask write to go to default and error out with many consecutive reads from the bus */
         offload_ledrunner = false;
+        /**
+         * @brief Let's make sure we always reset the write order
+         * when the interface is no longer mounted
+         */
+        extern bool tud_midi_n_mounted (uint8_t itf);
+        if (!tud_midi_n_mounted(MIDI_ITF)) {
+          extern void reset_asid_to_writeorder(void);
+          reset_asid_to_writeorder();
+        }
       }
     }
     return;
