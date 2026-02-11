@@ -1,11 +1,11 @@
 === USBSID-Pico v1.3 PCB Hardware License ~ Creative Commons
-https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/USBSID-Pico-v1.3[USBSID-Pico v1.3 PCB] © 2025 by
+https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/USBSID-Pico-v1.3[USBSID-Pico v1.3 PCB] © 2025-2026 by
 https://github.com/LouDnl[LouD] is licensed under +
 https://creativecommons.org/licenses/by-nc-nd/4.0/[Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International] +
 image:https://mirrors.creativecommons.org/presskit/icons/cc.svg[link="https://creativecommons.org/licenses/by-nc-nd/4.0/"]image:https://mirrors.creativecommons.org/presskit/icons/by.svg[link="https://creativecommons.org/licenses/by-nc-nd/4.0/"]image:https://mirrors.creativecommons.org/presskit/icons/nc.svg[link="https://creativecommons.org/licenses/by-nc-nd/4.0/"]image:https://mirrors.creativecommons.org/presskit/icons/nd.svg[link="https://creativecommons.org/licenses/by-nc-nd/4.0/"]
 
 === USBSID-Pico v1.0 PCB Hardware License ~ Creative Commons
-https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/USBSID-Pico-v1.0[USBSID-Pico v1.0 PCB] © 2024 by
+https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/USBSID-Pico-v1.0[USBSID-Pico v1.0 PCB] © 2024-2026 by
 https://github.com/LouDnl[LouD] is licensed under +
 https://creativecommons.org/licenses/by-sa/4.0/[Creative Commons Attribution-ShareAlike 4.0 International] +
 image:https://mirrors.creativecommons.org/presskit/icons/cc.svg[link="https://creativecommons.org/licenses/by-sa/4.0/"]image:https://mirrors.creativecommons.org/presskit/icons/by.svg[link="https://creativecommons.org/licenses/by-sa/4.0/"]image:https://mirrors.creativecommons.org/presskit/icons/sa.svg[link="https://creativecommons.org/licenses/by-sa/4.0/"]
