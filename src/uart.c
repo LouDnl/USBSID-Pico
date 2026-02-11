@@ -28,29 +28,28 @@
  */
 
 #ifdef USE_PIO_UART
+#if PICO_RP2350
 
 #include "globals.h"
 #include "uart.h"
 #include "logging.h"
 
 
-/* USBSID */
-extern uint8_t __not_in_flash("usbsid_buffer") uart_buffer[64];
-
-/* GPIO */
-extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
-extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
-extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
-extern uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
-extern void reset_sid(void);
-
-/* USBSID */
+/* usbsid.c */
+extern uint8_t uart_buffer[64];
 extern int usbdata;
 extern char ntype, dtype, uart;
 extern bool offload_ledrunner;
 
+/* gpio.c */
+extern uint16_t cycled_delay_operation(uint16_t cycles);
+extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
+extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint16_t cycled_delayed_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
+extern void reset_sid(void);
+
 /* Locals */
-static PIO uart_pio = pio1;
+static PIO uart_pio = pio2;
 static uint sm_uartrx;
 static int8_t pioirq_uartrx;
 static queue_t fifo_uartrx;
@@ -120,11 +119,11 @@ static void async_worker_func(__unused async_context_t *async_context, __unused 
     if (!queue_try_remove(&fifo_uartrx, &uart_buffer[bytes_rxed])) {
       panic("fifo_uartrx empty");
     } else {
-      // DBG("[%d/%d] %02X $%02X:%02X\n",i,bytes_per_rxpacket,uart_buffer[0],uart_buffer[1],uart_buffer[2]);
+      // usDBG("[%d/%d] %02X $%02X:%02X\n",i,bytes_per_rxpacket,uart_buffer[0],uart_buffer[1],uart_buffer[2]);
       if ((uart_buffer[0] == 0xFF && uart_buffer[1] == 0xFF)
           || (uart_buffer[1] == 0xFF && uart_buffer[2] == 0xFF)
           || (uart_buffer[2] == 0xFF && uart_buffer[3] == 0xFF)) {
-        DBG("[UART CONFIG] RESET\n");
+        usDBG("[UART CONFIG] RESET\n");
         memset(uart_buffer, 0, 8);
         bytes_per_rxpacket = 8;
         bytes_rxed = 0;
@@ -151,7 +150,7 @@ static void async_worker_func(__unused async_context_t *async_context, __unused 
           && uart_buffer[6] == 0xEE
           && uart_buffer[7] == 0xFF) { /* Receiving initiator packet */
           bytes_per_rxpacket = (size_t)(uart_buffer[3] << 8 | uart_buffer[4]);
-          DBG("[UART CONFIG] BYTES PER PACKET SET TO %d\n", bytes_per_rxpacket);
+          usDBG("[UART CONFIG] BYTES PER PACKET SET TO %d\n", bytes_per_rxpacket);
           memset(uart_buffer, 0, 8);
           bytes_rxed = 0;
         }
@@ -236,4 +235,5 @@ void deinit_uart(void)
   return;
 }
 
+#endif /* PICO_RP2350 */
 #endif /* USE_PIO_UART */

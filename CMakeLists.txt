@@ -30,7 +30,7 @@ set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
 string(TIMESTAMP MAGIC_SMOKE "%Y%m%d")  # Auto generate dated version
-set(PROJECT_VERSION "0.6.0-BETA.${MAGIC_SMOKE}")  # Generate compile version
+set(PROJECT_VERSION "0.6.1-BETA.${MAGIC_SMOKE}")  # Generate compile version
 
 ### Want a cookie?
 # NOTICE: ENABLING THESE DEBUGGING DEFINITIONS WILL HAVE SIGNIFICANT IMPACT AND WILL DELAY PLAYING!
@@ -40,12 +40,15 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(USBSID_DEBUGGING 1)     # Enable debugging ~ mandatory enable for all other logging types
   set(UART_DEBUGGING 1)       # Enable debugging over uart pins ~ USBCDC must be 0!
   set(USBCDC_DEBUGGING 0)     # Enable debugging over cdc port 2 ~ UART must be 0!
+  set(FILENAME_LOGGING 0)     # Enable logging of source filename
+  set(BOOT_LOGGING 0)         # Enable bootlog in usbsid.c
   set(DEFAULT_DEBUGGING 1)    # Enable debugging in usbsid.c
   set(CONFIG_DEBUGGING 1)     # Enable debugging in config.c
   set(USBIO_DEBUGGING 0)      # Enable debugging in usbsid.c
   set(GPIOBUS_DEBUGGING 0)    # Enable debugging in gpio.c
   set(MIDI_DEBUGGING 0)       # Enable debugging in midi.c
   set(MIDIVOICE_DEBUGGING 0)  # Enable debugging in midi.c
+  set(ASID_DEBUGGING 0)       # Enable debugging in acid.c and asid_buffer.c
   set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
   set(SIDWRITES_DEBUGGING 0)  # Enable logging of SID writes one core 2
   set(EMULATOR_DEBUGGING 0)   # Enable debugging in emulator
@@ -338,6 +341,7 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/midi.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi_handler.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/asid_buffer.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sysex.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid_cloneconfig.c
@@ -360,7 +364,12 @@ if(ONBOARD_SIDPLAYER EQUAL 1)
   # NOTICE: SIDPLAYER REQUIRES FULL OPTIMIZATIONS!!
   set(COMPILE_OPTS ${COMPILE_OPTS} -O3)
   ## Set sidplayer list directory
-  set(USPLAYER_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player)
+  if(NOT ${EMUDIR} STREQUAL "")
+    set(USPLAYER_LIST_DIR ${EMUDIR})
+  else()
+    set(USPLAYER_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player)
+  endif()
+  message(DEBUG "USPLAYER_LIST_DIR is set to ${USPLAYER_LIST_DIR}")
 
   ### Adjust filenames for user interpretation
   foreach(FILENAME ${FILENAMES})
@@ -423,7 +432,12 @@ if(ONBOARD_EMULATOR EQUAL 1)
   set(COMPILE_OPTS ${COMPILE_OPTS} -DEMBEDDED=1)
   add_compile_definitions(ONBOARD_EMULATOR=1)
   set(EMULATOR_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emulator)
-  set(EMUDORE_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emudore-embedded)
+  if(NOT ${EMUDIR} STREQUAL "")
+    set(EMUDORE_LIST_DIR ${EMUDIR})
+  else()
+    set(EMUDORE_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emudore-embedded)
+  endif()
+  message(DEBUG "EMUDORE_LIST_DIR is set to ${EMUDORE_LIST_DIR}")
 
   ### Adjust filenames for user interpretation
   foreach(FILENAME ${FILENAMES})
@@ -503,7 +517,7 @@ set(PIO_BUS     ${CMAKE_CURRENT_LIST_DIR}/src/pio/bus_control.pio)
 set(PIO_CLOCK   ${CMAKE_CURRENT_LIST_DIR}/src/pio/clock.pio)
 set(PIO_VU      ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu.pio)
 set(PIO_RGB     ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu_rgb.pio)
-set(PIO_COUNTER ${CMAKE_CURRENT_LIST_DIR}/src/pio/clock_counter.pio)
+set(PIO_COUNTER ${CMAKE_CURRENT_LIST_DIR}/src/pio/cycle_counter.pio)
 if(USE_PIO_UART EQUAL 1)
 set(PIO_UART    ${CMAKE_CURRENT_LIST_DIR}/src/pio/uart_rx.pio)
 endif()
@@ -538,14 +552,20 @@ if(USBSID_DEBUGGING EQUAL 1)
   if(DEFAULT_DEBUGGING EQUAL 1)
     add_compile_definitions(USBSID_DEBUG=1)
   endif()
+  if(FILENAME_LOGGING EQUAL 1)
+    add_compile_definitions(LOG_FILENAME=1)
+  endif()
+  if(BOOT_LOGGING EQUAL 1)
+    add_compile_definitions(USBSID_BOOTLOG=1)
+  endif()
+  if(CONFIG_DEBUGGING EQUAL 1)
+    add_compile_definitions(CONFIG_DEBUG=1)
+  endif()
   if(MEMORY_LOGGING EQUAL 1)
     add_compile_definitions(MEM_DEBUG=1)
   endif()
   if(SIDWRITES_DEBUGGING EQUAL 1)
     add_compile_definitions(WRITE_DEBUG=1)
-  endif()
-  if(CONFIG_DEBUGGING EQUAL 1)
-    add_compile_definitions(CONFIG_DEBUG=1)
   endif()
   if(USBIO_DEBUGGING EQUAL 1)
     add_compile_definitions(USBIO_DEBUG=1)
@@ -555,6 +575,9 @@ if(USBSID_DEBUGGING EQUAL 1)
   endif()
   if(MIDIVOICE_DEBUGGING EQUAL 1)
     add_compile_definitions(MIDIVOICE_DEBUG=1)
+  endif()
+  if(ASID_DEBUGGING EQUAL 1)
+    add_compile_definitions(ASID_DEBUG=1)
   endif()
   if(GPIOBUS_DEBUGGING EQUAL 1)
     add_compile_definitions(USBSIDGPIO_DEBUG=1)

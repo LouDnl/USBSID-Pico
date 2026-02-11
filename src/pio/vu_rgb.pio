@@ -28,7 +28,10 @@
 ; along with this program. If not, see <http://www.gnu.org/licenses/>.
 ;
 
+
+; My precious ~ PIO1 SM2
 .program vu_rgb
+
 .side_set 1
 
 .define public T1 3

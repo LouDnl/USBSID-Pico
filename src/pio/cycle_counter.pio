@@ -24,8 +24,13 @@
 
 .define PUBLIC CLK 22
 
-; Infinite cycle counter, wraps at 32bit and starts over
+
+; Infinite cycle counter ~ PIO1 SM3
+; rp2350: Requires DMA for `dma_encode_endless_transfer_count()`
+; rp2040: Requires 2 chained DMA channels for endless transfer
+; wraps at 32bit and starts over after approximately ~71 minutes
 .program cycle_counter
+
 .wrap_target
 init:
     set x 0          ; Set X to 0

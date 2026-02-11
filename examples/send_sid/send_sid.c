@@ -103,7 +103,7 @@ int usbsid_init(void)
   }
 
   for (int if_num = 0; if_num < 2; if_num++) {
-    if (libusb_kernel_driver_active(devh, if_num)) {
+    if (libusb_kernel_driver_active(devh, if_num) == 1) {
       libusb_detach_kernel_driver(devh, if_num);
     }
     rc = libusb_claim_interface(devh, if_num);
@@ -140,6 +140,7 @@ out:
   if (devh != NULL)
   libusb_close(devh);
   libusb_exit(NULL);
+  rc = -1;
   return rc;
 }
 
@@ -412,22 +413,22 @@ int main(int argc, char* argv[])
       }
       goto done;
     }
-    if(!strcmp(argv[arg], "-stop") || !strcmp(argv[arg], "stop")) {
+    if(!strcmp(argv[arg], "-stop") || !strcmp(argv[arg], "stop") || !strcmp(argv[arg], "s")) {
       fprintf(stdout, "Stopping playback\n");
       configbuff[1] = SID_PLAYER_STOP;
       write_chars(configbuff, 5);
     }
-    if(!strcmp(argv[arg], "-pause")) {
+    if(!strcmp(argv[arg], "-pause") || !strcmp(argv[arg], "pause") || !strcmp(argv[arg], "p")) {
       fprintf(stdout, "(Un)Pausing playback\n");
       configbuff[1] = SID_PLAYER_PAUSE;
       write_chars(configbuff, 5);
     }
-    if(!strcmp(argv[arg], "-next")) {
+    if(!strcmp(argv[arg], "-next") || !strcmp(argv[arg], "next")|| !strcmp(argv[arg], "n")) {
       fprintf(stdout, "Playing next subtune\n");
       configbuff[1] = SID_PLAYER_NEXT;
       write_chars(configbuff, 5);
     }
-    if(!strcmp(argv[arg], "-prev")) {
+    if(!strcmp(argv[arg], "-prev") || !strcmp(argv[arg], "prev") || !strcmp(argv[arg], "b")) {
       fprintf(stdout, "Playing previous subtune\n");
       configbuff[1] = SID_PLAYER_PREV;
       write_chars(configbuff, 5);

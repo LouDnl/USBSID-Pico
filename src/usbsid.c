@@ -92,9 +92,9 @@ extern void reset_sid_registers(void);
 extern void enable_sid(bool unmute);
 extern void disable_sid(void);
 extern void clear_bus_all(void);
-extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
-extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
-extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint16_t cycled_delay_operation(uint16_t cycles);
+extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
+extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
 extern bool is_muted;
 
 /* Uart */
@@ -165,8 +165,13 @@ midi_machine midimachine;
 queue_t sidtest_queue;
 queue_t logging_queue;
 
-/* Declare local variables */
-static semaphore_t core0_init, core1_init;
+/* Multicore sync using atomic memory - avoids semaphore spin locks AND
+ * FIFO (which is consumed by flash_safe_execute IRQ handler) */
+static volatile uint32_t core_sync_state = 0;
+#define SYNC_CORE1_STAGE1  0x11  /* Core 1 finished flash_safe_execute_core_init */
+#define SYNC_CORE0_STAGE1  0x01  /* Core 0 finished config loading */
+#define SYNC_CORE1_STAGE2  0x12  /* Core 1 finished queue/uart init */
+#define SYNC_CORE0_STAGE2  0x02  /* Core 0 finished hardware init */
 
 /* WebUSB Description URL */
 static const tusb_desc_webusb_url_t desc_url =
@@ -184,27 +189,27 @@ static const tusb_desc_webusb_url_t desc_url =
 void reset_reason(void)
 {
 #if PICO_RP2040
-  DBG("[RESET] Button double tapped? %d\n", flagged);
+  usNFO("[RESET] Button double tapped? %d\n", flagged);
   io_rw_32 *rr = (io_rw_32 *) (VREG_AND_CHIP_RESET_BASE + VREG_AND_CHIP_RESET_CHIP_RESET_OFFSET);
   if (*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_POR_BITS)
-    DBG("[RESET] Caused by power-on reset or brownout detection\n");
+    usNFO("[RESET] Caused by power-on reset or brownout detection\n");
   if (*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_RUN_BITS)
-    DBG("[RESET] Caused by RUN pin trigger ~ manual or ISA RESET signal\n");
+    usNFO("[RESET] Caused by RUN pin trigger ~ manual or ISA RESET signal\n");
   if (*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_PSM_RESTART_BITS)
-    DBG("[RESET] Caused by debug port\n");
+    usNFO("[RESET] Caused by debug port\n");
 #elif PICO_RP2350
   /* io_rw_32 *rr = (io_rw_32 *) (POWMAN_BASE + POWMAN_CHIP_RESET_OFFSET); */
-  DBG("[RESET] Button double tapped? %d %X\n", flagged, powman_hw->chip_reset);
+  usNFO("[RESET] Button double tapped? %d %X\n", flagged, powman_hw->chip_reset);
   if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_DP_RESET_REQ_BITS)
-    DBG("[RESET] Caused by arm debugger\n");
+    usNFO("[RESET] Caused by arm debugger\n");
   if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_RESCUE_BITS)
-    DBG("[RESET] Caused by rescure reset from arm debugger\n");
+    usNFO("[RESET] Caused by rescure reset from arm debugger\n");
   if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_RUN_LOW_BITS)
-    DBG("[RESET] Caused by RUN pin trigger ~ manual or ISA RESET signal\n");
+    usNFO("[RESET] Caused by RUN pin trigger ~ manual or ISA RESET signal\n");
   if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_BOR_BITS)
-    DBG("[RESET] Caused by brownout detection\n");
+    usNFO("[RESET] Caused by brownout detection\n");
   if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_POR_BITS)
-    DBG("[RESET] Caused by power-on reset\n");
+    usNFO("[RESET] Caused by power-on reset\n");
 #endif
   return;
 }
@@ -219,7 +224,7 @@ void init_logging(void)
   stdio_uart_init_full(uart0, BAUD_RATE, TX, RX);
   sleep_ms(100);  /* leave time for uart to settle */
   stdio_flush();
-  DBG("\n[%s]\n", __func__);
+  usNFO("[NFO] Uart logging initialized\n");
   #endif
   return;
 }
@@ -230,7 +235,7 @@ void init_logging(void)
 /* Write from device to host */
 void cdc_write(uint8_t * itf, uint32_t n)
 { /* No need to check if write available with current driver code */
-  IODBG("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
+  usIO("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
   tud_cdc_n_write(*itf, write_buffer, n);  /* write n bytes of data to client */
   tud_cdc_n_write_flush(*itf);
   return;
@@ -239,7 +244,7 @@ void cdc_write(uint8_t * itf, uint32_t n)
 /* Write from device to host */
 void webserial_write(uint8_t * itf, uint32_t n)
 { /* No need to check if write available with current driver code */
-  IODBG("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
+  usIO("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
   tud_vendor_write(write_buffer, n);
   tud_vendor_flush();
   return;
@@ -253,7 +258,7 @@ int __no_inline_not_in_flash_func(do_buffer_tick)(int top, int step)
   static int i = 1;
   cycled_write_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   WRITEDBG(dtype, i, top, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
-  IODBG("[I %d] [%c] $%02X:%02X (%u)\n", i, dtype, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
+  usIO("[I %d] [%c] $%02X:%02X (%u)\n", i, dtype, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   if (i+step >= top) {
     i = 1;
     return i;
@@ -286,7 +291,7 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
     if __us_unlikely(n_bytes == 0) {
       cycled_write_operation(sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
       WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
-      IODBG("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
+      usIO("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], (sid_buffer[3] << 8 | sid_buffer[4]));
     } else {
       buffer_task(n_bytes, 4);
     }
@@ -297,14 +302,14 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
     if __us_likely(n_bytes == 0) {
       cycled_write_operation(sid_buffer[1], sid_buffer[2], 6);  /* Add 6 cycles to each write for LDA(2) & STA(4) */
       WRITEDBG(dtype, n_bytes, n_bytes, sid_buffer[1], sid_buffer[2], 6);
-      IODBG("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], 6);
+      usIO("[I %d] [%c] $%02X:%02X (%u)\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2], 6);
     } else {
       buffer_task(n_bytes, 2);
     }
     return;
   };
   if __us_unlikely(command == READ) {  /* READING CAN ONLY HANDLE ONE AT A TIME, PERIOD. */
-    IODBG("[I %d] [%c] $%02X:%02X\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2]);
+    usIO("[I %d] [%c] $%02X:%02X\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2]);
     write_buffer[0] = cycled_read_operation(sid_buffer[1], 0);  /* write the address to the SID and read the data back */
     switch (rtype) {  /* write the result to the USB client */
       case 'C':
@@ -314,7 +319,7 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
         webserial_write(itf, BYTES_TO_SEND);
         break;
       default:
-        IODBG("[WRITE ERROR]%c\n", rtype);
+        usIO("[WRITE ERROR]%c\n", rtype);
         break;
     };
     vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
@@ -323,7 +328,7 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
   if (command == COMMAND) {
     switch (subcommand) {
       case CYCLED_READ:
-        IODBG("[I %d] [%c] $%02X %u\n", n_bytes, dtype, sid_buffer[1], (sid_buffer[2] << 8 | sid_buffer[3]));
+        usIO("[I %d] [%c] $%02X %u\n", n_bytes, dtype, sid_buffer[1], (sid_buffer[2] << 8 | sid_buffer[3]));
         write_buffer[0] = cycled_read_operation(sid_buffer[1], (sid_buffer[2] << 8 | sid_buffer[3]));
         switch (rtype) {  /* write the result to the USB client */
           case 'C':
@@ -333,7 +338,7 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
             webserial_write(itf, BYTES_TO_SEND);
             break;
           default:
-            IODBG("[WRITE ERROR]%c\n", rtype);
+            usIO("[WRITE ERROR]%c\n", rtype);
             break;
         };
         vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
@@ -342,44 +347,44 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
         cycled_delay_operation((sid_buffer[1] << 8 | sid_buffer[2]));
         return;
       case PAUSE:
-        DBG("[PAUSE_SID]\n");
+        usDBG("[PAUSE_SID]\n");
         pause_sid();
         break;
       case MUTE:
-        DBG("[MUTE_SID] %d\n",sid_buffer[1]);
+        usDBG("[MUTE_SID] %d\n",sid_buffer[1]);
         mute_sid();
         if (sid_buffer[1] == 1) is_muted = true;
         break;
       case UNMUTE:
-        DBG("[UNMUTE_SID] %d\n",sid_buffer[1]);
+        usDBG("[UNMUTE_SID] %d\n",sid_buffer[1]);
         if (sid_buffer[1] == 1) is_muted = false;
         unmute_sid();
         break;
       case RESET_SID:
         if (sid_buffer[1] == 0) {
-          DBG("[RESET_SID]\n");
+          usDBG("[RESET_SID]\n");
           reset_sid();
         }
         if (sid_buffer[1] == 1) {
-          DBG("[RESET_SID_REGISTERS]\n");
+          usDBG("[RESET_SID_REGISTERS]\n");
           reset_sid_registers();
         }
         break;
       case DISABLE_SID:
-        DBG("[DISABLE_SID]\n");
+        usDBG("[DISABLE_SID]\n");
         disable_sid();
         break;
       case ENABLE_SID:
-        DBG("[ENABLE_SID]\n");
+        usDBG("[ENABLE_SID]\n");
         enable_sid(true);
         break;
       case CLEAR_BUS:
-        DBG("[CLEAR_BUS]\n");
+        usDBG("[CLEAR_BUS]\n");
         clear_bus_all();
         break;
       case CONFIG:
         if (sid_buffer[1] < 0xD0) { /* Don't log incoming buffer to avoid spam above this region */
-          DBG("[CONFIG]\n");
+          usDBG("[CONFIG]\n");
         }
         /* Copy incoming buffer ignoring the command byte */
         memcpy(config_buffer, (sid_buffer + 1), (int)*n - 1);
@@ -387,11 +392,11 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
         memset(config_buffer, 0, count_of(config_buffer));
         break;
       case RESET_MCU:
-        DBG("[RESET_MCU]\n");
+        usDBG("[RESET_MCU]\n");
         mcu_reset();
         break;
       case BOOTLOADER:
-        DBG("[BOOTLOADER]\n");
+        usDBG("[BOOTLOADER]\n");
         mcu_jump_to_bootloader();
         break;
       default:
@@ -407,27 +412,27 @@ void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
 
 void tud_mount_cb(void)
 {
-  DBG("[%s]\n", __func__);
+  usDBG("[%s]\n", __func__);
   usb_connected = 1;
 }
 
 void tud_umount_cb(void)
 {
   usb_connected = 0, usbdata = 0, dtype = rtype = ntype;
-  DBG("[%s]\n", __func__);
+  usDBG("[%s]\n", __func__);
   disable_sid();  /* NOTICE: Testing if this is causing the random lockups */
 }
 
 void tud_suspend_cb(bool remote_wakeup_en)
 {
   /* (void) remote_wakeup_en; */
-  DBG("[%s] remote_wakeup_en:%d\n", __func__, remote_wakeup_en);
+  usDBG("[%s] remote_wakeup_en:%d\n", __func__, remote_wakeup_en);
   usb_connected = 0, usbdata = 0, dtype = rtype = ntype;
 }
 
 void tud_resume_cb(void)
 {
-  DBG("[%s]\n", __func__);
+  usDBG("[%s]\n", __func__);
   usb_connected = 1;
 }
 
@@ -509,20 +514,20 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char)
 {
   (void)itf;
   (void)wanted_char;
-  /* DBG("[%s]\n", __func__); */  /* Disabled due to possible uart spam */
+  /* usDBG("[%s]\n", __func__); */  /* Disabled due to possible uart spam */
 }
 
 void tud_cdc_tx_complete_cb(uint8_t itf)
 {
   (void)itf;
-  /* DBG("[%s]\n", __func__); */ /* Disabled due to uart spam */
+  /* usDBG("[%s]\n", __func__); */ /* Disabled due to uart spam */
 }
 
 void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
 {
   /* (void) itf; */
   /* (void) rts; */
-  DBG("[%s] itf:%x, dtr:%d, rts:%d\n", __func__, itf, dtr, rts);
+  usDBG("[%s] itf:%x, dtr:%d, rts:%d\n", __func__, itf, dtr, rts);
 
   if ( dtr ) {
     /* Terminal connected */
@@ -539,14 +544,14 @@ void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* p_line_coding)
 {
   /* (void)itf; */
   /* (void)p_line_coding; */
-  DBG("[%s] itf:%x, bit_rate:%u, stop_bits:%u, parity:%u, data_bits:%u\n", __func__, itf, (int)p_line_coding->bit_rate, p_line_coding->stop_bits, p_line_coding->parity, p_line_coding->data_bits);
+  usDBG("[%s] itf:%x, bit_rate:%u, stop_bits:%u, parity:%u, data_bits:%u\n", __func__, itf, (int)p_line_coding->bit_rate, p_line_coding->stop_bits, p_line_coding->parity, p_line_coding->data_bits);
 }
 
 void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 {
   /* (void)itf; */
   /* (void)duration_ms; */
-  DBG("[%s] its:%x, duration_ms:%x\n", __func__, itf, duration_ms);
+  usDBG("[%s] its:%x, duration_ms:%x\n", __func__, itf, duration_ms);
 }
 
 
@@ -591,7 +596,7 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
 void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
 {
   (void)itf;
-  DBG("[%s] %lu\n", __func__, sent_bytes);
+  usDBG("[%s] %lu\n", __func__, sent_bytes);
 }
 
 
@@ -600,7 +605,7 @@ void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
 /* Handle incoming vendor and webusb data */
 bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const * request)
 {
-  DBG("[%s] stage:%x, rhport:%x, bRequest:0x%x, wValue:%d, wIndex:%x, wLength:%x, bmRequestType:%x, type:%x, recipient:%x, direction:%x\n",
+  usDBG("[%s] stage:%x, rhport:%x, bRequest:0x%x, wValue:%d, wIndex:%x, wLength:%x, bmRequestType:%x, type:%x, recipient:%x, direction:%x\n",
     __func__, stage, rhport,
     request->bRequest, request->wValue, request->wIndex, request->wLength, request->bmRequestType,
     request->bmRequestType_bit.type, request->bmRequestType_bit.recipient, request->bmRequestType_bit.direction);
@@ -612,25 +617,25 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
       break;
     case TUSB_REQ_TYPE_CLASS:     /* 1 */
       if (request->bRequest == WEBUSB_COMMAND) {
-        DBG("request->bRequest == WEBUSB_COMMAND\n");
+        usDBG("request->bRequest == WEBUSB_COMMAND\n");
         if (request->wValue == WEBUSB_RESET) {
-          DBG("request->wValue == WEBUSB_RESET\n");
+          usDBG("request->wValue == WEBUSB_RESET\n");
           // BUG: NO WURKY CURKY
           /* reset_sid_registers(); */ // BUG: Temporary disabled
           reset_sid();  // NOTICE: Temporary until fixed!
           /* unmute_sid(); */
         }
         if (request->wValue == RESET_SID) {
-          DBG("request->wValue == RESET_SID\n");
+          usDBG("request->wValue == RESET_SID\n");
           reset_sid();
         }
         if (request->wValue == PAUSE) {
-          DBG("request->wValue == PAUSE\n");
+          usDBG("request->wValue == PAUSE\n");
           pause_sid();
           mute_sid();
         }
         if (request->wValue == WEBUSB_CONTINUE) {
-          DBG("request->wValue == WEBUSB_CONTINUE\n");
+          usDBG("request->wValue == WEBUSB_CONTINUE\n");
           pause_sid();
           unmute_sid();
         }
@@ -681,26 +686,23 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
 
 /* MAIN */
 
-/* Semaphore ping pong
+/* Multicore sync using atomic memory (avoids semaphore spin locks AND
+ * FIFO which is consumed by flash_safe_execute IRQ handler)
  *
- * Core 0 -> init semapohre core1_init
  * Core 0 -> launch core 1
- * Core 0 -> wait for core1_init signal
+ * Core 0 -> poll for SYNC_CORE1_STAGE1
  * Core 1 -> init flash safe execute
- * Core 1 -> release semaphore core1_init
- * Core 0 -> continue to load and apply config
- * Core 0 -> init SID clock
- * Core 1 -> init semaphore core0_init
- * Core 1 -> wait for core0_init signal
- * Core 0 -> release semaphore core0_init
- * Core 0 -> wait for core1_init signal
- * Core 1 -> continue startup RGB & Vu
- * Core 1 -> release semaphore core1_init
- * Core 1 -> wait for core0_init signal
- * Core 0 -> continue startup
- * Core 0 -> release semaphore core0_init
+ * Core 1 -> set SYNC_CORE1_STAGE1
+ * Core 1 -> poll for SYNC_CORE0_STAGE1
+ * Core 0 -> load and apply config
+ * Core 0 -> set SYNC_CORE0_STAGE1
+ * Core 0 -> poll for SYNC_CORE1_STAGE2
+ * Core 1 -> init queues and PIO uart
+ * Core 1 -> set SYNC_CORE1_STAGE2
+ * Core 1 -> poll for SYNC_CORE0_STAGE2
+ * Core 0 -> init GPIO, SID clock, PIO, DMA, etc.
+ * Core 0 -> set SYNC_CORE0_STAGE2
  * Core 0 -> enter while loop
- * Core 1 -> continue startup
  * Core 1 -> enter while loop
  */
 void core1_main(void)
@@ -708,23 +710,18 @@ void core1_main(void)
   /* Set core locking for flash saving ~ note this makes SIO_IRQ_PROC1 unavailable */
   flash_safe_execute_core_init();  /* This needs to start before any flash actions take place! */
 
-  /* Workaround to make sure flash_safe_execute is executed
-   * before everything else if a default config is detected
-   * This just ping pongs bootup around with Core 0
-   *
-   * Release core 1 semaphore */
-  sem_release(&core1_init);
+  /* Signal Core 0 we're ready (sync point 1) */
+  usBOOT("<CORE 1> Signaling core0 ready ~ 1\n");
+  __dmb();  /* Memory barrier before write */
+  core_sync_state = SYNC_CORE1_STAGE1;
+  __sev();  /* Signal event to wake Core 0 from WFE */
 
-  /* Create a blocking semaphore with max 1 permit */
-  sem_init(&core0_init, 0, 1);
-  /* Wait for core 0 to signal back */
-  sem_acquire_blocking(&core0_init);
-
-  /* Clear the dirt */
-  memset(sid_memory, 0, sizeof sid_memory);
-
-  /* Start the VU */
-  init_vu();
+  /* Wait for Core 0 to finish config loading */
+  usBOOT("<CORE 1> Waiting for core0 sync ~ 1\n");
+  while (core_sync_state != SYNC_CORE0_STAGE1) {
+    __wfe();  /* Wait for event - low power wait */
+  }
+  __dmb();  /* Memory barrier after read */
 
   /* Init queues */
   queue_init(&sidtest_queue, sizeof(sidtest_queue_entry_t), 1);  /* 1 entry deep */
@@ -737,13 +734,34 @@ void core1_main(void)
   init_uart();
   #endif
 
-  /* Release semaphore when core 1 is started */
-  sem_release(&core1_init);
+  /* Signal Core 0 we're ready (sync point 2) */
+  usBOOT("<CORE 1> Signaling core0 ready ~ 2\n");
+  __dmb();
+  core_sync_state = SYNC_CORE1_STAGE2;
+  __sev();
 
-  /* Wait for core 0 to signal boot finished */
-  sem_acquire_blocking(&core0_init);
+  /* Wait for Core 0 to finish hardware init */
+  usBOOT("<CORE 1> Waiting for core0 sync ~ 2\n");
+  while (core_sync_state != SYNC_CORE0_STAGE2) {
+    __wfe();
+  }
+  __dmb();
 
   while (1) {
+
+    /* Check SID test queue */
+    if (running_tests) {
+      sidtest_queue_entry_t s_entry;
+      if (queue_try_remove(&sidtest_queue, &s_entry)) {
+        s_entry.func(s_entry.s, s_entry.t, s_entry.wf);
+      }
+    }
+
+    /* Blinky blinky? */
+    if (!offload_ledrunner) {
+      led_runner();
+    }
+
 #if ONBOARD_SIDPLAYER
     if (sidplayer_init) {
       sidplayer_init = false;
@@ -804,28 +822,17 @@ void core1_main(void)
     }
 #endif /* ONBOARD_EMULATOR */
 
-    /* Check SID test queue */
-    if (running_tests) {
-      sidtest_queue_entry_t s_entry;
-      if (queue_try_remove(&sidtest_queue, &s_entry)) {
-        s_entry.func(s_entry.s, s_entry.t, s_entry.wf);
-      }
-    }
-
-    if (!offload_ledrunner) {
-      led_runner();
-    }
-
 #ifdef WRITE_DEBUG  /* Only run this queue when needed */
     if (usbdata == 1) {
       writelogging_queue_entry_t l_entry;
       if (queue_try_remove(&logging_queue, &l_entry)) {
-        DBG("[CORE2 %5u] [WRITE %c:%02d/%02d] $%02X:%02X %u\n",
+        usDBG("[CORE2 %5u] [WRITE %c:%02d/%02d] $%02X:%02X %u\n",
           queue_get_level(&logging_queue),
           l_entry.dtype, l_entry.n, l_entry.s, l_entry.reg, l_entry.val, l_entry.cycles);
       }
     }
 #endif
+
   }
   /* Point of no return, this should never be reached */
   return;
@@ -842,7 +849,7 @@ int main()
   set_sys_clock_pll(1500000000, 6, 2);
 #endif
 #elif PICO_RP2350
-/* Onboard SID player requires atleast 200MHz! */
+  /* Onboard SID player requires atleast 200MHz! */
 #if ONBOARD_SIDPLAYER
   /* System clock @ 200MHz */
   set_sys_clock_khz(200000, true);
@@ -864,18 +871,18 @@ int main()
   reset_reason();
 
   /* Clear flagged */
-  if (flagged) { auto_config = true; flagged = 0; }  /* BUG: NOT WORKING ON RP2350 */
+  if (flagged) { auto_config = true; flagged = 0; }  /* NOTE: Does not work on rp2350 */
 
-  /* Workaround to make sure flash_safe_execute is executed
-   * before everything else if a default config is detected
-   * This just ping pongs bootup around with Core 1
-   *
-   * Create a blocking semaphore with max 1 permit */
-  sem_init(&core1_init, 0, 1);
-  /* Init core 1 */
+  /* Launch Core 1 and wait for flash_safe_execute_core_init to complete */
+  usBOOT("CORE0 Launching core1\n");
   multicore_launch_core1(core1_main);
-  /* Wait for core 1 to signal back */
-  sem_acquire_blocking(&core1_init);
+
+  /* Wait for Core 1 to signal ready (sync point 1) */
+  usBOOT("CORE0 Waiting for core1 ready ~ 1\n");
+  while (core_sync_state != SYNC_CORE1_STAGE1) {
+    __wfe();  /* Wait for event - low power wait */
+  }
+  __dmb();  /* Insert memory barrier after read */
 
   /* Load config before init of USBSID settings ~ NOTE: This cannot be run from Core 1! */
   load_config(&usbsid_config);
@@ -889,36 +896,63 @@ int main()
   sid_mhz = (sid_hz / 1000 / 1000);
   sid_us = (1 / sid_mhz);
   if (!auto_config) {
-    CFG("[BOOT PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
-    CFG("[BOOT C64]  %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
-    CFG("[BOOT C64 RATES] REFRESH_RATE %lu Cycles, RASTER_RATE %lu Cycles\n", usbsid_config.refresh_rate, usbsid_config.raster_rate);
+    usNFO("[NFO] [PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
+    usNFO("[NFO] [C64] %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
+    usNFO("[NFO] [C64] REFRESH_RATE %lu Cycles, RASTER_RATE %lu Cycles\n", usbsid_config.refresh_rate, usbsid_config.raster_rate);
   }
-  /* Release core 0 semaphore */
-  sem_release(&core0_init);
-  /* Wait for core one to finish startup */
-  sem_acquire_blocking(&core1_init);
+
+  /* Signal Core 1 to continue (sync point 1) */
+  usBOOT("<CORE 0> Signaling core1 ~ 1\n");
+  __dmb();  /* Insert memory barrier after read */
+  core_sync_state = SYNC_CORE0_STAGE1;
+  __sev();  /* Signal event to wake Core 1 from WFE */
+
+  /* Wait for Core 1 to finish queue/uart init (sync point 2) */
+  usBOOT("<CORE 0> Waiting for core1 ready ~ 2\n");
+  while (core_sync_state != SYNC_CORE1_STAGE2) {
+    __wfe();  /* Wait for event - low power wait */
+  }
+  __dmb();  /* Insert memory barrier after read */
 
   /* Init GPIO */
+  usBOOT("Initializing GPIO\n");
   init_gpio();
   /* Start verification, detect and init sequence of SID clock */
+  usBOOT("Setup SID clock\n");
   setup_sidclock();
   /* Init PIO */
+  usBOOT("Setup PIO bus\n");
   setup_piobus();
   /* Sync PIOS */
+  usBOOT("Synchronize PIO's\n");
   sync_pios(true);
   /* Init DMA */
+  usBOOT("Setup DMA channels\n");
   setup_dmachannels();
+  /* Start the VU */
+  usBOOT("Initialize Vu\n");
+  init_vu();
   /* Init midi */
+  usBOOT("Initialize Midi\n");
   midi_init();
   /* Init ASID */
+  usBOOT("Initialize ASID\n");
   asid_init();
   /* Enable SID chips */
+  usBOOT("Enable SID chips\n");
   enable_sid(false);
+
+  /* Clear the dirt */
+#if !defined(ONBOARD_EMULATOR) || !defined(ONBOARD_SIDPLAYER)
+  memset(sid_memory, 0, sizeof sid_memory);
+#endif
 
   /* Check for default config bit
    * NOTE: This cannot be run from Core 1! */
-  if (!auto_config) detect_default_config();
-  if (auto_config) {  /* ISSUE: NOT WORKING ON RP2350 */
+  if (!auto_config) {
+    detect_default_config();
+  }
+  if (auto_config) {  /* NOTE: Does not work on rp2350 */
     auto_detect_routine(auto_config, true);  /* Double tap! */
     save_config_ext();
     auto_config = false;
@@ -927,8 +961,11 @@ int main()
   /* Print config once at end of boot routine */
   print_config();
 
-  /* Release core 0 semaphore to signal boot finished */
-  sem_release(&core0_init);
+  /* Signal Core 1 to enter main loop (sync point 2) */
+  usBOOT("<CORE 0> Signaling core1 ~ 2\n");
+  __dmb();  /* Memory barrier after read */
+  core_sync_state = SYNC_CORE0_STAGE2;
+  __sev();  /* Signal event to wake Core 1 from WFE */
 
   /* Loop IO tasks forever */
   while (1) {
@@ -939,6 +976,7 @@ int main()
 #ifdef USE_VENDOR_BUFFER
     vendor_task();  /* Only use this if buffering and fifo are enabled */
 #endif
+
     if (offload_ledrunner) {
       led_runner();
     }

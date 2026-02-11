@@ -43,43 +43,107 @@
 #include "logging.h"
 
 
-/* Config */
+/* config.c */
+extern Config usbsid_config;
 extern RuntimeCFG cfg;
 extern char *sidtypes[5];
 
-/* GPIO */
-extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
+/* gpio.c */
+extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
 extern void pause_sid(void);
 extern void reset_sid(void);
+extern void reset_sid_registers(void);
 
-/* Vu */
+/* vu.c */
 extern uint16_t vu;
 
+/* asid_buffer.c */
+extern uint32_t track_asid_arrival(void);
+extern void adjust_buffer_rate_dynamic(uint32_t target_rate);
+extern void reset_arrival_tracking(void);
+extern void ring_buffer_reset_size(void);
+extern void set_buffer_rate(uint16_t rate);
+
 /* Some locals, rural and such */
+static bool buffer_started = false;
 static bool default_order = false;
+static bool default_order_on_start = false;
 bool write_ordered = false;
-struct asid_regpair_t {  /* thanks to thomasj */
+/* thanks to thomasj */
+struct asid_regpair_t {
   uint8_t index;
   uint8_t wait_us;
 };
-struct asid_regpair_t asid_to_writeorder[NO_SID_REGISTERS_ASID] = {};  /* thanks to thomasj ~ SF2 Driver 11 no waits */
+/* thanks to thomasj ~ SF2 Driver 11 no waits */
+struct asid_regpair_t asid_to_writeorder[NO_SID_REGISTERS_ASID] = {};
 
-
+/**
+ * @brief Resets SID write order back to defaults
+ */
 void reset_asid_to_writeorder(void)
 {
-  DBG("[ASID] RESET WRITEORDER REGISTERS\n");
+  usASID("Reset writeorder registers\n");
   write_ordered = false;
   for (int i = 0; i < NO_SID_REGISTERS_ASID; i++) {
     asid_to_writeorder[i].index = i;
-    asid_to_writeorder[i].wait_us = 0;
+    asid_to_writeorder[i].wait_us = 10; /* 10 cycles as default for rp2350 being too fast */
   }
-  default_order = (default_order == false ? true : default_order);
+  default_order_on_start = (default_order == false ? true : default_order);
+  default_order = true;
+  reset_arrival_tracking();
+  ring_buffer_reset_size();
+  return;
 }
 
+/**
+ * @brief Initialize the asid buffer
+ *
+ * @param uint16_t framedelta_us ~ the rate to set the buffer to
+ */
+void init_asid_buffer(uint16_t framedelta_us)
+{
+  if (!buffer_started) {
+    usASID("Init buffer queue, timer and irq\n");
+    extern void init_buffer_pio(void);
+    extern void asid_ring_init(void);
+
+    asid_ring_init();
+    init_buffer_pio();
+    buffer_started = true;
+  }
+  /* Always set frame buffer timeout */
+  if (framedelta_us != 0) { /* Above zero means always use framedelta_us */
+    set_buffer_rate(framedelta_us);
+  } else {
+    set_buffer_rate(usbsid_config.refresh_rate);
+  }
+  return;
+}
+
+/**
+ * @brief De-initialize the asid buffer
+ */
+void deinit_asid_buffer(void)
+{
+  if (buffer_started) {
+    usASID("De-init buffer queue, timer and irq\n");
+    reset_asid_to_writeorder();
+    extern void stop_buffer_pio(void);
+    extern void asid_ring_deinit(void);
+    asid_ring_deinit();
+    stop_buffer_pio();
+    buffer_started = false;
+  }
+}
+
+/**
+ * @brief Initialize ASID on boot
+ */
 void asid_init(void)
 {
-  DBG("[%s]\n", __func__);
-  if (!default_order) reset_asid_to_writeorder();  /* Set defaults once on first write */
+  if (!default_order_on_start) reset_asid_to_writeorder();  /* Set defaults once on boot */
+  else { ring_buffer_reset_size(); reset_arrival_tracking(); }
+  usNFO("[ASID] Initialized\n");
 }
 
 /* Pling, plong, ploink!? */
@@ -122,7 +186,14 @@ void handle_asid_fmoplmessage(uint8_t* buffer)
   return;
 }
 
-/* Well, it does what it does */
+/**
+ * @brief Well, it does what it does
+ * @note deprecated!
+ *
+ * @param uint8_t sid     ~ the sidnumber
+ * @param uint8_t* buffer ~ the buffer to process
+ * @param int size        ~ the size of the buffer
+ */
 void handle_complete_asid_buffer(uint8_t sid, uint8_t* buffer, int size)
 { /* Assumes byte 0-2 are included in the buffer and skips these */
   (void)size;  /* Stop calling me fat, I'm just big boned! */
@@ -145,9 +216,16 @@ void handle_complete_asid_buffer(uint8_t sid, uint8_t* buffer, int size)
       }
     }
   }
+  return;
 }
 
-/* And this does the same */
+/**
+ * @brief And this does the same
+ * @note deprecated!
+ *
+ * @param uint8_t sid     ~ the sidnumber
+ * @param uint8_t* buffer ~ the buffer to process
+ */
 void handle_asid_message(uint8_t sid, uint8_t* buffer)
 { /* Assumes byte 0-2 are not included in the buffer */
   unsigned int reg = 0;
@@ -169,9 +247,15 @@ void handle_asid_message(uint8_t sid, uint8_t* buffer)
       }
     }
   }
+  return;
 }
 
-/* But this one lost track of time */
+/**
+ * @brief But this one lost track of time
+ *
+ * @param uint8_t sid     ~ the sidnumber
+ * @param uint8_t* buffer ~ the buffer to process
+ */
 void handle_writeordered_asid_message(uint8_t sid, uint8_t* buffer)
 { /* Assumes byte 0-2 are not included in the buffer */
   int chip;
@@ -199,32 +283,44 @@ void handle_writeordered_asid_message(uint8_t sid, uint8_t* buffer)
         }
         writeOrder[chip][asid_to_writeorder[reg].index].reg = asid_sid_registers[mask * 7 + bit];
         writeOrder[chip][asid_to_writeorder[reg].index].data = register_value;
-        // TODO: FIX Pico2 writes
         /* Pico 2 requires at least 10 cycles between writes
          * or it will be too damn fast! So if wait_us is lower then 10 we use 10 cycles
          * and do this for other Pico's aswell */
         writeOrder[chip][asid_to_writeorder[reg].index].wait_us = asid_to_writeorder[reg].wait_us;
-        /* DBG("[ASID1 %d] $%02X:%02X %u\n", asid_to_writeorder[reg].index, (writeOrder[chip][asid_to_writeorder[reg].index].reg |= sid), writeOrder[chip][asid_to_writeorder[reg].index].data, writeOrder[chip][asid_to_writeorder[reg].index].wait_us); */
+        /* usASID("[%d] $%02X:%02X %u\n", asid_to_writeorder[reg].index, (writeOrder[chip][asid_to_writeorder[reg].index].reg |= sid), writeOrder[chip][asid_to_writeorder[reg].index].data, writeOrder[chip][asid_to_writeorder[reg].index].wait_us); */
         dtype = asid;  /* Set data type to asid again */
         reg++;
       }
     }
   }
-
+  /* inline extern as only used here */
+  extern void asid_ring_write(uint8_t reg, uint8_t val, uint16_t c);
   for (size_t pos = 0; pos < NO_SID_REGISTERS_ASID; pos++) {
     if (writeOrder[chip][pos].wait_us != 0xff) {
-      /* Perform write including wait cycles */
-      cycled_write_operation((writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us);
-
+      /* Push data to ASID ringbuffer */
+      asid_ring_write(
+        (writeOrder[chip][pos].reg |= sid),
+        writeOrder[chip][pos].data,
+        /* Account for 1 cycle overhead in PIO bus */
+        // ((writeOrder[chip][pos].wait_us >= 0) ? (writeOrder[chip][pos].wait_us - 1) : 0));
+        writeOrder[chip][pos].wait_us);
+        // (write_ordered ? writeOrder[chip][pos].wait_us : 10)); /* Default write order has 10 cycles per write */
       WRITEDBG(dtype, pos, NO_SID_REGISTERS_ASID, (writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us);
-      /* DBG("[ASID2 %d] $%02X:%02X %u\n", pos, (writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us); */
+    } else {
+      asid_ring_write(0xffu,0xffu,0xffffu);
     }
   }
   for (size_t pos = 0; pos < NO_SID_REGISTERS_ASID; pos++) {
     writeOrder[chip][pos].wait_us = 0xff;  /* indicate not used */
   }
+  return;
 }
 
+/**
+ * @brief Process received writeorder configuration
+ *
+ * @param uint8_t* buffer ~ the buffer containing the configuration
+ */
 void handle_asid_writeorder_config(uint8_t* buffer)
 { /* thanks to thomasj */
   uint8_t data;
@@ -234,13 +330,54 @@ void handle_asid_writeorder_config(uint8_t* buffer)
     asid_to_writeorder[i].index = data & 0x1f;
     /* Regular handling removes 7us, so adjust */
     cycles = ((data & 0x40) << 1) + buffer[(i << 1) + 1];
-    /* asid_to_writeorder[i].wait_us = max(0, cycles - 7); */ /* USP doesn't have overhead, disabled */
-    asid_to_writeorder[i].wait_us = cycles;
-    CFG("[ASID WRITE ORDER %d] {%02u,%02u}\n", i, asid_to_writeorder[i].index, asid_to_writeorder[i].wait_us);
+    asid_to_writeorder[i].wait_us = MAX(1, cycles); /* USP has 1 cycle overhead */
+    /* asid_to_writeorder[i].wait_us = cycles; */
+    usASID("[WO%2d] {%02u,%02u}\n", i, asid_to_writeorder[i].index, asid_to_writeorder[i].wait_us);
   }
+  default_order = false;
+  return;
 }
 
-void handle_asid_envmessage(uint8_t* buffer) /* TODO: Update clock settings on the fly when env differs from config */
+/**
+ * @brief Set ASID environment
+ *
+ * @param int refresh_rate
+ * @param int speed_multiplier
+ * @param int custom_speed
+ * @param int buffering
+ * @param uint16_t framedelta_us
+ */
+inline void set_asid_env(int refresh_rate, int speed_multiplier, int custom_speed, int buffering, uint16_t framedelta_us)
+{
+  (void)speed_multiplier; /* Not used */
+  (void)custom_speed;     /* Not used */
+  (void)buffering;        /* Not used */
+
+  { /* apply the new clock_rate based on the refresh_rate if applicable */
+    extern void apply_clockrate(int n_clock, bool suspend_sids);
+    apply_clockrate(
+      ((refresh_rate == 0)
+      ? 1   /* PAL */
+      : 2), /* NTSC */
+      true);
+  }
+  reset_sid_registers();
+  reset_sid();
+
+  init_asid_buffer(framedelta_us); /* Init on env set */
+  ring_buffer_reset_size();  /* Reset buffer to default size for new tune */
+
+  /* DON'T call reset_arrival_tracking() here */
+  /* Instead, just accept that calculated rate will converge to framedelta */
+  return;
+}
+
+/**
+ * @brief Process received environment
+ *
+ * @param uint8_t* buffer ~ the buffer containing the environment
+ */
+void handle_asid_envmessage(uint8_t* buffer)
 { /* SID environment is only logged and not used for now */
   /* Incoming buffer skips first 3 bytes and
      starts at SETTINGS
@@ -258,7 +395,7 @@ void handle_asid_envmessage(uint8_t* buffer) /* TODO: Update clock settings on t
   int speed_multiplier = (buffer[0] & 0b11110) >> 1;
   int custom_speed = (buffer[0] & 0b100000) >> 5;
   int buffering = (buffer[0] & 0b1000000) >> 6;
-  DBG("[ASID] Settings refresh rate: %s, speed multiplier: %d, custom speed: %d, buffering: %d\n",
+  usASID("Settings: refresh rate: %s, speed multiplier: %d, custom speed: %d, buffering: %d\n",
     (refresh_rate == 0 ? "PAL" : "NTSC"),
     speed_multiplier, custom_speed, buffering);
   /*
@@ -272,8 +409,10 @@ void handle_asid_envmessage(uint8_t* buffer) /* TODO: Update clock settings on t
     bits1-0: framedelta uS (MSB)
     bits6-2: 5 bits (reserved)
   */
-  uint16_t framedelta_us = (buffer[1] & 0x7F) | (buffer[2] & 0x7F) << 7 | (buffer[3] & 0x03) << 14;
-  DBG("[ASID] Framedelta: %d\n", framedelta_us);
+  uint16_t framedelta_us = ((buffer[1] & 0x7F) | (buffer[2] & 0x7F) << 7 | ((buffer[3] & 0x03) << 14));
+  usASID("Framedelta: %d\n", framedelta_us);
+  set_asid_env(refresh_rate, speed_multiplier, custom_speed, buffering, framedelta_us);
+  return;
 }
 
 void handle_asid_typemessage(uint8_t* buffer)
@@ -284,22 +423,29 @@ void handle_asid_typemessage(uint8_t* buffer)
      0xF0, 0x2D, 0x32, SIDNO, SIDTYPE, 0x7F
   */
   int sidtype = ((buffer[1] == 0) ? 3 : (buffer[1] == 1) ? 2 : 0);
-  DBG("[ASID] Tune SID %d type: %s\n", buffer[0], sidtypes[sidtype]);
+  usASID("Tune SID %d type: %s\n", buffer[0], sidtypes[sidtype]);
+  return;
 }
 
 /* Spy vs Spy ? */
 void decode_asid_message(uint8_t* buffer, int size)
 {
+  static uint32_t rate; /* Tracks the rate of ASID messages */
   switch(buffer[2]) {
     case 0x4C:  /* Play start */
-      DBG("[ASID] PLAY START\n");
+      usASID("Play start\n");
+      if (!buffer_started) init_asid_buffer(usbsid_config.refresh_rate); /* Start buffer on play start */
+      reset_arrival_tracking();  /* Reset timing on play start */
+      ring_buffer_reset_size();  /* Reset buffer to default size for new tune */
       midimachine.bus = CLAIMED;
       break;
     case 0x4D:  /* Play stop */
-      DBG("[ASID] PLAY STOP\n");
-      reset_sid();
-      pause_sid();
+      usASID("Play stop\n");
+      reset_sid_registers();
       if (!default_order) reset_asid_to_writeorder();
+      set_buffer_rate(usbsid_config.refresh_rate);
+      ring_buffer_reset_size();  /* Reset buffer to default size */
+      if (buffer_started) deinit_asid_buffer(); /* Stop buffer on play stop */
       midimachine.bus = FREE;
       break;
     case 0x30:  /* Write order timing (order and delay between individual SID register writes, to closely match the C64 driver used) */
@@ -315,21 +461,31 @@ void decode_asid_message(uint8_t* buffer, int size)
     case 0x4F:  /* Display characters */
       break;
     case 0x4E:  /* SID 1 */
-      if (!default_order) reset_asid_to_writeorder();  /* Set defaults once on first write */
-      if (!write_ordered) handle_asid_message(0, &buffer[3]);
-      else handle_writeordered_asid_message(0, &buffer[3]);
+      if (!buffer_started) init_asid_buffer(usbsid_config.refresh_rate); /* Start buffer on first write */
+      if (!default_order_on_start) reset_asid_to_writeorder();  /* Set defaults once on first write if not set yet */
+      /* Only track arrival timing for SID1 - represents actual frame rate.
+       * Multi-SID tunes send multiple messages per frame (one per SID). */
+      rate = track_asid_arrival();
+      /* Adjust rate based on buffer state (called for all SIDs) */
+      adjust_buffer_rate_dynamic(rate);
+      handle_writeordered_asid_message(0, &buffer[3]);
       break;
     case 0x50:  /* SID 2 */
-      if (!write_ordered) handle_asid_message(32, &buffer[3]);
-      else handle_writeordered_asid_message(32, &buffer[3]);
+      /* Update SID count and adjust rate - tracking only on SID1 for timing */
+      extern void update_sid_count(uint8_t sid_num);
+      update_sid_count(2);
+      adjust_buffer_rate_dynamic(0);
+      handle_writeordered_asid_message(32, &buffer[3]);
       break;
     case 0x51:  /* SID 3 */
-      if (!write_ordered) handle_asid_message(64, &buffer[3]);
-      else handle_writeordered_asid_message(64, &buffer[3]);
+      update_sid_count(3);
+      adjust_buffer_rate_dynamic(0);
+      handle_writeordered_asid_message(64, &buffer[3]);
       break;
     case 0x52:  /* SID 4 */
-      if (!write_ordered) handle_asid_message(96, &buffer[3]);
-      else handle_writeordered_asid_message(96, &buffer[3]);
+      update_sid_count(4);
+      adjust_buffer_rate_dynamic(0);
+      handle_writeordered_asid_message(96, &buffer[3]);
       break;
     case 0x60:  /* FMOpl */
       if (cfg.fmopl_enabled) {  /* Only if FMOpl is enabled, drop otherwise */

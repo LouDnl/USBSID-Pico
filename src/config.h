@@ -110,18 +110,18 @@ extern uint32_t ADDR_PERSISTENT[];
 
 /* USBSID-Pico config struct */
 typedef struct SIDChip {
-  uint8_t id;        /* ID for this SID 0 ~ 4, 255 = disabled */
-  uint8_t addr;      /* Starting address to use for this SID, 255 = disabled */
-  uint8_t type;      /* 0 = unknown, 1 = N/A, 2 = MOS8580, 3 = MOS6581, 4 = FMopl */
+  uint8_t id;    /* ID for this SID 0 ~ 4, 255 = disabled */
+  uint8_t addr;  /* Starting address to use for this SID, 255 = disabled */
+  uint8_t type;  /* 0 = unknown, 1 = N/A, 2 = MOS8580, 3 = MOS6581, 4 = FMopl */
 } SIDChip;
 
 typedef struct Socket {
-  uint8_t chiptype;          /* 0 = real, 1 = clone, 2 = unknown */
-  uint8_t clonetype;         /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
+  uint8_t chiptype;     /* 0 = real, 1 = clone, 2 = unknown */
+  uint8_t clonetype;    /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
   SIDChip sid1;
   SIDChip sid2;
-  bool    enabled : 1;       /* enable / disable this socket */
-  bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
+  bool    enabled : 1;  /* enable / disable this socket */
+  bool    dualsid : 1;  /* enable / disable dual SID support for this socket (requires clone) */
 } Socket;
 
 typedef struct Config {
@@ -155,7 +155,6 @@ typedef struct Config {
     bool enabled : 1;
   } Asid;                       /* 7 */
   struct {
-    // uint8_t sid_states[4][32];  /* Stores states of each SID ~ 4 sids max */
     bool enabled : 1;
   } Midi;                       /* 8 */
   struct {
@@ -166,8 +165,7 @@ typedef struct Config {
   bool lock_clockrate : 1;      /* lock the set clockspeed from being changed */
   bool stereo_en : 1;           /* audio switch is off (mono) or on (stereo) ~ (PCB v1.3+ only) */
   bool lock_audio_sw : 1;       /* lock the audio switch into it's current stateand prevent it from being changed ~ (PCB v1.3+ only) */
-  bool mirrored : 1;       /* act as socket 1 */
-  bool fauxstereo : 1;     /* faux stereo effect */
+  bool mirrored : 1;            /* act as socket 1 */
 } Config;
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
@@ -240,7 +238,6 @@ typedef struct Config {
   .stereo_en = false, \
   .lock_audio_sw = false, \
   .mirrored = false, \
-  .fauxstereo = false, \
 } \
 
 static const Config usbsid_default_config = USBSID_DEFAULT_CONFIG_INIT;
@@ -316,6 +313,7 @@ enum
   MIRRORED_SID     = 0x45,  /* Socket Two is linked to Socket One */
   DUAL_SOCKET1     = 0x46,  /* Two SID's in socket One, Socket Two disabled */
   DUAL_SOCKET2     = 0x47,  /* Two SID's in socket Two, Socket One disabled */
+  FLIP_SOCKETS     = 0x48,  /* Socket Two is Socket One and vice versa */
 
   SET_CLOCK        = 0x50,  /* Change SID clock frequency by array id */
   DETECT_SIDS      = 0x51,  /* Try to detect the SID types per socket ~ routines see sid_detection.c */

@@ -34,8 +34,8 @@
 
 
 /* GPIO */
-extern void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
-extern uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles);
+extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
 extern void clear_bus(int sidno);
 
 /* Config */
@@ -69,7 +69,7 @@ uint8_t (*sid_detection[4])(uint8_t) = { detect_sid_model, detect_sid_version, d
 /* This routine works on real MOS SID chips and does not work on SKPico */
 uint8_t detect_sid_model(uint8_t start_addr)
 { /* https://github.com/GideonZ/1541ultimate/blob/master/software/6502/sidcrt/player/advanced/detection.asm */
-  CFG("[SID] DETECT SID MODEL\n");
+  usCFG("[SID] DETECT SID MODEL\n");
   clear_bus(start_addr / 0x20);
   int restart = 0;
 restart:
@@ -90,24 +90,24 @@ restart:
   if (restart == 3) goto end;
   if (sidtype != 0 && sidtype != 1) {
     restart++;
-    CFG("[SID] RESTART %d (ST:%u)\n", restart, sidtype);
+    usCFG("[SID] RESTART %d (ST:%u)\n", restart, sidtype);
     goto restart;
   }
 end:
   /* output 0 = 8580, 1 = 6581, 2 = unknown
    * that is: Carry flag is set for 6581, and clear for 8580. */
-  CFG("[SID] 0x%02X detect_sid_model sidtype raw %02X\n", start_addr, sidtype);
-  CFG("[SID] 0x%02X detect_sid_model readtest %02X\n", start_addr, readtest);  /* SHOULD READ 3 */
+  usCFG("[SID] 0x%02X detect_sid_model sidtype raw %02X\n", start_addr, sidtype);
+  usCFG("[SID] 0x%02X detect_sid_model readtest %02X\n", start_addr, readtest);  /* SHOULD READ 3 */
   sidtype = (sidtype == 0 ? 2 : sidtype == 1 ? 3 : 0);  /* return 0 = unknown, 2 = 8580, 3 = 6581 */
   if (readtest != 3) sidtype = 0;  /* if the readtest does not read 3, return unknown */
-  CFG("[SID] 0x%02X detect_sid_model return %u\n", start_addr, sidtype);
+  usCFG("[SID] 0x%02X detect_sid_model return %u\n", start_addr, sidtype);
   return sidtype;
 }
 
 /* This routine works on real MOS SID chips and does not work on SKPico */
 uint8_t detect_sid_version(uint8_t start_addr)
 { /* https://codebase64.org/doku.php?id=base:detecting_sid_type_-_safe_method */
-  CFG("[SID] DETECT SID VERSION\n");
+  usCFG("[SID] DETECT SID VERSION\n");
   int restart = 0;
 restart:
   /* LDA #$ff  ~ 2 cycles */
@@ -126,21 +126,21 @@ restart:
   if (restart == 3) goto end;
   if (sidtype != 2 && sidtype != 3) {
     restart++;
-    CFG("[SID] RESTART %d (ST:%u)\n", restart, sidtype);
+    usCFG("[SID] RESTART %d (ST:%u)\n", restart, sidtype);
     goto restart;
   }
 end:
   restart = 0;
-  CFG("[SID] 0x%02X detect_sid_version raw %02X\n", start_addr, sidtype);
+  usCFG("[SID] 0x%02X detect_sid_version raw %02X\n", start_addr, sidtype);
   // sidtype = (sidtype < 4 ? sidtype : 0);
   sidtype = ((sidtype >= 1) && (sidtype % 2) == 0 ? 2 : 3);
-  CFG("[SID] 0x%02X detect_sid_version return %02X\n", start_addr, sidtype);
+  usCFG("[SID] 0x%02X detect_sid_version return %02X\n", start_addr, sidtype);
   return sidtype;
 }
 
 uint8_t detect_sid_unsafe(uint8_t start_addr)
 { /* https://codebase64.org/doku.php?id=base:detecting_sid_type */
-  CFG("[SID] DETECT SID UNSAFE\n");
+  usCFG("[SID] DETECT SID UNSAFE\n");
   /* clear sid registers */
   for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
     /* STA $D400,x ~ 5 cycles */
@@ -160,17 +160,17 @@ uint8_t detect_sid_unsafe(uint8_t start_addr)
   /* LDA $d41b ~ 4 cycles */
   uint8_t sidtype = cycled_read_operation((start_addr + 0x1B), 8);
 
-  CFG("[SID] 0x%02X detect_sid_version raw %02X\n", start_addr, sidtype);
+  usCFG("[SID] 0x%02X detect_sid_version raw %02X\n", start_addr, sidtype);
   // sidtype = (sidtype < 4 ? sidtype : 0);
   sidtype = ((sidtype >= 1) && (sidtype % 2) == 0 ? 2 : 3);
-  CFG("[SID] 0x%02X detect_sid_version return %02X\n", start_addr, sidtype);
+  usCFG("[SID] 0x%02X detect_sid_version return %02X\n", start_addr, sidtype);
   return sidtype;
 }
 
 /* This routine works on SKPico and does not work on real MOS SID chips */
 uint8_t detect_sid_version_skpico(uint8_t start_addr)  /* Not working on real SIDS!? */
 { /* https://codebase64.org/doku.php?id=base:detecting_sid_type_-_safe_method */
-  CFG("[SID] DETECT SID VERSION SKPICO\n");
+  usCFG("[SID] DETECT SID VERSION SKPICO\n");
   int restart = 0;
 restart:
   /* LDA #$ff ~ 2 cycles */
@@ -191,20 +191,20 @@ restart:
   if (restart == 3) goto end;
   if (sidtype != 2 && sidtype != 3) {
     restart++;
-    CFG("[SID] RESTART %d (ST:%u)\n", restart, sidtype);
+    usCFG("[SID] RESTART %d (ST:%u)\n", restart, sidtype);
     goto restart;
   }
 end:
   restart = 0;
-  CFG("[SID] 0x%02X detect_sid_version_skpico raw %02X\n", start_addr, sidtype);
+  usCFG("[SID] 0x%02X detect_sid_version_skpico raw %02X\n", start_addr, sidtype);
   sidtype = (sidtype < 4 ? sidtype : 0);
-  CFG("[SID] 0x%02X detect_sid_version_skpico %02X\n", start_addr, sidtype);
+  usCFG("[SID] 0x%02X detect_sid_version_skpico %02X\n", start_addr, sidtype);
   return sidtype;  /* that is: Carry flag is set for 6581, and clear for 8580. */
 }
 
 bool detect_skpico(uint8_t base_address)
 {
-  CFG("[SID] CHECKING FOR SIDKICK-pico @ 0x%02X\n", base_address);
+  usCFG("[SID] CHECKING FOR SIDKICK-pico @ 0x%02X\n", base_address);
   /* SKPico routine */
   char skpico_version[36] = {0};
   cycled_write_operation((0x1F + base_address), 0xFF, 10); /* Init config mode */
@@ -222,7 +222,7 @@ bool detect_skpico(uint8_t base_address)
       && skpico_version[3] == 0x69
       && skpico_version[4] == 0x63
       && skpico_version[5] == 0x6F) {
-    CFG("[SID] SIDKICK-pico @ 0x%02X version is: %.36s\n", base_address, skpico_version);
+    usCFG("[SID] SIDKICK-pico @ 0x%02X version is: %.36s\n", base_address, skpico_version);
     return true;
   }
   return false;
@@ -230,7 +230,7 @@ bool detect_skpico(uint8_t base_address)
 
 bool detect_fpgasid(uint8_t base_address)
 {
-  CFG("[SID] CHECKING FOR FPGASID @ 0x%02X\n", base_address);
+  usCFG("[SID] CHECKING FOR FPGASID @ 0x%02X\n", base_address);
   uint8_t idHi, idLo;
   /* Enable configuration mode (if available) */
   cycled_write_operation((0x19 + base_address), 0x80, 6);      /* Write magic cookie Hi */
@@ -243,9 +243,9 @@ bool detect_fpgasid(uint8_t base_address)
   cycled_write_operation((0x19 + base_address), 0x0, 6);       /* Clear magic cookie Hi */
   cycled_write_operation((0x1A + base_address), 0x0, 6);       /* Clear magic cookie Lo */
   uint16_t fpgasid_id = (idHi << 8 | idLo);
-  CFG("[SID] READ IDENTIFY 0x%04X (0x%02X,0x%02X) @ 0x%02X\n", fpgasid_id, idHi, idLo, base_address);
+  usCFG("[SID] READ IDENTIFY 0x%04X (0x%02X,0x%02X) @ 0x%02X\n", fpgasid_id, idHi, idLo, base_address);
   if (fpgasid_id == FPGASID_ID) {
-    CFG("[SID] Found FPGASID @ 0x%02X\n", base_address);
+    usCFG("[SID] Found FPGASID @ 0x%02X\n", base_address);
     return true;
   }
   return false;
@@ -253,7 +253,7 @@ bool detect_fpgasid(uint8_t base_address)
 
 bool detect_fmopl(uint8_t base_address)
 {
-  CFG("[SID] DETECT FMOPL @: %02X\n", base_address);
+  usCFG("[SID] DETECT FMOPL @: %02X\n", base_address);
   int restart = 0;
 restart:
   cycled_write_operation(base_address, 0x04, 10);
@@ -261,7 +261,7 @@ restart:
   cycled_write_operation(base_address, 0x04, 10);
   cycled_write_operation((base_address + 0x10), 0x80, 10);
   uint8_t r = cycled_read_operation(base_address, 10);
-  CFG("[SID] READ FMOPL = 0xC0? %02X\n", r);
+  usCFG("[SID] READ FMOPL = 0xC0? %02X\n", r);
   if (restart == 3) goto end;
   if (r != 0xC0) {
     restart++;
@@ -306,7 +306,7 @@ uint8_t detect_sid_type(Socket * socket, SIDChip * sidchip)
   int detection_routine = (socket->clonetype != 2 ? 0 : 2);
   if (sidchip->addr != 0xFF) {
     uint8_t sid = sid_detection[detection_routine](sidchip->addr);
-    CFG("[CONFIG] [READ SID%d] [%02x %s]\n", (sidchip->id + 1), sid, sidtypes[sid]);
+    usCFG("[READ SID%d] [%02x %s]\n", (sidchip->id + 1), sid, sidtypes[sid]);
     sidchip->type = sid;
     goto done_sid;
   }
@@ -320,7 +320,7 @@ done_sid:
       apply_fmopl_config(false);
     };
   }
-  CFG("[CONFIG] SOCKET ONE SID%d TYPE: %s\n", sidchip->id, sidtypes[sidchip->type]);
+  usCFG("SOCKET ONE SID%d TYPE: %s\n", sidchip->id, sidtypes[sidchip->type]);
   return sidchip->type;
 }
 
@@ -330,10 +330,10 @@ done_sid:
  */
 void auto_detect_routine(bool auto_config, bool with_delay)
 {
-  CFG("\n");
-  CFG("[START AUTO DETECT ROUTINE]\n");
+  usCFG("\n");
+  usCFG("[START AUTO DETECT ROUTINE]\n");
   if (auto_config) {
-    CFG("[SID] SET AUTO CONFIG DEFAULT VALUES\n");
+    usCFG("[SID] SET AUTO CONFIG DEFAULT VALUES\n");
     usbsid_config.mirrored = false;           /* Yeah let's just disable that for now okay? */
 
     /* Socket One */
@@ -364,11 +364,11 @@ void auto_detect_routine(bool auto_config, bool with_delay)
     apply_socket_change(true);
     if (with_delay) sleep_ms(250); /* Stupid workaround for SKPico requiring a zillion ms to boot up */
   }
-  CFG("[SID] START CHIP TYPE DETECTION FOR SOCKET ONE\n");
+  usCFG("[SID] START CHIP TYPE DETECTION FOR SOCKET ONE\n");
   if (with_delay) sleep_ms(500); /* Stupid workaround for SKPico requiring a zillion ms to boot up */
   /* SocketOne (twice if failed) */
   if (detect_clone_type(&usbsid_config.socketOne) == 0) detect_clone_type(&usbsid_config.socketOne);
-  CFG("[SID] START CHIP TYPE DETECTION FOR SOCKET TWO\n");
+  usCFG("[SID] START CHIP TYPE DETECTION FOR SOCKET TWO\n");
   if (with_delay) sleep_ms(500);
    /* SocketTwo (twice if failed) */
   if (detect_clone_type(&usbsid_config.socketTwo) == 0) detect_clone_type(&usbsid_config.socketTwo);
@@ -378,11 +378,11 @@ void auto_detect_routine(bool auto_config, bool with_delay)
 
   if (with_delay) sleep_ms(250); /* Stupid workaround for SKPico requiring a zillion ms to boot up */
   /* Detect SID types at default config once, uses the chiptype to define the detection routine */
-  CFG("[SID] START SID TYPE DETECTION FOR SOCKET ONE\n");
+  usCFG("[SID] START SID TYPE DETECTION FOR SOCKET ONE\n");
   detect_sid_type(&usbsid_config.socketOne, &usbsid_config.socketOne.sid1);
   if (usbsid_config.socketOne.dualsid)
     detect_sid_type(&usbsid_config.socketOne, &usbsid_config.socketOne.sid2);
-  CFG("[SID] START SID TYPE DETECTION FOR SOCKET TWO\n");
+  usCFG("[SID] START SID TYPE DETECTION FOR SOCKET TWO\n");
   detect_sid_type(&usbsid_config.socketTwo, &usbsid_config.socketTwo.sid1);
   if (usbsid_config.socketTwo.dualsid)
     detect_sid_type(&usbsid_config.socketTwo, &usbsid_config.socketTwo.sid2);
@@ -393,10 +393,11 @@ void auto_detect_routine(bool auto_config, bool with_delay)
   /* Apply new socket and bus config */
   apply_socket_change(true);
 
-  CFG("[END AUTO DETECT ROUTINE]\n");
+  usCFG("[END AUTO DETECT ROUTINE]\n");
 
   if (check_socket_config_errors()) {
-    CFG("[AUTO DETECT CONFIG ERROR DETECTED]\n");
+    usCFG("[AUTO DETECT CONFIG ERROR DETECTED]\n");
     socket_config_fallback();
   }
+  usCFG("\n");
 }

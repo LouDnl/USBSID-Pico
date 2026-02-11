@@ -39,7 +39,7 @@ extern Config usbsid_config;  /* usbsid.c */
 #ifdef ONBOARD_EMULATOR
 extern uint8_t *sid_memory;
 #else
-extern uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __attribute__((aligned(2 * (0x20 * 4))));  /* usbsid.c */
+extern uint8_t sid_memory[(0x20 * 4)];  /* usbsid.c */
 #endif
 extern int usbdata;     /* usbsid.c */
 extern int numsids;     /* config.c */
@@ -144,7 +144,7 @@ void led_vumeter_task(void)
     }
     #endif
 
-    MDBG("[%c:%d][PWM]$%04x[V1]$%02X%02X$%02X%02X$%02X$%02X$%02X[V2]$%02X%02X$%02X%02X$%02X$%02X$%02X[V3]$%02X%02X$%02X%02X$%02X$%02X$%02X[FC]$%02x%02x$%02x[VOL]$%02x\n",
+    usMEM("[%c:%d][PWM]$%04x[V1]$%02X%02X$%02X%02X$%02X$%02X$%02X[V2]$%02X%02X$%02X%02X$%02X$%02X$%02X[V3]$%02X%02X$%02X%02X$%02X$%02X$%02X[FC]$%02x%02x$%02x[VOL]$%02x\n",
       dtype, usbdata, vu,
       sid_memory[0x01], sid_memory[0x00], sid_memory[0x03], sid_memory[0x02], sid_memory[0x04], sid_memory[0x05], sid_memory[0x06],
       sid_memory[0x08], sid_memory[0x07], sid_memory[0x0A], sid_memory[0x09], sid_memory[0x0B], sid_memory[0x0C], sid_memory[0x0D],
@@ -218,10 +218,18 @@ void led_runner(void)
     us_now = to_us_since_boot(get_absolute_time());
     if (vu == 0 && usbdata == 1) {
       n_checks++;
-      if (n_checks >= MAX_CHECKS)  /* 100 checks */
-      {
+      if (n_checks >= MAX_CHECKS) { /* 100 checks */
         n_checks = 0, usbdata = 0, dtype = ntype;  /* NOTE: This sets dtype to 0 which causes buffertask write to go to default and error out with many consecutive reads from the bus */
         offload_ledrunner = false;
+        /**
+         * @brief Let's make sure we always reset the write order
+         * when the interface is no longer mounted
+         */
+        extern bool tud_midi_n_mounted (uint8_t itf);
+        if (!tud_midi_n_mounted(MIDI_ITF)) {
+          extern void reset_asid_to_writeorder(void);
+          reset_asid_to_writeorder();
+        }
       }
     }
     return;

@@ -32,6 +32,7 @@
 #endif
 
 #ifdef USE_PIO_UART
+#if PICO_RP2350
 
 
 /* Default includes */
@@ -58,6 +59,7 @@
 #define UART_FIFO_SIZE 65535 /* TODO: Verify size */
 
 
+#endif /* PICO_RP2350 */
 #endif /* USE_PIO_UART */
 
 #ifdef __cplusplus

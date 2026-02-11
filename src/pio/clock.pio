@@ -33,6 +33,8 @@
 ; empty. Write the least significant bit to the OUT pin group.
 ;
 
+
+; PHI1 SID Clock ~ PIO0 SM0
 .program clock
 
 .wrap_target ; Free 0 cycle unconditional jump

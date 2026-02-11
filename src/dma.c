@@ -31,14 +31,17 @@
 #include "sid.h"
 
 
-/* imports */
+/* pio.c */
 extern PIO bus_pio, clkcnt_pio;
 extern uint sm_control, sm_data, sm_clock, sm_delay, sm_clkcnt;
 
-/* locals */
+/* DMA */
 int dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay;
-int dma_clkcnt_control;
-volatile uint32_t clkcnt_word;
+int dma_counter;
+#if PICO_RP2040
+int dma_counter_chain;
+#endif
+volatile uint32_t cycle_count_word;
 
 /* Shiny things */
 #if defined(PICO_DEFAULT_LED_PIN)
@@ -55,7 +58,7 @@ uint32_t rgb_value = 0;
 
 void setup_dmachannels(void)
 { /* NOTE: Do not manually assign DMA channels, this causes a Panic on the PicoW */
-  CFG("[DMA CHANNELS INIT] START\n");
+  usCFG("[DMA CHANNELS INIT] START\n");
 
   /* NOTICE: DMA read address is disabled for now, it is causing confirmed desync on the rp2040 (rp2350 seems to works, but needs improving) */
   /* NOTICE: DMA chaining on rp2350 causes desync with cycled writes, probably due to RP2350-E8 */
@@ -65,7 +68,10 @@ void setup_dmachannels(void)
   dma_tx_data = dma_claim_unused_channel(true);
   dma_rx_data = dma_claim_unused_channel(true);
   dma_tx_delay = dma_claim_unused_channel(true);
-  dma_clkcnt_control = dma_claim_unused_channel(true);
+  dma_counter = dma_claim_unused_channel(true);
+#if PICO_RP2040
+  dma_counter_chain = dma_claim_unused_channel(true);
+#endif
 
   { /* dma controlbus */
     dma_channel_config tx_config_control = dma_channel_get_default_config(dma_tx_control);
@@ -108,33 +114,72 @@ void setup_dmachannels(void)
     //#endif
     dma_channel_configure(dma_tx_delay, &tx_config_delay, &bus_pio->txf[sm_delay], NULL, 1, false);
   }
-  #if PICO_RP2350 /* NOTE: endless transfer not supported on rp2040 */
+#if PICO_RP2350 /* RP2350 has native endless transfer support */
   { /* dma rx clock counter ~ should be an endless updating item */
-    dma_channel_config clkcnt_config_data = dma_channel_get_default_config(dma_clkcnt_control);
+    dma_channel_config clkcnt_config_data = dma_channel_get_default_config(dma_counter);
     channel_config_set_transfer_data_size(&clkcnt_config_data, DMA_SIZE_32);
     channel_config_set_read_increment(&clkcnt_config_data, false);
     channel_config_set_write_increment(&clkcnt_config_data, false);
     channel_config_set_dreq(&clkcnt_config_data, DREQ_PIO1_RX3);
-    // channel_config_set_irq_ignore(&dma_clkcnt_control, false);
-    // dma_channel_configure(dma_clkcnt_control, &clkcnt_config_data, &clkcnt_word, &bus_pio->rxf[sm_clkcnt], 1, false);
-    clkcnt_word = 0;
+    // channel_config_set_irq_ignore(&dma_counter, false);
+    // dma_channel_configure(dma_counter, &clkcnt_config_data, &cycle_count_word, &bus_pio->rxf[sm_clkcnt], 1, false);
+    cycle_count_word = 0;
     dma_channel_configure(
-      dma_clkcnt_control,
+      dma_counter,
       &clkcnt_config_data,
-      &clkcnt_word,
+      &cycle_count_word,
       &clkcnt_pio->rxf[sm_clkcnt],
-      dma_encode_endless_transfer_count(), /* ENDLESS transfer count */ // BUG: Spinlocks the Pico
-      // dma_encode_transfer_count_with_self_trigger(1), /* Self triggered transfer count */ // BUG: Spinlocks the Pico
+      dma_encode_endless_transfer_count(), /* ENDLESS transfer count */
       true /* Start transfers immediately */
-      // false
     );
   }
-  #endif
+#else /* RP2040: ping-pong chain for continuous transfer */
+  {
+    cycle_count_word = 0;
+    /* Channel A */
+    dma_channel_config cfg_a = dma_channel_get_default_config(dma_counter);
+    channel_config_set_transfer_data_size(&cfg_a, DMA_SIZE_32);
+    channel_config_set_read_increment(&cfg_a, false);
+    channel_config_set_write_increment(&cfg_a, false);
+    channel_config_set_dreq(&cfg_a, DREQ_PIO1_RX3);
+    channel_config_set_chain_to(&cfg_a, dma_counter_chain);
+    dma_channel_configure(
+      dma_counter,
+      &cfg_a,
+      &cycle_count_word,
+      &clkcnt_pio->rxf[sm_clkcnt],
+      1,
+      false
+    );
 
-  CFG("[DMA CHANNELS CLAIMED] C:%d TX:%d RX:%d D:%d CNT:%d\n",
-    dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay, dma_clkcnt_control);
+    /* Channel B — identical transfer, chains back to A */
+    dma_channel_config cfg_b = dma_channel_get_default_config(dma_counter_chain);
+    channel_config_set_transfer_data_size(&cfg_b, DMA_SIZE_32);
+    channel_config_set_read_increment(&cfg_b, false);
+    channel_config_set_write_increment(&cfg_b, false);
+    channel_config_set_dreq(&cfg_b, DREQ_PIO1_RX3);
+    channel_config_set_chain_to(&cfg_b, dma_counter);
+    dma_channel_configure(
+      dma_counter_chain,
+      &cfg_b,
+      &cycle_count_word,
+      &clkcnt_pio->rxf[sm_clkcnt],
+      1,
+      false);
 
-  CFG("[DMA CHANNELS INIT] FINISHED\n");
+    /* Start channel A — it will chain to B, B chains back, forever */
+    dma_channel_start(dma_counter_chain);
+  }
+#endif
+#if PICO_RP2350
+  usCFG("[DMA CHANNELS CLAIMED] C:%d TX:%d RX:%d D:%d CNT:%d\n",
+    dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay, dma_counter);
+#else
+  usCFG("[DMA CHANNELS CLAIMED] C:%d TX:%d RX:%d D:%d CNTA:%d CNTB:%d\n",
+    dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay, dma_counter, dma_counter_chain);
+#endif
+
+  usCFG("[DMA CHANNELS INIT] FINISHED\n");
   return;
 }
 
@@ -164,42 +209,9 @@ void setup_vu_dma(void)
   #endif
 }
 
-/**
- * @brief returns the amount of C64 cpu clock
- * cycles counted by the counter SM and updated
- * by a continous running DMA channel
- *
- * @returns uint32_t */
-uint32_t clockcycles(void)
-{
-  #if PICO_RP2350
-  return (uint32_t)clkcnt_word;
-  #else
-  return 0; /* Not supported on rp2040 */
-  #endif
-}
-
-/**
- * @brief delay for n PHI1 clockcycles
- * Will do a cycled delay if not rp2350
- * with cycle counter
- *
- * @param uint32_t n_cycles
- */
-void clockcycle_delay(uint32_t n_cycles)
-{ /* ISSUE: Will crap out if delay cycles wrap around __UINT32_MAX__ */
-  if __us_unlikely(n_cycles == 0) return;
-  int32_t now, end;
-  now = end = clockcycles();
-  do {
-    end = clockcycles();
-  } while (end < (now + n_cycles));
-  return;
-}
-
 void stop_dma_channels(void)
 { // TODO: Fix and finish per RP2040-E13 and RP2350-E5
-  // CFG("[STOP DMA CHANNELS]\n");
+  // usCFG("[STOP DMA CHANNELS]\n");
   /* Clear any Interrupt enable bits as per RP2040-E13 */
   // TODO: FINISH
   /* Atomically abort channels */
@@ -219,7 +231,7 @@ void stop_dma_channels(void)
 void start_dma_channels(void)
 { /* NOTE: DO NOT USE, THIS STARTS A TRANSFER IN THE CURRENT CONFIG */
   /* Trigger -> start dma channels all at once */
-  // CFG("[START DMA CHANNELS]\n");
+  // usCFG("[START DMA CHANNELS]\n");
   // dma_hw->multi_channel_trigger = (1 << dma_tx_delay) | (1 << dma_rx_data) | (1 << dma_tx_data) | (1 << dma_tx_control);
   return;
 }
@@ -237,6 +249,6 @@ void unclaim_dma_channels(void)
   return;
 }
 
-// dma_hw->abort = (1 << dma_clkcnt_control);
+// dma_hw->abort = (1 << dma_counter);
 // while (dma_hw->abort) tight_loop_contents();
-// while (dma_hw->ch[dma_clkcnt_control].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS) tight_loop_contents();
+// while (dma_hw->ch[dma_counter].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS) tight_loop_contents();

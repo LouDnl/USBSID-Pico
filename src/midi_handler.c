@@ -51,8 +51,8 @@
 extern RuntimeCFG cfg;
 
 /* GPIO */
-extern uint8_t __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles);
-extern uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles);
+extern uint8_t cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint16_t cycled_delay_operation(uint16_t cycles);
 
 /* Initialize variables */
 extern const midi_ccvalues midi_ccvalues_defaults; /* midi.c */
@@ -103,14 +103,14 @@ void midi_programs_init(void)
 
 void midi_processor_init(void)
 {
-  CFG("[START MIDI HANLDER INIT]\n");
+  usCFG("Start Midi handler init\n");
 
   /* NOTE: Temporary - always init defaults */
   memcpy(&CC, &midi_ccvalues_defaults, sizeof(midi_ccvalues));
 
   midi_programs_init();
 
-  CFG("[END MIDI HANLDER INIT]\n");
+  usCFG("End Midi handler init\n");
 
 }
 
@@ -176,7 +176,7 @@ AGAIN:
     }
     if (instr->pt[i].end == true) pulsetable = false;
     if (instr->wt[i].end == true) wavetable = false;
-    // DBG("%d:%d%d%d%d\n", i, pulsetable, instr->pt[i].end, wavetable, instr->wt[i].end);
+    // usDBG("%d:%d%d%d%d\n", i, pulsetable, instr->pt[i].end, wavetable, instr->wt[i].end);
     i++;
     if (pulsetable || wavetable) {
       cycled_delay_operation((uint16_t)(R_PAL - (writes * 6)));  /* One table entry each per frame ;) */
@@ -185,6 +185,6 @@ AGAIN:
     }
   }
   if (((buffer[0] & 0xF0) == 0x80) && (keys_pressed > 0)) keys_pressed--;
-  // DBG("[K]%d\n", keys_pressed);
+  // usDBG("[K]%d\n", keys_pressed);
   return;
 }

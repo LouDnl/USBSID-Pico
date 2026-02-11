@@ -20,6 +20,10 @@ on:
   # Allows you to run this workflow manually from the Actions tab when needed
   workflow_dispatch:
 
+concurrency:
+  group: dev-firmware-build
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build

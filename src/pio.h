@@ -41,7 +41,7 @@
 
 /* PIO */
 #include "bus_control.pio.h"   /* Busje komt zo! */
-#include "clock_counter.pio.h" /* !<(O.O)>! */
+#include "cycle_counter.pio.h" /* !<(O.O)>! */
 #include "clock.pio.h"         /* TikTak */
 #include "vu.pio.h"            /* Kiem em goan! */
 #if defined(USE_RGB)
@@ -49,25 +49,44 @@
 #endif
 
 
-/* PIO & Statemachine usage
+/* NOTICE: PIO & Statemachine usage
  * PIO0
- * SM0: PHI1 SID clock
- * SM1: Control bus
- * SM2: Data bus
- * SM3: Delay timer
+ * SM0: sm_clkcnt  - PHI1 SID clock (clock.pio / pio.c)
+ * SM1: sm_control - Bus control write and data read (bus_control.pio / pio.c)
+ * SM2: sm_data    - Data and address bus write (bus_control.pio / pio.c)
+ * SM3: sm_delay   - Delay cycle counter interrupt for bus SM1 & SM2 (bus_control.pio / pio.c)
  * PIO1
- * SM0: RGB LED control
- * SM1: LED PWM control
- * SM2: Uart RX
- * SM3: PHI1 Cycle counter
- *
- * rp2350 only!
- * PIO2
- * SM0: SID2 clock
- * SM1: SID2 Control bus
- * SM2: SID2 Data bus
- * SM3: PHI2 Cycle counter
+ * SM0: Buffer raster cycle counter (ASID) (bus_control.pio / asid_buffer.c)
+ * SM1: LED PWM control (Non Wifi boards only, unused otherwise) (vu.pio)
+ * SM2: RGB LED control (as LED but for RGB Boards only, unused otherwise) (vu_rgb.pio)
+ * SM3: PHI1 Clock cycle counter (cycle_counter.pio)
+ * PIO2 (rp2350 only!)
+ * SM0: Uart RX (uart_rx.pio / uart.c)
+ * SM1:
+ * SM2:
+ * SM3:
  */
+
+ /* NOTICE: PIO <-> DMA information
+  * all pio statemachines have one or more corresponding DMA
+  * configurations in dma.c where the corresponding DREQ is also set
+  * PIO0
+  * SM0: - no DMA use
+  * SM1: dma_tx_control - DMA_SIZE_8  - DREQ_PIO0_TX1
+  * SM1: dma_rx_data    - DMA_SIZE_8  - DREQ_PIO0_RX1
+  * SM2: dma_tx_data    - DMA_SIZE_32 - DREQ_PIO0_TX2
+  * SM3: dma_tx_delay   - DMA_SIZE_16 - DREQ_PIO0_TX3
+  * PIO1
+  * SM0: - no DMA use
+  * SM1: dma_pwmled     - DMA_SIZE_32 - DREQ_PIO1_TX0
+  * SM2: dma_rgbled     - DMA_SIZE_32 - DREQ_PIO1_TX1
+  * SM3: dma_counter    - DMA_SIZE_32 - DREQ_PIO1_RX3 (dual channel on rp2040)
+  * PIO2 (rp2350 only!)
+  * SM0:
+  * SM1:
+  * SM2:
+  * SM3:
+  */
 
 
 /* IRQ's */
