@@ -313,6 +313,7 @@ enum
   MIRRORED_SID     = 0x45,  /* Socket Two is linked to Socket One */
   DUAL_SOCKET1     = 0x46,  /* Two SID's in socket One, Socket Two disabled */
   DUAL_SOCKET2     = 0x47,  /* Two SID's in socket Two, Socket One disabled */
+  FLIP_SOCKETS     = 0x48,  /* Socket Two is Socket One and vice versa */
 
   SET_CLOCK        = 0x50,  /* Change SID clock frequency by array id */
   DETECT_SIDS      = 0x51,  /* Try to detect the SID types per socket ~ routines see sid_detection.c */

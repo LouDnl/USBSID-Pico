@@ -308,6 +308,31 @@ void set_sid_id_addr(int socket, int sid, int id)
   return;
 }
 
+/**
+ * @brief Flip socket id's and addresses at runtime
+ *
+ */
+void flip_sockets(void)
+{
+  uint8_t ids[4] = {
+    usbsid_config.socketOne.sid1.id,
+    usbsid_config.socketOne.sid2.id,
+    usbsid_config.socketTwo.sid1.id,
+    usbsid_config.socketTwo.sid2.id
+  };
+  usbsid_config.socketOne.sid1.id = ids[2];
+  usbsid_config.socketOne.sid1.addr = sidaddr_default[ids[2]];
+  usbsid_config.socketOne.sid2.id = ids[3];
+  usbsid_config.socketOne.sid2.addr = sidaddr_default[ids[3]];
+  usbsid_config.socketTwo.sid1.id = ids[0];
+  usbsid_config.socketTwo.sid1.addr = sidaddr_default[ids[0]];
+  usbsid_config.socketTwo.sid2.id = ids[1];
+  usbsid_config.socketTwo.sid2.addr = sidaddr_default[ids[1]];
+  extern void apply_bus_config(bool quiet);
+  apply_bus_config(false);
+  return;
+}
+
 /* Called from apply_config apply_socket_change */
 int verify_fmopl_sidno(void)
 { /* TODO: THIS USES CONFIG AND RUNTIMECFG CROSSED, THIS MUST BE CONFIG ONLY */

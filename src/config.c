@@ -660,6 +660,11 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, false, false, usbsid_config.socketTwo.chiptype, false);
       }
       break;
+    case FLIP_SOCKETS:
+      usCFG("[CMD] FLIP_SOCKETS\n");
+      extern void flip_sockets(void);
+      flip_sockets();
+      break;
     case MIRRORED_SID:
       usCFG("[CMD] MIRRORED_SID\n");
       set_socket_config(buffer[1], true, false, usbsid_config.socketOne.chiptype, true, false, usbsid_config.socketTwo.chiptype, true);
