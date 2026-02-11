@@ -111,6 +111,6 @@ jobs:
         with:
           name: tools-${{ matrix.buildname }}-${{ matrix.os }}
           path: |
-            repo/examples/${{ matrix.directory }}/${{ matrix.buildname }}
+            ${{ matrix.os == 'windows-2022' && format('repo/examples/{0}/{1}.exe', matrix.directory, matrix.buildname) || format('repo/examples/{0}/{1}', matrix.directory, matrix.buildname) }}
             ${{ matrix.os == 'windows-2022' && format('repo/examples/{0}/*.dll', matrix.directory) || '' }}
           if-no-files-found: ignore
