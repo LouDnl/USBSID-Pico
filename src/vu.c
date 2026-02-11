@@ -218,8 +218,7 @@ void led_runner(void)
     us_now = to_us_since_boot(get_absolute_time());
     if (vu == 0 && usbdata == 1) {
       n_checks++;
-      if (n_checks >= MAX_CHECKS)  /* 100 checks */
-      {
+      if (n_checks >= MAX_CHECKS) { /* 100 checks */
         n_checks = 0, usbdata = 0, dtype = ntype;  /* NOTE: This sets dtype to 0 which causes buffertask write to go to default and error out with many consecutive reads from the bus */
         offload_ledrunner = false;
       }
