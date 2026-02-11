@@ -54,14 +54,14 @@ void print_cfg(const uint8_t *buf, size_t len)
   usCFG("[PRINT CFG START]\n");
   for (size_t i = 0; i < len; ++i) {
     if (i == 0)
-      usCFG("[R%03d] ", i);
-    usCFG("%02x", buf[i]);
+      usNFO("[R%03d] ", i);
+    usNFO("%02x", buf[i]);
     if (i == (len - 1)) {
-      usCFG("\n");
+      usNFO("\n");
     } else if ((i != 0) && (i % 16 == 15)) {
-      usCFG("\n[R%03d] ", i);
+      usNFO("\n[R%03d] ", i);
     } else {
-      usCFG(" ");
+      usNFO(" ");
     }
   }
   usCFG("[PRINT CFG END]\n");
