@@ -30,7 +30,7 @@ set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
 string(TIMESTAMP MAGIC_SMOKE "%Y%m%d")  # Auto generate dated version
-set(PROJECT_VERSION "0.6.0-BETA.${MAGIC_SMOKE}")  # Generate compile version
+set(PROJECT_VERSION "0.6.1-BETA.${MAGIC_SMOKE}")  # Generate compile version
 
 ### Want a cookie?
 # NOTICE: ENABLING THESE DEBUGGING DEFINITIONS WILL HAVE SIGNIFICANT IMPACT AND WILL DELAY PLAYING!
