@@ -42,11 +42,7 @@ extern char *mono_stereo[2];
  * Partly copied from and inspired by SKPico code by frenetic
  * see: https://github.com/frntc/SIDKick-pico
  */
-#if PICO_RP2350
-register uint32_t b asm( "r13" );
-#else
 register uint32_t b asm( "r10" );
-#endif
 volatile const uint32_t *BUSState = &sio_hw->gpio_in;
 
 
@@ -89,14 +85,14 @@ int detect_clocksignal(void)
   return r;  /* 1 if clock detected */
 }
 
-void toggle_audio_switch(void) /* BUG: This _can_ cause a hardfault on rp2350 */
+void toggle_audio_switch(void)
 { /* Toggle the SPST switch stereo <-> mono */
   #if defined(HAS_AUDIOSWITCH)
   if (!usbsid_config.lock_audio_sw) {
     b = *BUSState; /* read complete bus */
     int audio_state = (b & bPIN(AU_SW)) >> AU_SW; /* Pinpoint current audio switch state */
     audio_state ^= 1;
-    usCFG("TOGGLE AUDIO SWITCH TO: %d (%s)\n", audio_state, mono_stereo[audio_state]);
+    usCFG("TOGGLE AUDIO SWITCH TO: %d (%s)\n", (int)audio_state, mono_stereo[(int)audio_state]);
     tPIN(AU_SW);  /* toggle mono <-> stereo */
   } else {
     usCFG("Audio switch is locked at %d (%s), toggle not applied\n",
@@ -110,7 +106,7 @@ void set_audio_switch(bool state)
 { /* Set the SPST switch */
   #if defined(HAS_AUDIOSWITCH)
   if (!usbsid_config.lock_audio_sw) {
-    usCFG("SET AUDIO SWITCH TO: %d (%s)\n", state, mono_stereo[state]);
+    usCFG("SET AUDIO SWITCH TO: %d (%s)\n", (int)state, mono_stereo[(int)state]);
     if (state) {
       sPIN(AU_SW);       /* set   mono <-> stereo pin */
     } else cPIN(AU_SW);  /* clear mono <-> stereo pin */
