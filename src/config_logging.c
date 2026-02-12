@@ -94,7 +94,7 @@ void print_cfg_addr(void)
 
 void print_pico_features(void)
 {
-  usCFG("\n[START PRINT PICO DEFAULT FEATURES]\n");
+  usCFG("[START PRINT PICO DEFAULT FEATURES]\n");
 
   usCFG("PICO_PIO_VERSION = %d\n", PICO_PIO_VERSION);  /* pio.h */
   #if defined(PICO_DEFAULT_LED_PIN)
