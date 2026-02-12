@@ -30,7 +30,7 @@ set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
 string(TIMESTAMP MAGIC_SMOKE "%Y%m%d")  # Auto generate dated version
-set(PROJECT_VERSION "0.6.1-BETA.${MAGIC_SMOKE}")  # Generate compile version
+set(PROJECT_VERSION "0.6.2-BETA.${MAGIC_SMOKE}")  # Generate compile version
 
 ### Want a cookie?
 # NOTICE: ENABLING THESE DEBUGGING DEFINITIONS WILL HAVE SIGNIFICANT IMPACT AND WILL DELAY PLAYING!
@@ -99,11 +99,11 @@ endif()
 # remember that enabling debugging and disabling optimizations
 # will weird out tune playing and reading from and writing to
 # SKPico will stop functioning
-# *3 is required for onboard siplayer but can cause desync
+# *3 is required for onboard siplayer but could cause desync
 # with DMA read_address and chain_to()
 set(DEBUG_SYMBOLS 0)      # 0 default, 1 debug symbols & debug build enabled
 set(DEBUGGING 0)          # 0 default, 1~3 equals -g1~3
-set(OPTIMIZATIONS 3)      # 2 default, 2 ~ -O1 for debugging
+set(OPTIMIZATIONS 3)      # 3 default, 3 ~ -O1 for debugging
 set(WARNINGS_ONLY 0)      # 0 default, 0 error on warnings
 set(TUSB_DEBUG 0)         # 0 default, 0~3 non verbose to very verbose
 set(ANALYSE_STACKUSAGE 0) # 0 default, 1 enabled, 0 disabled
