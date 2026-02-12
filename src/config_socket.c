@@ -32,14 +32,17 @@
 #include "logging.h"
 
 
-/* Config */
+/* config. */
 extern void save_load_apply_config(bool at_boot, bool print_cfg);
 extern Config usbsid_config;
 extern RuntimeCFG cfg;
 
-/* Config bus */
+/* config_bus.c */
 extern void apply_bus_config(bool quiet);
 extern uint8_t sidaddr_default[4];
+
+/* sid.c */
+extern void reset_sid_registers(void);
 
 /* Pre declarations */
 void apply_socket_change(bool quiet);
@@ -330,6 +333,8 @@ void flip_sockets(void)
   usbsid_config.socketTwo.sid2.addr = sidaddr_default[ids[1]];
   extern void apply_bus_config(bool quiet);
   apply_bus_config(false);
+  /* Reset SID registers after fiddling with the socket configuration */
+  reset_sid_registers();
   return;
 }
 
@@ -424,7 +429,6 @@ void set_socket_config(uint8_t cmd, bool s1en, bool s1dual, uint8_t s1chip, bool
     apply_socket_change(false);
   }
   /* Reset SID registers after fiddling with the socket configuration */
-  extern void reset_sid_registers(void);
   reset_sid_registers();
   return;
 }
