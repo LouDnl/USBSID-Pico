@@ -423,6 +423,9 @@ void set_socket_config(uint8_t cmd, bool s1en, bool s1dual, uint8_t s1chip, bool
   } else if (cmd == 1) {
     apply_socket_change(false);
   }
+  /* Reset SID registers after fiddling with the socket configuration */
+  extern void reset_sid_registers(void);
+  reset_sid_registers();
   return;
 }
 
