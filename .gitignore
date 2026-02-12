@@ -37,6 +37,7 @@
 # folders
 !.github
 !.github/**
+!.gitlab
 !src
 !src/pio
 !lib

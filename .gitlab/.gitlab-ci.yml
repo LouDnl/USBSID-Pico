@@ -1,0 +1,845 @@
+# USBSID-Pico GitLab CI/CD Configuration
+# Equivalent to all GitHub Actions workflows:
+#   - build.yml (dev firmware builds)
+#   - buildtools.yml (tools builds)
+#   - release.yml (versioned releases)
+#   - tagged_build.yml (snapshot prereleases)
+
+variables:
+  BUILD_THREADS: "4"
+  BUILD_TYPE: "Release"
+  PICO_SDK_REF: "2.2.0"
+  PICO_EXTRAS_REF: "sdk-2.2.0"
+  PICOTOOL_REF: "2.2.0"
+  GIT_SUBMODULE_STRATEGY: recursive
+
+# Pipeline runs on:
+# - dev branch: firmware source changes or tools changes
+# - master branch: any push
+# - Tags: v* for releases, d* for snapshots
+# - Manual trigger
+workflow:
+  rules:
+    # Dev branch - firmware source changes
+    - if: $CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"
+      changes:
+        - src/**
+        - lib/**
+        - CMakeLists.txt
+        - .gitlab-ci.yml
+      variables:
+        PIPELINE_TYPE: "dev-firmware"
+    # Dev branch - tools changes
+    - if: $CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"
+      changes:
+        - examples/config-tool/**
+        - examples/send_sid/**
+      variables:
+        PIPELINE_TYPE: "dev-tools"
+    # Master branch push
+    - if: $CI_COMMIT_BRANCH == "master" && $CI_PIPELINE_SOURCE == "push"
+      variables:
+        PIPELINE_TYPE: "master"
+    # Version tags (v0.0.0, v1.0.0-BETA, etc.) - full release
+    - if: $CI_COMMIT_TAG =~ /^v(\d|\.|-|[A-Z])+$/
+      variables:
+        PIPELINE_TYPE: "release"
+    # Date tags (d20250101, etc.) - snapshot prerelease
+    - if: $CI_COMMIT_TAG =~ /^d[0-9a-z]+$/
+      variables:
+        PIPELINE_TYPE: "snapshot"
+    # Manual trigger
+    - if: $CI_PIPELINE_SOURCE == "web"
+      variables:
+        PIPELINE_TYPE: "manual"
+    # Triggered by another pipeline
+    - if: $CI_PIPELINE_SOURCE == "pipeline"
+    # Force run variable
+    - if: $FORCE_RUN == "true"
+
+stages:
+  - prepare
+  - build-firmware
+  - build-tools
+  - package
+  - release
+
+default:
+  interruptible: true
+
+# ============================================================================
+# CACHING - Shared SDK/toolchain caches
+# ============================================================================
+
+.pico_sdk_cache:
+  cache:
+    - key: pico-sdk-${PICO_SDK_REF}
+      paths:
+        - pico-sdk/
+      policy: pull-push
+    - key: pico-extras-${PICO_EXTRAS_REF}
+      paths:
+        - pico-extras/
+      policy: pull-push
+    - key: picotool-${PICOTOOL_REF}
+      paths:
+        - picotool/
+      policy: pull-push
+
+# ============================================================================
+# FIRMWARE BUILD TEMPLATE
+# ============================================================================
+
+.firmware_build_template:
+  stage: build-firmware
+  image: ubuntu:22.04
+  extends: .pico_sdk_cache
+  before_script:
+    # Install base dependencies
+    - apt-get update
+    - apt-get install -y build-essential cmake ninja-build git python3 python3-pip wget curl
+    # Install ARM toolchain
+    - apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
+    # Install xa65 and bin2h for SID player builds
+    - |
+      if [ "${WITH_SIDPLAYER}" = "1" ]; then
+        apt-get install -y xa65
+        git clone --depth 1 https://github.com/elnormous/bin2h.git /tmp/bin2h
+        cd /tmp/bin2h && make && cp bin2h /usr/local/bin/
+      fi
+    # Clone/update Pico SDK if not cached
+    - |
+      if [ ! -d "pico-sdk" ]; then
+        git clone --depth 1 --branch ${PICO_SDK_REF} --recurse-submodules https://github.com/raspberrypi/pico-sdk.git pico-sdk
+      fi
+    - export PICO_SDK_PATH=$(pwd)/pico-sdk
+    - cd pico-sdk/lib/tinyusb && python3 tools/get_deps.py ${PICO_PLATFORM} && cd -
+    # Clone/update Pico Extras if not cached
+    - |
+      if [ ! -d "pico-extras" ]; then
+        git clone --depth 1 --branch ${PICO_EXTRAS_REF} --recurse-submodules https://github.com/raspberrypi/pico-extras.git pico-extras
+      fi
+    - export PICO_EXTRAS_PATH=$(pwd)/pico-extras
+    # Build picotool if not cached
+    - |
+      if [ ! -d "picotool" ]; then
+        git clone --depth 1 --branch ${PICOTOOL_REF} --recurse-submodules https://github.com/raspberrypi/picotool.git picotool-src
+        cmake -S picotool-src -B picotool-src/build -DCMAKE_INSTALL_PREFIX=$(pwd)/picotool -DPICOTOOL_FLAT_INSTALL=1
+        cmake --build picotool-src/build -j${BUILD_THREADS} --target install
+        rm -rf picotool-src
+      fi
+    # Clone optional libraries based on build type
+    - |
+      if [ "${WITH_EMULATOR}" = "1" ]; then
+        git clone --depth 1 https://github.com/loudnl/emudore-embedded.git lib/emudore-embedded
+      fi
+    - |
+      if [ "${WITH_SIDPLAYER}" = "1" ]; then
+        git clone --depth 1 https://github.com/loudnl/usbsid-player.git lib/usbsid-player
+      fi
+  script:
+    - mkdir -p build_${BUILD_DIR}
+    - |
+      cmake -S . -B build_${BUILD_DIR} \
+        -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+        -DPICO_PLATFORM=${PICO_PLATFORM} \
+        -DPICO_BOARD=${PICO_BOARD} \
+        -Dpicotool_DIR=$(pwd)/picotool/picotool \
+        -DONBOARD_EMULATOR=${WITH_EMULATOR:-0} \
+        -DONBOARD_SIDPLAYER=${WITH_SIDPLAYER:-0}
+    - cmake --build build_${BUILD_DIR} --config ${BUILD_TYPE} -j${BUILD_THREADS}
+    - ls -la build_${BUILD_DIR}/*.uf2
+    # Gather artifacts
+    - mkdir -p dist
+    - cp -v build_${BUILD_DIR}/*.uf2 dist/
+  artifacts:
+    name: "usbsid-${BUILD_DIR}-${CI_COMMIT_REF_SLUG}-${CI_PIPELINE_IID}"
+    paths:
+      - dist/*.uf2
+    expire_in: 1 week
+
+# ============================================================================
+# DEV FIRMWARE BUILDS (build.yml equivalent)
+# ============================================================================
+
+# Base builds
+firmware:pico:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico"
+    PICO_BOARD: "pico"
+    PICO_PLATFORM: "rp2040"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-firmware" || $PIPELINE_TYPE == "manual"
+
+firmware:pico_w:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "picow"
+    PICO_BOARD: "pico_w"
+    PICO_PLATFORM: "rp2040"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-firmware" || $PIPELINE_TYPE == "manual"
+
+firmware:pico2:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico2"
+    PICO_BOARD: "pico2"
+    PICO_PLATFORM: "rp2350-arm-s"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-firmware" || $PIPELINE_TYPE == "manual"
+
+firmware:pico2_w:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico2w"
+    PICO_BOARD: "pico2_w"
+    PICO_PLATFORM: "rp2350-arm-s"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-firmware" || $PIPELINE_TYPE == "manual"
+
+# Emulator builds
+firmware:pico_emulator:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico_em"
+    PICO_BOARD: "pico"
+    PICO_PLATFORM: "rp2040"
+    WITH_EMULATOR: "1"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-firmware" || $PIPELINE_TYPE == "manual"
+
+firmware:pico_w_emulator:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico_w_em"
+    PICO_BOARD: "pico_w"
+    PICO_PLATFORM: "rp2040"
+    WITH_EMULATOR: "1"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-firmware" || $PIPELINE_TYPE == "manual"
+
+firmware:pico2_emulator:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico2_em"
+    PICO_BOARD: "pico2"
+    PICO_PLATFORM: "rp2350-arm-s"
+    WITH_EMULATOR: "1"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-firmware" || $PIPELINE_TYPE == "manual"
+
+firmware:pico2_w_emulator:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico2_w_em"
+    PICO_BOARD: "pico2_w"
+    PICO_PLATFORM: "rp2350-arm-s"
+    WITH_EMULATOR: "1"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-firmware" || $PIPELINE_TYPE == "manual"
+
+# SID Player builds
+firmware:pico2_sidplayer:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico2_sp"
+    PICO_BOARD: "pico2"
+    PICO_PLATFORM: "rp2350-arm-s"
+    WITH_SIDPLAYER: "1"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-firmware" || $PIPELINE_TYPE == "manual"
+
+firmware:pico2_w_sidplayer:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico2_w_sp"
+    PICO_BOARD: "pico2_w"
+    PICO_PLATFORM: "rp2350-arm-s"
+    WITH_SIDPLAYER: "1"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-firmware" || $PIPELINE_TYPE == "manual"
+
+# ============================================================================
+# RELEASE FIRMWARE BUILDS (release.yml equivalent)
+# Same matrix as dev builds but triggered on version tags
+# ============================================================================
+
+release:firmware:pico:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico"
+    PICO_BOARD: "pico"
+    PICO_PLATFORM: "rp2040"
+  artifacts:
+    name: "releasebuild-usbsidpico"
+    paths:
+      - dist/*.uf2
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+release:firmware:pico_w:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "picow"
+    PICO_BOARD: "pico_w"
+    PICO_PLATFORM: "rp2040"
+  artifacts:
+    name: "releasebuild-usbsidpicow"
+    paths:
+      - dist/*.uf2
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+release:firmware:pico2:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico2"
+    PICO_BOARD: "pico2"
+    PICO_PLATFORM: "rp2350-arm-s"
+  artifacts:
+    name: "releasebuild-usbsidpico2"
+    paths:
+      - dist/*.uf2
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+release:firmware:pico2_w:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico2w"
+    PICO_BOARD: "pico2_w"
+    PICO_PLATFORM: "rp2350-arm-s"
+  artifacts:
+    name: "releasebuild-usbsidpico2w"
+    paths:
+      - dist/*.uf2
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+release:firmware:pico_emulator:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico_em"
+    PICO_BOARD: "pico"
+    PICO_PLATFORM: "rp2040"
+    WITH_EMULATOR: "1"
+  artifacts:
+    name: "releasebuild-usbsidpico_em"
+    paths:
+      - dist/*.uf2
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+release:firmware:pico_w_emulator:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico_w_em"
+    PICO_BOARD: "pico_w"
+    PICO_PLATFORM: "rp2040"
+    WITH_EMULATOR: "1"
+  artifacts:
+    name: "releasebuild-usbsidpico_w_em"
+    paths:
+      - dist/*.uf2
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+release:firmware:pico2_emulator:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico2_em"
+    PICO_BOARD: "pico2"
+    PICO_PLATFORM: "rp2350-arm-s"
+    WITH_EMULATOR: "1"
+  artifacts:
+    name: "releasebuild-usbsidpico2_em"
+    paths:
+      - dist/*.uf2
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+release:firmware:pico2_w_emulator:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico2_w_em"
+    PICO_BOARD: "pico2_w"
+    PICO_PLATFORM: "rp2350-arm-s"
+    WITH_EMULATOR: "1"
+  artifacts:
+    name: "releasebuild-usbsidpico2_w_em"
+    paths:
+      - dist/*.uf2
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+release:firmware:pico2_sidplayer:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico2_sp"
+    PICO_BOARD: "pico2"
+    PICO_PLATFORM: "rp2350-arm-s"
+    WITH_SIDPLAYER: "1"
+  artifacts:
+    name: "releasebuild-usbsidpico2_sp"
+    paths:
+      - dist/*.uf2
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+release:firmware:pico2_w_sidplayer:
+  extends: .firmware_build_template
+  variables:
+    BUILD_DIR: "pico2_w_sp"
+    PICO_BOARD: "pico2_w"
+    PICO_PLATFORM: "rp2350-arm-s"
+    WITH_SIDPLAYER: "1"
+  artifacts:
+    name: "releasebuild-usbsidpico2_w_sp"
+    paths:
+      - dist/*.uf2
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+# ============================================================================
+# TOOLS BUILD TEMPLATES (buildtools.yml equivalent)
+# ============================================================================
+
+.tools_ubuntu_template:
+  stage: build-tools
+  image: ubuntu:latest
+  before_script:
+    - apt-get update
+    - apt-get install -y pkg-config cmake build-essential libusb-1.0-0 libusb-1.0-0-dev
+  script:
+    - cd examples/${DIRECTORY}
+    - ls -lhai
+    - rm ${BUILDNAME} || true
+    - cmake -S . -B build -DEXECUTABLE=${BUILDNAME}
+    - cmake --build build -j${BUILD_THREADS}
+    - ls -lhai
+  artifacts:
+    name: "tools-${BUILDNAME}-linux"
+    paths:
+      - examples/${DIRECTORY}/${BUILDNAME}
+    expire_in: 1 week
+
+.tools_windows_template:
+  stage: build-tools
+  tags:
+    - windows
+    - msys2
+  before_script:
+    - pacman -Syu --noconfirm
+    - pacman -S --noconfirm --needed
+        mingw-w64-x86_64-gcc
+        mingw-w64-x86_64-libusb
+        mingw-w64-x86_64-cmake
+        mingw-w64-x86_64-pkg-config
+        mingw-w64-x86_64-ninja
+  script:
+    - cd examples/${DIRECTORY}
+    - ls -lhai
+    - rm ${BUILDNAME}.exe || true
+    - cmake -S . -B build -DEXECUTABLE=${BUILDNAME}
+    - cmake --build build -j${BUILD_THREADS}
+    - ls -lhai
+  artifacts:
+    name: "tools-${BUILDNAME}-windows"
+    paths:
+      - examples/${DIRECTORY}/${BUILDNAME}.exe
+      - examples/${DIRECTORY}/*.dll
+    expire_in: 1 week
+
+.tools_macos_template:
+  stage: build-tools
+  tags:
+    - macos
+  script:
+    - cd examples/${DIRECTORY}
+    - ls -lhai
+    - rm ${BUILDNAME} || true
+    - cmake -S . -B build -DEXECUTABLE=${BUILDNAME}
+    - cmake --build build -j${BUILD_THREADS}
+    - ls -lhai
+  artifacts:
+    name: "tools-${BUILDNAME}-macos-${MACOS_VERSION}"
+    paths:
+      - examples/${DIRECTORY}/${BUILDNAME}
+    expire_in: 1 week
+
+# ============================================================================
+# DEV TOOLS BUILDS
+# ============================================================================
+
+# Ubuntu tools
+tools:config-tool:ubuntu:
+  extends: .tools_ubuntu_template
+  variables:
+    DIRECTORY: "config-tool"
+    BUILDNAME: "cfg_usbsid"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
+
+tools:send_sid:ubuntu:
+  extends: .tools_ubuntu_template
+  variables:
+    DIRECTORY: "send_sid"
+    BUILDNAME: "send_sid"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
+
+# Windows tools
+tools:config-tool:windows:
+  extends: .tools_windows_template
+  variables:
+    DIRECTORY: "config-tool"
+    BUILDNAME: "cfg_usbsid"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
+
+tools:send_sid:windows:
+  extends: .tools_windows_template
+  variables:
+    DIRECTORY: "send_sid"
+    BUILDNAME: "send_sid"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
+
+# macOS 14 (ARM64) tools
+tools:config-tool:macos14:
+  extends: .tools_macos_template
+  tags:
+    - macos
+    - arm64
+  variables:
+    DIRECTORY: "config-tool"
+    BUILDNAME: "cfg_usbsid_macos14"
+    MACOS_VERSION: "14"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
+
+tools:send_sid:macos14:
+  extends: .tools_macos_template
+  tags:
+    - macos
+    - arm64
+  variables:
+    DIRECTORY: "send_sid"
+    BUILDNAME: "send_sid_macos14"
+    MACOS_VERSION: "14"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
+
+# macOS 15 (Intel) tools
+tools:config-tool:macos15-intel:
+  extends: .tools_macos_template
+  tags:
+    - macos
+    - x86_64
+  variables:
+    DIRECTORY: "config-tool"
+    BUILDNAME: "cfg_usbsid_macos15intel"
+    MACOS_VERSION: "15-intel"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
+
+tools:send_sid:macos15-intel:
+  extends: .tools_macos_template
+  tags:
+    - macos
+    - x86_64
+  variables:
+    DIRECTORY: "send_sid"
+    BUILDNAME: "send_sid_macos15intel"
+    MACOS_VERSION: "15-intel"
+  rules:
+    - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
+
+# ============================================================================
+# RELEASE TOOLS BUILDS
+# ============================================================================
+
+release:tools:config-tool:ubuntu:
+  extends: .tools_ubuntu_template
+  variables:
+    DIRECTORY: "config-tool"
+    BUILDNAME: "cfg_usbsid"
+  artifacts:
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+release:tools:send_sid:ubuntu:
+  extends: .tools_ubuntu_template
+  variables:
+    DIRECTORY: "send_sid"
+    BUILDNAME: "send_sid"
+  artifacts:
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+release:tools:config-tool:windows:
+  extends: .tools_windows_template
+  variables:
+    DIRECTORY: "config-tool"
+    BUILDNAME: "cfg_usbsid"
+  artifacts:
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+release:tools:send_sid:windows:
+  extends: .tools_windows_template
+  variables:
+    DIRECTORY: "send_sid"
+    BUILDNAME: "send_sid"
+  artifacts:
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+release:tools:config-tool:macos14:
+  extends: .tools_macos_template
+  tags:
+    - macos
+    - arm64
+  variables:
+    DIRECTORY: "config-tool"
+    BUILDNAME: "cfg_usbsid_macos14"
+    MACOS_VERSION: "14"
+  artifacts:
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+release:tools:send_sid:macos14:
+  extends: .tools_macos_template
+  tags:
+    - macos
+    - arm64
+  variables:
+    DIRECTORY: "send_sid"
+    BUILDNAME: "send_sid_macos14"
+    MACOS_VERSION: "14"
+  artifacts:
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+release:tools:config-tool:macos15-intel:
+  extends: .tools_macos_template
+  tags:
+    - macos
+    - x86_64
+  variables:
+    DIRECTORY: "config-tool"
+    BUILDNAME: "cfg_usbsid_macos15intel"
+    MACOS_VERSION: "15-intel"
+  artifacts:
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+release:tools:send_sid:macos15-intel:
+  extends: .tools_macos_template
+  tags:
+    - macos
+    - x86_64
+  variables:
+    DIRECTORY: "send_sid"
+    BUILDNAME: "send_sid_macos15intel"
+    MACOS_VERSION: "15-intel"
+  artifacts:
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+# ============================================================================
+# PACKAGE STAGE - Collect and zip tools
+# ============================================================================
+
+package:tools:
+  stage: package
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache zip
+  script:
+    - mkdir -p tools-output
+    # Collect all tools from artifacts
+    - cp -v examples/config-tool/cfg_usbsid* tools-output/ || true
+    - cp -v examples/send_sid/send_sid* tools-output/ || true
+    - cp -v examples/config-tool/*.dll tools-output/ || true
+    - cp -v examples/send_sid/*.dll tools-output/ || true
+    - ls -la tools-output/
+    - zip -r -j tools.zip tools-output/
+  artifacts:
+    name: "releasebuild-usbsidtools"
+    paths:
+      - tools.zip
+    expire_in: 4 weeks
+  needs:
+    - job: release:tools:config-tool:ubuntu
+      optional: true
+    - job: release:tools:send_sid:ubuntu
+      optional: true
+    - job: release:tools:config-tool:windows
+      optional: true
+    - job: release:tools:send_sid:windows
+      optional: true
+    - job: release:tools:config-tool:macos14
+      optional: true
+    - job: release:tools:send_sid:macos14
+      optional: true
+    - job: release:tools:config-tool:macos15-intel
+      optional: true
+    - job: release:tools:send_sid:macos15-intel
+      optional: true
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+# ============================================================================
+# RELEASE STAGE
+# ============================================================================
+
+# Create GitLab release for version tags (v*)
+create:release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  script:
+    - echo "Creating release for ${CI_COMMIT_TAG}"
+  release:
+    tag_name: ${CI_COMMIT_TAG}
+    name: "${CI_COMMIT_TAG}"
+    description: |
+      ## USBSID-Pico ${CI_COMMIT_TAG}
+
+      Firmware and tools release.
+
+      **Commits in this release:**
+      See the commit history for changes since the previous release.
+
+      ---
+      *Generated by GitLab CI/CD*
+    assets:
+      links:
+        - name: "Download all artifacts"
+          url: "${CI_PROJECT_URL}/-/pipelines/${CI_PIPELINE_ID}"
+          link_type: "other"
+  needs:
+    - job: release:firmware:pico
+    - job: release:firmware:pico_w
+    - job: release:firmware:pico2
+    - job: release:firmware:pico2_w
+    - job: release:firmware:pico_emulator
+    - job: release:firmware:pico_w_emulator
+    - job: release:firmware:pico2_emulator
+    - job: release:firmware:pico2_w_emulator
+    - job: release:firmware:pico2_sidplayer
+    - job: release:firmware:pico2_w_sidplayer
+    - job: package:tools
+  rules:
+    - if: $PIPELINE_TYPE == "release"
+
+# Create prerelease for date tags (d*)
+create:snapshot:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  script:
+    - echo "Creating snapshot prerelease for ${CI_COMMIT_TAG}"
+  release:
+    tag_name: ${CI_COMMIT_TAG}
+    name: "${CI_COMMIT_TAG} snapshot"
+    description: |
+      ## Snapshot Build ${CI_COMMIT_TAG}
+
+      This is an automated snapshot build for testing purposes.
+
+      **Note:** This is a prerelease and may contain bugs.
+
+      ---
+      *Generated by GitLab CI/CD*
+    assets:
+      links:
+        - name: "Download all artifacts"
+          url: "${CI_PROJECT_URL}/-/pipelines/${CI_PIPELINE_ID}"
+          link_type: "other"
+  needs:
+    - job: release:firmware:pico
+    - job: release:firmware:pico_w
+    - job: release:firmware:pico2
+    - job: release:firmware:pico2_w
+    - job: release:firmware:pico_emulator
+    - job: release:firmware:pico_w_emulator
+    - job: release:firmware:pico2_emulator
+    - job: release:firmware:pico2_w_emulator
+    - job: release:firmware:pico2_sidplayer
+    - job: release:firmware:pico2_w_sidplayer
+    - job: package:tools
+  rules:
+    - if: $PIPELINE_TYPE == "snapshot"
+
+# ============================================================================
+# CLEANUP - Remove old snapshot releases (equivalent to tagged_build cleanup)
+# This runs as a scheduled pipeline or can be triggered manually
+# ============================================================================
+
+cleanup:old-snapshots:
+  stage: prepare
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - |
+      echo "Cleaning up old snapshot prereleases..."
+      # This requires a GitLab API token with appropriate permissions
+      # Set GITLAB_API_TOKEN in CI/CD variables
+      if [ -z "$GITLAB_API_TOKEN" ]; then
+        echo "GITLAB_API_TOKEN not set, skipping cleanup"
+        exit 0
+      fi
+
+      API_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases"
+
+      # Get all releases
+      releases=$(curl -s --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" "${API_URL}")
+
+      # Count prereleases (those with 'd' prefix tags)
+      prerelease_count=0
+
+      echo "$releases" | jq -r '.[] | select(.tag_name | startswith("d")) | .tag_name' | while read tag; do
+        prerelease_count=$((prerelease_count + 1))
+
+        # Keep at least 10 prereleases
+        if [ $prerelease_count -gt 10 ]; then
+          # Get release created_at and check if older than 30 days
+          created_at=$(echo "$releases" | jq -r ".[] | select(.tag_name == \"$tag\") | .created_at")
+          created_timestamp=$(date -d "$created_at" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "$created_at" +%s 2>/dev/null)
+          current_timestamp=$(date +%s)
+          days_ago=$(( (current_timestamp - created_timestamp) / 86400 ))
+
+          if [ $days_ago -gt 30 ]; then
+            echo "Deleting old prerelease: $tag (${days_ago} days old)"
+            curl -s --request DELETE --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" "${API_URL}/${tag}"
+          fi
+        fi
+      done
+
+      echo "Cleanup complete"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $CLEANUP_SNAPSHOTS == "true"
+    - if: $PIPELINE_TYPE == "snapshot"
+      when: manual
+      allow_failure: true

@@ -363,7 +363,7 @@ void adjust_buffer_rate_dynamic(uint32_t target_rate)
       if (headroom < diff_size) {
         /* Critical: less than 1 frame headroom, aggressive reduction */
         new_rate = new_rate * 3 / 4;  /* 25% reduction */
-        usASID("Emergency rate reduction: %d\n", new_rate);
+        usWRN("Emergency rate reduction: %d\n", new_rate);
       }
     }
   }
@@ -641,7 +641,7 @@ static void ring_put(uint8_t item)
   uint16_t next_write = (asid_ringbuffer.ring_write + 1) % ring_size;
   if (next_write == asid_ringbuffer.ring_read) {
     /* Buffer full - would overflow. Drop this byte to prevent corruption. */
-    usASID("Buffer overflow - dropping data\n");
+    usERR("Buffer overflow - dropping data\n");
     return;
   }
 
