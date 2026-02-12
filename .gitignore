@@ -46,7 +46,6 @@
 !lib
 !lib/emulator
 !lib/emudore-embedded
-!lib/emudore-embedded/**
 !lib/emulator/roms
 
 # non firmware related directories
@@ -65,19 +64,21 @@
 !media
 !examples
 !examples/cloje64
-!examples/cloje64/**
 !examples/config-tool
 !examples/config-tool/ini-examples
 !examples/config-tool/inih
-!examples/config-tool/inih/**
 !examples/send_sid
-!examples/send_sid/**
 !examples/hardsid-sidblaster
-!examples/hardsid-sidblaster/**
 !examples/udev-rules
-!examples/udev-rules/**
 !examples/vmpk
-!examples/vmpk/**
 !examples/webconfig-tool
-!examples/webconfig-tool/**
 !resources
+
+# recursive directory contents
+!lib/emudore-embedded/**
+!examples/cloje64/**
+!examples/config-tool/inih/**
+!examples/hardsid-sidblaster/**
+!examples/udev-rules/**
+!examples/vmpk/**
+!examples/webconfig-tool/**
