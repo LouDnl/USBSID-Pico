@@ -1438,6 +1438,7 @@ void print_help(void)
   printf("  -defaults,--config-defaults   : Reset USBSID-Pico config to defaults\n");
   printf("                                  Add optional positional argument `1` to reboot USBSID-Pico afterwards\n");
   printf("--[PRESETS]---------------------------------------------------------------------------------------------------------\n");
+  printf("  -flip,    --flip-sockets      : Flip sockets SocketOne becomes SocketTwo, SocketTwo becomes SocketOne\n");
   printf("  (add '-q' before any of the preset commands for a quick change and apply the config without saving and rebooting)\n");
   printf("  -single,  --single-sid        : Socket 1 enabled @ single SID, Socket 2 disabled\n");
   printf("  -single2, --single-sid-s2     : Socket 1 disabled, Socket 2 enabled @ single SID\n");
@@ -1628,6 +1629,11 @@ void config_usbsidpico(int argc, char **argv)
     if (!strcmp(argv[param_count], "-mirrored") || !strcmp(argv[param_count], "--mirrored-sid")) {
       printf("Set USBSID-Pico config to single -> dual mirrored SID\n");
       write_config_command(MIRRORED_SID, quickchange, 0 ,0 ,0);
+      goto exit;
+    }
+    if (!strcmp(argv[param_count], "-flip") || !strcmp(argv[param_count], "--flip-sockets")) {
+      printf("Set USBSID-Pico config to flip sockets One <-> Two\n");
+      write_config_command(FLIP_SOCKETS, 0, 0 ,0 ,0);
       goto exit;
     }
 
