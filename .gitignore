@@ -34,10 +34,13 @@
 !libusb-1.0.dll
 !libwinpthread-1.dll
 
-# folders
+# repo directories
 !.github
 !.github/**
 !.gitlab
+!.gitlab/**
+
+# firmware source directories
 !src
 !src/pio
 !lib
@@ -45,6 +48,10 @@
 !lib/emudore-embedded
 !lib/emudore-embedded/**
 !lib/emulator/roms
+
+# non firmware related directories
+!cases
+!cases/**
 !doc
 !doc/images
 !doc/images/firmware
@@ -56,7 +63,6 @@
 !images
 !images/tees
 !media
-!resources
 !examples
 !examples/cloje64
 !examples/cloje64/**
@@ -65,25 +71,13 @@
 !examples/config-tool/inih
 !examples/config-tool/inih/**
 !examples/send_sid
-!examples/drivers
-!examples/drivers/hardsid-sidblaster
-!examples/drivers/hardsid-sidblaster/**
-!examples/libsidplayfp
-!examples/libsidplayfp/**
-!examples/sidplayfp
-!examples/sidplayfp/**
-!examples/USBSID-Pico-driver
-!examples/USBSID-Pico-driver/**
-!examples/sidberry
-!examples/vice
-!examples/retrodebugger
-!examples/libsidplayfp
-!examples/sidplayfp
-!examples/USBSID-Pico-driver
+!examples/send_sid/**
 !examples/hardsid-sidblaster
-!examples/udev-rules
-!cases
-!cases/**
-
-# folder contents
 !examples/hardsid-sidblaster/**
+!examples/udev-rules
+!examples/udev-rules/**
+!examples/vmpk
+!examples/vmpk/**
+!examples/webconfig-tool
+!examples/webconfig-tool/**
+!resources
