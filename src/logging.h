@@ -69,6 +69,8 @@ do {                                 \
 #endif
 
 #define usNFO(...) __DBG(__VA_ARGS__) /* Info logging, cannot be turned off */
+#define usERR(fmt, ...) __DBG("[ERROR] " fmt __VA_OPT__(,) __VA_ARGS__) /* Error logging, cannot be turned off */
+#define usWRN(fmt, ...) __DBG("[WARNING] " fmt __VA_OPT__(,) __VA_ARGS__) /* Warning logging, cannot be turned off */
 
 #ifdef USBSID_DEBUG
 #define usDBG(fmt, ...) __DBG("[DBG] " fmt __VA_OPT__(,) __VA_ARGS__)
