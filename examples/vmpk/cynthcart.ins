@@ -1,0 +1,106 @@
+;
+; USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board
+; for interfacing one or two MOS SID chips and/or hardware SID emulators over
+; (WEB)USB with your computer, phone or ASID supporting player
+;
+; cynthcart.ins
+; This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
+; File author: LouD
+;
+; Copyright (c) 2024-2026 LouD
+;
+; This program is free software: you can redistribute it and/or modify
+; it under the terms of the GNU General Public License as published by
+; the Free Software Foundation, version 2.
+;
+; This program is distributed in the hope that it will be useful, but
+; WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+; General Public License for more details.
+;
+; You should have received a copy of the GNU General Public License
+; along with this program. If not, see <http://www.gnu.org/licenses/>.
+;
+
+; ----------------------------------------------------------------------
+
+.Patch Names
+
+[Cynthcart]
+
+0=00 SW BASS
+1=01 GRITTY BASS
+2=02 PORTAMENTO 5THS
+3=03 SAW PORTAMENTO
+4=04 PULSE 5THS
+5=05 PULSE HIGH PORT
+6=06 TRIANGLE HIGH LONG
+7=07 TRIANGLE DROP
+8=08 SID EXPLOSION
+9=09 MUTE
+10=10 FILTER BASS
+11=11 SWEEP ARP
+12=12 PLUCK ARP
+13=13 SLOW ARP
+14=14 FILTER STACK 1
+15=15 FILTER STACK 2
+16=16 PULSAR
+17=17 VIBRATO LEAD
+18=18 SLOW RISE
+19=19 BENDING ECHO
+20=20 6-VOICE SAW
+21=21 ARP LEAD
+22=22 LASER BASS
+23=23 TROMBONE BLAST
+24=24 NOISY SQUARE ARP
+25=25 TRIANGLE SYNC
+26=26 MONO SYNC ECHO
+27=27 CLEAN SAWTOOTH
+28=28 CLEAN TRIANGLE
+29=29 CLEAN SQUARE
+30=30 SAWTOOTH BASS
+
+
+; ----------------------------------------------------------------------
+
+.Note Names
+
+; ----------------------------------------------------------------------
+
+.Controller Names
+
+[USBSID Cynthcart Control]
+0=Filter Resonance
+1=Filter Cutoff (wheel)
+2=Select Voice Mode
+3=Select Modulation Mode
+4=Attack
+5=Release
+6=Pulse Width
+7=Master Volume
+8=Tremolo Depth
+9=Tremolo Speed
+13=Osc Waveform (all voices)
+14=Osc Waveform (voice 2 only)
+15=Osc Waveform (voice 3 only)
+85=Start Cynthcart
+86=Stop Cynthcart
+87=Reset Cynthcart
+
+; ----------------------------------------------------------------------
+
+.RPN Names
+
+; ----------------------------------------------------------------------
+
+.NRPN Names
+
+; ----------------------------------------------------------------------
+
+.Instrument Definitions
+
+[USBSID-Pico]
+Control=USBSID Cynthcart Control
+; Bank MSB 0 starts at 0
+Patch[0]=Cynthcart
+; Bank MSB 1 starts at 128
