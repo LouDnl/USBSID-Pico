@@ -37,15 +37,20 @@ extern Config usbsid_config;
 extern char *mono_stereo[2];
 
 
-/* Read GPIO macro
+/**
+ * @brief read gpio in bus state
  *
- * Partly copied from and inspired by SKPico code by frenetic
- * see: https://github.com/frntc/SIDKick-pico
+ * @return uint32_t the complete bus state
  */
-register uint32_t b asm( "r10" );
-volatile const uint32_t *BUSState = &sio_hw->gpio_in;
+static inline uint32_t read_bus(void)
+{
+  return sio_hw->gpio_in;
+}
 
-
+/**
+ * @brief Initialize default GPIO states at boot
+ *
+ */
 void init_gpio(void)
 { /* GPIO defaults for PIO bus */
   gpio_set_dir(RES, GPIO_OUT);
@@ -69,7 +74,13 @@ void init_gpio(void)
   return;
 }
 
-/* Detect clock signal */
+/**
+ * @brief Detect clock signal at PHI1
+ * @note only applicable for PCB v1.0
+ *
+ * @return int 1 for detected
+ * @return int 0 for undetected
+ */
 int detect_clocksignal(void)
 {
   usCFG("[DETECT CLOCK] START\n");
@@ -77,20 +88,23 @@ int detect_clocksignal(void)
   gpio_init(PHI1);
   gpio_set_pulls(PHI1, false, true);
   for (int i = 0; i < 20; i++) {
-    b = *BUSState; /* read complete bus */
-    r |= c = (b & bPIN(PHI1)) >> PHI1;
+    r |= c = (read_bus() & bPIN(PHI1)) >> PHI1;
   }
   usCFG("[RESULT] %d: %s\n", r, (r == 0 ? "INTERNAL CLOCK" : "EXTERNAL CLOCK"));
   usCFG("[DETECT CLOCK] END\n");
   return r;  /* 1 if clock detected */
 }
 
+/**
+ * @brief Toggle the audio switch on <-> off
+ * @note only applicable for PCB v1.3
+ *
+ */
 void toggle_audio_switch(void)
 { /* Toggle the SPST switch stereo <-> mono */
   #if defined(HAS_AUDIOSWITCH)
   if (!usbsid_config.lock_audio_sw) {
-    b = *BUSState; /* read complete bus */
-    int audio_state = (b & bPIN(AU_SW)) >> AU_SW; /* Pinpoint current audio switch state */
+    int audio_state = (read_bus() & bPIN(AU_SW)) >> AU_SW; /* Pinpoint current audio switch state */
     audio_state ^= 1;
     usCFG("TOGGLE AUDIO SWITCH TO: %d (%s)\n", (int)audio_state, mono_stereo[(int)audio_state]);
     tPIN(AU_SW);  /* toggle mono <-> stereo */
@@ -102,6 +116,12 @@ void toggle_audio_switch(void)
   #endif
 }
 
+/**
+ * @brief Set the audio switch to on or off
+ * @note only applicable for PCB v1.3
+ *
+ * @param boolean switch state
+ */
 void set_audio_switch(bool state)
 { /* Set the SPST switch */
   #if defined(HAS_AUDIOSWITCH)
