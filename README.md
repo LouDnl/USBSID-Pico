@@ -23,10 +23,12 @@ Shop link: [https://greyandslate.etsy.com/?search_query=usbsid](https://greyands
 # Index
 * [Software support & Features](#software-support-and-features)
   * [Software manual](doc/USBSID-Pico-software-manual.adoc) [PDF](doc/USBSID-Pico-software-manual.pdf)
-  * [SID Playing](#sid-playing)
-  * [C64 emulators](#c64-emulators)
-  * [C64 Music trackers](#c64-music-trackers)
-  * [Amiga](#amiga)
+  * [SID files](#sid-files)
+    - [Webbased SID players](#webbased-sid-players)
+    - [SID players](#sid-players)
+    - [Amiga SID players](#amiga-sid-players)
+  * [Commodore 64 emulators](#commodore-64-emulators)
+  * [Chiptune trackers using SID's](#chiptune-trackers-using-sids)
   * [Driver code](#driver-code)
   * [Midi](#midi)
 * [Questions & Support](#questions-and-support)
@@ -60,13 +62,12 @@ Shop link: [https://greyandslate.etsy.com/?search_query=usbsid](https://greyands
 * [Disclaimer](#disclaimer)
 * [License](#license)
 * [Certification](#certification)
-* [Changelog](CHANGELOG.md)
 
 # Software support and features
 ![USBSID-Pico](images/pcbv1.3-pdsid.png)  
 See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for more information on how to use supported software!  
 
-### SID files
+## SID files
 USBSID-Pico supports various ways of playing SID files.
 
 #### Webbased SID players 
@@ -81,7 +82,7 @@ _Chrome webbrowser only_
 |:-:|:-:|:-:|:-:|  
 | [<img src="images/acid64.png" width="100em">](https://acid64.com/) | [<img src="images/vice.svg" width="100em">](https://sourceforge.net/projects/vice-emu/) | [<img src="images/libsidplayfp.png" width="100em">](https://github.com/libsidplayfp/) | [<img src="images/phosphor.png" width="100em">](https://github.com/sandlbn/Phosphor) |  
 | version [4.4.0](https://acid64.com/download)<br>(Windows only) | version [3.10.0](https://github.com/VICE-Team/svn-mirror/releases/tag/3.10.0) | player [2.16](https://github.com/libsidplayfp/libsidplayfp/releases/tag/v2.16.0rc)<br>lib [2.16](https://github.com/libsidplayfp/sidplayfp/releases/tag/v2.16.0rc) | [any version](https://github.com/sandlbn/Phosphor/releases) |  
-| up to 4 SIDs | up to 3 SIDs | up to 3 SIDs | up to 4 SIDs |  
+| up to 3 SIDs | up to 3 SIDs | up to 3 SIDs | up to 4 SIDs |  
 
 Other:
 - [SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux & Windows with up to 4 SIDs supported (Windows version is buggy).
@@ -91,7 +92,7 @@ Other:
 Real SID's on the Amiga? Why yes!
 - [erique](https://github.com/erique) and [koobo](https://github.com/koobo) have added support to [playsid](https://github.com/erique/playsid.library)  
 
-### Commodore 64 emulators
+## Commodore 64 emulators
 Official support has been added to:  
 | Vice | JSIDPlay2 | Denise |
 |:-:|:-:|:-:|  
@@ -102,21 +103,20 @@ Official support has been added to:
 Others:
 - Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouDnl/RetroDebugger), up to 4 SIDs are supported.
 
-### Chiptune trackers using SID's
+## Chiptune trackers using SID's
 Into creating chiptunes? USBSID-Pico is your board!
 - You should be able to use the ASID fork of [sidfactory2](https://github.com/Chordian/sidfactory2/tree/asid-support) without issues.  
 - When using Vice or RetroDebugger you can freely use applications like [SID-Wizard](https://sourceforge.net/projects/sid-wizard/) for music creation.  
 - There is also work being done in my forks of [GTUltra](https://github.com/LouDnl/GTUltra-USBSID) and [Goattracker2](https://github.com/LouDnl/goattracker2).  
   Ask on Discord for latest binaries :)
 
-
-### Driver code
+## Driver code
 Want to create your own implementation? You can by using the driver code examples below
 - [USBSID-Pico driver](https://github.com/LouDnl/USBSID-Pico-driver) repo is available @ https://github.com/LouDnl/USBSID-Pico-driver and contains `C++`, `Java` and `Javascript` implementation examples
   - [@sandlbn](https://github.com/sandlbn) has created a driver in `Rust` which is available here [USBSID-Pico-Rust-driver](https://github.com/sandlbn/USBSID-Pico-Rust-driver)
 - [HardSID USB / SidBlaster USB](examples/hardsid-sidblaster) emulation driver example
 
-### Midi
+## Midi
 USBSID-Pico acts as Midi device and supports basic Midi in ~ note that Midi is still in development and in Beta phase.  
 This means that no support is available here at this time, please visit the Discord for more information.
 
@@ -183,7 +183,7 @@ An example rule file can be found [here](examples/udev-rules/69-usbsid-permissio
 See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for driver installation information!
 
 # Firmware
-See the [firmware changelog](CHANGELOG.md) for more information on what's changed and previous releases.  
+See the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on what's changed and previous releases.  
 
 ### Configuring your board's firmware
 See the [Firmware manual](doc/USBSID-Pico-firmware-manual.adoc) for more information on how to set up your board!  
