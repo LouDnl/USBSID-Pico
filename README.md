@@ -84,7 +84,8 @@ _Chrome webbrowser only_
 | up to 4 SIDs | up to 3 SIDs | up to 3 SIDs | up to 4 SIDs |  
 
 Other:
-- [SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux & Windows with up to 4 SIDs supported (Windows version is buggy).  
+- [SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux & Windows with up to 4 SIDs supported (Windows version is buggy).
+- [TrueSID](https://csdb.dk/release/?id=259243) TrueSID is a Python based graphical SID player which utilizes JSIDPlay2 and / or SidplayFp to play SID tunes  
 
 #### Amiga SID players
 Real SID's on the Amiga? Why yes!
