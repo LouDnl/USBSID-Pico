@@ -65,42 +65,57 @@ Shop link: [https://greyandslate.etsy.com/?search_query=usbsid](https://greyands
 # Software support and features
 ![USBSID-Pico](images/pcbv1.3-pdsid.png)  
 See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for more information on how to use supported software!  
-#### SID Playing
+
+### SID files
 USBSID-Pico supports various ways of playing SID files.
+
+#### Webbased SID players 
+_Chrome webbrowser only_  
 - Out-of-the box playing is supported by using [Deepsid by Chordian](https://deepsid.chordian.net)  
   by selecting `WebUSB (Hermit)` as player in the pulldown menu or  
   by selecting `ASID (MIDI)` as player in the pulldown menu.
 - Out-of-the box playing is also supported by using [C64jukebox by Kenchis](https://haendel.ddns.net:8443/static/c64jukebox.vue), note that this is still in BETA.  
-- [SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux & Windows with up to 4 SIDs supported (Windows version is buggy).  
-#### C64 emulators
-Several Commodore 64 emulatores have official support  
 
-| Vice | JSIDPlay2 | Denise | (lib)sidplayfp |  
+#### SID players
+| Acid64 Pro | VSID(Vice) | (lib)sidplayfp | Phosphor |  
 |:-:|:-:|:-:|:-:|  
-| [<img src="images/vice.svg" width="100em">](https://github.com/VICE-Team/svn-mirror/releases/tag/3.10.0) | [<img src="images/jsidplay2.png" width="100em">](https://haendel.ddns.net/~ken/#_latest_beta_versions) | [<img src="images/denise.png" width="100em">](https://sourceforge.net/projects/deniseemu/) | [<img src="images/libsidplayfp.png" width="100em">](https://github.com/libsidplayfp/) |
-| version [3.10.0](https://github.com/VICE-Team/svn-mirror/releases/tag/3.10.0) | version [4.13](https://sourceforge.net/projects/jsidplay2/files/jsidplay2/4.13/) | version [2.7](https://sourceforge.net/projects/deniseemu/) | player [2.16](https://github.com/libsidplayfp/libsidplayfp/releases/tag/v2.16.0rc)<br>lib [2.16](https://github.com/libsidplayfp/sidplayfp/releases/tag/v2.16.0rc) |  
-| up to 4 SIDs in x64sc<br>up to 3 SIDs in vsid | up to 4 SIDs | up to 4 SIDs | up to 4 SIDs |  
+| [<img src="images/acid64.png" width="100em">](https://acid64.com/) | [<img src="images/vice.svg" width="100em">](https://sourceforge.net/projects/vice-emu/) | [<img src="images/libsidplayfp.png" width="100em">](https://github.com/libsidplayfp/) | [<img src="images/phosphor.png" width="100em">](https://github.com/sandlbn/Phosphor) |  
+| version [4.4.0](https://acid64.com/download)<br>(Windows only) | version [3.10.0](https://github.com/VICE-Team/svn-mirror/releases/tag/3.10.0) | player [2.16](https://github.com/libsidplayfp/libsidplayfp/releases/tag/v2.16.0rc)<br>lib [2.16](https://github.com/libsidplayfp/sidplayfp/releases/tag/v2.16.0rc) | [any version](https://github.com/sandlbn/Phosphor/releases) |  
+| up to 4 SIDs | up to 3 SIDs | up to 3 SIDs | up to 4 SIDs |  
 
-And some have unofficial support through forks on my Github
+Other:
+- [SidBerry](https://github.com/LouDnl/SidBerry) is a command line SID file player for Linux & Windows with up to 4 SIDs supported (Windows version is buggy).  
+
+#### Amiga SID players
+Real SID's on the Amiga? Why yes!
+- [erique](https://github.com/erique) and [koobo](https://github.com/koobo) have added support to [playsid](https://github.com/erique/playsid.library)  
+
+### Commodore 64 emulators
+Official support has been added to:  
+| Vice | JSIDPlay2 | Denise |
+|:-:|:-:|:-:|  
+| [<img src="images/vice.svg" width="100em">](https://sourceforge.net/projects/vice-emu/) | [<img src="images/jsidplay2.png" width="100em">](https://haendel.ddns.net/~ken/#_latest_beta_versions) | [<img src="images/denise.png" width="100em">](https://sourceforge.net/projects/deniseemu/) |  
+| version [3.10.0](https://github.com/VICE-Team/svn-mirror/releases/tag/3.10.0) | version [4.13](https://sourceforge.net/projects/jsidplay2/files/jsidplay2/4.13/) | version [2.7](https://sourceforge.net/projects/deniseemu/) |  
+| up to 4 SIDs in x64sc | up to 4 SIDs | up to 4 SIDs |  
+
+Others:
 - Unofficial support is added to a fork of [RetroDebugger](https://github.com/LouDnl/RetroDebugger), up to 4 SIDs are supported.
 
-#### C64 Music trackers
+### Chiptune trackers using SID's
 Into creating chiptunes? USBSID-Pico is your board!
 - You should be able to use the ASID fork of [sidfactory2](https://github.com/Chordian/sidfactory2/tree/asid-support) without issues.  
 - When using Vice or RetroDebugger you can freely use applications like [SID-Wizard](https://sourceforge.net/projects/sid-wizard/) for music creation.  
-- There is also work being done in my forks of [Goattracker2](https://github.com/LouDnl/goattracker2) and [GTUltra](https://github.com/LouDnl/GTUltra-USBSID).  
+- There is also work being done in my forks of [GTUltra](https://github.com/LouDnl/GTUltra-USBSID) and [Goattracker2](https://github.com/LouDnl/goattracker2).  
   Ask on Discord for latest binaries :)
 
-#### Amiga
-Real SID's on the Amiga? Why yes!
-- [erique](https://github.com/erique) and [koobo](https://github.com/koobo) have added support to [playsid](https://github.com/erique/playsid.library)
 
-#### Driver code
+### Driver code
 Want to create your own implementation? You can by using the driver code examples below
 - [USBSID-Pico driver](https://github.com/LouDnl/USBSID-Pico-driver) repo is available @ https://github.com/LouDnl/USBSID-Pico-driver and contains `C++`, `Java` and `Javascript` implementation examples
+  - [@sandlbn](https://github.com/sandlbn) has created a driver in `Rust` which is available here [USBSID-Pico-Rust-driver](https://github.com/sandlbn/USBSID-Pico-Rust-driver)
 - [HardSID USB / SidBlaster USB](examples/hardsid-sidblaster) emulation driver example
 
-#### Midi
+### Midi
 USBSID-Pico acts as Midi device and supports basic Midi in ~ note that Midi is still in development and in Beta phase.  
 This means that no support is available here at this time, please visit the Discord for more information.
 
