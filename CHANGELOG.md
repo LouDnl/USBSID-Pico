@@ -1,3 +1,6 @@
+# **DEPRECATED**
+Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on version changes
+
 # Changelog
 
 #### In progress, expected release v0.6.0-BETA
