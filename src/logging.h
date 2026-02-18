@@ -110,14 +110,18 @@ do {                                 \
 
 #ifdef MIDI_DEBUG
 #define usMIDI(fmt, ...) __DBG("[MIDI] " fmt __VA_OPT__(,) __VA_ARGS__)
+#define usMCMD(...) __DBG(__VA_ARGS__)
 #else
 #define usMIDI(...) ((void)0)
+#define usMCMD(...) ((void)0)
 #endif
 
 #ifdef MIDIVOICE_DEBUG
 #define usMVCE(fmt, ...) __DBG("[MVOICE] " fmt __VA_OPT__(,) __VA_ARGS__)
+#define usMDAT(...) __DBG(__VA_ARGS__)
 #else
 #define usMVCE(...) ((void)0)
+#define usMDAT(...) ((void)0)
 #endif
 
 #ifdef ASID_DEBUG

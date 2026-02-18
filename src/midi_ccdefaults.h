@@ -69,57 +69,71 @@ typedef struct midi_ccvalues {
   uint8_t CC_VOL;   /* Channel Volume */
   /* Fixed values ~ Voice related */
   uint8_t CC_ATT;   /* Attack */
-  uint8_t CC_DEL;   /* Decay */
+  uint8_t CC_DEC;   /* Decay */
   uint8_t CC_SUS;   /* Sustain */
   uint8_t CC_REL;   /* Release */
   /* Fixed undefined CC values ~ Cynthcart related */
   uint8_t CC_CEN;   /* Enable  Cynthcart */
   uint8_t CC_CDI;   /* Disable Cynthcart */
   uint8_t CC_CRE;   /* Restart Cynthcart */
+  /* Fixed CC values ~ SID / Voice selection */
+  uint8_t CC_SID1;  /* 102 ~ Select SID 1 */
+  uint8_t CC_SID2;  /* 103 ~ Select SID 2 */
+  uint8_t CC_SID3;  /* 104 ~ Select SID 3 */
+  uint8_t CC_SID4;  /* 105 ~ Select SID 4 */
+  uint8_t CC_VCE1;  /* 106 ~ Select Voice 1 */
+  uint8_t CC_VCE2;  /* 107 ~ Select Voice 2 */
+  uint8_t CC_VCE3;  /* 108 ~ Select Voice 3 */
 } midi_ccvalues;
 
 /* Default Control Change Byte values */
 #define MIDI_DEFAULT_CCVALUES_INIT { \
-  /* Modifyable values ~ Voice related */ \
-  .CC_NOTE =  0x14,  /*  20 ~ Note frequency */ \
+  /* Default values ~ Voice related */ \
+  .CC_NOTE =  0x01,  /*   1 ~ Note frequency for manual input */ \
   .CC_PWM  =  0x15,  /*  21 ~ Pulse Width Modulation (Modulation wheel) */ \
-  .CC_NOIS =  0x16,  /*  22 ~ Noise waveform */ \
-  .CC_PULS =  0x17,  /*  23 ~ Pulse waveform */ \
-  .CC_SAWT =  0x18,  /*  24 ~ Sawtooth waveform */ \
-  .CC_TRIA =  0x19,  /*  25 ~ Triangle waveform */ \
-  .CC_TEST =  0x1A,  /*  26 ~ Test bit */ \
-  .CC_RMOD =  0x1B,  /*  27 ~ Ring modulator bit */ \
-  .CC_SYNC =  0x1C,  /*  28 ~ Sync bit */ \
-  .CC_GATE =  0x1D,  /*  29 ~ Gate bit */ \
-  .CC_GTEN =  0x1E,  /*  30 ~ Gate auto enabled on noteon note off */ \
-  /* Modifyable values ~ Chip related */ \
-  .CC_FFC  =  0x6E,  /* 110 ~ Filter Frequency Cutoff */ \
-  .CC_RES  =  0x6F,  /* 111 ~ Filter resonance */ \
-  .CC_3OFF =  0x70,  /* 112 ~ Voice 3 disconnect */ \
-  .CC_FLT1 =  0x71,  /* 113 ~ Filter voice 1 */ \
-  .CC_FLT2 =  0x72,  /* 114 ~ Filter voice 2 */ \
-  .CC_FLT3 =  0x73,  /* 115 ~ Filter voice 3 */ \
-  .CC_FLTE =  0x74,  /* 116 ~ Filter external */ \
-  .CC_HPF  =  0x75,  /* 117 ~ High pass */ \
-  .CC_BPF  =  0x76,  /* 118 ~ Band pass */ \
-  .CC_LPF  =  0x77,  /* 119 ~ Low pass */ \
-  /* Fixed values ~ Midi related */ \
-  .CC_BMSB =  0x00,  /*   0 ~ Bank Select MSB */ \
-  .CC_BLSB =  0x20,  /*  32 ~ Bank Select LSB */ \
-  .CC_MOD  =  0x01,  /*   1 ~ Modulation wheel */ \
-  .CC_MODL =  0x21,  /*  33 ~ Modulation wheel LSB */ \
-  .CC_AOFF =  0x78,  /* 123 ~ All notes off */ \
-  /* Fixed values ~ Chip related */ \
-  .CC_VOL  =  0x07,  /*   7 ~ Channel Volume */ \
-  /* Fixed values ~ Voice related */ \
-  .CC_ATT  =  0x49,  /*  73 ~ Attack */ \
-  .CC_DEL  =  0x4B,  /*  75 ~ Decay */ \
-  .CC_SUS  =  0x40,  /*  64 ~ Sustain */ \
-  .CC_REL  =  0x48,  /*  72 ~ Release */ \
-  /* Fixed (undefined) CC values ~ Cynthcart related */ \
+  .CC_NOIS =  0x02,  /*   2 ~ Noise waveform */ \
+  .CC_PULS =  0x03,  /*   3 ~ Pulse waveform */ \
+  .CC_SAWT =  0x04,  /*   4 ~ Sawtooth waveform */ \
+  .CC_TRIA =  0x05,  /*   5 ~ Triangle waveform */ \
+  .CC_TEST =  0x06,  /*   6 ~ Test bit */ \
+  .CC_RMOD =  0x07,  /*   7 ~ Ring modulator bit */ \
+  .CC_SYNC =  0x08,  /*   8 ~ Sync bit */ \
+  .CC_GATE =  0x10,  /*  16 ~ Gate bit */ \
+  .CC_ATT  =  0x11,  /*  17 ~ Attack */ \
+  .CC_DEC  =  0x12,  /*  18 ~ Decay */ \
+  .CC_SUS  =  0x13,  /*  19 ~ Sustain */ \
+  .CC_REL  =  0x14,  /*  20 ~ Release */ \
+  /* Default values ~ Chip related */ \
+  .CC_FFC  =  0x20,  /*  32 ~ Filter Frequency Cutoff */ \
+  .CC_RES  =  0x21,  /*  33 ~ Filter resonance */ \
+  .CC_FLT1 =  0x22,  /*  34 ~ Filter voice 1 */ \
+  .CC_FLT2 =  0x23,  /*  35 ~ Filter voice 2 */ \
+  .CC_FLT3 =  0x24,  /*  36 ~ Filter voice 3 */ \
+  .CC_FLTE =  0x25,  /*  37 ~ Filter external */ \
+  .CC_3OFF =  0x30,  /*  48 ~ Voice 3 disconnect */ \
+  .CC_HPF  =  0x31,  /*  49 ~ High pass */ \
+  .CC_BPF  =  0x32,  /*  50 ~ Band pass */ \
+  .CC_LPF  =  0x33,  /*  51 ~ Low pass */ \
+  .CC_VOL  =  0x34,  /*  52 ~ Channel Volume */ \
+  /* Default CC values ~ SID / Voice selection */ \
+  .CC_GTEN =  0x40,  /*  64 ~ Gate auto enabled on noteon note off */ \
+  .CC_SID1 =  0x68,  /* 104 ~ Select SID 1 */ \
+  .CC_SID2 =  0x69,  /* 105 ~ Select SID 2 */ \
+  .CC_SID3 =  0x6A,  /* 106 ~ Select SID 3 */ \
+  .CC_SID4 =  0x6B,  /* 107 ~ Select SID 4 */ \
+  .CC_VCE1 =  0x6C,  /* 108 ~ Select Voice 1 */ \
+  .CC_VCE2 =  0x6D,  /* 109 ~ Select Voice 2 */ \
+  .CC_VCE3 =  0x6E,  /* 110 ~ Select Voice 3 */ \
+  /* Cynthcart related _FIXED_ CC values */ \
   .CC_CEN  =  0x55,  /*  85 ~ Enable Cynthcart */ \
   .CC_CDI  =  0x56,  /*  86 ~ Disable Cynthcart */ \
   .CC_CRE  =  0x57,  /*  87 ~ Reset Cynthcart */ \
+  /* Unused values ~ Midi related */ \
+  .CC_BMSB =  0xFF,  /*   0 ~ Bank Select MSB */ \
+  .CC_BLSB =  0xFF,  /*  32 ~ Bank Select LSB */ \
+  .CC_MOD  =  0xFF,  /*   1 ~ Modulation wheel */ \
+  .CC_MODL =  0xFF,  /*  33 ~ Modulation wheel LSB */ \
+  .CC_AOFF =  0xFF,  /* 123 ~ All notes off */ \
 } \
 
 /* static const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT; */

@@ -128,9 +128,11 @@ static const enum raster_rates rasterrates[]  = { R_DEFAULT, R_PAL, R_NTSC, R_NT
 
 /* Masks 🤿 we use */
 typedef enum {
+  MIN_VAL = 0,
   BYTE = 0xFF,
   L_NIBBLE = 0xF0,
-  R_NIBBLE = 0xF,
+  R_NIBBLE = 0x0F,
+  NIBBLE_MAX = 0xF,
   TRIPLE_NIBBLE = 0xFFF,
   NIBBLE_3 = 0xF00,
   H_BYTE = 0xFF00,
@@ -139,7 +141,10 @@ typedef enum {
   MIDI_CC_MAX = 0x7F,
   VOICE_FREQLO = BYTE,
   VOICE_FREQHI = BYTE,
+  CUTOFF_MAX = 2047,
+  MIDI_MAX = 0x7f7f,
   SHIFT_3 = 3,
+  SHIFT_4 = 4,
   SHIFT_8 = 8,
   ZERO  = 0,
   ONE   = 1,
@@ -195,7 +200,7 @@ enum {
 
 enum {
   /* sid_states ~  SID registers */
-  /* TODO: THESE NEED TO GO BUT ARE USED IN sid_routines.c  */
+  /* NOTICE: THESE ARE USED IN sid_routines.c and midi_handler.c */
   NOTELO =  0,
   NOTEHI =  1,
   PWMLO  =  2,
