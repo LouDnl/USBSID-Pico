@@ -54,7 +54,7 @@ extern Config usbsid_config;
 extern uint32_t clockcycles(void);
 
 /* PIO */
-PIO raster_pio = pio1;
+const PIO raster_pio = pio1;
 static uint sm_buffer, offset_buffer;
 bool buffer_sm_started = false;
 bool buffer_sm_claimed = false;
@@ -75,7 +75,7 @@ volatile /* static */ uint8_t frames_since_nowrites = 0;  /* Frames since last S
 static uint8_t frames_since_multisid = 0;  /* Frames since last SID2/3/4 message */
 
 /* IRQ */
-int pio_irq;
+static int pio_irq;
 static int8_t buffer_irq;
 const int BUFFPIOIRQ = 2;
 bool buffer_irq_started = false;
