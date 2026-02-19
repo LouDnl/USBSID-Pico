@@ -44,6 +44,7 @@
 const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT;
 
 /* sid.c */
+extern void reset_sid(void);
 extern void reset_sid_registers(void);
 
 /* midi_handler.c */
@@ -98,6 +99,7 @@ inline void emulator_queue_deinit(void)
   /* emudore */
   queue_free(&cynthcart_queue);
   reset_sid();
+  reset_sid_registers();
 }
 
 inline void handle_emulater_data(void)
