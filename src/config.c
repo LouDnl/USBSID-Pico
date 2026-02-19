@@ -52,7 +52,7 @@ extern queue_t sidtest_queue;
 extern bool auto_config;
 #if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
 /* Offload Vu to Cora1 when running C64 on Core2 */
-extern bool offload_ledrunner;
+extern volatile bool offload_ledrunner;
 #endif
 
 /* GPIO */

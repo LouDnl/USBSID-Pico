@@ -48,11 +48,11 @@ volatile uint32_t cycle_count_word;
 extern PIO led_pio;
 extern uint sm_pwmled;
 int dma_pwmled;
-int pwm_value = 0;
+volatile int pwm_value = 0;
 #if defined(USE_RGB)  /* No RGB LED on _w Pico's */
 extern uint sm_rgbled;
 int dma_rgbled;
-uint32_t rgb_value = 0;
+volatile uint32_t rgb_value = 0;
 #endif
 #endif
 

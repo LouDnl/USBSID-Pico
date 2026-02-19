@@ -51,16 +51,16 @@ uint8_t * sid_memory = &c64memory[0xd400];
 uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __aligned(2 * (0x20 * 4));
 #endif
 
-int usb_connected = 0, usbdata = 0;
+volatile int usb_connected = 0, usbdata = 0;
 uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
 uint8_t *cdc_itf = 0, *wusb_itf = 0;
 /* nonetype, datatype, returntype */
-char ntype = '0', dtype = '0', rtype = '0';
-char cdc = 'C', asid = 'A', midi = 'M', sysex = 'S', wusb = 'W', uart = 'U';
+volatile char ntype = '0', dtype = '0', rtype = '0';
+const char cdc = 'C', asid = 'A', midi = 'M', sysex = 'S', wusb = 'W', uart = 'U';
 bool web_serial_connected = false;
 
 double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
-bool auto_config = false;
+volatile bool auto_config = false;
 volatile bool offload_ledrunner = false;
 
 /* Init var pointers for external use */
@@ -103,7 +103,7 @@ extern void init_uart(void);
 #endif
 
 /* Vu */
-extern uint16_t vu;
+extern volatile uint16_t vu;
 extern void init_vu(void);
 extern void led_runner(void);
 
@@ -256,6 +256,7 @@ void webserial_write(uint8_t * itf, uint32_t n)
 int __no_inline_not_in_flash_func(do_buffer_tick)(int top, int step)
 {
   static int i = 1;
+  if (i < 1) i = 1;  /* Guard: static init unreliable with -O3 */
   cycled_write_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   WRITEDBG(dtype, i, top, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   usIO("[I %d] [%c] $%02X:%02X (%u)\n", i, dtype, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));

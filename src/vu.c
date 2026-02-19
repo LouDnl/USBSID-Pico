@@ -41,15 +41,14 @@ extern uint8_t *sid_memory;
 #else
 extern uint8_t sid_memory[(0x20 * 4)];  /* usbsid.c */
 #endif
-extern int usbdata;     /* usbsid.c */
-extern int numsids;     /* config.c */
-extern bool offload_ledrunner;
+extern volatile int usbdata;     /* usbsid.c */
+extern volatile bool offload_ledrunner;
 
 /* GPIO externals */
 extern void setup_vu(void);
 extern int dma_pwmled, dma_rgbled;
-extern int pwm_value;
-extern uint32_t rgb_value;
+volatile extern int pwm_value;
+volatile extern uint32_t rgb_value;
 
 /* LED breathe levels */
 enum
@@ -65,11 +64,10 @@ enum
 };
 
 /* (RGB)LED variables */
-int n_checks = 0, updown = 1;
-uint64_t us_now = 0;
-uint16_t vu = 0;
-uint64_t start_us = 0;
-uint32_t breathe_interval_us = BREATHE_INTV;
+volatile int n_checks = 0, updown = 1;
+volatile uint64_t us_now = 0;
+volatile uint16_t vu = 0;
+volatile uint64_t start_us = 0;
 
 /* RGB LED */
 #if defined(USE_RGB)
@@ -161,7 +159,7 @@ void led_breathe_task(void)
 {
   #if LED_PWM
   if (usbdata == 0 && dtype == ntype) {
-    if (to_us_since_boot(get_absolute_time()) - start_us < breathe_interval_us) {
+    if (to_us_since_boot(get_absolute_time()) - start_us < (uint32_t)BREATHE_INTV) {
       return;  /* not enough time since last check */
     }
     start_us = to_us_since_boot(get_absolute_time());

@@ -69,10 +69,10 @@ static uint32_t arrival_times[ARRIVAL_HISTORY_SIZE];
 volatile uint8_t arrival_index = 0;
 volatile uint8_t arrival_count = 0;
 volatile uint32_t calculated_rate = 0;
-static uint16_t base_rate = 0;  /* The rate from env message */
-static uint8_t sid_count_estimate = 1;  /* Estimated number of SIDs in tune */
-volatile /* static */ uint8_t frames_since_nowrites = 0;  /* Frames since last SID2/3/4 message */
-static uint8_t frames_since_multisid = 0;  /* Frames since last SID2/3/4 message */
+volatile static uint16_t base_rate = 0;  /* The rate from env message */
+volatile static uint8_t sid_count_estimate = 1;  /* Estimated number of SIDs in tune */
+volatile uint8_t frames_since_nowrites = 0;  /* Frames since last SID2/3/4 message */
+volatile static uint8_t frames_since_multisid = 0;  /* Frames since last SID2/3/4 message */
 
 /* IRQ */
 static int pio_irq;
@@ -88,7 +88,7 @@ static const uint8_t ASID_FRAME_WRITES_MAX = 28;
 static uint8_t ring_get(void);
 static int ring_diff(void);
 volatile uint16_t corrected_rate = 0;
-uint8_t diff_size = (2 * (4 * ASID_FRAME_WRITES_MAX)); /* = 224 bytes | 112 bytes == 1 frame, was 64 bytes */
+const uint8_t diff_size = (2 * (4 * ASID_FRAME_WRITES_MAX)); /* = 224 bytes | 112 bytes == 1 frame, was 64 bytes */
 typedef struct {
   uint16_t ring_read;
   uint16_t ring_write;
@@ -668,6 +668,9 @@ static uint8_t __not_in_flash_func(ring_get)(void)
  */
 void asid_ring_init(void)
 {
+  /* Explicitely set sid_count_estimate to 1 at start for potential compiler zeroing issue */
+  sid_count_estimate = 1;
+
   if (!asid_ringbuffer.is_allocated) {
     if (asid_ringbuffer.ringbuffer != NULL) { free(asid_ringbuffer.ringbuffer); }
     /* Allocate max size upfront - allows growth without reallocation */

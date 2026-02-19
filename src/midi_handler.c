@@ -72,7 +72,7 @@ extern uint8_t cycled_write_operation(uint8_t address, uint8_t data, uint16_t cy
 // volatile static MidiSID msid[4];
 volatile uint8_t active_sid = 0;
 volatile uint8_t active_voice = 0;
-volatile static bool auto_gate[4] = {true, true, true, true};
+volatile static bool auto_gate[4] = {0};
 volatile static int keys_pressed;
 volatile bool pitch_wheel = false;
 extern const midi_ccvalues midi_ccvalues_defaults; /* midi.c */
@@ -473,6 +473,11 @@ void midi_processor_init(void)
 
   /* NOTE: Temporary - always init defaults */
   memcpy(&CC, &midi_ccvalues_defaults, sizeof(midi_ccvalues)); /* TODO: midi.c and midi_handler.c must always use the same mapping */
+
+  /* Explicitly initialize auto_gate - static initializer is unreliable with `-O3` */
+  for (int i = 0; i < 4; i++) {
+    auto_gate[i] = true;
+  }
 
   midi_cc_init();
 

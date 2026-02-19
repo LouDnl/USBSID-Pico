@@ -37,7 +37,7 @@
 
 /* usbsid.c */
 extern uint8_t uart_buffer[64];
-extern int usbdata;
+extern int volatile usbdata;
 extern char ntype, dtype, uart;
 extern bool offload_ledrunner;
 
@@ -174,6 +174,9 @@ static void init_async(void)
 
 void init_uart(void)
 {
+  /* Explicitely set bytes_per_rxpacket to 8 at start for potential compiler zeroing issue */
+  bytes_per_rxpacket = 8
+
   /* create a queue so the irq can save the data somewhere */
   queue_init(&fifo_uartrx, 1, UART_FIFO_SIZE);
 
