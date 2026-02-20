@@ -42,7 +42,7 @@
 #include "logging.h"
 #include "sid.h"
 #include "midi.h"
-#include "midi_ccdefaults.h"
+#include "midi_cc.h"
 
 // #define NOTEHI(n) ((musical_scale_values[(n - ((n >= 0x81) ? 0x80 : 0))] & 0xFF00) >> 8)
 // #define NOTELO(n) (musical_scale_values[(n - ((n >= 0x81) ? 0x80 : 0))] & 0xFF)
@@ -60,22 +60,27 @@ extern RuntimeCFG cfg;
 /* bus.c */
 extern uint8_t cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
 
+/* midi.c */
+extern const midi_ccvalues midi_ccvalues_defaults;
+
 /* Initialize variables */
-// struct MidiSID_s {
-//   bool v1_active : 1;
-//   bool v2_active : 1;
-//   bool v3_active : 1;
-//   bool active : 1;
-//   bool auto_gate : 1;
-// } MidiSID_t = {0};
-// typedef struct MidiSID_s MidiSID;
-// volatile static MidiSID msid[4];
+typedef struct Voice_m {
+   uint8_t note_index;
+} Voice_m;
+typedef struct SID_m {
+  Voice_m v[3];
+} SID_m;
+volatile static SID_m msid[4] = {0};
 volatile uint8_t active_sid = 0;
 volatile uint8_t active_voice = 0;
+volatile uint8_t previous_sid = 0;
+volatile uint8_t previous_voice = 0;
 volatile static bool auto_gate[4] = {0};
-volatile static int keys_pressed;
-volatile bool pitch_wheel = false;
-extern const midi_ccvalues midi_ccvalues_defaults; /* midi.c */
+volatile static int keys_pressed = 0;
+volatile bool copy_voice = false;
+volatile bool copy_sid = false;
+volatile bool link_voice = false;
+volatile bool link_sid = false;
 midi_ccvalues CC;
 void (*cc_func_ptr_array[128])(uint8_t a, uint8_t b);
 
@@ -83,6 +88,11 @@ void (*cc_func_ptr_array[128])(uint8_t a, uint8_t b);
 void midi_bus_operation(uint8_t a, uint8_t b)
 {
   cycled_write_operation(a, b, 6);  /* 6 cycles constant for LDA 2 and STA 4 */
+  return;
+}
+void midi_bus_operation_fast(uint8_t a, uint8_t b)
+{
+  cycled_write_operation(a, b, 0);  /* 0 cycles constant for fast writing */
   return;
 }
 
@@ -93,7 +103,7 @@ void midi_bus_operation(uint8_t a, uint8_t b)
  */
 static uint8_t sidbase(void)
 {
-  return cfg.sidaddr[active_sid];
+  return cfg.sidaddr[cfg.ids[active_sid]];
 }
 
 /**
@@ -165,13 +175,55 @@ static inline void set_nibble(uint8_t reg, uint8_t val, int nibble)
   return;
 }
 
+static void copy_sid_to_sid(void)
+{
+  uint8_t sid_base = sidbase();
+  uint8_t prev_sid_base = cfg.sidaddr[cfg.ids[previous_sid]];
+  for (uint8_t i = MIN_VAL; i < MAX_REGS; i++) {
+    uint8_t reg = (sid_base+i);
+    uint8_t val = sid_memory[(prev_sid_base+i)];
+    midi_bus_operation_fast(reg,val);
+  }
+  return;
+}
+
+static void copy_voice_to_voice(void)
+{
+  uint8_t voice_base = (sidbase()+voicebase());
+  uint8_t prev_voice_base = (sidbase()+previous_voice*7);
+  for (uint8_t i = MIN_VAL; i < VOICE_REGS; i++) {
+    uint8_t reg = (voice_base+i);
+    uint8_t val = sid_memory[(prev_voice_base+i)];
+    midi_bus_operation_fast(reg,val);
+  }
+  return;
+}
+
 static void select_sid(uint8_t cc, uint8_t onoff)
 {
   (void)onoff;
-  if (cc == CC.CC_SID1) active_sid = 0;
-  if (cc == CC.CC_SID2) active_sid = 1;
-  if (cc == CC.CC_SID3) active_sid = 2;
-  if (cc == CC.CC_SID4) active_sid = 3;
+  previous_sid = active_sid;
+  if (cc == CC.CC_SID1) {
+    active_sid = 0;
+  }
+  if (cc == CC.CC_SID2) {
+    active_sid = 1;
+  }
+  if (cc == CC.CC_SID3) {
+    active_sid = 2;
+  }
+  if (cc == CC.CC_SID4) {
+    active_sid = 3;
+  }
+  if (active_sid > cfg.numsids) {
+    active_sid = cfg.numsids; /* Fallback to max sid */
+  }
+
+  if (copy_sid) {
+    copy_sid_to_sid();
+    copy_sid = false;
+  }
+
   usMVCE("SID SELECT: %d [%d]\n", active_sid, cc);
   return;
 }
@@ -179,10 +231,70 @@ static void select_sid(uint8_t cc, uint8_t onoff)
 static void select_voice(uint8_t cc, uint8_t onoff)
 {
   (void)onoff;
-  if (cc == CC.CC_VCE1) active_voice = 0;
-  if (cc == CC.CC_VCE2) active_voice = 1;
-  if (cc == CC.CC_VCE3) active_voice = 2;
+  previous_voice = active_voice;
+  if (cc == CC.CC_VCE1) {
+    active_voice = 0;
+  }
+  else
+  if (cc == CC.CC_VCE2) {
+    active_voice = 1;
+  }
+  else
+  if (cc == CC.CC_VCE3) {
+    active_voice = 2;
+  }
+
+  if (copy_voice) {
+    copy_voice_to_voice();
+    copy_voice = false;
+  }
+
   usMVCE("VOICE SELECT: %d [%d]\n", active_voice, cc);
+  return;
+}
+
+static void set_handler(uint8_t cc, uint8_t value)
+{
+  if (cc == CC.CC_GTEN) {
+    usNFO("[CC_GTEN] SID%d From %d ", active_sid, auto_gate[active_sid]);
+    if (value) auto_gate[active_sid] = !auto_gate[active_sid];
+    else auto_gate[active_sid] = false;
+    usNFO("To %d\n", auto_gate[active_sid]);
+    return;
+  }
+  else
+  if (cc == CC.CC_CVCE) {
+    usNFO("[CC_CVCE] From %d ", copy_voice);
+    if (value) copy_voice = !copy_voice;
+    else copy_voice = true;
+    usNFO("To %d\n", copy_voice);
+    return;
+  }
+  else
+  if (cc == CC.CC_CSID) {
+    usNFO("[CC_CSID] From %d ", copy_sid);
+    if (value) copy_sid = !copy_sid;
+    else copy_sid = true;
+    usNFO("To %d\n", copy_sid);
+    return;
+  }
+  else
+  if (cc == CC.CC_LVCE) {
+    usNFO("[CC_LVCE] From %d ", link_voice);
+    if (value) link_voice = !link_voice;
+    else link_voice = true;
+    usNFO("To %d\n", link_voice);
+    return;
+  }
+  else
+  if (cc == CC.CC_LSID) {
+    usNFO("[CC_LSID] From %d ", link_sid);
+    if (value) link_sid = !link_sid;
+    else link_sid = true;
+    usNFO("To %d\n", link_sid);
+    return;
+  }
+
   return;
 }
 
@@ -320,23 +432,12 @@ static void set_adsr(uint8_t cc, uint8_t value)
   midi_bus_operation((sidbase()+(voicebase()+reg)),sid_memory[(sidbase()+(voicebase()+reg))]);
   return;
 }
-
-static void set_handler(uint8_t cc, uint8_t value)
-{
-  if (cc == CC.CC_GTEN) {
-    if (value) auto_gate[active_sid] = !auto_gate[active_sid];
-    else auto_gate[active_sid] = false;
-  }
-
-  return;
-}
-
 static void set_voicepwm(uint8_t cc, uint8_t value)
 {
   uint16_t pwm = MAP(value, MIN_VAL, MIDI_CC_MAX, MIN_VAL, TRIPLE_NIBBLE);
   uint8_t Plo  = (uint8_t)(pwm & BYTE);
   uint8_t Phi  = (uint8_t)((pwm & NIBBLE_3) >> SHIFT_8);
-  usNFO("[PWM] %04x %02x %02x\n", pwm, Phi, Plo);
+  /* usNFO("[PWM] %04x %02x %02x\n", pwm, Phi, Plo); */
 
   sid_memory[(sidbase()+(voicebase()+PWMLO))] = Plo;
   midi_bus_operation((sidbase()+(voicebase()+PWMLO)),sid_memory[(sidbase()+(voicebase()+PWMLO))]);
@@ -348,40 +449,43 @@ static void set_voicepwm(uint8_t cc, uint8_t value)
 
 static void set_notefrequency(uint8_t cc, uint8_t value)
 {
-  uint16_t frequency;
-  if (pitch_wheel) { /* BUG: BROKEN */
-    uint16_t currfreq = ((sid_memory[(sidbase()+(voicebase()+NOTEHI))] << SHIFT_8) | sid_memory[(sidbase()+(voicebase()+NOTELO))]);
-    /* uint16_t mapval = ((cc << SHIFT_8) | value); */
-    for (int i = 0; i < 96; i++) {
-      if (musical_scale_values[i] == currfreq) {
-        value = i;
-        break;
-      }
-    }
-    /* uint8_t step = MAP(mapval, MIN_VAL, MIDI_MAX, MIN_VAL, R_NIBBLE); */
-    /* frequency = ((mapval < (MIDI_MAX / 2)) ? musical_scale_values[value-step] : musical_scale_values[value+step]); */
-    uint8_t step = MAP(cc, MIN_VAL, MIDI_CC_MAX, MIN_VAL, R_NIBBLE);
-    frequency = ((cc < 64) ? musical_scale_values[value-step] : musical_scale_values[value+step]);
-    /* currfreq = (mapval < (MIDI_MAX / 2)) ? (currfreq - mapval) : (currfreq + mapval); */
-    /* frequency = MAP(currfreq, MIN_VAL, MIDI_MAX, musical_scale_values[0], musical_scale_values[95]); */
-  } else {
-    frequency = MAP(value, MIN_VAL, MIDI_CC_MAX, musical_scale_values[0], musical_scale_values[95]);
-  }
+  uint16_t frequency = MAP(value, MIN_VAL, MIDI_CC_MAX, musical_scale_values[MIN_VAL], musical_scale_values[SCALE_MAX]);
   uint8_t Flo = (uint8_t)(frequency & VOICE_FREQLO);
   uint8_t Fhi = (uint8_t)((frequency >> SHIFT_8) >= VOICE_FREQHI ? VOICE_FREQHI : (frequency >> SHIFT_8));
-  usNFO("[NFREQ] %04x %02x %02x\n", frequency, Fhi, Flo);
 
   sid_memory[(sidbase()+(voicebase()+NOTEHI))] = Fhi;
   midi_bus_operation((sidbase()+(voicebase()+NOTEHI)),sid_memory[(sidbase()+(voicebase()+NOTEHI))]);
   sid_memory[(sidbase()+(voicebase()+NOTELO))] = Flo;
   midi_bus_operation((sidbase()+(voicebase()+NOTELO)),sid_memory[(sidbase()+(voicebase()+NOTELO))]);
-  pitch_wheel = false;
+  return;
+}
+
+static void pitch_notefrequency(uint8_t lo, uint8_t hi)
+{
+  uint16_t pitch_note = (uint16_t)((hi<<SHIFT_8)|lo);
+  uint8_t step = (pitch_note <= (uint16_t)MIDI_HALF)
+    ? MAP(pitch_note, MIN_VAL, MIDI_HALF, PITCH_MAX, MIN_VAL)
+    : MAP(pitch_note, MIDI_HALF, MIDI_MAX, MIN_VAL, PITCH_MAX);
+  uint8_t curr_index = msid[active_sid].v[active_voice].note_index;
+  int8_t new_index = ((pitch_note < (uint16_t)MIDI_HALF) ? (curr_index-step) : (curr_index+step));
+  new_index = (new_index < 0 ? 0 : new_index > SCALE_MAX ? SCALE_MAX : new_index);
+
+  uint16_t frequency =  musical_scale_values[new_index];
+
+  uint8_t Flo = (uint8_t)(frequency & VOICE_FREQLO);
+  uint8_t Fhi = (uint8_t)((frequency >> SHIFT_8) >= VOICE_FREQHI ? VOICE_FREQHI : (frequency >> SHIFT_8));
+
+  sid_memory[(sidbase()+(voicebase()+NOTEHI))] = Fhi;
+  midi_bus_operation((sidbase()+(voicebase()+NOTEHI)),sid_memory[(sidbase()+(voicebase()+NOTEHI))]);
+  sid_memory[(sidbase()+(voicebase()+NOTELO))] = Flo;
+  midi_bus_operation((sidbase()+(voicebase()+NOTELO)),sid_memory[(sidbase()+(voicebase()+NOTELO))]);
   return;
 }
 
 static void note_on(uint8_t note_index, uint8_t velocity)
 {
   (void)velocity; /* TODO: Implement into ADSR? */
+  msid[active_sid].v[active_voice].note_index = note_index;
   uint16_t frequency = musical_scale_values[note_index]; // ISSUE: Possible issue here with indexes that are out of range!?
   uint8_t Flo = (frequency & VOICE_FREQLO);
   uint8_t Fhi = ((frequency >> SHIFT_8) >= VOICE_FREQHI ? VOICE_FREQHI : (frequency >> SHIFT_8));
@@ -390,6 +494,9 @@ static void note_on(uint8_t note_index, uint8_t velocity)
   midi_bus_operation((sidbase()+(voicebase()+NOTEHI)),sid_memory[(sidbase()+(voicebase()+NOTEHI))]);
   sid_memory[(sidbase()+(voicebase()+NOTELO))] = Flo;
   midi_bus_operation((sidbase()+(voicebase()+NOTELO)),sid_memory[(sidbase()+(voicebase()+NOTELO))]);
+
+  keys_pressed++;
+  usNFO("[KEYS] ON  %d\n",keys_pressed);
 
   if (auto_gate[active_sid]) {
     set_bit((voicebase()+CONTR),BIT_0); /* Set get bit on */
@@ -402,6 +509,7 @@ static void note_on(uint8_t note_index, uint8_t velocity)
 static void note_off(uint8_t note_index, uint8_t velocity)
 {
   (void)velocity; /* TODO: Implement into ADSR? */
+  msid[active_sid].v[active_voice].note_index = 0;
   uint16_t frequency = musical_scale_values[note_index];
   uint8_t Flo = (frequency & VOICE_FREQLO);
   uint8_t Fhi = ((frequency >> SHIFT_8) >= VOICE_FREQHI ? VOICE_FREQHI : (frequency >> SHIFT_8));
@@ -410,6 +518,9 @@ static void note_off(uint8_t note_index, uint8_t velocity)
   midi_bus_operation((sidbase()+(voicebase()+NOTEHI)),sid_memory[(sidbase()+(voicebase()+NOTEHI))]);
   sid_memory[(sidbase()+(voicebase()+NOTELO))] = Flo;
   midi_bus_operation((sidbase()+(voicebase()+NOTELO)),sid_memory[(sidbase()+(voicebase()+NOTELO))]);
+
+  if (keys_pressed > 0) keys_pressed--;
+  usNFO("[KEYS] OFF %d\n",keys_pressed);
 
   if (auto_gate[active_sid] && (keys_pressed == 0)) { /* NOTE: TESTING KEY_PRESSED */
     unset_bit((voicebase()+CONTR),BIT_0); /* Set get bit on */
@@ -426,18 +537,24 @@ void midi_cc_init(void)
   }
   /* Handler settings */
   cc_func_ptr_array[CC.CC_GTEN] = set_handler;
+  cc_func_ptr_array[CC.CC_CVCE] = set_handler;
+  cc_func_ptr_array[CC.CC_CSID] = set_handler;
+  cc_func_ptr_array[CC.CC_LVCE] = set_handler;
+  cc_func_ptr_array[CC.CC_LSID] = set_handler;
+
   /* SID selection */
   cc_func_ptr_array[CC.CC_SID1] = select_sid;
   cc_func_ptr_array[CC.CC_SID2] = select_sid;
   cc_func_ptr_array[CC.CC_SID3] = select_sid;
   cc_func_ptr_array[CC.CC_SID4] = select_sid;
+
   /* Voice selection */
   cc_func_ptr_array[CC.CC_VCE1] = select_voice;
   cc_func_ptr_array[CC.CC_VCE2] = select_voice;
   cc_func_ptr_array[CC.CC_VCE3] = select_voice;
 
   /* SID->Voice settings */
-  /* cc_func_ptr_array[CC.CC_NOTE] = set_notefrequency; */
+  cc_func_ptr_array[CC.CC_NOTE] = set_notefrequency;
   cc_func_ptr_array[CC.CC_PWM]  = set_voicepwm;
   cc_func_ptr_array[CC.CC_NOIS] = set_controlreg;
   cc_func_ptr_array[CC.CC_PULS] = set_controlreg;
@@ -451,6 +568,7 @@ void midi_cc_init(void)
   cc_func_ptr_array[CC.CC_DEC]  = set_adsr;
   cc_func_ptr_array[CC.CC_SUS]  = set_adsr;
   cc_func_ptr_array[CC.CC_REL]  = set_adsr;
+
   /* SID settings */
   cc_func_ptr_array[CC.CC_FFC]  = set_filtercutoff;
   cc_func_ptr_array[CC.CC_RES]  = set_resfilter;
@@ -507,16 +625,13 @@ void process_midi(uint8_t *buffer, int size)
       handle_control_change((buffer+1), (size-1));
       break;
     case 0x80 ... 0x8F:  /* Channel 0~16 Note Off */
-      if (keys_pressed > 0) keys_pressed--;
       note_off(buffer[1],buffer[2]);
       break;
     case 0x90 ... 0x9F:  /* Channel 0~16 Note On */
-      keys_pressed++;
       note_on(buffer[1],buffer[2]);
       break;
     case 0xE0 ... 0xEF:  /* Channel 0~16 Pitch Bend Change */
-      pitch_wheel = true;
-      set_notefrequency(buffer[1],buffer[2]);
+      pitch_notefrequency(buffer[1],buffer[2]);
       break;
     case 0xC0 ... 0xCF:  /* Channel 0~16 Program change */
     case 0xD0 ... 0xDF:  /* Channel 0~16 Pressure (After-touch) */
