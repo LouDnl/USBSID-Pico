@@ -40,7 +40,9 @@
 #include "sid.h"
 #include "logging.h"
 
-#include "midi_ccdefaults.h"
+#include "midi_cc.h"
+
+/* Always boot with default CC values ~ TODO: Load from flash!? */
 const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT;
 
 /* sid.c */
@@ -69,6 +71,7 @@ queue_t cynthcart_queue;
 /* Initialize the midi handlers */
 void midi_init(void)
 {
+  usNFO("\n");
   usNFO("[MIDI] Init start\n");
 
   /* Set initial stream state and index */
