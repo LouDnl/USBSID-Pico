@@ -157,7 +157,7 @@ bool
   stopping_emulator;
 #endif /* ONBOARD_EMULATOR */
 #if defined(ONBOARD_SIDPLAYER)
-extern bool
+extern volatile bool
   sidplayer_init,
   sidplayer_start,
   sidplayer_playing,
@@ -165,7 +165,7 @@ extern bool
   sidplayer_next,
   sidplayer_prev;
 /* SID player locals */
-volatile uint8_t * sidfile = NULL; /* Temporary buffer to store incoming data */
+uint8_t * sidfile = NULL; /* Temporary buffer to store incoming data */
 volatile int sidfile_size = 0;
 volatile char tuneno = 0;
 volatile bool is_prg = false; /* Default to SID file */
