@@ -31,11 +31,13 @@
 
 
 #define FPGASID_ID 0xF51D
+#define PDSID_ID 'S'
 
 
 /* GPIO */
 extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
 extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
+extern uint16_t cycled_delay_operation(uint16_t cycles);
 extern void clear_bus(int sidno);
 
 /* Config */
@@ -50,20 +52,6 @@ extern void apply_socket_change(bool quiet);
 extern void apply_fmopl_config(bool quiet);
 extern bool check_socket_config_errors(void);
 extern void socket_config_fallback(void);
-
-/* Pre declarations */
-uint8_t detect_sid_version(uint8_t start_addr);
-uint8_t detect_sid_model(uint8_t start_addr);
-uint8_t detect_sid_version_skpico(uint8_t start_addr);
-uint8_t detect_sid_unsafe(uint8_t start_addr);
-
-/* SID detection routines
- * routine 1: https://github.com/GideonZ/1541ultimate/blob/master/software/6502/sidcrt/player/advanced/detection.asm
- * routine 2: https://codebase64.org/doku.php?id=base:detecting_sid_type_-_safe_method
- * routine 3: Same as routine 2 but adapted for SKPico
- * routine 4: https://codebase64.org/doku.php?id=base:detecting_sid_type
- */
-uint8_t (*sid_detection[4])(uint8_t) = { detect_sid_model, detect_sid_version, detect_sid_version_skpico, detect_sid_unsafe };
 
 
 /* This routine works on real MOS SID chips and does not work on SKPico */
@@ -204,7 +192,7 @@ end:
 
 bool detect_skpico(uint8_t base_address)
 {
-  usCFG("[SID] Check for SIDKick-pico @ 0x%02X\n", base_address);
+  usCFG("[CHIP] Check for SIDKick-pico @ 0x%02X\n", base_address);
   /* SKPico routine */
   char skpico_version[36] = {0};
   cycled_write_operation((0x1F + base_address), 0xFF, 10); /* Init config mode */
@@ -222,7 +210,7 @@ bool detect_skpico(uint8_t base_address)
       && skpico_version[3] == 0x69
       && skpico_version[4] == 0x63
       && skpico_version[5] == 0x6F) {
-    usCFG("[SID] SIDKick-pico @ 0x%02X version is: %.36s\n", base_address, skpico_version);
+    usCFG("[CHIP] SIDKick-pico @ 0x%02X version is: %.36s\n", base_address, skpico_version);
     return true;
   }
   return false;
@@ -230,7 +218,7 @@ bool detect_skpico(uint8_t base_address)
 
 bool detect_fpgasid(uint8_t base_address)
 {
-  usCFG("[SID] Check for FPGASID @ 0x%02X\n", base_address);
+  usCFG("[CHIP] Check for FPGASID @ 0x%02X\n", base_address);
   uint8_t idHi, idLo;
   /* Enable configuration mode (if available) */
   cycled_write_operation((0x19 + base_address), 0x80, 6);      /* Write magic cookie Hi */
@@ -243,9 +231,24 @@ bool detect_fpgasid(uint8_t base_address)
   cycled_write_operation((0x19 + base_address), 0x0, 6);       /* Clear magic cookie Hi */
   cycled_write_operation((0x1A + base_address), 0x0, 6);       /* Clear magic cookie Lo */
   uint16_t fpgasid_id = (idHi << 8 | idLo);
-  usCFG("[SID] Read Identify 0x%04X (0x%02X,0x%02X) @ 0x%02X\n", fpgasid_id, idHi, idLo, base_address);
+  usCFG("[CHIP] Read Identify 0x%04X (0x%02X,0x%02X) @ 0x%02X\n", fpgasid_id, idHi, idLo, base_address);
   if (fpgasid_id == FPGASID_ID) {
-    usCFG("[SID] Found FPGASID @ 0x%02X\n", base_address);
+    usCFG("[CHIP] Found FPGASID @ 0x%02X\n", base_address);
+    return true;
+  }
+  return false;
+}
+
+bool detect_pdsid(uint8_t base_address)
+{
+  usCFG("[CHIP] Check for PDsid @ 0x%02X\n", base_address);
+  cycled_write_operation(0x1d,'P',6); /* 0x50 */
+  cycled_delay_operation(4); /* 4 cycles */
+  cycled_write_operation(0x1e,'D',6); /* 0x44 */
+  cycled_delay_operation(4); /* 4 cycles */
+  uint8_t pdsid_id = cycled_read_operation(0x1e,6);
+  if (pdsid_id == PDSID_ID) { /* 0x53 'S' */
+    usCFG("[CHIP] Found PDsid @ 0x%02X\n", base_address);
     return true;
   }
   return false;
@@ -277,18 +280,21 @@ uint8_t detect_clone_type(Socket * cfg_ptr)
 
   // struct Socket * cfg_ptr = (socket == 1 ? &usbsid_config.socketOne : &usbsid_config.socketTwo);
   uint8_t base_address = cfg_ptr->sid1.addr;
-  static int chip, clone;
+  static int chip, clone, debby_does_dp;
 
-  if (detect_skpico(base_address))  { chip = 1; clone = 2; goto done_clone; }  /* Clone, SKpico */
-  if (detect_fpgasid(base_address)) { chip = 1; clone = 4; goto done_clone; }  /* Clone, FPGASID */
-  chip = 0;   /* Real */
-  clone = 0;  /* Disabled */
+  if (detect_skpico(base_address))  { chip = 1; clone = 2; can_dual = 1; goto done_clone; }  /* Clone, SKpico */
+  if (detect_fpgasid(base_address)) { chip = 1; clone = 4; can_dual = 1; goto done_clone; }  /* Clone, FPGASID */
+  if (detect_pdsid(base_address))   { chip = 1; clone = 6; can_dual = 0; goto done_clone; }  /* Clone, PDsid */
+  chip = 0;           /* Real */
+  clone = 0;          /* Disabled */
+  debby_does_dp = 0;  /* Parle! */
   /* Disable SID detection for SID2 in this socket since no supporting clone is present */
-  cfg_ptr->dualsid = false;  /* NOTICE: Workaround, might break detection for other clone types */
+  cfg_ptr->dualsid   = false;   /* NOTICE: Workaround, might break detection for other clone types */
   cfg_ptr->sid2.addr = 0xFF;  /* NOTICE: Workaround, might break detection for other clone types */
-  cfg_ptr->sid2.id = 0xFF;  /* NOTICE: Workaround, might break detection for other clone types */
-  cfg_ptr->sid2.type = 1;  /* NOTICE: Workaround, might break detection for other clone types */
+  cfg_ptr->sid2.id   = 0xFF;    /* NOTICE: Workaround, might break detection for other clone types */
+  cfg_ptr->sid2.type = 1;     /* NOTICE: Workaround, might break detection for other clone types */
 done_clone:
+  cfg_ptr->dualsid   = debby_does_dp;
   cfg_ptr->chiptype  = chip;
   cfg_ptr->clonetype = clone;
   return clone;
@@ -302,10 +308,13 @@ uint8_t detect_sid_type(Socket * socket, SIDChip * sidchip)
     sidchip->type = 1;      /* N/A */
     return sidchip->type;
   }
-  /* routine 2 for SKPico, all others use routine 0 */
-  int detection_routine = (socket->clonetype != 2 ? 0 : 2);
+
   if (sidchip->addr != 0xFF) {
-    uint8_t sid = sid_detection[detection_routine](sidchip->addr);
+    uint8_t sid = (
+      socket->clonetype != 2
+      ? detect_sid_model(sidchip->addr) /* default routine */
+      : detect_sid_version_skpico(sidchip->addr) /* special routine for SKPico */
+    );
     usCFG("[SID] Read SID%d: %02x %s\n", (sidchip->id + 1), sid, sidtypes[sid]);
     sidchip->type = sid;
     goto done_sid;
@@ -324,80 +333,92 @@ done_sid:
   return sidchip->type;
 }
 
-/* Auto detect Chip and SID type routine
- * `auto_config` will ignore current socket and sid settings
- * `with_delay` is required for SIDKICK-pico at boot time
- */
-void auto_detect_routine(bool auto_config, bool with_delay)
+bool chip_detection(void)
 {
-  usCFG("\n");
-  usCFG("[START AUTO DETECT ROUTINE]\n");
-  if (auto_config) {
-    usCFG("[SID] Set default values for auto config\n");
+  { /* Set defaults for chip detection */
     usbsid_config.mirrored = false;           /* Yeah let's just disable that for now okay? */
 
     /* Socket One */
     usbsid_config.socketOne.enabled = true;   /* start enabled */
-    usbsid_config.socketOne.dualsid = true;   /* start as dualsid */
+    usbsid_config.socketOne.dualsid = false;  /* start as singlesid */
     usbsid_config.socketOne.chiptype = 0;     /* real */
     usbsid_config.socketOne.clonetype = 0;    /* disabled */
     usbsid_config.socketOne.sid1.id = 0;      /* default id */
     usbsid_config.socketOne.sid1.addr = 0x00; /* default address */
     usbsid_config.socketOne.sid1.type = 0;    /* unknown */
-    usbsid_config.socketOne.sid2.id = 1;      /* default id */
-    usbsid_config.socketOne.sid2.addr = 0x20; /* default address */
+    usbsid_config.socketOne.sid2.id = 0xFF;   /* default id */
+    usbsid_config.socketOne.sid2.addr = 0xFF; /* default address */
     usbsid_config.socketOne.sid2.type = 0;    /* unknown */
 
     /* Socket Two */
     usbsid_config.socketTwo.enabled = true;   /* start enabled */
-    usbsid_config.socketTwo.dualsid = true;   /* start as dualsid */
+    usbsid_config.socketTwo.dualsid = false;  /* start as singlesid */
     usbsid_config.socketTwo.chiptype = 0;     /* real */
     usbsid_config.socketTwo.clonetype = 0;    /* disabled */
-    usbsid_config.socketTwo.sid1.id = 2;      /* default id */
-    usbsid_config.socketTwo.sid1.addr = 0x40; /* default address */
+    usbsid_config.socketTwo.sid1.id = 1;      /* default id */
+    usbsid_config.socketTwo.sid1.addr = 0x20; /* default address */
     usbsid_config.socketTwo.sid1.type = 0;    /* unknown */
-    usbsid_config.socketTwo.sid2.id = 3;      /* default id */
-    usbsid_config.socketTwo.sid2.addr = 0x60; /* default address */
+    usbsid_config.socketTwo.sid2.id = 0xFF;   /* default id */
+    usbsid_config.socketTwo.sid2.addr = 0xFF; /* default address */
     usbsid_config.socketTwo.sid2.type = 0;    /* unknown */
-
     /* Apply socket and bus config before continuing or detection routines will not work properly */
     apply_socket_change(true);
-    if (with_delay) sleep_ms(250); /* Stupid workaround for SKPico requiring a zillion ms to boot up */
+    sleep_ms(250); /* Stupid workaround for SKPico requiring a zillion ms to boot up */
   }
-  usCFG("[SID] Chip type detection ~ Socket One\n");
-  if (with_delay) sleep_ms(500); /* Stupid workaround for SKPico requiring a zillion ms to boot up */
+
+  usCFG("[CHIP] Type detection ~ Socket One\n");
+  sleep_ms(500); /* Stupid workaround for SKPico requiring a zillion ms to boot up */
   /* SocketOne (twice if failed) */
   if (detect_clone_type(&usbsid_config.socketOne) == 0) detect_clone_type(&usbsid_config.socketOne);
-  usCFG("[SID] Chip type detection ~ Socket Two\n");
-  if (with_delay) sleep_ms(500);
+
+  usCFG("[CHIP] Type detection ~ Socket Two\n");
+  sleep_ms(500);
    /* SocketTwo (twice if failed) */
   if (detect_clone_type(&usbsid_config.socketTwo) == 0) detect_clone_type(&usbsid_config.socketTwo);
-  if (auto_config) verify_sid_addr(true);
 
-  apply_socket_change(true);
+  if (usbsid_config.socketOne.chiptype == 1 || usbsid_config.socketTwo.chiptype == 1) {
+    /* We have a winner! */
+    return true;
+  }
 
-  if (with_delay) sleep_ms(250); /* Stupid workaround for SKPico requiring a zillion ms to boot up */
-  /* Detect SID types at default config once, uses the chiptype to define the detection routine */
+  return false;
+}
+
+/**
+ * @brief Auto detect Chip and SID type routine
+ *
+ */
+void auto_detect_routine(void)
+{
+  usNFO("\n");
+  usCFG("START AUTO DETECT ROUTINE\n");
+  bool have_clone = chip_detection();
+
+
+  if (have_clone) verify_sid_addr(true); /* Verify/update the new addresses */
+  apply_socket_change(true); /* Silently apply the socket change */
+
+  sleep_ms(250); /* Stupid workaround for SKPico requiring a zillion ms to boot up */
+
+  /* Detect SID types, uses the chiptype to define the detection routine */
   usCFG("[SID] SID type detection ~ Socket One\n");
   detect_sid_type(&usbsid_config.socketOne, &usbsid_config.socketOne.sid1);
-  if (usbsid_config.socketOne.dualsid)
-    detect_sid_type(&usbsid_config.socketOne, &usbsid_config.socketOne.sid2);
+  if (usbsid_config.socketOne.dualsid) detect_sid_type(&usbsid_config.socketOne, &usbsid_config.socketOne.sid2);
   usCFG("[SID] SID type detection ~ Socket Two\n");
   detect_sid_type(&usbsid_config.socketTwo, &usbsid_config.socketTwo.sid1);
-  if (usbsid_config.socketTwo.dualsid)
-    detect_sid_type(&usbsid_config.socketTwo, &usbsid_config.socketTwo.sid2);
-  if (auto_config) {
-    verify_chipdetection_results(false); /* Only on auto config verify results */
-    verify_sid_addr(false);
-  }
-  /* Apply new socket and bus config */
-  apply_socket_change(true);
+  if (usbsid_config.socketTwo.dualsid) detect_sid_type(&usbsid_config.socketTwo, &usbsid_config.socketTwo.sid2);
 
-  usCFG("[END AUTO DETECT ROUTINE]\n");
+  verify_chipdetection_results(false); /* Verify the detection */
+  verify_sid_addr(false); /* Verify/update the new addresses */
+
+  /* Apply new socket and bus config */
+  apply_socket_change(true); /* Silently apply the socket change */
+
+  usCFG("END AUTO DETECT ROUTINE\n");
 
   if (check_socket_config_errors()) {
-    usCFG("[AUTO DETECT CONFIG ERROR DETECTED]\n");
+    usCFG("AUTO DETECT CONFIG ERROR DETECTED\n");
     socket_config_fallback();
   }
-  usCFG("\n");
+  usNFO("\n");
 }

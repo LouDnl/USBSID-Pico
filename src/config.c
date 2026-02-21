@@ -91,6 +91,7 @@ extern void midi_bus_operation(uint8_t a, uint8_t b);
 extern bool detect_fmopl(uint8_t base_address);
 extern uint8_t detect_sid_type(Socket * socket, SIDChip * sidchip);
 extern uint8_t detect_clone_type(Socket * cfg_ptr);
+extern void auto_detect_routine(void);
 extern uint8_t detect_sid_model(uint8_t start_addr);
 extern uint8_t detect_sid_version(uint8_t start_addr);
 extern uint8_t detect_sid_unsafe(uint8_t start_addr);
@@ -829,7 +830,20 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       } else if (buffer[1] == 1) { /* Only if 1, else just skip! */
         if (buffer[2] < 4) {
           usCFG("[CMD] SID DETECTION @ $%02x\n", buffer[3]);
-          sid_detection[buffer[2]](buffer[3]);
+          switch (buffer[2]) {
+            case 0:
+              detect_sid_model(buffer[3]); /* 0 */
+              break;
+            case 1:
+              detect_sid_version(buffer[3]); /* 1 */
+              break;
+            case 2:
+              detect_sid_version_skpico(buffer[3]); /* 2 */
+              break;
+            case 3:
+              detect_sid_unsafe(buffer[3]); /* 3 */
+              break;
+          }
         }
       }
       break;
@@ -851,7 +865,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       break;
     case AUTO_DETECT:
       usCFG("[CMD] AUTO_DETECT\n");
-      auto_detect_routine(true, true);  /* Double tap! */
+      auto_detect_routine();  /* Double tap! */
       if (buffer[1] == 1) { /* Save and reboot */
         save_config_ext();
         mcu_reset(); /* Point of no return */
@@ -1045,8 +1059,21 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case SKPICO: break;  /* Reserved for config implementation */
     case ARMSID: break;  /* Reserved for config implementation */
     case PDSID:
-      usCFG("[TOGGLE PDSID TYPE]\n");
-      switch_pdsid_type();
+      if (buffer[1] == 0) {
+        usCFG("[TOGGLE PDSID TYPE]\n");
+        reset_switch_pdsid_type();
+        break;
+      } else if (buffer[1] == 1) {
+        usCFG("[SET PDSID TYPE %d @ $%02x]\n",buffer[3],buffer[2]);
+        if (!set_pdsid_sid_type(buffer[2],buffer[3])) {
+          usERR("Failed to set PDSID type!!\n");
+        }
+        break;
+      } else if (buffer[1] == 2) {
+        uint8_t result = read_pdsid_sid_type(buffer[2]);
+        usCFG("[READ PDSID RESULT %d @ $%02x]\n",result,buffer[2]);
+        break;
+      }
       break;
     #if defined(ONBOARD_SIDPLAYER)
     case UPLOAD_SID_START:
@@ -1224,7 +1251,7 @@ void detect_default_config(void)
     usbsid_config.default_config = 0;
     usCFG("DEFAULT CONFIG STATE SET TO %d\n", usbsid_config.default_config);
     first_boot = true;  /* Only at first boot the link popup will be sent */
-    auto_detect_routine(false, true); /* default auto detect routine based on default config */
+    auto_detect_routine(); /* default auto detect routine based on default config */
     save_config(&usbsid_config);
     usCFG("CONFIG SAVED\n");
   }
