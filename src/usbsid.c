@@ -945,7 +945,7 @@ int main()
   enable_sid(false);
 
   /* Clear the dirt */
-#if !defined(ONBOARD_EMULATOR) || !defined(ONBOARD_SIDPLAYER)
+#if !defined(ONBOARD_EMULATOR) && !defined(ONBOARD_SIDPLAYER)
   memset(sid_memory, 0, sizeof sid_memory);
 #endif
 
