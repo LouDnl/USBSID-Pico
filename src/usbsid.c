@@ -963,6 +963,12 @@ int main()
   /* Print config once at end of boot routine */
   print_config();
 
+  /* Reset SID chips */
+  usBOOT("Reset SID chips\n");
+  reset_sid(); /* WARNING: Might cause issues! */
+  usBOOT("Reset SID registers\n");
+  reset_sid_registers(); /* WARNING: Might cause issues! */
+
   /* Signal Core 1 to enter main loop (sync point 2) */
   usBOOT("<CORE 0> Signaling core1 ~ 2\n");
   __dmb();  /* Memory barrier after read */
