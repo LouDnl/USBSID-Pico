@@ -129,6 +129,15 @@ static const enum raster_rates rasterrates[]  = { R_DEFAULT, R_PAL, R_NTSC, R_NT
 /* Masks 🤿 we use */
 typedef enum {
   MIN_VAL = 0,
+  PITCH_MAX = 16,
+  SCALE_MAX = 95,
+  CUTOFF_MAX = 2047,
+  MIDI_CC_MAX = 0x7F,
+  MIDI_HALF = 16320,
+  MIDI_MAX = 0x7f7f,
+  MAX_VOICES  =  3, /* 3 voices per SID */
+  MAX_REGS    = 25, /* 29 - 4 non writeable */
+  VOICE_REGS  =  7, /* 7 registers per voice */
   BYTE = 0xFF,
   L_NIBBLE = 0xF0,
   R_NIBBLE = 0x0F,
@@ -138,11 +147,8 @@ typedef enum {
   H_BYTE = 0xFF00,
   F_MASK_HI = 0x7F8,
   F_MASK_LO = 0x7,
-  MIDI_CC_MAX = 0x7F,
   VOICE_FREQLO = BYTE,
   VOICE_FREQHI = BYTE,
-  CUTOFF_MAX = 2047,
-  MIDI_MAX = 0x7f7f,
   SHIFT_3 = 3,
   SHIFT_4 = 4,
   SHIFT_8 = 8,
@@ -156,7 +162,7 @@ typedef enum {
   BIT_5 = 0x20,
   BIT_6 = 0x40,
   BIT_7 = 0x80
-} register_masks;
+} masks_n_vals;
 
 /*
  * Voice registers
@@ -191,11 +197,6 @@ static const uint8_t sid_registers[29] =
   0x1B,
   /* Envelope Voice 3 */
   0x1C
-};
-
-enum {
-  NO_SID_REGISTERS = 25, /* 29 - 4 non writeable */
-  NO_VOICES_PER_SID = 3,
 };
 
 enum {
