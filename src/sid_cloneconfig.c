@@ -32,21 +32,22 @@
 #include "sid_skpico.h"
 
 
-/* GPIO */
+/* bus.c */
 extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
 extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
+extern void cycled_delay_operation(uint16_t cycles);
 
-/* SID */
+/* sid.c */
 extern void clear_sid_memory(void);
 extern void clear_volume_state(void);
 extern void set_reset_state(bool state);
 extern void set_paused_state(bool state);
 
-/* Config */
+/* config.c */
 extern Config usbsid_config;
 extern RuntimeCFG cfg;
 
-/* Config logging */
+/* config_logging.c */
 extern void print_cfg(const uint8_t *buf, size_t len);
 extern char *sidtypes[5];
 

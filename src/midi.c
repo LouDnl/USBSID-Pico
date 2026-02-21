@@ -42,8 +42,6 @@
 
 #include "midi_cc.h"
 
-/* Always boot with default CC values ~ TODO: Load from flash!? */
-const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT;
 
 /* sid.c */
 extern void reset_sid(void);
@@ -66,6 +64,9 @@ extern bool emulator_running,
 extern bool stop_cynthcart(void);
 queue_t cynthcart_queue;
 #endif
+
+/* Always boot with default CC values ~ TODO: Load from flash!? */
+const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT;
 
 
 /* Initialize the midi handlers */

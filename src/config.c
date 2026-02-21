@@ -32,11 +32,9 @@
 #include "logging.h"
 
 
-/* USBSID */
-extern void init_sidclock(void);
-extern void deinit_sidclock(void);
-extern void cdc_write(uint8_t * itf, uint32_t n);
-extern void webserial_write(uint8_t * itf, uint32_t n);
+/* usbsid.c */
+extern void cdc_write(volatile uint8_t * itf, uint32_t n);
+extern void webserial_write(volatile uint8_t * itf, uint32_t n);
 extern char rtype;
 extern uint8_t *cdc_itf;
 extern uint8_t *wusb_itf;
@@ -55,78 +53,65 @@ extern bool auto_config;
 extern volatile bool offload_ledrunner;
 #endif
 
-/* GPIO */
-extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
-extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
-extern uint16_t cycled_delay_operation(uint16_t cycles);
-extern void reset_sid(void);
-extern void restart_bus(void);
-extern void restart_bus_clocks(void);
+/* dma.c */
 extern void stop_dma_channels(void);
 extern void start_dma_channels(void);
+
+/* pio.c */
+extern void init_sidclock(void);
+extern void deinit_sidclock(void);
 extern void sync_pios(bool at_boot);
+extern void restart_bus_clocks(void);
+
+/* sid.c */
 extern void enable_sid(bool unmute);
 extern void disable_sid(void);
 extern void mute_sid(void);
 extern void unmute_sid(void);
+extern void reset_sid(void);
 extern void reset_sid_registers(void);
+
+/* bus.c */
+extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
+extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
+extern uint16_t cycled_delay_operation(uint16_t cycles);
+extern void restart_bus(void);
+
+/* gpio.c */
 extern void toggle_audio_switch(void);
 extern void set_audio_switch(bool state);
 
-/* MCU */
+/* mcu.c */
 extern void mcu_reset(void);
 
-/* Midi */
+/* midi.c */
 extern void midi_bus_operation(uint8_t a, uint8_t b);
 
-/* SID detection */
+/* sid_detection.c */
 extern bool detect_fmopl(uint8_t base_address);
 extern uint8_t detect_sid_type(Socket * socket, SIDChip * sidchip);
 extern uint8_t detect_clone_type(Socket * cfg_ptr);
-extern void auto_detect_routine(bool auto_config, bool with_delay);
-extern uint8_t (*sid_detection[4])(uint8_t); /* SID detection routines */
+extern uint8_t detect_sid_model(uint8_t start_addr);
+extern uint8_t detect_sid_version(uint8_t start_addr);
+extern uint8_t detect_sid_unsafe(uint8_t start_addr);
+extern uint8_t detect_sid_version_skpico(uint8_t start_addr);
 
-/* SID tests */
+/* sid_tests.c */
 extern void sid_test(int sidno, char test, char wf);
 extern bool running_tests;
 
-/* SID clone config */
+/* sid_cloneconfig.c */
 extern void read_fpgasid_configuration(uint8_t base_address);
 extern void read_skpico_configuration(uint8_t base_address);
-extern void switch_pdsid_type(void);
+extern void reset_switch_pdsid_type(void);
+extern uint8_t read_pdsid_sid_type(uint8_t base_address);
+extern bool set_pdsid_sid_type(uint8_t base_address, uint8_t type);
 
-/* SID player */
-#ifdef ONBOARD_EMULATOR
-extern bool stop_cynthcart(void); /* TODO: Remove double declaration */
-extern void set_logging(int logid);
-extern void unset_logging(int logid);
-bool
-  emulator_running,
-  starting_emulator,
-  stopping_emulator;
-#endif /* ONBOARD_EMULATOR */
-#if defined(ONBOARD_SIDPLAYER)
-extern bool
-  sidplayer_init,
-  sidplayer_start,
-  sidplayer_playing,
-  sidplayer_stop,
-  sidplayer_next,
-  sidplayer_prev;
-/* SID player locals */
-uint8_t * sidfile = NULL; /* Temporary buffer to store incoming data */
-int sidfile_size;
-char tuneno;
-volatile bool is_prg = false; /* Default to SID file */
-static int sidbytes_received;
-static bool receiving_sidfile;
-#endif /* ONBOARD_SIDPLAYER */
-
-/* Config BUS */
+/* config_bus.c */
 extern void apply_bus_config(bool quiet);
 extern void apply_fmopl_config(bool quiet);
 
-/* Config socket */
+/* config_socket.c */
 extern void verify_socket_settings(void);
 extern void verify_sid_addr(bool quiet);
 extern void apply_socket_config(bool quiet);
@@ -135,7 +120,7 @@ extern void set_sid_id_addr(int socket, int sid, int id); // TODO: REMOVE ME!!
 extern void set_socket_config(uint8_t cmd, bool s1en, bool s1dual, uint8_t s1chip, bool s2en, bool s2dual, uint8_t s2chip, bool mirror);
 extern uint8_t sidaddr_default[4];
 
-/* Config logging */
+/* config_logging.c */
 extern void print_cfg(const uint8_t *buf, size_t len);
 extern void print_cfg_addr(void);
 extern void print_pico_features(void);
@@ -160,24 +145,52 @@ void save_config_ext(void);
 int return_clockrate(void);
 void apply_clockrate(int n_clock, bool suspend_sids);
 
+/* SID player */
+#ifdef ONBOARD_EMULATOR
+extern bool stop_cynthcart(void); /* TODO: Remove double declaration */
+extern void set_logging(int logid);
+extern void unset_logging(int logid);
+bool
+  emulator_running,
+  starting_emulator,
+  stopping_emulator;
+#endif /* ONBOARD_EMULATOR */
+#if defined(ONBOARD_SIDPLAYER)
+extern bool
+  sidplayer_init,
+  sidplayer_start,
+  sidplayer_playing,
+  sidplayer_stop,
+  sidplayer_next,
+  sidplayer_prev;
+/* SID player locals */
+volatile uint8_t * sidfile = NULL; /* Temporary buffer to store incoming data */
+volatile int sidfile_size = 0;
+volatile char tuneno = 0;
+volatile bool is_prg = false; /* Default to SID file */
+static int sidbytes_received = 0;
+static bool receiving_sidfile = 0;
+#endif /* ONBOARD_SIDPLAYER */
+
 /* Declare variables */
-Config usbsid_config;
-RuntimeCFG cfg;
-bool first_boot = false;
+Config usbsid_config = {0};
+RuntimeCFG cfg = {0};
+volatile bool first_boot = false;
 const char __in_flash("usbsid_vars") *project_version = PROJECT_VERSION;
 const char __in_flash("usbsid_vars") *pcb_version = PCB_VERSION;
+const char __in_flash("usbsid_vars") *us_product = USBSID_PRODUCT;
 
 /* Declare local variables */
 /* 0x15 (16) max before starting at 0 flash sector erase */
 static uint8_t config_saveid = 0;
 /* 256 Bytes MAX == FLASH_PAGE_SIZE (Max storage size is 4096 bytes == FLASH_SECTOR_SIZE) */
-static uint8_t config_array[FLASH_PAGE_SIZE];
+static uint8_t config_array[FLASH_PAGE_SIZE] = {0};
 /* 10 bytes is enough for now */
 static uint8_t socket_config_array[10];
 /* 64 byte array for copying the config version into */
-static uint8_t p_version_array[MAX_BUFFER_SIZE];
+static uint8_t p_version_array[MAX_BUFFER_SIZE] = {0};
 /* Config magic verification storage */
-static uint32_t cm_verification;
+static uint32_t cm_verification = 0;
 
 
 #ifdef ONBOARD_EMULATOR

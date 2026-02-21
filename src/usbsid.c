@@ -52,14 +52,14 @@ uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __aligned(2 * (0x
 #endif
 
 volatile int usb_connected = 0, usbdata = 0;
-uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
-uint8_t *cdc_itf = 0, *wusb_itf = 0;
+volatile uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
+volatile uint8_t *cdc_itf = 0, *wusb_itf = 0;
 /* nonetype, datatype, returntype */
 volatile char ntype = '0', dtype = '0', rtype = '0';
 const char cdc = 'C', asid = 'A', midi = 'M', sysex = 'S', wusb = 'W', uart = 'U';
-bool web_serial_connected = false;
+static bool web_serial_connected = false;
 
-double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
+volatile double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
 volatile bool auto_config = false;
 volatile bool offload_ledrunner = false;
 
@@ -233,7 +233,7 @@ void init_logging(void)
 /* USB TO HOST */
 
 /* Write from device to host */
-void cdc_write(uint8_t * itf, uint32_t n)
+void cdc_write(volatile uint8_t * itf, uint32_t n)
 { /* No need to check if write available with current driver code */
   usIO("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
   tud_cdc_n_write(*itf, write_buffer, n);  /* write n bytes of data to client */
@@ -242,7 +242,7 @@ void cdc_write(uint8_t * itf, uint32_t n)
 }
 
 /* Write from device to host */
-void webserial_write(uint8_t * itf, uint32_t n)
+void webserial_write(volatile uint8_t * itf, uint32_t n)
 { /* No need to check if write available with current driver code */
   usIO("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
   tud_vendor_write(write_buffer, n);
@@ -278,7 +278,7 @@ void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
 }
 
 /* Process received usb data */
-void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
+void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volatile uint32_t * n)
 {
   usbdata = 1;
   vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
@@ -897,6 +897,7 @@ int main()
   sid_mhz = (sid_hz / 1000 / 1000);
   sid_us = (1 / sid_mhz);
   if (!auto_config) {
+    usNFO("\n");
     usNFO("[NFO] [PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
     usNFO("[NFO] [C64] %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
     usNFO("[NFO] [C64] REFRESH_RATE %lu Cycles, RASTER_RATE %lu Cycles\n", usbsid_config.refresh_rate, usbsid_config.raster_rate);

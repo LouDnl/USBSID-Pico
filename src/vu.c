@@ -34,18 +34,22 @@
 #endif
 
 
-/* Init external vars */
-extern Config usbsid_config;  /* usbsid.c */
+/* config.c */
+extern Config usbsid_config;
+
+/* usbsid.c */
 #ifdef ONBOARD_EMULATOR
 extern uint8_t *sid_memory;
 #else
-extern uint8_t sid_memory[(0x20 * 4)];  /* usbsid.c */
+extern uint8_t sid_memory[(0x20 * 4)];
 #endif
-extern volatile int usbdata;     /* usbsid.c */
+extern volatile int usbdata;
 extern volatile bool offload_ledrunner;
 
-/* GPIO externals */
+/* pio.c */
 extern void setup_vu(void);
+
+/* dma.c */
 extern int dma_pwmled, dma_rgbled;
 volatile extern int pwm_value;
 volatile extern uint32_t rgb_value;
@@ -71,10 +75,8 @@ volatile uint64_t start_us = 0;
 
 /* RGB LED */
 #if defined(USE_RGB)
-static double r_, g_, b_ = 0;
-int _rgb = 0;
-int c1, c2, c3;
-unsigned char o1 = 0, o2 = 0, o3 = 0;
+volatile static double r_, g_, b_ = 0;
+volatile static int _rgb = 0;
 #endif
 
 

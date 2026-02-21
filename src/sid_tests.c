@@ -30,14 +30,16 @@
 #include "logging.h"
 
 
-/* GPIO */
+/* bus.c */
 extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
+
+/* sid.c */
 extern void clear_sid_registers(int sidno);
 extern void reset_sid_registers(void);
 
 /* Declare variables */
 volatile bool running_tests = false;
-uint8_t waveforms[4] = { 16, 32, 64, 128 };
+static const uint8_t waveforms[4] = { 16, 32, 64, 128 };
 
 
 void test_operation(uint8_t reg, uint8_t val)

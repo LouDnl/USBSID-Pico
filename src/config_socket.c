@@ -32,7 +32,7 @@
 #include "logging.h"
 
 
-/* config. */
+/* config.c */
 extern void save_load_apply_config(bool at_boot, bool print_cfg);
 extern Config usbsid_config;
 extern RuntimeCFG cfg;

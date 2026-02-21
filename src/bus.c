@@ -72,6 +72,7 @@ volatile uint8_t control_word, read_data;
 volatile uint16_t delay_word;
 volatile uint32_t data_word, dir_mask;
 
+
 /**
  * @brief Set the bits going to the PIO databus based on provided address
  *

@@ -32,11 +32,11 @@
 #include "logging.h"
 
 
-/* Config */
+/* config.c */
 extern Config usbsid_config;
 extern RuntimeCFG cfg;
 
-/* Declare variables */
+/* Constants */
 const uint8_t sidaddr_default[4] = { 0x00, 0x20, 0x40, 0x60 };
 const uint8_t sidmask_default[5] = { 0b100, 0b100, 0b010, 0b010, 0b110 };
 const uint8_t addrmask_default[5] = { 0x1F, 0x3F, 0x1F, 0x3F, 0x00 };

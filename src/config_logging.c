@@ -32,7 +32,7 @@
 #include "logging.h"
 
 
-/* Config */
+/* config.c */
 extern Config usbsid_config;
 extern RuntimeCFG cfg;
 extern char *project_version;

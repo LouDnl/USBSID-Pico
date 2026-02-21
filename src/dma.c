@@ -32,20 +32,20 @@
 
 
 /* pio.c */
-extern PIO bus_pio, clkcnt_pio;
+extern const PIO bus_pio, clkcnt_pio;
 extern uint sm_control, sm_data, sm_clock, sm_delay, sm_clkcnt;
 
 /* DMA */
-int dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay;
-int dma_counter;
+int dma_tx_control = 0, dma_tx_data = 0, dma_rx_data = 0, dma_tx_delay = 0;
+int dma_counter = 0;
 #if PICO_RP2040
-int dma_counter_chain;
+int dma_counter_chain = 0;
 #endif
 volatile uint32_t cycle_count_word;
 
 /* Shiny things */
 #if defined(PICO_DEFAULT_LED_PIN)
-extern PIO led_pio;
+extern const PIO led_pio;
 extern uint sm_pwmled;
 int dma_pwmled;
 volatile int pwm_value = 0;
@@ -55,6 +55,7 @@ int dma_rgbled;
 volatile uint32_t rgb_value = 0;
 #endif
 #endif
+
 
 void setup_dmachannels(void)
 { /* NOTE: Do not manually assign DMA channels, this causes a Panic on the PicoW */

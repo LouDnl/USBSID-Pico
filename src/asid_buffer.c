@@ -56,15 +56,15 @@ extern uint32_t clockcycles(void);
 /* PIO */
 const PIO raster_pio = pio1;
 static uint sm_buffer, offset_buffer;
-bool buffer_sm_started = false;
-bool buffer_sm_claimed = false;
+static bool buffer_sm_started = false;
+static bool buffer_sm_claimed = false;
 
 /* Arrival rate tracking */
 #define ARRIVAL_HISTORY_SIZE 8
 #define MULTISID_TIMEOUT_FRAMES 30  /* Reset to 1-SID after this many frames without SID2+ */
 #define NOWRITES_TIMEOUT_FRAMES 100  /* Disable everything after this amount of frames */
 
-static bool still_receiving = false;
+static bool still_receiving = false; /* IRQ */
 static uint32_t arrival_times[ARRIVAL_HISTORY_SIZE];
 volatile uint8_t arrival_index = 0;
 volatile uint8_t arrival_count = 0;
@@ -75,18 +75,18 @@ volatile uint8_t frames_since_nowrites = 0;  /* Frames since last SID2/3/4 messa
 volatile static uint8_t frames_since_multisid = 0;  /* Frames since last SID2/3/4 message */
 
 /* IRQ */
-static int pio_irq;
-static int8_t buffer_irq;
 const int BUFFPIOIRQ = 2;
-bool buffer_irq_started = false;
+volatile static int pio_irq = 0;
+volatile static int8_t buffer_irq = 0;
+volatile static bool buffer_irq_started = false;
 volatile uint32_t irq_now_at = 0;
 volatile uint32_t irq_end_at = 0;
 volatile uint32_t irq_prev_at = 0;
 
 /* Ring buffer */
-static const uint8_t ASID_FRAME_WRITES_MAX = 28;
 static uint8_t ring_get(void);
 static int ring_diff(void);
+static const uint8_t ASID_FRAME_WRITES_MAX = 28;
 volatile uint16_t corrected_rate = 0;
 const uint8_t diff_size = (2 * (4 * ASID_FRAME_WRITES_MAX)); /* = 224 bytes | 112 bytes == 1 frame, was 64 bytes */
 typedef struct {
@@ -104,8 +104,6 @@ static const uint16_t RING_SIZE_MAX = (150 * 224);    /* 33600 bytes - maximum s
 static const uint16_t RING_SIZE_STEP = (20 * 224);    /* 4480 bytes - grow/shrink increment */
 volatile uint16_t ring_size = RING_SIZE_DEFAULT;      /* Current effective size */
 static uint16_t ring_size_allocated = 0;              /* Actual allocated size */
-/* TODO: REMOVE ~ TEMPORARY */
-volatile bool in_asid_irq = false;
 
 
 /**
@@ -430,7 +428,6 @@ void reset_arrival_tracking(void)
  */
 void __not_in_flash_func(buffer_irq_handler)(void)
 {
-  in_asid_irq = true;
   irq_prev_at = irq_now_at;
   irq_now_at = clockcycles();
 
@@ -478,7 +475,6 @@ void __not_in_flash_func(buffer_irq_handler)(void)
     frames_since_nowrites = 0;
     still_receiving = true;
   }
-  in_asid_irq = false;
 
   /* Interrupt cleared at end of routine
    * if play becomes irregular, irq's might be
