@@ -59,6 +59,7 @@ volatile uint32_t rgb_value = 0;
 
 void setup_dmachannels(void)
 { /* NOTE: Do not manually assign DMA channels, this causes a Panic on the PicoW */
+  usNFO("\n");
   usCFG("[DMA CHANNELS INIT] START\n");
 
   /* NOTICE: DMA read address is disabled for now, it is causing confirmed desync on the rp2040 (rp2350 seems to works, but needs improving) */

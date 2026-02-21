@@ -292,6 +292,7 @@ void __no_inline_not_in_flash_func(default_config)(Config* config)
 void __no_inline_not_in_flash_func(load_config)(Config* config)
 {
   print_cfg_addr();
+  usNFO("\n");
   usCFG("[START LOAD CONFIG]\n");
   int savelocationid = 0;  /* counter for finding the current save location */
 AGAIN:
@@ -1189,6 +1190,7 @@ void print_config(void)
 
 void apply_config(bool at_boot, bool print_cfg)
 {
+  usNFO("\n");
   usCFG("[START CONFIG APPLY]\n");
   usCFG("Verifying socket settings\n");
   verify_socket_settings();
@@ -1239,6 +1241,7 @@ void save_config_ext(void)
 
 void detect_default_config(void)
 {
+  usNFO("\n");
   usCFG("DETECT DEFAULT CONFIG START\n");
   usCFG("IS DEFAULT CONFIG? %s\n",
     true_false[usbsid_config.default_config]);
