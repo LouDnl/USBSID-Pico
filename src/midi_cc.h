@@ -75,6 +75,7 @@ typedef struct midi_ccvalues {
   uint8_t CC_VCE3;  /* Select Voice 3 */
   /* Custom commands */
   uint8_t CC_GTEN;  /* Gate auto enabled on noteon note off */
+  uint8_t CC_POLY;  /* Turn on polyfonic for current SID */
   uint8_t CC_CVCE;  /* Enable copy voice mode */
   uint8_t CC_CSID;  /* Enable copy SID mode */
   uint8_t CC_LVCE;  /* Link/Unlink voice */
@@ -130,10 +131,11 @@ typedef struct midi_ccvalues {
   .CC_VCE3 =  0x6E,  /* 110 ~ Select Voice 3 */ \
   /* Default CC values ~ custom commands */ \
   .CC_GTEN =  0x40,  /*  64 ~ Gate auto enabled on noteon note off */ \
-  .CC_CVCE =  0x6F,  /* 111 ~ Enable copy voice mode */ \
-  .CC_CSID =  0x08,  /*   8 ~ Enable copy SID mode */ \
-  .CC_LVCE =  0x18,  /*  24 ~ Link/Unlink voice */ \
-  .CC_LSID =  0x28,  /*  40 ~ Link/Unlink SID */ \
+  .CC_POLY =  0x6F,  /* 111 ~ Turn on polyfonic for current SID */ \
+  .CC_CVCE =  0x08,  /*   8 ~ Enable copy voice mode */ \
+  .CC_CSID =  0x18,  /*  24 ~ Enable copy SID mode */ \
+  .CC_LVCE =  0x28,  /*  40 ~ Link/Unlink voice */ \
+  .CC_LSID =  0x38,  /*  56 ~ Link/Unlink SID */ \
   /* Cynthcart related _FIXED_ CC values */ \
   .CC_CEN  =  0x55,  /*  85 ~ Enable Cynthcart */ \
   .CC_CDI  =  0x56,  /*  86 ~ Disable Cynthcart */ \
