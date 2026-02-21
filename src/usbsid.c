@@ -975,6 +975,13 @@ int main()
   core_sync_state = SYNC_CORE0_STAGE2;
   __sev();  /* Signal event to wake Core 1 from WFE */
 
+  {
+    extern const char *us_product;
+    extern const char *project_version;
+    usNFO("\n");
+    usDBG("%s v%s Started successfully\n\n", us_product, project_version);
+  }
+
   /* Loop IO tasks forever */
   while (1) {
     tud_task_ext(/* UINT32_MAX */0, false);  /* equals tud_task(); */
