@@ -36,7 +36,7 @@ extern uint8_t *sid_memory;
 #else
 extern uint8_t sid_memory[(0x20 * 4)];
 #endif
-extern int usbdata;
+extern volatile int usbdata;
 
 /* config.c */
 extern Config usbsid_config;

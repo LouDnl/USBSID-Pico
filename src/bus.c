@@ -65,12 +65,13 @@ extern void stop_pios(void);
 volatile bool is_muted; /* Global muting state */
 
 /* Direct Pio IRQ access */
-volatile const uint32_t *IRQState = &pio0_hw->irq;
+#define IRQState (pio0_hw->irq)
 
 /* DMA bus data variables */
-uint8_t control_word, read_data;
-uint16_t delay_word;
-uint32_t data_word, dir_mask;
+volatile uint8_t control_word, read_data;
+volatile uint16_t delay_word;
+volatile uint32_t data_word, dir_mask;
+
 
 /**
  * @brief Set the bits going to the PIO databus based on provided address
@@ -197,13 +198,14 @@ uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles)
   pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ0));  /* Clear the statemachine IRQ before starting */
   pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ1));  /* Clear the statemachine IRQ before starting */
   dma_channel_set_read_addr(dma_tx_delay, &delay_word, false);
-  dma_hw->multi_channel_trigger = (1u << dma_tx_delay);  /* Delay cycle s DMA transfer */
+  dma_channel_set_trans_count(dma_tx_delay, 1, false);  /* Reset transfer count to 1 */
+  dma_hw->multi_channel_trigger = (1u << dma_tx_delay);  /* Delay cycles DMA transfer */
 
   for (;;) {  /* Keep mofo waiting yeah! */
-    if (((*IRQState & (1u << PIO_IRQ1)) >> PIO_IRQ1) != 1)
+    if (((IRQState & (1u << PIO_IRQ1)) >> PIO_IRQ1) != 1)
       continue;
-    pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ0));  /* Clear the statemachine IRQ after finishing */
-    pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ1));  /* Clear the statemachine IRQ after finishing */
+    /* Clear the statemachine IRQ after finishing */
+    IRQState = (1u << PIO_IRQ0) | (1u << PIO_IRQ1);  /* Write-1-to-Clear to clear both flags */
     return cycles;
   }
 
@@ -312,8 +314,8 @@ uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t a
 void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles)
 {
   delay_word = cycles;
-  sid_memory[(address & 0x7F)] = data;
-  if (set_bus_bits(address, true) != 1) {
+  sid_memory[(address & 0x7F)] = data; /* Store SID write data in SID memory */
+  if (set_bus_bits(address, true) != 1) { /* Set bus bits (uses SID memory as source) */
     return;
   }
 
@@ -371,7 +373,7 @@ uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, ui
   );
   dma_channel_wait_for_finish_blocking(dma_rx_data);  /* Wait for data */
   sid_memory[(address & 0x7F)] = (read_data & 0xFF);
-  return (read_data & 0xFF);
+  return sid_memory[(address & 0x7F)];
 }
 
 /**

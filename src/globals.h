@@ -87,7 +87,8 @@
 #define MIDI_CABLE 0
 
 /* USB data type */
-extern char dtype, ntype, cdc, asid, midi, sysex, wusb;
+extern volatile char dtype, ntype;
+extern const char cdc, asid, midi, sysex, wusb;
 
 /* WebUSB globals */
 #define URL  "/usbsid.loudai.nl"

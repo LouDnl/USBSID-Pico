@@ -40,18 +40,18 @@
 #include "sid.h"
 #include "logging.h"
 
-#include "midi_ccdefaults.h"
-const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT;
+#include "midi_cc.h"
 
-/* GPIO */
-extern uint8_t cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
+
+/* sid.c */
 extern void reset_sid(void);
+extern void reset_sid_registers(void);
 
-/* Midi handler */
+/* midi_handler.c */
 extern void midi_processor_init(void);
 extern void process_midi(uint8_t *buffer, int size);
 
-/* ASID */
+/* sysex.c */
 extern void process_sysex(uint8_t *buffer, int size);
 
 #ifdef ONBOARD_EMULATOR
@@ -65,10 +65,14 @@ extern bool stop_cynthcart(void);
 queue_t cynthcart_queue;
 #endif
 
+/* Always boot with default CC values ~ TODO: Load from flash!? */
+const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT;
+
 
 /* Initialize the midi handlers */
 void midi_init(void)
 {
+  usNFO("\n");
   usNFO("[MIDI] Init start\n");
 
   /* Set initial stream state and index */
@@ -99,6 +103,7 @@ inline void emulator_queue_deinit(void)
   /* emudore */
   queue_free(&cynthcart_queue);
   reset_sid();
+  reset_sid_registers();
 }
 
 inline void handle_emulater_data(void)
@@ -165,7 +170,7 @@ inline void handle_emulator_cc(void)
 inline void midi_buffer_task(uint8_t buffer)
 {
   if (midimachine.index != 0) {
-    if (midimachine.type != SYSEX) usMIDI(" [B%d]$%02x#%03d", midimachine.index, buffer, buffer);
+    if (midimachine.type != SYSEX) usMCMD(" [B%d]$%02x#%03d", midimachine.index, buffer, buffer);
   }
 
   if (buffer & 0x80) { /* Handle start byte */
@@ -214,7 +219,7 @@ inline void midi_buffer_task(uint8_t buffer)
         dtype = midi; /* Set data type to midi */
         midimachine.midi_bytes = 2;
         if (midimachine.bus != CLAIMED && midimachine.type == NONE) {
-          if (midimachine.index == 0) usMIDI("[M][B%d]$%02x#%03d", midimachine.index, buffer, buffer);
+          if (midimachine.index == 0) usMCMD("[M][B%d]$%02x#%03d", midimachine.index, buffer, buffer);
           midimachine.type = MIDI;
           midimachine.state = RECEIVING;
           midimachine.bus = CLAIMED;
@@ -232,7 +237,7 @@ inline void midi_buffer_task(uint8_t buffer)
         dtype = midi; /* Set data type to midi */
         midimachine.midi_bytes = 3;
         if (midimachine.bus != CLAIMED && midimachine.type == NONE) {
-          if (midimachine.index == 0) usMIDI("[M][B%d]$%02x#%03d", midimachine.index, buffer, buffer);
+          if (midimachine.index == 0) usMCMD("[M][B%d]$%02x#%03d", midimachine.index, buffer, buffer);
           midimachine.type = MIDI;
           midimachine.state = RECEIVING;
           midimachine.bus = CLAIMED;
@@ -253,7 +258,7 @@ inline void midi_buffer_task(uint8_t buffer)
         if (midimachine.type == MIDI) {
           /* if (midimachine.streambuffer[0] >= 0x80 || midimachine.streambuffer[0] <= 0xEF) { */
             if (midimachine.index == midimachine.midi_bytes) {
-              usMIDI("\n");
+              usMCMD("\n");
               dtype = midi; /* Set data type to midi */
 
               /* Do something fancy now */
@@ -265,12 +270,9 @@ inline void midi_buffer_task(uint8_t buffer)
               } else
               if (emulator_running) { /* Cynthcart, yeah baby yeah! */
                 handle_emulater_data();
-              } else { /* Boring midi ;-) */
-              #endif
-                /* process_midi(midimachine.streambuffer, midimachine.index); */ // BUG: DISABLED
-                /* This function causes strange behaviour on SIDs after use */
-              #ifdef ONBOARD_EMULATOR
               }
+              #else
+              process_midi(midimachine.streambuffer, midimachine.index);
               #endif
 
               midimachine.index = 0;
@@ -282,11 +284,11 @@ inline void midi_buffer_task(uint8_t buffer)
       } else {
         /* Buffer is full, receiving to much data too handle, wait for message to end */
         midimachine.state = WAITING_FOR_END;
-        usMIDI("[EXCESS][IDX]%02d %02x \n", midimachine.index, buffer);
+        usMCMD("[EXCESS][IDX]%02d %02x \n", midimachine.index, buffer);
       }
     } else if (midimachine.state == WAITING_FOR_END) {
       /* Consuming SysEx messages, nothing else to do */
-      usMIDI("[EXCESS][IDX]%02d %02x \n", midimachine.index, buffer);
+      usMCMD("[EXCESS][IDX]%02d %02x \n", midimachine.index, buffer);
     }
   }
 }

@@ -30,7 +30,7 @@
 #include "sid.h"
 
 
-/* config. */
+/* config.c */
 extern Config usbsid_config;
 
 /* config_logging.c */

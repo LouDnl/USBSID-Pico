@@ -218,12 +218,16 @@ uint8_t const * tud_descriptor_configuration_cb(uint8_t index)
 #define USBSID_PRODUCT "ERROR MISSING PRODUCT!"
 #endif
 
+/* Static string storage to prevent -O3 optimization issues with macro-defined strings */
+static const char usb_manufacturer[] = USBSID_MANUFACTURER;
+static const char usb_product[] = USBSID_PRODUCT;
+
 /* String Descriptors */
-const char *string_desc_arr[] =
+static const char * const string_desc_arr[] =
 {
     (const char[]){0x09, 0x04},  // 0: is supported language is English (0x0409)
-    USBSID_MANUFACTURER,         // 1: Manufacturer
-    USBSID_PRODUCT,              // 2: Product
+    usb_manufacturer,            // 1: Manufacturer
+    usb_product,                 // 2: Product
     "USES-MCU-ID",               // 3: Serial, uses chip ID
     "USBSID-Pico Data",          // 4: CDC Interface
     "USBSID-Pico Midi",          // 5: Midi Interface

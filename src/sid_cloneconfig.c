@@ -32,21 +32,22 @@
 #include "sid_skpico.h"
 
 
-/* GPIO */
+/* bus.c */
 extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
 extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
+extern void cycled_delay_operation(uint16_t cycles);
 
-/* SID */
+/* sid.c */
 extern void clear_sid_memory(void);
 extern void clear_volume_state(void);
 extern void set_reset_state(bool state);
 extern void set_paused_state(bool state);
 
-/* Config */
+/* config.c */
 extern Config usbsid_config;
 extern RuntimeCFG cfg;
 
-/* Config logging */
+/* config_logging.c */
 extern void print_cfg(const uint8_t *buf, size_t len);
 extern char *sidtypes[5];
 
@@ -151,7 +152,7 @@ void read_fpgasid_configuration(uint8_t base_address)
   cycled_write_operation((0x19 + base_address), 0x0, 6);   /* Clear magic cookie Hi */
   cycled_write_operation((0x1A + base_address), 0x0, 6);   /* Clear magic cookie Lo */
 
-  usCFG("\n");
+  usNFO("\n");
   usCFG("[FPGASID DIAGNOSTIC RESULT]\n");
   usCFG("ID: %04X (FPGASID)\n", fpgasid_id);
   usCFG("CPLD REVISION: %02X\n", cpld);
@@ -175,7 +176,7 @@ void read_fpgasid_configuration(uint8_t base_address)
   print_fpgasid_sidconfig(1, 1, sid_one_b);
   print_fpgasid_sidconfig(1, 2, sid_two_b);
 
-  usCFG("\n");
+  usNFO("\n");
 
   return;
 }
@@ -183,7 +184,7 @@ void read_fpgasid_configuration(uint8_t base_address)
 void print_skpico_configuration(uint8_t base_address, uint8_t * configarray)
 {
 
-  usCFG("\n");
+  usNFO("\n");
   usCFG("[SIDKICK-pico @ 0x%02X CONFIG]\n", base_address);
   for (size_t i = 0; i < 64; i++) {
     if (i >= 4 && i <= 7) continue;
@@ -204,7 +205,7 @@ void print_skpico_configuration(uint8_t base_address, uint8_t * configarray)
     usCFG("[%02ld] %s: %02X\n", i, config_names[i], configarray[i]);
   }
   usCFG("[PRINT CFG SETTINGS END]\n");
-  usCFG("\n");
+  usNFO("\n");
 
 }
 
@@ -239,7 +240,7 @@ void read_skpico_configuration(uint8_t base_address)
  * This requires a 5 second reset hold
  * to switch to and or from 6581/8580
  */
-void switch_pdsid_type(void)
+void reset_switch_pdsid_type(void)
 {
   set_reset_state(true); // reset_state = 1;
   set_paused_state(false); // paused_state = 0;
@@ -253,4 +254,43 @@ void switch_pdsid_type(void)
   sPIN(RES); // gpio_put(RES, 1);
   set_reset_state(false); // reset_state = 0;
   return;
+}
+
+/** // BUG: Inconsistent results when set to 8580
+ * @brief Read PDSID configured type
+ *
+ * @param uint8_t base_address
+ * @return uint8_t pdsid type
+ */
+uint8_t read_pdsid_sid_type(uint8_t base_address)
+{
+  cycled_write_operation((base_address + 0x1d),0x50,6);  /* 'P' */
+  cycled_delay_operation(1000);
+  cycled_write_operation((base_address + 0x1e),0x44,6);  /* 'D' */
+  cycled_delay_operation(1000);
+  uint8_t result = cycled_read_operation((base_address + 0x1f),6); /* 0 = 6581, 1 = 8580 */
+  cycled_delay_operation(1000);
+  cycled_write_operation((base_address + 0x1d),0x00,6);  /* end config mode */
+  return result;
+}
+
+/**
+ * @brief Set the pdsid sid type object
+ *
+ * @param uint8_t base_address
+ * @param uint8_t type
+ * @return boolean true succes
+ * @return boolean false false
+ */
+bool set_pdsid_sid_type(uint8_t base_address, uint8_t type)
+{
+  if (type > 1) { return false; } /* Cannot do that here! */
+  cycled_write_operation((base_address + 0x1d),0x50,6); /* 'P' */
+  cycled_delay_operation(1000);
+  cycled_write_operation((base_address + 0x1e),0x44,6); /* 'D' */
+  cycled_delay_operation(1000);
+  cycled_write_operation((base_address + 0x1f),type,6); /* 0 = 6581, 1 = 8580 */
+  cycled_delay_operation(1000);
+  cycled_write_operation((base_address + 0x1d),0x00,6);  /* end config mode */
+  return true;
 }

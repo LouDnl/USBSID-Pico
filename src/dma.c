@@ -32,32 +32,34 @@
 
 
 /* pio.c */
-extern PIO bus_pio, clkcnt_pio;
+extern const PIO bus_pio, clkcnt_pio;
 extern uint sm_control, sm_data, sm_clock, sm_delay, sm_clkcnt;
 
 /* DMA */
-int dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay;
-int dma_counter;
+int dma_tx_control = 0, dma_tx_data = 0, dma_rx_data = 0, dma_tx_delay = 0;
+int dma_counter = 0;
 #if PICO_RP2040
-int dma_counter_chain;
+int dma_counter_chain = 0;
 #endif
 volatile uint32_t cycle_count_word;
 
 /* Shiny things */
 #if defined(PICO_DEFAULT_LED_PIN)
-extern PIO led_pio;
+extern const PIO led_pio;
 extern uint sm_pwmled;
 int dma_pwmled;
-int pwm_value = 0;
+volatile int pwm_value = 0;
 #if defined(USE_RGB)  /* No RGB LED on _w Pico's */
 extern uint sm_rgbled;
 int dma_rgbled;
-uint32_t rgb_value = 0;
+volatile uint32_t rgb_value = 0;
 #endif
 #endif
 
+
 void setup_dmachannels(void)
 { /* NOTE: Do not manually assign DMA channels, this causes a Panic on the PicoW */
+  usNFO("\n");
   usCFG("[DMA CHANNELS INIT] START\n");
 
   /* NOTICE: DMA read address is disabled for now, it is causing confirmed desync on the rp2040 (rp2350 seems to works, but needs improving) */

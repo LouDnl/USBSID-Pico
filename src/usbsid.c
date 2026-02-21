@@ -51,16 +51,16 @@ uint8_t * sid_memory = &c64memory[0xd400];
 uint8_t __not_in_flash("usbsid_buffer") sid_memory[(0x20 * 4)] __aligned(2 * (0x20 * 4));
 #endif
 
-int usb_connected = 0, usbdata = 0;
-uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
-uint8_t *cdc_itf = 0, *wusb_itf = 0;
+volatile int usb_connected = 0, usbdata = 0;
+volatile uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
+volatile uint8_t *cdc_itf = 0, *wusb_itf = 0;
 /* nonetype, datatype, returntype */
-char ntype = '0', dtype = '0', rtype = '0';
-char cdc = 'C', asid = 'A', midi = 'M', sysex = 'S', wusb = 'W', uart = 'U';
-bool web_serial_connected = false;
+volatile char ntype = '0', dtype = '0', rtype = '0';
+const char cdc = 'C', asid = 'A', midi = 'M', sysex = 'S', wusb = 'W', uart = 'U';
+static bool web_serial_connected = false;
 
-double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
-bool auto_config = false;
+volatile double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
+volatile bool auto_config = false;
 volatile bool offload_ledrunner = false;
 
 /* Init var pointers for external use */
@@ -103,7 +103,7 @@ extern void init_uart(void);
 #endif
 
 /* Vu */
-extern uint16_t vu;
+extern volatile uint16_t vu;
 extern void init_vu(void);
 extern void led_runner(void);
 
@@ -118,7 +118,7 @@ extern bool get_reset_state(void);
 extern bool running_tests;
 
 /* SID detection */
-extern void auto_detect_routine(bool auto_config, bool with_delay);
+extern void auto_detect_routine(void);
 
 /* SID player */
 #ifdef ONBOARD_EMULATOR
@@ -233,7 +233,7 @@ void init_logging(void)
 /* USB TO HOST */
 
 /* Write from device to host */
-void cdc_write(uint8_t * itf, uint32_t n)
+void cdc_write(volatile uint8_t * itf, uint32_t n)
 { /* No need to check if write available with current driver code */
   usIO("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
   tud_cdc_n_write(*itf, write_buffer, n);  /* write n bytes of data to client */
@@ -242,7 +242,7 @@ void cdc_write(uint8_t * itf, uint32_t n)
 }
 
 /* Write from device to host */
-void webserial_write(uint8_t * itf, uint32_t n)
+void webserial_write(volatile uint8_t * itf, uint32_t n)
 { /* No need to check if write available with current driver code */
   usIO("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
   tud_vendor_write(write_buffer, n);
@@ -256,6 +256,7 @@ void webserial_write(uint8_t * itf, uint32_t n)
 int __no_inline_not_in_flash_func(do_buffer_tick)(int top, int step)
 {
   static int i = 1;
+  if (i < 1) i = 1;  /* Guard: static init unreliable with -O3 */
   cycled_write_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   WRITEDBG(dtype, i, top, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   usIO("[I %d] [%c] $%02X:%02X (%u)\n", i, dtype, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
@@ -277,7 +278,7 @@ void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
 }
 
 /* Process received usb data */
-void __no_inline_not_in_flash_func(process_buffer)(uint8_t * itf, uint32_t * n)
+void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volatile uint32_t * n)
 {
   usbdata = 1;
   vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
@@ -896,6 +897,7 @@ int main()
   sid_mhz = (sid_hz / 1000 / 1000);
   sid_us = (1 / sid_mhz);
   if (!auto_config) {
+    usNFO("\n");
     usNFO("[NFO] [PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
     usNFO("[NFO] [C64] %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
     usNFO("[NFO] [C64] REFRESH_RATE %lu Cycles, RASTER_RATE %lu Cycles\n", usbsid_config.refresh_rate, usbsid_config.raster_rate);
@@ -953,7 +955,7 @@ int main()
     detect_default_config();
   }
   if (auto_config) {  /* NOTE: Does not work on rp2350 */
-    auto_detect_routine(auto_config, true);  /* Double tap! */
+    auto_detect_routine();  /* Double tap! */
     save_config_ext();
     auto_config = false;
     mcu_reset();
@@ -961,11 +963,24 @@ int main()
   /* Print config once at end of boot routine */
   print_config();
 
+  /* Reset SID chips */
+  usBOOT("Reset SID chips\n");
+  reset_sid(); /* WARNING: Might cause issues! */
+  usBOOT("Reset SID registers\n");
+  reset_sid_registers(); /* WARNING: Might cause issues! */
+
   /* Signal Core 1 to enter main loop (sync point 2) */
   usBOOT("<CORE 0> Signaling core1 ~ 2\n");
   __dmb();  /* Memory barrier after read */
   core_sync_state = SYNC_CORE0_STAGE2;
   __sev();  /* Signal event to wake Core 1 from WFE */
+
+  {
+    extern const char *us_product;
+    extern const char *project_version;
+    usNFO("\n");
+    usDBG("%s v%s Started successfully\n\n", us_product, project_version);
+  }
 
   /* Loop IO tasks forever */
   while (1) {

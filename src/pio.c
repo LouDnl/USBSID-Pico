@@ -45,14 +45,14 @@ extern const char* pcb_version;
 extern void setup_vu_dma(void);
 
 /* locals */
-PIO bus_pio = pio0;
-PIO clkcnt_pio = pio1;
-uint sm_control, offset_control; /* pio0 */
-uint sm_data, offset_data;       /* pio0 */
-uint sm_clock, offset_clock;     /* pio0 */
-uint sm_delay, offset_delay;     /* pio0 */
-uint sm_clkcnt, offset_clkcnt;   /* pio1 */
-float sidclock_frequency, busclock_frequency;
+const PIO bus_pio = pio0;
+const PIO clkcnt_pio = pio1;
+volatile uint sm_control = 0, offset_control = 0; /* pio0 */
+volatile uint sm_data = 0, offset_data = 0;       /* pio0 */
+volatile uint sm_clock = 0, offset_clock = 0;     /* pio0 */
+volatile uint sm_delay = 0, offset_delay = 0;     /* pio0 */
+volatile uint sm_clkcnt = 0, offset_clkcnt = 0;   /* pio1 */
+volatile float sidclock_frequency = 0.0, busclock_frequency = 0.0;
 
 /* Shiny things */
 #if defined(PICO_DEFAULT_LED_PIN)
@@ -118,7 +118,8 @@ void setup_piobus(void)
   uint32_t pico_hz = clock_get_hz(clk_sys);
   busclock_frequency = (float)pico_hz / (usbsid_config.clock_rate * 32) / 2;  /* Clock frequency is 8 times the SID clock */
 
-  usBOOT("[BUS CLK INIT] START\n");
+  usNFO("\n");
+  usDBG("[BUS CLK INIT] START\n");
   usDBG("[PI CLK]@%luMHz [DIV]@%.2f [BUS CLK]@%.2f [CFG SID CLK]%d\n",
      (pico_hz / 1000 / 1000),
      busclock_frequency,
