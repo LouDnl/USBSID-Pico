@@ -282,9 +282,9 @@ uint8_t detect_clone_type(Socket * cfg_ptr)
   uint8_t base_address = cfg_ptr->sid1.addr;
   static int chip, clone, debby_does_dp;
 
-  if (detect_skpico(base_address))  { chip = 1; clone = 2; can_dual = 1; goto done_clone; }  /* Clone, SKpico */
-  if (detect_fpgasid(base_address)) { chip = 1; clone = 4; can_dual = 1; goto done_clone; }  /* Clone, FPGASID */
-  if (detect_pdsid(base_address))   { chip = 1; clone = 6; can_dual = 0; goto done_clone; }  /* Clone, PDsid */
+  if (detect_skpico(base_address))  { chip = 1; clone = 2; debby_does_dp = 1; goto done_clone; }  /* Clone, SKpico */
+  if (detect_fpgasid(base_address)) { chip = 1; clone = 4; debby_does_dp = 1; goto done_clone; }  /* Clone, FPGASID */
+  if (detect_pdsid(base_address))   { chip = 1; clone = 6; debby_does_dp = 0; goto done_clone; }  /* Clone, PDsid */
   chip = 0;           /* Real */
   clone = 0;          /* Disabled */
   debby_does_dp = 0;  /* Parle! */
