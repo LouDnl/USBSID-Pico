@@ -138,9 +138,9 @@ volatile bool sidplayer_next = false;
 volatile bool sidplayer_prev = false;
 
 extern uint8_t * sidfile; /* Temporary buffer to store incoming data */
-extern int sidfile_size;
-extern char tuneno;
-extern bool is_prg;
+extern volatile int sidfile_size;
+extern volatile char tuneno;
+extern volatile bool is_prg;
 extern void load_prg(uint8_t * binary_, size_t binsize_, bool loop);
 extern void load_sidtune(uint8_t * sidfile, int sidfilesize, char subt);
 extern void init_sidplayer(void);
