@@ -118,7 +118,7 @@ extern bool get_reset_state(void);
 extern bool running_tests;
 
 /* SID detection */
-extern void auto_detect_routine(bool auto_config, bool with_delay);
+extern void auto_detect_routine(void);
 
 /* SID player */
 #ifdef ONBOARD_EMULATOR
@@ -955,7 +955,7 @@ int main()
     detect_default_config();
   }
   if (auto_config) {  /* NOTE: Does not work on rp2350 */
-    auto_detect_routine(auto_config, true);  /* Double tap! */
+    auto_detect_routine();  /* Double tap! */
     save_config_ext();
     auto_config = false;
     mcu_reset();
