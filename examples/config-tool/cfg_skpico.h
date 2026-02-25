@@ -32,15 +32,16 @@
 #define SKPICO_DAC_START 30
 #define SKPICO_DAC_LEN 1
 
-const uint8_t init_configmode[3] = { 0x0, 0x1F, 0xFF };       /* Inits and extends config mode */
-const uint8_t config_extend[3] = { 0x0, 0x1D, 0xFA };         /* Clear address lines and extend config mode */
-const uint8_t config_exit[3] = { 0x0, 0x1D, 0xFB };           /* Exit config mode without reset */
-const uint8_t config_update[3] = { 0x0, 0x1D, 0xFE };         /* Update configuration and exit */
-const uint8_t config_writeupdate[3] = { 0x0, 0x1D, 0xFF };    /* Update and write configuration and exit */
-const uint8_t config_write[3] = { 0x0, 0x1D, 0x0 };           /* Write complete config to memory */
-const uint8_t start_config_write[3] = { 0x0, 0x1E, 0x0 };     /* Write single value to config */
-const uint8_t set_dac_mode_mono8[3] = { 0x0, 0x1F, 0xFC };    /* Set DAC mode to mono */
-const uint8_t set_dac_mode_stereo8[3] = { 0x0, 0x1F, 0xFB };  /* Set DAC mode to stereo */
+const uint8_t init_configmode[3]      = { 0x00, 0x1f, 0xff };  /* Inits and extends config mode */
+const uint8_t config_extend[3]        = { 0x00, 0x1d, 0xfa };  /* Clear address lines and extend config mode */
+const uint8_t config_exit[3]          = { 0x00, 0x1d, 0xfb };  /* Exit config mode without reset */
+const uint8_t config_leave[3]         = { 0x00, 0x1d, 0xfd };  /* Leave config mode */
+const uint8_t config_update[3]        = { 0x00, 0x1d, 0xfe };  /* Update configuration and exit */
+const uint8_t config_writeupdate[3]   = { 0x00, 0x1d, 0xff };  /* Update and write configuration and exit */
+const uint8_t config_write[3]         = { 0x00, 0x1d, 0x00 };  /* Write complete config to memory */
+const uint8_t select_profile[3]       = { 0x00, 0x1e, 0x00 };  /* Select profile before read/write v0.22 and up */
+const uint8_t set_dac_mode_mono8[3]   = { 0x00, 0x1f, 0xfc };  /* Set DAC mode to mono */
+const uint8_t set_dac_mode_stereo8[3] = { 0x00, 0x1f, 0xfb };  /* Set DAC mode to stereo */
 
 const uint8_t skpico_default_config[64] = {                   /* Default SKPico config */
   0x1, 0xC, 0x1, 0xE, /* SID 1 */
@@ -84,6 +85,10 @@ unsigned char * config_names[/* 64 */] = {
   "CFG_POT_FILTER",      // 60   // 16  // Paddles
   "CFG_DIGIDETECT",      // 61   //  0  // 0 ... 1
   "","",                 // 62 -> 63
+};
+unsigned char * u64_names[] = {
+  "CFG_SID2_VOLUME_U64", // config_names[10] becomes 0 + 10 = 10
+  "CFG_FM_VOLUME_U64"    // config_names[11] becomes 1 + 10 = 11
 };
 unsigned char * sid_types[] = {
   "6581", "8580", "8580+digiboost", "none", "FMopl"

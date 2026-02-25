@@ -86,6 +86,13 @@ static uint8_t skpico_config[64] = {0xFF};
 static uint8_t skpico_version[36] = {0xFF};
 static uint8_t base_address = 0x0;
 static int sid_socket = 1;
+static int skpico_v = 0;
+static bool is_u64fw = false;
+
+/* Mommy's little helper */
+bool startsWith(const char *str, const char *prefix) {
+  return (strncmp(str, prefix, strlen(prefix)) == 0);
+}
 
 /* -----USBSID-Pico------ */
 
@@ -503,7 +510,7 @@ void print_cfg_buffer(const uint8_t *buf, size_t len)
     if (i == (len - 1)) {
       printf("\n");
     } else if ((i != 0) && (i % 16 == 15)) {
-      printf("\n[R%03d] ", i);
+      printf("\n[R%03d] ", i+1);
     } else {
       printf(" ");
     }
@@ -1002,9 +1009,11 @@ void print_socket_config(void)
 
 void skpico_config_mode(int debug)
 {
+  if (debug == 1) { printf("SKPico enter config mode\n"); }
   uint8_t skpicobuff[3] = {0};
-  memcpy(skpicobuff, &init_configmode, 3);
+  memcpy(skpicobuff, &init_configmode, 3); /* 0x1f, 0xff */
   skpicobuff[1] = (skpicobuff[1] + base_address);
+  nanosleep((const struct timespec[]){{0, 1000L}}, NULL);  /* Teeny, weeny, usleepy */
   write_chars(skpicobuff, 3);  /* Start or extend config mode */
   if (debug == 1) {
     printf("[%s][W]%02X $%02X:%02X\n", __func__, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
@@ -1013,20 +1022,50 @@ void skpico_config_mode(int debug)
 
 void skpico_extend_config_mode(int debug)
 {
+  if (debug == 1) { printf("SKPico extend config mode\n"); }
   uint8_t skpicobuff[3] = {0};
   memcpy(skpicobuff, &config_extend, 3);
   skpicobuff[1] = (skpicobuff[1] + base_address);
+  nanosleep((const struct timespec[]){{0, 1000L}}, NULL);  /* Teeny, weeny, usleepy */
   write_chars(skpicobuff, 3);  /* Exit config mode */
   if (debug == 1) {
     printf("[%s][W]%02X $%02X:%02X\n", __func__, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
   }
 }
 
-void skpico_end_config_mode(int debug)
+void skpico_exit_reset_config_mode(int debug)
 {
+  if (debug == 1) { printf("SKPico exit config mode and reset\n"); }
   uint8_t skpicobuff[3] = {0};
   memcpy(skpicobuff, &config_exit, 3);
   skpicobuff[1] = (skpicobuff[1] + base_address);
+  nanosleep((const struct timespec[]){{0, 1000L}}, NULL);  /* Teeny, weeny, usleepy */
+  write_chars(skpicobuff, 3);  /* Exit config mode */
+  if (debug == 1) {
+    printf("[%s][W]%02X $%02X:%02X\n", __func__, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
+  }
+}
+
+void skpico_exit_config_mode(int debug)
+{
+  if (debug == 1) { printf("SKPico exit config mode\n"); }
+  uint8_t skpicobuff[3] = {0};
+  memcpy(skpicobuff, &config_exit, 3);
+  skpicobuff[1] = (skpicobuff[1] + base_address);
+  nanosleep((const struct timespec[]){{0, 1000L}}, NULL);  /* Teeny, weeny, usleepy */
+  write_chars(skpicobuff, 3);  /* Exit config mode */
+  if (debug == 1) {
+    printf("[%s][W]%02X $%02X:%02X\n", __func__, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
+  }
+}
+
+void skpico_leave_config_mode(int debug)
+{
+  if (debug == 1) { printf("SKPico leave config mode\n"); }
+  uint8_t skpicobuff[3] = {0};
+  memcpy(skpicobuff, &config_leave, 3);
+  skpicobuff[1] = (skpicobuff[1] + base_address);
+  nanosleep((const struct timespec[]){{0, 1000L}}, NULL);  /* Teeny, weeny, usleepy */
   write_chars(skpicobuff, 3);  /* Exit config mode */
   if (debug == 1) {
     printf("[%s][W]%02X $%02X:%02X\n", __func__, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
@@ -1035,9 +1074,11 @@ void skpico_end_config_mode(int debug)
 
 void skpico_update_config(int debug)
 {
+  if (debug == 1) { printf("SKPico update config\n"); }
   uint8_t skpicobuff[3] = {0};
   memcpy(skpicobuff, &config_update, 3);
   skpicobuff[1] = (skpicobuff[1] + base_address);
+  nanosleep((const struct timespec[]){{0, 1000L}}, NULL);  /* Teeny, weeny, usleepy */
   write_chars(skpicobuff, 3);  /* Update config, doesn't save */
   if (debug == 1) {
     printf("[%s][W]%02X $%02X:%02X\n", __func__, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
@@ -1046,42 +1087,33 @@ void skpico_update_config(int debug)
 
 void skpico_save_config(int debug)
 {
+  if (debug == 1) { printf("SKPico update and save config\n"); }
   uint8_t skpicobuff[3] = {0};
   memcpy(skpicobuff, &config_writeupdate, 3);
   skpicobuff[1] = (skpicobuff[1] + base_address);
+  nanosleep((const struct timespec[]){{0, 1000L}}, NULL);  /* Teeny, weeny, usleepy */
   write_chars(skpicobuff, 3);  /* Update & save config */
   if (debug == 1) {
     printf("[%s][W]%02X $%02X:%02X\n", __func__, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
   }
 }
 
-void skpico_read_config(int debug)
+void skpico_select_profile(int profile, int debug)
 {
-  // memset(skpico_config, 0, count_of(skpico_config));  // Let's keep it 0xFF'd okay?
+  if (debug == 1) { printf("SKPico select profile %d\n", profile); }
+  uint8_t skpicobuff[3] = {0};
+  memcpy(skpicobuff, &select_profile, 3);
+  skpicobuff[1] = (skpicobuff[1] + base_address);
+  skpicobuff[2] = profile;
+  nanosleep((const struct timespec[]){{0, 1000L}}, NULL);  /* Teeny, weeny, usleepy */
+  write_chars(skpicobuff, 3);  /* Start or extend config mode */
   if (debug == 1) {
-    print_cfg_buffer(skpico_config, count_of(skpico_config));
+    printf("[%s][W]%02X $%02X:%02X\n", __func__, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
   }
+}
 
-  skpico_config_mode(debug);
-
-  for (int i = 0; i <= 63; ++i) {
-    read_buffer[1] = (0x1d + base_address);
-    int len;
-    nanosleep((const struct timespec[]){{0, 1000L}}, NULL);  /* Teeny, weeny, usleepy */
-    write_chars(read_buffer, 3);
-    len = read_chars(read_data, count_of(read_data));
-    skpico_config[i] = read_data[0];
-    if (debug == 1) {
-      printf("[%s][R%d]%02X $%02X:%02X\n", __func__, i, read_buffer[0], read_buffer[1], read_data[0]);
-    }
-  }
-
-  skpico_extend_config_mode(debug);
-
-  if (debug == 1) {
-    print_cfg_buffer(skpico_config, count_of(skpico_config));
-  }
-
+void skpico_print_cfgsettings(void)
+{
   printf("[PRINT CFG SETTINGS START]\n");
   for (size_t i = 0; i < 64; i++) {
     if (i >= 4 && i <= 7) continue;
@@ -1091,8 +1123,12 @@ void skpico_read_config(int debug)
       printf("[%02ld] %s: %02X ~ %s\n", i, config_names[i], skpico_config[i], (skpico_config[i] < s_sid_types) ? (char*)sid_types[skpico_config[i]] : (char*)error_type[0]);
       continue;
     }
-    if (i == 10) {
+    if (i == 10 && !is_u64fw) {
       printf("[%02ld] %s: %02X ~ %s\n", i, config_names[i], skpico_config[i], (skpico_config[i] < s_sid2_address) ? (char*)sid2_address[skpico_config[i]] : (char*)error_type[0]);
+      continue;
+    }
+    if ((i == 10 || i == 11) && is_u64fw) {
+      printf("[%02ld] %s: %02X ~ Ultimate64\n", i, u64_names[i-10], skpico_config[i]);
       continue;
     }
     if (i == 59) {
@@ -1103,50 +1139,87 @@ void skpico_read_config(int debug)
   }
   printf("[PRINT CFG SETTINGS END]\n");
 
-  //return;
+  return;
 }
 
-void skpico_read_version(int debug)
+void skpico_read_config(int profile, int debug, bool init)
 {
-  uint8_t skpico_version_result[SKPICO_VER_SIZE] = {0};
-  char skpico_version[SKPICO_VER_SIZE] = {0};
-  uint8_t skpicobuff[3] = {0, 0, 0};
+  memset(skpico_config,0xff,count_of(skpico_config));
+  if (debug == 1) {
+    print_cfg_buffer(skpico_config, count_of(skpico_config));
+  }
+
+  skpico_config_mode(debug);
+  if (skpico_v >= 22) {
+    skpico_select_profile(profile,debug);
+  } else {
+    skpico_select_profile(0,debug);
+  }
+
+  uint8_t skpicobuff[3] = {0};
+  memcpy(skpicobuff, &read_buffer, 3);
+
+  for (int i = 0; i < 64; i++) {
+    skpicobuff[1] = (0x1d + base_address);
+    int len;
+    nanosleep((const struct timespec[]){{0, 1000L}}, NULL);  /* Teeny, weeny, usleepy */
+    write_chars(skpicobuff, 3);
+    len = read_chars(read_data, count_of(read_data));
+    skpico_config[i] = read_data[0];
+    if (debug == 1) {
+      printf("[%s][R%d]%02X $%02X:%02X\n", __func__, i, skpicobuff[0], skpicobuff[1], read_data[0]);
+    }
+  }
+
+  skpico_exit_config_mode(debug);
+
+  if (debug == 1) {
+    print_cfg_buffer(skpico_config, count_of(skpico_config));
+  }
+  return;
+}
+
+void skpico_read_version(int debug, bool init)
+{
+  uint8_t skpico_version_result[64] = {0};
+  char skpico_version[32] = {0};
+  uint8_t skpicobuff[3] = {0x0, 0, 0};
   int len;
 
   char skpico_correction = 0x60;  /* { 0x70, 0x69, 0x63, 0x6F } */
 
   skpico_config_mode(debug);
-  skpico_extend_config_mode(debug);
 
-  for (int i = 0; i < SKPICO_VER_SIZE; i++) {
+  for (int i = 0; i < 32; i++) {
 
-    skpicobuff[1] = (0x1E + base_address);
-    skpicobuff[2] = 0xE0 + i;
+    skpicobuff[1] = (0x1e + base_address);
+    skpicobuff[2] = 224 + i;
     write_chars(skpicobuff, 3);
     if (debug) printf("[%s][W]%02X $%02X:%02X\n", __func__, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
 
-    read_buffer[1] = (0x1D + base_address);
+    read_buffer[1] = (0x1d + base_address);
+    nanosleep((const struct timespec[]){{0, 1000L}}, NULL);  /* Teeny, weeny, usleepy */
     write_chars(read_buffer, 3);
     len = read_chars(read_data, count_of(read_data));
     if (debug) printf("[%s][R]%02X $%02X:%02X\n", __func__, read_buffer[0], read_buffer[1], read_data[0]);
     skpico_version_result[i] = read_data[0];
     if (i >= 2 && i <= 5) skpico_version_result[i] |= skpico_correction;
   }
+  skpico_v = (((skpico_version_result[8] - '0') * 10) + (skpico_version_result[9] - '0'));
+  is_u64fw = ((skpico_version_result[11] == 0x55) ? true : false);
+
+  skpico_leave_config_mode(debug);
 
   if (debug) print_cfg_buffer(skpico_version_result, count_of(skpico_version_result));
-  memcpy(&skpico_version[0], &skpico_version_result, count_of(skpico_version_result) - 1);
-  if (skpico_version[0] != 0) printf("[CONFIG] SIDKICK-pico version is: %.36s\n", skpico_version);
+  memcpy(&skpico_version[0], &skpico_version_result, count_of(skpico_version_result) - 32);
+  printf("[CONFIG] SIDKICK-pico version is: %.36s (skpico_v: %d is_u64fw: %s)\n", skpico_version, skpico_v, (is_u64fw ? "true" : "false"));
 }
 
-void skpico_write_config(int debug)
+
+void skpico_write_config(int profile, int debug)
 {
-  uint8_t skpicobuff[3] = {0};
-  memcpy(skpicobuff, &start_config_write, 3);
-  skpicobuff[1] = (skpicobuff[1] + base_address);
-  write_chars(skpicobuff, 3);
-  if (debug == 1) {
-    printf("[%s][W]%02X $%02X:%02X\n", __func__, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
-  }
+  /* No init here! */
+  skpico_select_profile(profile,debug);
 
   for (int i = 0; i < 64 ; i++) {
     uint8_t skpicobuff[3] = {0};
@@ -1158,6 +1231,7 @@ void skpico_write_config(int debug)
       printf("[%s][W%d]%02X $%02X:%02X\n", __func__, i, skpicobuff[0], skpicobuff[1], skpicobuff[2]);
     }
   }
+  /* No exit or leave here! */
 }
 
 /* -----SIDKICK-pico----- */
@@ -1176,12 +1250,15 @@ void print_help_skpico(void)
   printf("--[OPTIONS]---------------------------------------------------------------------------------------------------------\n");
   printf("  -h,       --help              : Show this help message\n");
   printf("  -d,       --debug             : Prints all read write debug information\n");
-  printf("  --default-config              : Resets the SKPico to default configuration\n");
+  printf("  --default-config N            : Resets the SKPico to default configuration\n");
+  printf("                                  N is profile number to reset (required!)\n");
   printf("  -sock     --socket            : Set the USBSID-Pico socket to use, defaults to socket 1\n");
   printf("  -addr     --base-address      : Set the USBSID-Pico base address to use\n");
   printf("  (-sock and -addr are mutually exclusive, you can choose only one)\n");
-  printf("  -r,       --read              : Read and print SIDKICK-pico configuration\n");
-  printf("  -w,       --write             : Write single config item to SIDKICK-pico (will read the current config first)\n");
+  printf("  -r N,     --read N            : Read and print SIDKICK-pico configuration\n");
+  printf("                                  N is profile number to read (required!)\n");
+  printf("  -w N,     --write N           : Write single config item to SIDKICK-pico (will read the current config first)\n");
+  printf("                                  N is profile number to update (required!)\n");
   printf("--[MANUAL CONFIGURATION]--------------------------------------------------------------------------------------------\n");
   printf("  All the following options require '-w'\n");
   printf("  -s1       --sidone            : Change SID type to:\n");
@@ -1242,10 +1319,11 @@ void config_skpico(int argc, char **argv)
       debug = 1;
     }
     if (!strcmp(argv[param_count], "--default-config")) {
+      int profile = ((argv[param_count+1] != NULL) && !startsWith(argv[param_count+1], "-")) ? atoi(argv[++param_count]) : 0;
       memcpy(skpico_config, skpico_default_config, 64);
-      printf("Start writing default config\n");
+      printf("Start writing default config to profile %d\n", profile);
       skpico_config_mode(debug);
-      skpico_write_config(debug);
+      skpico_write_config(profile, debug);
 
       printf("Start saving default config\n");
       sleep(1);
@@ -1256,8 +1334,8 @@ void config_skpico(int argc, char **argv)
 
       sleep(1);
       printf("Start reading config\n");
-      skpico_read_config(debug);
-      skpico_end_config_mode(debug);
+      skpico_read_config(profile, debug, true);
+      skpico_print_cfgsettings();
     }
   }
 
@@ -1265,29 +1343,34 @@ void config_skpico(int argc, char **argv)
 
   for (int param_count = 2; param_count < argc; param_count++) {
     if (!strcmp(argv[param_count], "-r") || !strcmp(argv[param_count], "--read")) {
+      int profile = ((argv[param_count+1] != NULL) && !startsWith(argv[param_count+1], "-")) ? atoi(argv[++param_count]) : 0;
       param_count++;
       printf("Sending reset SIDs command\n");
-      write_command(RESET_SID);
-      printf("Waiting a second or two for SKPico MCU to settle\n");
-      sleep(2);
-      printf("Read config\n");
-      skpico_read_config(debug);
-      skpico_end_config_mode(debug);
-      write_command(RESET_SID);
+
+      skpico_read_version(debug, true);
+      // if (skpico_v < 22) { skpico_exit_reset_config_mode(debug); }
+      skpico_exit_reset_config_mode(debug);
+      printf("Read config from profile %d\n", profile);
+      skpico_read_config(profile, debug, true);
+      skpico_print_cfgsettings();
       return;
     }
     if (!strcmp(argv[param_count], "-rv") || !strcmp(argv[param_count], "--read-version")) {
       param_count++;
       printf("Read version\n");
-      skpico_read_version(debug);
-      skpico_end_config_mode(debug);
-      write_command(RESET_SID);
+      skpico_read_version(debug, true);
       return;
     }
     if (!strcmp(argv[param_count], "-w") || !strcmp(argv[param_count], "--write")) {
+      int profile = ((argv[param_count+1] != NULL) && !startsWith(argv[param_count+1], "-")) ? atoi(argv[++param_count]) : 0;
       param_count++;
-      printf("Write config ~ read current config first\n");
-      skpico_read_config(debug);
+      skpico_read_version(debug, true);
+      skpico_exit_reset_config_mode(debug);
+      printf("Write config ~ read current config from profile %d first\n", profile);
+      skpico_read_config(profile, debug, true);
+      skpico_exit_reset_config_mode(debug);
+      skpico_print_cfgsettings();
+      skpico_config_mode(debug);
       for (int param_count = 1; param_count < argc; param_count++) {
         if (!strcmp(argv[param_count], "-s1") || !strcmp(argv[param_count], "--sidone")) {
           param_count++;
@@ -1317,8 +1400,9 @@ void config_skpico(int argc, char **argv)
           param_count++;
           int vol = atoi(argv[param_count]);
           if (vol >= 0 && vol <= 14) {
-            printf("SID two volume from: %d to: %d\n", skpico_config[11], vol);
-            skpico_config[11] = vol;
+            int s2volid = (is_u64fw ? 10 : 11);
+            printf("SID two volume from: %d to: %d\n", skpico_config[s2volid], vol);
+            skpico_config[s2volid] = vol;
           }
         }
         if (!strcmp(argv[param_count], "-s1db") || !strcmp(argv[param_count], "--sidone-digiboost")) {
@@ -1340,10 +1424,15 @@ void config_skpico(int argc, char **argv)
         if (!strcmp(argv[param_count], "-io") || !strcmp(argv[param_count], "--iopina5a8")) {
           param_count++;
           int io = atoi(argv[param_count]);
-          if (io < 6) {
-            printf("SKPico SID 2 IO pin from: %s to: %s\n", sid2_address[skpico_config[10]], sid2_address[io]);
-            skpico_config[10] = io;
+          if (!is_u64fw) {
+            if (io < 6) {
+              printf("SKPico SID 2 IO pin from: %s to: %s\n", sid2_address[skpico_config[10]], sid2_address[io]);
+              skpico_config[10] = io;
+            }
+          } else {
+            printf("Unable to set IO pin for Ultimate64 firmware versions\n");
           }
+
         }
         if (!strcmp(argv[param_count], "-clock") || !strcmp(argv[param_count], "--clockspeed")) {
           param_count++;
@@ -1364,26 +1453,27 @@ void config_skpico(int argc, char **argv)
       }
       // Default & and fallback
       if (skpico_config[2] != 1) skpico_config[2] =   1;  // register read
+      if (is_u64fw) skpico_config[11] =  14;  // fmopl volume default
       skpico_config[12] =  7;  // panning
       skpico_config[58] =  7;  // balance
       skpico_config[61] =  1;  // digidetect on
       if (skpico_config[59] > 2) skpico_config[59] = 0;  // reset clockspeed to PAL if incorrect
 
-      printf("Start writing config\n");
+      printf("Start writing config to profile %d\n", profile);
       skpico_extend_config_mode(debug);
-      skpico_write_config(debug);
+      skpico_write_config(profile, debug);
 
       printf("Start saving config\n");
-      sleep(1);
       skpico_save_config(debug);
 
       printf("Extend config mode\n");
       skpico_extend_config_mode(debug);
 
       sleep(1);
-      printf("Start reading config\n");
-      skpico_read_config(debug);
-      skpico_end_config_mode(debug);
+      printf("Start reading config from profile %d\n", profile);
+      skpico_read_config(profile, debug, false);
+      skpico_print_cfgsettings();
+      skpico_exit_reset_config_mode(debug);
 
       sleep(1);
       goto exit;

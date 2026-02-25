@@ -49,6 +49,7 @@ enum
   COMMAND      =   3,   /*       0b11 ~ 0xC0 */
   /* Lower 6 bits for byte count */
   /* Lower 6 bits for Commands */
+  CYCLED_READ  =   4,   /*      0b100 ~ 0x04 */
   PAUSE        =  10,   /*     0b1010 ~ 0x0A */
   UNPAUSE      =  11,   /*     0b1011 ~ 0x0B */
   MUTE         =  12,   /*     0b1100 ~ 0x0C */
@@ -147,10 +148,10 @@ enum config_clockrates
 uint8_t read_data[1];
 uint8_t read_data_max[64];
 uint8_t read_data_uber[128];
-uint8_t read_buffer[3]    = { (READ << 6), 0x0, 0x0 };
-uint8_t write_buffer[3]   = { (WRITE << 6), 0x0, 0x0 };
-uint8_t command_buffer[3] = { (COMMAND << 6), 0x0, 0x0 };
-uint8_t config_buffer[6]  = { ((COMMAND << 6) | 18), 0x0, 0x0, 0x0, 0x0, 0x0 };
+uint8_t read_buffer[3]    = { (uint8_t)(READ << 6), 0x0, 0x0 };
+uint8_t write_buffer[3]   = { (uint8_t)(WRITE << 6), 0x0, 0x0 };
+uint8_t command_buffer[3] = { (uint8_t)(COMMAND << 6), 0x0, 0x0 };
+uint8_t config_buffer[6]  = { (uint8_t)((COMMAND << 6) | 18), 0x0, 0x0, 0x0, 0x0, 0x0 };
 
 const char * error_type[] = {"ERROR"};
 const char * enabled[] = {"Disabled", "Enabled"};
