@@ -118,8 +118,8 @@ inline static int __not_in_flash_func(set_bus_bits)(uint8_t address, bool write)
       break;
   }
   data_word = (dir_mask << 16) | data_word;
-  // usCFG("$%02X:%02X $%04X 0b"PRINTF_BINARY_PATTERN_INT32" $%04X 0b"PRINTF_BINARY_PATTERN_INT16"\n",
-  //   address, data, data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word));
+  // usCFG("$%02X:%02X $%04X 0b%032b $%04X 0b%016b\n",
+  //   address, data, data_word, data_word, control_word, control_word);
   return 1;
 }
 
@@ -171,16 +171,16 @@ uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t ad
       read_data = 0x0;
       dma_channel_set_write_addr(dma_rx_data, &read_data, true);
       dma_channel_wait_for_finish_blocking(dma_rx_data);
-      usGPIO("[W]$%08x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\n[R]$%08x 0b"PRINTF_BINARY_PATTERN_INT32"\n",
-        data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word),
-        control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word),
-        read_data, PRINTF_BYTE_TO_BINARY_INT32(read_data));
+      usGPIO("[W]$%08x 0b%032b $%04x 0b%016b\n[R]$%08x 0b%032b\n",
+        data_word, data_word,
+        control_word, control_word,
+        read_data, read_data);
       sid_memory[(address & 0x7F)] = read_data & 0xFF;
       return read_data & 0xFF;
   }
   /* WRITE, G_PAUSE & G_CLEAR_BUS*/
   dma_channel_wait_for_finish_blocking(dma_tx_control);
-  usGPIO("[W]$%08x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\n", data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word));
+  usGPIO("[W]$%08x 0b%032b $%04x 0b%016b\n", data_word, data_word, control_word, control_word);
   return 0;
 }
 
@@ -259,8 +259,8 @@ void __no_inline_not_in_flash_func(cycled_write_operation_nondma)(uint8_t addres
   pio_sm_put_blocking(bus_pio, sm_data, data_word);
   pio_sm_put_blocking(bus_pio, sm_delay, delay_word);
 
-  usGPIO("[WC]$%04x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16" $%02X:%02X(%u %u)\n",
-    data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word),
+  usGPIO("[WC]$%04x 0b%032b $%04x 0b%016b $%02X:%02X(%u %u)\n",
+    data_word, data_word, control_word, control_word,
     address, data, cycles, delay_word);
   return;
 }
@@ -337,8 +337,8 @@ void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint
    */
   dma_channel_wait_for_finish_blocking(dma_tx_control);
 
-  usGPIO("[WC]$%04x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16" $%02X:%02X(%u %u)\n",
-    data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word),
+  usGPIO("[WC]$%04x 0b%032b $%04x 0b%016b $%02X:%02X(%u %u)\n",
+    data_word, data_word, control_word, control_word,
     address, data, cycles, delay_word);
   return;
 }
