@@ -23,12 +23,15 @@
  *
  */
 
+/* Hardware api's */
+#include "hardware/clocks.h"
+#include "hardware/flash.h"
+#include "hardware/sync.h"
+
 #include "globals.h"
-
 #include "config.h"
-#include "pio.h"
-
 #include "logging.h"
+#include "pio.h"
 #include "sid.h"
 
 
@@ -119,12 +122,15 @@ void setup_piobus(void)
   busclock_frequency = (float)pico_hz / (usbsid_config.clock_rate * 32) / 2;  /* Clock frequency is 8 times the SID clock */
 
   usNFO("\n");
-  usDBG("[BUS CLK INIT] START\n");
-  usDBG("[PI CLK]@%luMHz [DIV]@%.2f [BUS CLK]@%.2f [CFG SID CLK]%d\n",
-     (pico_hz / 1000 / 1000),
-     busclock_frequency,
-     ((float)pico_hz / busclock_frequency / 2),
-     (int)usbsid_config.clock_rate);
+  usDBG("BUS Clock initialisation\n");
+  usDBG("  Pico Clock @ %luMHz\n",
+    (pico_hz / 1000 / 1000));
+  usDBG("  BUS clock divisor = %.2f\n",
+    busclock_frequency);
+  usDBG("  BUS Clock @ %.2f\n",
+    (float)pico_hz / busclock_frequency / 2);
+  usDBG("  C64 SID Clock = %d\n",
+    (int)usbsid_config.clock_rate);
 
   { /* control bus */
     sm_control = 1;  /* PIO0 SM1 */
@@ -177,17 +183,17 @@ void setup_piobus(void)
     pio_sm_init(clkcnt_pio, sm_clkcnt, offset_clkcnt, &clkcnt_delay);
     pio_sm_set_enabled(clkcnt_pio, sm_clkcnt, true);
   }
-  usDBG("[BUS CLK INIT] FINISHED\n");
   return;
 }
 
 void sync_pios(bool at_boot)
 { /* Sync PIO's */
+  usNFO("\n");
   #if PICO_PIO_VERSION == 0
-  usDBG("[RESTART PIOS] Pico & Pico_w\n");
+  usDBG("Restarting PIO's (Pico & Pico_w)\n");
   pio_sm_restart(bus_pio, 0b1111);
   #elif PICO_PIO_VERSION > 0  /* NOTE: rp2350 only */
-  usDBG("[SYNC PIOS] Pico2\n");
+  usDBG("Synchronise PIO's (Pico2 & Pico2_w)\n");
   pio_clkdiv_restart_sm_multi_mask(bus_pio, 0, 0b1111, 0);
   // pio_clkdiv_restart_sm_multi_mask(clkcnt_pio, 0, 0b0011, 0); /* TODO: SYNC COUNTER PIO WITH BUS PIO */
   pio_clkdiv_restart_sm_multi_mask(clkcnt_pio, 0, 0b1000, 0);
@@ -203,7 +209,8 @@ void sync_pios(bool at_boot)
 
 void restart_bus_clocks(void)
 {
-  usDBG("[CLK RE-INIT] START\n");
+  usNFO("\n");
+  usDBG("Re-initialise clocks\n");
   uint32_t pico_hz = clock_get_hz(clk_sys);
   busclock_frequency = (float)pico_hz / (usbsid_config.clock_rate * 32) / 2;  /* Clock frequency is 8 times the SID clock */
   sidclock_frequency = (float)pico_hz / usbsid_config.clock_rate / 2;
@@ -213,17 +220,18 @@ void restart_bus_clocks(void)
   pio_sm_set_clkdiv(bus_pio, sm_delay, busclock_frequency);
   pio_sm_set_clkdiv(clkcnt_pio, sm_clkcnt, busclock_frequency);
 
-  usDBG("[PI CLK]@%luMHz [DIV]@%.2f [BUS CLK]@%.2f [CFG SID CLK]%d\n",
-    (pico_hz / 1000 / 1000),
-    busclock_frequency,
-    ((float)pico_hz / busclock_frequency / 2),
+  usDBG("  Pico Clock @ %luMHz\n",
+    (pico_hz / 1000 / 1000));
+  usDBG("  BUS clock divisor = %.2f\n",
+    busclock_frequency);
+  usDBG("  BUS Clock @ %.2f\n",
+    ((float)pico_hz / busclock_frequency / 2));
+  usDBG("  SID clock divisor = %.2f\n",
+    sidclock_frequency);
+  usDBG("  SID Clock @ %.2f\n",
+    ((float)pico_hz / sidclock_frequency / 2));
+  usDBG("  C64 SID Clock = %d\n",
     (int)usbsid_config.clock_rate);
-  usDBG("[PI CLK]@%luMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n",
-    (pico_hz / 1000 / 1000),
-    sidclock_frequency,
-    ((float)pico_hz / sidclock_frequency / 2),
-    (int)usbsid_config.clock_rate);
-  usDBG("[CLK RE-INIT] FINISHED\n");
   return;
 }
 
@@ -254,17 +262,20 @@ void init_sidclock(void)
   uint32_t pico_hz = clock_get_hz(clk_sys);
   sidclock_frequency = (float)pico_hz / usbsid_config.clock_rate / 2;
 
-  usBOOT("[SID] CLK INIT START\n");
-  usNFO("[NFO] [PI CLK]@%luMHz [DIV]@%.2f [SID CLK]@%.2f [CFG SID CLK]%d\n",
-    (pico_hz / 1000 / 1000),
-    sidclock_frequency,
-    ((float)pico_hz / sidclock_frequency / 2),
+  usNFO("\n");
+  usDBG("SID Clock initialisation\n");
+  usDBG("  Pico Clock @ %luMHz\n",
+    (pico_hz / 1000 / 1000));
+  usDBG("  SID clock divisor = %.2f\n",
+    sidclock_frequency);
+  usDBG("  SID Clock @ %.2f\n",
+    ((float)pico_hz / sidclock_frequency / 2));
+  usDBG("  C64 SID Clock = %d\n",
     (int)usbsid_config.clock_rate);
   offset_clock = pio_add_program(bus_pio, &clock_program);
   sm_clock = 0;  /* PIO0 SM0 */
   pio_sm_claim(bus_pio, sm_clock);
   clock_program_init(bus_pio, sm_clock, offset_clock, PHI1, sidclock_frequency);
-  usBOOT("[SID] CLK INIT FINISHED\n");
 
   return;
 }
@@ -301,7 +312,7 @@ void setup_sidclock(void)
 /* De-init nMHz square wave output */
 void deinit_sidclock(void)
 {
-  usDBG("[SID] CLK DE-INIT\n");
+  usDBG("SID Clock deinitialise\n");
   clock_program_deinit(bus_pio, sm_clock, offset_clock, clock_program);
 
   return;

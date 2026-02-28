@@ -44,9 +44,8 @@ extern uint8_t sid_memory[];
 /* config.c */
 extern RuntimeCFG cfg;
 
-extern PIO bus_pio;
-extern uint sm_control, sm_data, sm_clock, sm_delay;
-extern int dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay;
+/* bus.c */
+extern bool get_muted_state(void);
 
 /* vu.c */
 extern uint16_t vu;
@@ -55,14 +54,14 @@ extern uint16_t vu;
 extern void setup_dmachannels(void);
 extern void unclaim_dma_channels(void);
 extern volatile uint32_t cycle_count_word;
+extern int dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay;
 
 /* pio.c */
 extern void setup_piobus(void);
 extern void sync_pios(bool at_boot);
 extern void stop_pios(void);
-
-/* globals */
-volatile bool is_muted; /* Global muting state */
+extern PIO bus_pio;
+extern uint sm_control, sm_data, sm_clock, sm_delay;
 
 /* Direct Pio IRQ access */
 #define IRQState (pio0_hw->irq)
@@ -93,7 +92,7 @@ inline static int __not_in_flash_func(set_bus_bits)(uint8_t address, bool write)
   }
   address = (address & 0x7F);
   uint8_t data = (write ? sid_memory[(address & 0x7F)] : 0x0);
-  if (is_muted && ((address & 0x1F) == 0x18)) data &= 0xF0; /* Mask volume register to 0 if muted */
+  if (get_muted_state() && ((address & 0x1F) == 0x18)) data &= 0xF0; /* Mask volume register to 0 if muted */
   switch (address) {
     case 0x00 ... 0x1F:
       if __us_unlikely(cfg.one == 0b110 || cfg.one == 0b111) return 0;
@@ -118,8 +117,8 @@ inline static int __not_in_flash_func(set_bus_bits)(uint8_t address, bool write)
       break;
   }
   data_word = (dir_mask << 16) | data_word;
-  // usCFG("$%02X:%02X $%04X 0b%032b $%04X 0b%016b\n",
-  //   address, data, data_word, data_word, control_word, control_word);
+  /* usCFG("$%02X:%02X $%04X 0b%032b $%04X 0b%016b\n",
+    address, data, data_word, data_word, control_word, control_word); */
   return 1;
 }
 

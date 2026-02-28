@@ -24,6 +24,7 @@
  */
 
 #include "globals.h"
+#include "config_constants.h"
 #include "config.h"
 #include "usbsid.h"
 #include "midi.h"
@@ -66,23 +67,31 @@ volatile bool offload_ledrunner = false;
 /* Init var pointers for external use */
 uint8_t (*write_buffer_p)[MAX_BUFFER_SIZE] = &write_buffer;
 
-/* Config */
+/* config.c */
 extern void load_config(Config * config);
+extern void save_config_ext(void);
 extern void handle_config_request(uint8_t * buffer, uint32_t size);
 extern void print_config(void);
-extern void apply_config(bool at_boot, bool print_cfg);
-extern void save_config_ext(void);
+extern ConfigError apply_config(bool at_boot);
 extern void detect_default_config();
 extern Config usbsid_config;
 extern RuntimeCFG cfg;
 extern bool first_boot;
 
-/* GPIO */
+/* gpio.c */
 extern void init_gpio(void);
+
+/* pio.c */
 extern void setup_sidclock(void);
 extern void setup_piobus(void);
-extern void setup_dmachannels(void);
 extern void sync_pios(bool at_boot);
+
+/* dma.c */
+extern void setup_dmachannels(void);
+
+/* sid.c */
+extern bool get_reset_state(void);
+extern void set_muted_state(bool state);
 extern void pause_sid(void);
 extern void pause_sid_withmute(void);
 extern void mute_sid(void);
@@ -92,33 +101,31 @@ extern void reset_sid_registers(void);
 extern void enable_sid(bool unmute);
 extern void disable_sid(void);
 extern void clear_bus_all(void);
+
+/* bus.c */
 extern uint16_t cycled_delay_operation(uint16_t cycles);
 extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
 extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
-extern bool is_muted;
 
-/* Uart */
+/* uart.c */
 #ifdef USE_PIO_UART
 extern void init_uart(void);
 #endif
 
-/* Vu */
+/* vu.c */
 extern volatile uint16_t vu;
 extern void init_vu(void);
 extern void led_runner(void);
 
-/* MCU */
+/* mcu.c */
 extern void mcu_reset(void);
 extern void mcu_jump_to_bootloader(void);
 
-/* SID */
-extern bool get_reset_state(void);
-
-/* SID tests */
+/* sid_tests.c */
 extern bool running_tests;
 
-/* SID detection */
-extern void auto_detect_routine(void);
+/* sid_detection.c */
+extern ConfigError sid_auto_detect(bool at_boot);
 
 /* SID player */
 #ifdef ONBOARD_EMULATOR
@@ -136,7 +143,6 @@ volatile bool sidplayer_playing = false;
 volatile bool sidplayer_stop = false;
 volatile bool sidplayer_next = false;
 volatile bool sidplayer_prev = false;
-
 extern uint8_t * sidfile; /* Temporary buffer to store incoming data */
 extern volatile int sidfile_size;
 extern volatile char tuneno;
@@ -151,11 +157,11 @@ extern void next_subtune(void);
 extern void previous_subtune(void);
 #endif /* ONBOARD_SIDPLAYER */
 
-/* Midi */
+/* midi.c */
 extern void midi_init(void);
 extern void process_stream(uint8_t *buffer, size_t size);
 
-/* ASID */
+/* asid.c */
 extern void asid_init(void);
 
 /* Midi init */
@@ -189,7 +195,7 @@ static const tusb_desc_webusb_url_t desc_url =
 void reset_reason(void)
 {
 #if PICO_RP2040
-  usNFO("[RESET] Button double tapped? %d\n", flagged);
+  usNFO("\n[RESET] Button double tapped? %d\n", flagged);
   io_rw_32 *rr = (io_rw_32 *) (VREG_AND_CHIP_RESET_BASE + VREG_AND_CHIP_RESET_CHIP_RESET_OFFSET);
   if (*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_POR_BITS)
     usNFO("[RESET] Caused by power-on reset or brownout detection\n");
@@ -199,7 +205,7 @@ void reset_reason(void)
     usNFO("[RESET] Caused by debug port\n");
 #elif PICO_RP2350
   /* io_rw_32 *rr = (io_rw_32 *) (POWMAN_BASE + POWMAN_CHIP_RESET_OFFSET); */
-  usNFO("[RESET] Button double tapped? %d %X\n", flagged, powman_hw->chip_reset);
+  usNFO("\n[RESET] Button double tapped? %d %X\n", flagged, powman_hw->chip_reset);
   if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_DP_RESET_REQ_BITS)
     usNFO("[RESET] Caused by arm debugger\n");
   if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_RESCUE_BITS)
@@ -224,7 +230,7 @@ void init_logging(void)
   stdio_uart_init_full(uart0, BAUD_RATE, TX, RX);
   sleep_ms(100);  /* leave time for uart to settle */
   stdio_flush();
-  usNFO("[NFO] Uart logging initialised\n");
+  usNFO("\n[NFO] Uart logging initialised\n");
   #endif
   return;
 }
@@ -339,7 +345,7 @@ void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volat
             webserial_write(itf, BYTES_TO_SEND);
             break;
           default:
-            usIO("[WRITE ERROR]%c\n", rtype);
+            usERR("While writing to '%c'\n", rtype);
             break;
         };
         vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
@@ -354,11 +360,11 @@ void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volat
       case MUTE:
         usDBG("[MUTE_SID] %d\n",sid_buffer[1]);
         mute_sid();
-        if (sid_buffer[1] == 1) is_muted = true;
+        if (sid_buffer[1] == 1) set_muted_state(true);
         break;
       case UNMUTE:
         usDBG("[UNMUTE_SID] %d\n",sid_buffer[1]);
-        if (sid_buffer[1] == 1) is_muted = false;
+        if (sid_buffer[1] == 1) set_muted_state(false);
         unmute_sid();
         break;
       case RESET_SID:
@@ -413,27 +419,30 @@ void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volat
 
 void tud_mount_cb(void)
 {
-  usDBG("[%s]\n", __func__);
+  /* usDBG("[%s]\n", __func__); */
+  usNFO("[CDC] Mount\n");
   usb_connected = 1;
 }
 
 void tud_umount_cb(void)
 {
   usb_connected = 0, usbdata = 0, dtype = rtype = ntype;
-  usDBG("[%s]\n", __func__);
+  /* usDBG("[%s]\n", __func__); */
+  usNFO("[CDC] Unmount\n");
   disable_sid();  /* NOTICE: Testing if this is causing the random lockups */
 }
 
 void tud_suspend_cb(bool remote_wakeup_en)
 {
   /* (void) remote_wakeup_en; */
-  usDBG("[%s] remote_wakeup_en:%d\n", __func__, remote_wakeup_en);
+  /* usDBG("[%s] remote_wakeup_en:%d\n", __func__, remote_wakeup_en); */
+  usNFO("[CDC] remote_wakeup_en:%d\n", remote_wakeup_en);
   usb_connected = 0, usbdata = 0, dtype = rtype = ntype;
 }
 
 void tud_resume_cb(void)
 {
-  usDBG("[%s]\n", __func__);
+  /* usDBG("[%s]\n", __func__); */
   usb_connected = 1;
 }
 
@@ -521,14 +530,15 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char)
 void tud_cdc_tx_complete_cb(uint8_t itf)
 {
   (void)itf;
-  /* usDBG("[%s]\n", __func__); */ /* Disabled due to uart spam */
+  /* usDBG("[%s]\n", __func__); */  /* Disabled due to uart spam */
 }
 
 void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
 {
   /* (void) itf; */
   /* (void) rts; */
-  usDBG("[%s] itf:%x, dtr:%d, rts:%d\n", __func__, itf, dtr, rts);
+  /* usDBG("[%s] itf:%x, dtr:%d, rts:%d\n", __func__, itf, dtr, rts); */
+  usNFO("[CDC] Line state itf:%x, dtr:%d, rts:%d\n", itf, dtr, rts);
 
   if ( dtr ) {
     /* Terminal connected */
@@ -545,14 +555,15 @@ void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* p_line_coding)
 {
   /* (void)itf; */
   /* (void)p_line_coding; */
-  usDBG("[%s] itf:%x, bit_rate:%u, stop_bits:%u, parity:%u, data_bits:%u\n", __func__, itf, (int)p_line_coding->bit_rate, p_line_coding->stop_bits, p_line_coding->parity, p_line_coding->data_bits);
+  usNFO("[CDC] Line coding itf:%x, bit_rate:%u, stop_bits:%u, parity:%u, data_bits:%u\n",
+    itf, (int)p_line_coding->bit_rate, p_line_coding->stop_bits, p_line_coding->parity, p_line_coding->data_bits);
 }
 
 void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 {
   /* (void)itf; */
   /* (void)duration_ms; */
-  usDBG("[%s] its:%x, duration_ms:%x\n", __func__, itf, duration_ms);
+  usNFO("[CDC] Break its:%x, duration_ms:%x\n", itf, duration_ms);
 }
 
 
@@ -597,7 +608,7 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
 void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
 {
   (void)itf;
-  usDBG("[%s] %lu\n", __func__, sent_bytes);
+  usNFO("[VDR] TX %lu\n", sent_bytes);
 }
 
 
@@ -606,8 +617,8 @@ void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
 /* Handle incoming vendor and webusb data */
 bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const * request)
 {
-  usDBG("[%s] stage:%x, rhport:%x, bRequest:0x%x, wValue:%d, wIndex:%x, wLength:%x, bmRequestType:%x, type:%x, recipient:%x, direction:%x\n",
-    __func__, stage, rhport,
+  usNFO("[VDR] XFER stage:%x, rhport:%x, bRequest:0x%x, wValue:%d, wIndex:%x, wLength:%x, bmRequestType:%x, type:%x, recipient:%x, direction:%x\n",
+    stage, rhport,
     request->bRequest, request->wValue, request->wIndex, request->wLength, request->bmRequestType,
     request->bmRequestType_bit.type, request->bmRequestType_bit.recipient, request->bmRequestType_bit.direction);
   /* Do nothing with IDLE (0), DATA (2) & ACK (3) stages */
@@ -844,13 +855,14 @@ int main()
 {
   /* Set system clockspeed */
 #if PICO_RP2040
+#if ONBOARD_SIDPLAYER
+  /* System clock overclocked @ 250MHz */
+  set_sys_clock_khz(250000, true); /* Boo fucking hoo, still too slow!! */
+#else
   /* System clock @ MAX SPEED!! ARRRR 200MHz */
   set_sys_clock_khz(200000, true);
-#if 0
-  /* System clock @ 125MHz */
-  set_sys_clock_pll(1500000000, 6, 2);
-#endif
-#elif PICO_RP2350
+#endif /* ONBOARD_SIDPLAYER */
+#elif PICO_RP2350 /* #endif PICO_RP2040 */
   /* Onboard SID player requires atleast 200MHz! */
 #if ONBOARD_SIDPLAYER
   /* System clock @ 200MHz */
@@ -889,7 +901,10 @@ int main()
   /* Load config before init of USBSID settings ~ NOTE: This cannot be run from Core 1! */
   load_config(&usbsid_config);
   /* Apply saved config to used vars */
-  apply_config(true, false);
+  ConfigError err = apply_config(true);
+  if (err != CFG_OK) {
+    usERR("%s\n", config_error_str(err));
+  };
 
   /* Log boot CPU and C64 clock speeds */
   cpu_mhz = (clock_get_hz(clk_sys) / 1000 / 1000);
@@ -899,9 +914,15 @@ int main()
   sid_us = (1 / sid_mhz);
   if (!auto_config) {
     usNFO("\n");
-    usNFO("[NFO] [PICO] %lu Hz, %.0f MHz, %.4f uS\n", clock_get_hz(clk_sys), cpu_mhz, cpu_us);
-    usNFO("[NFO] [C64] %.0f Hz, %.6f MHz, %.4f uS\n", sid_hz, sid_mhz, sid_us);
-    usNFO("[NFO] [C64] REFRESH_RATE %lu Cycles, RASTER_RATE %lu Cycles\n", usbsid_config.refresh_rate, usbsid_config.raster_rate);
+    usNFO("[NFO] Clock information:\n");
+    usNFO("[NFO]   Pico Clock @ %lu Hz, %.0f MHz, %.4f uS\n",
+      clock_get_hz(clk_sys), cpu_mhz, cpu_us);
+    usNFO("[NFO]   C64 SID Clock @ %.0f Hz, %.6f MHz, %.4f uS\n",
+      sid_hz, sid_mhz, sid_us);
+    usNFO("[NFO]   C64 Refresh Rate = %lu Cycles\n",
+      usbsid_config.refresh_rate);
+    usNFO("[NFO]   C64 Raster Rate = %lu Cycles\n",
+      usbsid_config.raster_rate);
   }
 
   /* Signal Core 1 to continue (sync point 1) */
@@ -946,9 +967,7 @@ int main()
   enable_sid(false);
 
   /* Clear the dirt */
-#if !defined(ONBOARD_EMULATOR) && !defined(ONBOARD_SIDPLAYER)
-  memset(sid_memory, 0, sizeof sid_memory);
-#endif
+  memset(sid_memory, 0, SID_MEMORY_SIZE); /* Always no more then 128 bytes */
 
   /* Check for default config bit
    * NOTE: This cannot be run from Core 1! */
@@ -956,7 +975,7 @@ int main()
     detect_default_config();
   }
   if (auto_config) {  /* NOTE: Does not work on rp2350 */
-    auto_detect_routine();  /* Double tap! */
+    sid_auto_detect(true);  /* Double tap! */
     save_config_ext();
     auto_config = false;
     mcu_reset();

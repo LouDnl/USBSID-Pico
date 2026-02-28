@@ -329,6 +329,7 @@ endif()
 set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/usbsid_doubletap.c
   ${CMAKE_CURRENT_LIST_DIR}/src/usbsid.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/config_constants.c
   ${CMAKE_CURRENT_LIST_DIR}/src/config.c
   ${CMAKE_CURRENT_LIST_DIR}/src/config_bus.c
   ${CMAKE_CURRENT_LIST_DIR}/src/config_socket.c

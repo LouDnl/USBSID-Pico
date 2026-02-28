@@ -24,6 +24,7 @@
  */
 
 #include "globals.h"
+#include "config_constants.h"
 #include "config.h"
 #include "gpio.h"
 #include "logging.h"
@@ -106,11 +107,11 @@ void toggle_audio_switch(void)
   if (!usbsid_config.lock_audio_sw) {
     int audio_state = (read_bus() & bPIN(AU_SW)) >> AU_SW; /* Pinpoint current audio switch state */
     audio_state ^= 1;
-    usCFG("TOGGLE AUDIO SWITCH TO: %d (%s)\n", (int)audio_state, mono_stereo[(int)audio_state]);
+    usCFG("Toggle audio switch to: %d (%s)\n", (int)audio_state, monostereo_str((int)audio_state));
     tPIN(AU_SW);  /* toggle mono <-> stereo */
   } else {
     usCFG("Audio switch is locked at %d (%s), toggle not applied\n",
-      (int)usbsid_config.stereo_en, mono_stereo[(int)usbsid_config.stereo_en]);
+      (int)usbsid_config.stereo_en, monostereo_str((int)usbsid_config.stereo_en));
     return;
   }
   #endif
@@ -126,13 +127,13 @@ void set_audio_switch(bool state)
 { /* Set the SPST switch */
   #if defined(HAS_AUDIOSWITCH)
   if (!usbsid_config.lock_audio_sw) {
-    usCFG("SET AUDIO SWITCH TO: %d (%s)\n", (int)state, mono_stereo[(int)state]);
+    usCFG("Set audio switch to: %d (%s)\n", (int)state, monostereo_str((int)state));
     if (state) {
       sPIN(AU_SW);       /* set   mono <-> stereo pin */
     } else cPIN(AU_SW);  /* clear mono <-> stereo pin */
   } else {
     usCFG("Audio switch is locked at %d (%s), requested change to %d (%s) ignored\n",
-      (int)usbsid_config.stereo_en, mono_stereo[(int)usbsid_config.stereo_en], state, mono_stereo[state]);
+      (int)usbsid_config.stereo_en, monostereo_str((int)usbsid_config.stereo_en), state, monostereo_str((int)state));
     return;
   }
   #else

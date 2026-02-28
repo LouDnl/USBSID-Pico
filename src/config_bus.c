@@ -25,6 +25,7 @@
 
 
 #include "globals.h"
+#include "config_constants.h"
 #include "config.h"
 #include "usbsid.h"
 #include "midi.h"
@@ -36,241 +37,198 @@
 extern Config usbsid_config;
 extern RuntimeCFG cfg;
 
-/* Constants */
-const uint8_t sidaddr_default[4] = { 0x00, 0x20, 0x40, 0x60 };
-const uint8_t sidmask_default[5] = { 0b100, 0b100, 0b010, 0b010, 0b110 };
-const uint8_t addrmask_default[5] = { 0x1F, 0x3F, 0x1F, 0x3F, 0x00 };
+
+/**
+ * @brief ChipSelect mask by physical slot
+ *
+ * Slot 0 (SID 0,1) = Socket 1 (CS1)
+ * Slot 1 (SID 2,3) = Socket 2 (CS2)
+ * Bit pattern:
+ * b2=CS2, b1=CS1 (active low)
+ * b0=RW (default write, active low)
+ */
+static const uint8_t cs_mask_by_slot[5] = {
+  0b100,  /* Slot 0: CS1 active */
+  0b100,  /* Slot 1: CS1 active */
+  0b010,  /* Slot 2: CS2 active */
+  0b010,  /* Slot 3: CS2 active */
+  0b110,  /* N/A: both inactive */
+};
+
+/**
+ * @brief Address decode mask by physical slot
+ *
+ * Primary SIDs use 0x1F (regs 0-31)
+ * Secondary SIDs use 0x3F (regs 32-64)
+ */
+static const uint8_t addr_mask_by_slot[5] = {
+  0x1F,   /* Slot 0: Primary S1 (0x00-0x1F) */
+  0x3F,   /* Slot 0: Secondary S1 (0x20-0x3F) */
+  0x1F,   /* Slot 1: Primary S2 (0x40-0x5F) */
+  0x3F,   /* Slot 1: Secondary S2 (0x60-0x7F) */
+  0x00,   /* N/A: no address decode */
+};
 
 
-void apply_bus_config_OLD(void)
-{ /* NOTE: DEPRECATED */
-  /* Apply defaults */
-  cfg.sidtype[0] = usbsid_config.socketOne.sid1.type;  /* SID1 */
-  cfg.sidtype[1] = usbsid_config.socketOne.sid2.type;  /* SID2 */
-  cfg.sidtype[2] = usbsid_config.socketTwo.sid1.type;  /* SID3 */
-  cfg.sidtype[3] = usbsid_config.socketTwo.sid2.type;  /* SID4 */
-  cfg.sidaddr[0] = usbsid_config.socketOne.sid1.addr;
-  cfg.sidaddr[1] = usbsid_config.socketOne.sid2.addr;
-  cfg.sidaddr[2] = usbsid_config.socketTwo.sid1.addr;
-  cfg.sidaddr[3] = usbsid_config.socketTwo.sid2.addr;
+/**
+ * @brief Apply new busmask from supplied runtime configuration
+ *        The busmask is used by bus.c functions
+ *
+ * @param RuntimeCFG *rt
+ */
+void apply_bus_masks(RuntimeCFG *rt)
+{
+  if (rt == NULL) return;
 
-  /* one == 0x00, two == 0x20, three == 0x40, four == 0x60 */
-  if (cfg.mirrored) {                    /* act-as-one enabled overrules all settings */
-    cfg.one = cfg.two = 0;                     /* CS1 low, CS2 low */
-    cfg.three = cfg.four = 0;                  /* CS1 low, CS2 low */
-    cfg.one_mask = cfg.two_mask = cfg.three_mask = cfg.four_mask = 0x1F;
-    /* No changes to sidtypes */
-  } else {
-    if (cfg.sock_one && !cfg.sock_two) {       /* SocketOne enabled, SocketTwo disabled */
-      cfg.one = 0b100;                     /* CS1 low, CS2 high */
-      cfg.two = (cfg.sids_one == 2) ? 0b100    /* CS1 low, CS2 high */
-        : 0b110;                       /* CS1 high, CS2 high */
-      cfg.three = cfg.four = 0b110;            /* CS1 high, CS2 high */
-      cfg.one_mask = 0x1F;
-      cfg.two_mask = (cfg.sids_one == 2) ? 0x3F : 0x0;
-      cfg.three_mask = 0x0;
-      cfg.four_mask = 0x0;
-      /* Apply differences */
-      cfg.sidtype[1] = (cfg.sids_one == 2)  /* SID2 */
-        ? usbsid_config.socketOne.sid2.type : 1;
-      cfg.sidtype[2] = 1;  /* SID3 */
-      cfg.sidtype[3] = 1;  /* SID4 */
+  /* Pointers to mask outputs for easier iteration */
+  uint8_t *cs_out[4] = { &rt->one, &rt->two, &rt->three, &rt->four };
+  uint8_t *mask_out[4] = { &rt->one_mask, &rt->two_mask, &rt->three_mask, &rt->four_mask };
+
+  if (rt->mirrored) {
+    /* Mirrored mode: both CS lines active, same address decode */
+    rt->one = rt->two = rt->three = rt->four = 0;  /* Both CS low = active */
+
+    if (rt->sock_one_dual) {
+      /* Dual mirrored: SID1 at 0x00, SID2 at 0x20 on both sockets */
+      rt->one_mask = rt->three_mask = 0x1F;  /* SID1 mask */
+      rt->two_mask = rt->four_mask = 0x3F;   /* SID2 mask */
+      /* Mirror types from S1 to S2 */
+      rt->sidtype[2] = rt->sidtype[0];
+      rt->sidtype[3] = rt->sidtype[1];
+    } else {
+      /* Single mirrored: only SID1 on both sockets */
+      rt->one_mask = rt->two_mask = rt->three_mask = rt->four_mask = 0x1F;
+      /* All types match SID1 */
+      rt->sidtype[1] = rt->sidtype[2] = rt->sidtype[3] = rt->sidtype[0];
     }
-    if (!cfg.sock_one && cfg.sock_two) {       /* SocketOne disabled, SocketTwo enabled */
-      cfg.one = 0b010;                     /* CS1 high, CS2 low */
-      cfg.two = (cfg.sids_two == 2) ? 0b010    /* CS1 high, CS2 low */
-        : 0b110;                       /* CS1 high, CS2 high */
-      cfg.three = cfg.four = 0b110;            /* CS1 high, CS2 high */
-      cfg.one_mask = 0x1F;
-      cfg.two_mask = (cfg.sids_two == 2) ? 0x3F : 0x0;
-      cfg.three_mask = 0x0;
-      cfg.four_mask = 0x0;
-      /* Apply differences */
-      cfg.sidtype[0] = usbsid_config.socketTwo.sid1.type;  /* SID1 */
-      cfg.sidtype[1] = (cfg.sids_two == 2)  /* SID2 */
-        ? usbsid_config.socketTwo.sid2.type : 1;
-      cfg.sidtype[2] = 1;  /* SID3 */
-      cfg.sidtype[3] = 1;  /* SID4 */
-    }
-    if (cfg.sock_one && cfg.sock_two) {        /* SocketOne enabled, SocketTwo enabled */
-      /* TODO: Compact if else spiderweb */
-      if (cfg.sids_one == 1 && cfg.sids_two == 1) {
-        cfg.one   = 0b100;
-        cfg.two   = 0b010;
-        cfg.three = 0b110;
-        cfg.four  = 0b110;
-        cfg.one_mask = 0x1F;
-        cfg.two_mask = 0x1F;
-        cfg.three_mask = 0x0;
-        cfg.four_mask = 0x0;
-        /* Apply differences */
-        cfg.sidtype[0] = usbsid_config.socketOne.sid1.type;  /* SID1 */
-        cfg.sidtype[1] = usbsid_config.socketTwo.sid1.type;  /* SID2 */
-        cfg.sidtype[2] = 1;  /* SID3 */
-        cfg.sidtype[3] = 1;  /* SID4 */
-      }
-      if (cfg.sids_one == 2 && cfg.sids_two == 1) {
-        cfg.one   = 0b100;
-        cfg.two   = 0b100;
-        cfg.three = 0b010;
-        cfg.four  = 0b110;
-        cfg.one_mask = 0x1F;
-        cfg.two_mask = 0x3F;
-        cfg.three_mask = 0x1F;
-        cfg.four_mask = 0x0;
-        /* Apply differences */
-        cfg.sidtype[0] = usbsid_config.socketOne.sid1.type;  /* SID1 */
-        cfg.sidtype[1] = usbsid_config.socketOne.sid2.type;  /* SID2 */
-        cfg.sidtype[2] = usbsid_config.socketTwo.sid1.type;  /* SID3 */
-        cfg.sidtype[3] = 1;  /* SID4 */
-      }
-      if (cfg.sids_one == 1 && cfg.sids_two == 2) {
-        cfg.one   = 0b100;
-        cfg.two   = 0b010;
-        cfg.three = 0b010;
-        cfg.four  = 0b110;
-        cfg.one_mask = 0x1F;
-        cfg.two_mask = 0x1F;
-        cfg.three_mask = 0x3F;
-        cfg.four_mask = 0x0;
-        /* Apply differences */
-        cfg.sidtype[0] = usbsid_config.socketOne.sid1.type;  /* SID1 */
-        cfg.sidtype[1] = usbsid_config.socketTwo.sid2.type;  /* SID2 */
-        cfg.sidtype[2] = usbsid_config.socketTwo.sid2.type;  /* SID3 */
-        cfg.sidtype[3] = 1;  /* SID4 */
-      }
-      if (cfg.sids_one == 2 && cfg.sids_two == 2) {
-        cfg.one   = 0b100;
-        cfg.two   = 0b100;
-        cfg.three = 0b010;
-        cfg.four  = 0b010;
-        cfg.one_mask = 0x1F;
-        cfg.two_mask = 0x3F;
-        cfg.three_mask = 0x1F;
-        cfg.four_mask = 0x3F;
-        /* No changes to sidtypes */
-      }
+    return;
+  }
+
+  /* Non-mirrored: compute per-SID masks based on ID→slot mapping */
+  for (int id = 0; id < 4; id++) {
+    int slot = rt->ids[id];
+
+    if (slot == 4 || slot > 3) {
+      /* N/A slot: disable this SID */
+      *cs_out[id] = cs_mask_by_slot[4];    /* Both CS high */
+      *mask_out[id] = addr_mask_by_slot[4]; /* No address decode */
+    } else {
+      *cs_out[id] = cs_mask_by_slot[slot];
+      *mask_out[id] = addr_mask_by_slot[slot];
     }
   }
-  usCFG("[TEST OLD] ONE:%02X ONE:%02X TWO:%02X TWO:%02X THREE:%02X THREE:%02X FOUR:%02X FOUR:%02X\n",
-      cfg.one, cfg.one_mask, cfg.two, cfg.two_mask, cfg.three, cfg.three_mask, cfg.four, cfg.four_mask);
+
+  /* Apply socket disable rules to sidtype array */
+  if (rt->sock_one && !rt->sock_two) {
+    /* Only Socket 1 enabled */
+    if (!rt->sock_one_dual) {
+      rt->sidtype[1] = SID_NA;  /* S1 SID2 not present */
+    }
+    rt->sidtype[2] = SID_NA;  /* S2 SID1 not present */
+    rt->sidtype[3] = SID_NA;  /* S2 SID2 not present */
+  }
+  else if (!rt->sock_one && rt->sock_two) {
+    /* Only Socket 2 enabled */
+    rt->sidtype[0] = SID_NA;  /* S1 SID1 not present */
+    rt->sidtype[1] = SID_NA;  /* S1 SID2 not present */
+    if (!rt->sock_two_dual) {
+      rt->sidtype[3] = SID_NA;  /* S2 SID2 not present */
+    }
+  }
+  else if (rt->sock_one && rt->sock_two) {
+    /* Both sockets enabled */
+    if (!rt->sock_one_dual) {
+      rt->sidtype[1] = SID_NA;  /* S1 has no SID2 */
+    }
+    if (!rt->sock_two_dual) {
+      rt->sidtype[3] = SID_NA;  /* S2 has no SID2 */
+    }
+  }
+
   return;
 }
 
-void apply_bus_config(bool quiet) // ISSUE: FINISH
-{ /* bus config doesn't care if the sid is real or fmopl */
-  if (!quiet) usCFG("Applying bus settings\n");
+/**
+ * @brief Applies a config to a runtime config and calls `apply_bus_masks`
+ *
+ * @param Config *config
+ * @param RuntimeCFG *rt
+ */
+void apply_runtime_config(const Config *config, RuntimeCFG *rt)
+{
+  if (config == NULL || rt == NULL) return;
 
-  /* Default everything first */
-  memset(cfg.ids, 4, 4);  /* Default to 4 N/A */
-  memset(cfg.sidid, 4, 4);  /* Default to 4 N/A */
-  memset(cfg.sidtype, 1, 4);  /* Default to 1 N/A */
-  memset(cfg.sidaddr, 0xFF, 4); /* Default to 0xFF N/A */
-  memset(cfg.sidmask, 0x00, 4); /* Default to 0x00 N/A */
-  memset(cfg.addrmask, 0b110, 4); /* Default to 0b110 N/A */
-  cfg.one = cfg.two = cfg.three = cfg.four = sidmask_default[4]; /* Default to 0x00 N/A */
-  cfg.one_mask = cfg.two_mask = cfg.three_mask = cfg.four_mask = addrmask_default[4]; /* Default to 0b110 N/A */
+  /* Clear supplied runtime config first */
+  uint32_t irq = save_and_disable_interrupts();
+  memset(rt, 0, sizeof(RuntimeCFG));
+  restore_interrupts(irq);
 
-  /* Store SID id's from config in physical order for address arrangements */
-  cfg.sidid[0] = usbsid_config.socketOne.sid1.id;
-  cfg.sidid[1] = usbsid_config.socketOne.sid2.id;
-  cfg.sidid[2] = usbsid_config.socketTwo.sid1.id;
-  cfg.sidid[3] = usbsid_config.socketTwo.sid2.id;
-  // TODO: Fix is so this is not nescessary by defaulting to 4
-  for (int id = 0; id < 4; id++) { /* Change 0xFF to 4 for runtime use */
-    /* Set the configured SID order to physical SID order relation */
-    cfg.sidid[id] = ((cfg.sidid[id] == 0xFF) ? 4 : cfg.sidid[id]);
+  /* Socket state flags */
+  rt->sock_one = config->socketOne.enabled;
+  rt->sock_two = config->socketTwo.enabled;
+  rt->sock_one_dual = config->socketOne.dualsid;
+  rt->sock_two_dual = config->socketTwo.dualsid;
+  rt->mirrored = config->mirrored;
+
+  /* Chip types */
+  rt->chip_one = config->socketOne.chiptype;
+  rt->chip_two = config->socketTwo.chiptype;
+
+  /* SID counts */
+  if (rt->mirrored) {
+    /* Mirrored mode: numsids reflects what's addressable, not physical */
+    rt->sids_one = rt->sock_one_dual ? 2 : 1;
+    rt->sids_two = rt->sids_one;  /* Mirror S1 count */
+    rt->numsids = rt->sids_one;   /* Only S1's count matters */
+  } else {
+    rt->sids_one = rt->sock_one ? (rt->sock_one_dual ? 2 : 1) : 0;
+    rt->sids_two = rt->sock_two ? (rt->sock_two_dual ? 2 : 1) : 0;
+    rt->numsids = rt->sids_one + rt->sids_two;
   }
 
-  /* Store the config socket->sid id of each addressable SID id in ids */
-  for (int id = 0; id < 4; id++) {
-    for (int i = 0; i < 4; i++) {
-      if (cfg.sidid[id] == i) {
-        cfg.ids[i] = id;
-      }
+  /* Physical SID slot data (indexed 0-3) */
+  const SIDChip *slots[4] = {
+    &config->socketOne.sid1,  /* Slot 0: S1 primary */
+    &config->socketOne.sid2,  /* Slot 1: S1 secondary */
+    &config->socketTwo.sid1,  /* Slot 2: S2 primary */
+    &config->socketTwo.sid2,  /* Slot 3: S2 secondary */
+  };
+
+  /* Initialise with defaults */
+  memset(rt->ids, 4, 4);          /* Default: all slots N/A */
+  memset(rt->sidid, 4, 4);        /* Default: all IDs N/A */
+  memset(rt->sidtype, SID_NA, 4); /* Default: all types N/A */
+  memset(rt->sidaddr, 0xFF, 4);   /* Default: all addresses disabled */
+  memset(rt->sidmask, 0, 4);      /* Default: no masks */
+  memset(rt->addrmask, 0, 4);     /* Default: no address masks */
+
+  /* Copy from config, converting 0xFF IDs to 4 (N/A marker) */
+  for (int slot = 0; slot < 4; slot++) {
+    uint8_t id = slots[slot]->id;
+    rt->sidid[slot] = (id == 0xFF) ? 4 : id;
+    rt->sidaddr[slot] = slots[slot]->addr;
+    rt->sidtype[slot] = slots[slot]->type;
+  }
+
+  /* Build reverse mapping: ID → slot */
+  for (int slot = 0; slot < 4; slot++) {
+    uint8_t id = rt->sidid[slot];
+    if (id < 4) {
+      rt->ids[id] = slot;
     }
   }
 
-  /* Pre set all settings from config */
-  /* Ordered by physical SID */
-  cfg.sidtype[0] = usbsid_config.socketOne.sid1.type;  /* Physical */
-  cfg.sidtype[1] = usbsid_config.socketOne.sid2.type;  /* Virtual */
-  cfg.sidtype[2] = usbsid_config.socketTwo.sid1.type;  /* Physical */
-  cfg.sidtype[3] = usbsid_config.socketTwo.sid2.type;  /* Virtual */
-  cfg.sidaddr[0] = usbsid_config.socketOne.sid1.addr;  /* Physical */
-  cfg.sidaddr[1] = usbsid_config.socketOne.sid2.addr;  /* Virtual */
-  cfg.sidaddr[2] = usbsid_config.socketTwo.sid1.addr;  /* Physical */
-  cfg.sidaddr[3] = usbsid_config.socketTwo.sid2.addr;  /* Virtual */
-  /* Ordered by configured SID */
-  cfg.sidmask[0] = sidmask_default[cfg.ids[0]];
-  cfg.sidmask[1] = sidmask_default[cfg.ids[1]];
-  cfg.sidmask[2] = sidmask_default[cfg.ids[2]];
-  cfg.sidmask[3] = sidmask_default[cfg.ids[3]];
-  cfg.addrmask[0] = addrmask_default[cfg.ids[0]];
-  cfg.addrmask[1] = addrmask_default[cfg.ids[1]];
-  cfg.addrmask[2] = addrmask_default[cfg.ids[2]];
-  cfg.addrmask[3] = addrmask_default[cfg.ids[3]];
-
-  if (!quiet) {
-  for (int id = 0; id < 4; id++) {
-      usCFG("[TEST0] ID:%d IDS:%d SIDID:%d TYPE:%02X ADDR:%02X MASK:%02X ADDRMASK:%02X\n",
-        id, cfg.ids[id], cfg.sidid[id], cfg.sidtype[id], cfg.sidaddr[id], cfg.sidmask[cfg.ids[id]], cfg.addrmask[cfg.ids[id]]);
-    }
+  /* Assign masks based on slot positions */
+  for (int slot = 0; slot < 4; slot++) {
+    rt->sidmask[slot] = cs_mask_by_slot[slot];
+    rt->addrmask[slot] = addr_mask_by_slot[slot];
   }
 
-  /* Mirrored is easy */
-  if (cfg.mirrored) {  /* Mirrored (act-as-one) overrules everything at runtime :) */
-    cfg.one = cfg.two = cfg.three = cfg.four = 0;  /* CS1 & CS2 low */
-    if ((cfg.sock_one_dual == true) && (cfg.numsids == 2)) {
-      cfg.one_mask = cfg.three_mask = 0x1F;
-      cfg.two_mask = cfg.four_mask = 0x3F;
-      cfg.sidtype[2] = cfg.sidtype[0];  /* Map sidtype to SID1 */
-      cfg.sidtype[3] = cfg.sidtype[1];  /* Map sidtype to SID2 */
-    } else {
-      cfg.one_mask = cfg.two_mask = cfg.three_mask = cfg.four_mask = 0x1F;  /* Map everything to SID1 */
-      cfg.sidtype[1] = cfg.sidtype[2] = cfg.sidtype[3] = cfg.sidtype[0];    /* Map each sidtype to SID1 */
-    }
+  /* Apply bus control masks */
+  apply_bus_masks(rt);
 
-  } else { /* Now for the tricky part */
+  usCFG("Applied RuntimeCFG sids=%d (s1=%d s2=%d) mirrored=%d\n",
+    rt->numsids, rt->sids_one, rt->sids_two, rt->mirrored);
 
-    /* Set everything from all presets */
-    cfg.one   = cfg.ids[0] != 4 ? cfg.sidmask[cfg.sidid[cfg.ids[0]]] : sidmask_default[cfg.ids[0]];
-    cfg.two   = cfg.ids[1] != 4 ? cfg.sidmask[cfg.sidid[cfg.ids[1]]] : sidmask_default[cfg.ids[1]];
-    cfg.three = cfg.ids[2] != 4 ? cfg.sidmask[cfg.sidid[cfg.ids[2]]] : sidmask_default[cfg.ids[2]];
-    cfg.four  = cfg.ids[3] != 4 ? cfg.sidmask[cfg.sidid[cfg.ids[3]]] : sidmask_default[cfg.ids[3]];
-    cfg.one_mask   = cfg.ids[0] != 4 ? cfg.addrmask[cfg.sidid[cfg.ids[0]]] : addrmask_default[cfg.ids[0]];
-    cfg.two_mask   = cfg.ids[1] != 4 ? cfg.addrmask[cfg.sidid[cfg.ids[1]]] : addrmask_default[cfg.ids[1]];
-    cfg.three_mask = cfg.ids[2] != 4 ? cfg.addrmask[cfg.sidid[cfg.ids[2]]] : addrmask_default[cfg.ids[2]];
-    cfg.four_mask  = cfg.ids[3] != 4 ? cfg.addrmask[cfg.sidid[cfg.ids[3]]] : addrmask_default[cfg.ids[3]];
-
-    if (!quiet) usCFG("[TEST 1] ONE:%02X ONE:%02X TWO:%02X TWO:%02X THREE:%02X THREE:%02X FOUR:%02X FOUR:%02X\n",
-      cfg.one, cfg.one_mask, cfg.two, cfg.two_mask, cfg.three, cfg.three_mask, cfg.four, cfg.four_mask);
-    /* EVERYTHING WORKS UP TO HERE BUT IGNORES SOCKET SETTINGS */
-
-    /* Disable things based on preset enabled/disabled sockets */
-    if (cfg.sock_one && !cfg.sock_two) {
-      if (cfg.sids_one == 2) { /* No changes */ };
-      if (cfg.sids_one == 1) { cfg.sidtype[1] = 1; };  /* Physical (virtual) SID 2 to N/A */
-      cfg.sidtype[2] = 1;  /* Physical SID 3 to N/A */
-      cfg.sidtype[3] = 1;  /* Physical (virtual) SID 4 to N/A */
-    }
-    if (!cfg.sock_one && cfg.sock_two) {
-      if (cfg.sids_two == 2) { /* No changes */ };
-      if (cfg.sids_two == 1) { cfg.sidtype[2] = 1; };   /* Physical SID 3 to N/A */
-      cfg.sidtype[0] = 1;  /* Physical SID 1 to N/A */
-      cfg.sidtype[1] = 1;  /* Physical SID 2 to N/A */
-    }
-    if (cfg.sock_one && cfg.sock_two) { /* NOPE */
-
-      if (cfg.sids_one == 2 && cfg.sids_two == 2) { /* No changes */ };
-      if (cfg.sids_one == 2 && cfg.sids_two == 1) { /* NOPE */ };
-      if (cfg.sids_one == 1 && cfg.sids_two == 2) { /* NOPE */ };
-      if (cfg.sids_one == 1 && cfg.sids_two == 1) { /* NOPE */ };
-
-    }
-
-    if (!quiet) usCFG("[TEST 2] ONE:%02X ONE:%02X TWO:%02X TWO:%02X THREE:%02X THREE:%02X FOUR:%02X FOUR:%02X\n",
-      cfg.one, cfg.one_mask, cfg.two, cfg.two_mask, cfg.three, cfg.three_mask, cfg.four, cfg.four_mask);
-  }
-
+  return;
 }

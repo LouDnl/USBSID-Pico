@@ -32,7 +32,10 @@
 #endif
 
 
-#define FPGASID_IDENTIFIER 0xF51D
+#define FPGASID_ID 0xF51D
+#define CONF_HI    0x19
+#define CONF_LO    0x1a
+#define FPGAID_BIT 0x1e
 
 static const char __in_flash("fpgasid_vars") *slots[2] = { "A", "B" };
 static const char __in_flash("fpgasid_vars") *extinsource[4] = { "analog input", "disabled", "other SID", "digifix (8580)" };
@@ -42,7 +45,7 @@ static const char __in_flash("fpgasid_vars") *mixedwave[2] = { "6581", "8580" };
 static const char __in_flash("fpgasid_vars") *crunchydac[2] = { "on (6581)", "off (8580)" };
 static const char __in_flash("fpgasid_vars") *filtermode[2] = { "6581", "8580" };
 static const char __in_flash("fpgasid_vars") *outputmode[2] = { "dual output over SID1 & SID2 channels -> stereo", "dual output over SID1 channel -> mono mix" };
-static const char __in_flash("fpgasid_vars") *sid2addr[5] = { "$D400 ", "$DE00 ", "$D500 ", "$D420 ", "" };
+static const char __in_flash("fpgasid_vars") *sid2addr[5] = { "$d400 ", "$de00 ", "$d500 ", "$d420 ", "" };
 
 #ifdef __cplusplus
   }

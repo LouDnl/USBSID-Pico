@@ -41,12 +41,8 @@
 #include "pico/flash.h"
 #include "pico/stdlib.h"
 
-/* Hardware api's */
-#include "hardware/clocks.h"
-#include "hardware/flash.h"
-#include "hardware/sync.h"
-
 /* Required for default config */
+#include "globals.h"
 #include "sid.h"
 
 
@@ -116,8 +112,7 @@ typedef struct SIDChip {
 } SIDChip;
 
 typedef struct Socket {
-  uint8_t chiptype;     /* 0 = real, 1 = clone, 2 = unknown */
-  uint8_t clonetype;    /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
+  uint8_t chiptype;     /* 0 = real, 1 = unknown, 2...etc see config_logging.c */
   SIDChip sid1;
   SIDChip sid2;
   bool    enabled : 1;  /* enable / disable this socket */
@@ -146,13 +141,14 @@ typedef struct Config {
     bool    idle_breathe : 1;
   } RGBLED;                     /* 4 */
   struct {
-    bool enabled : 1;
+    bool enabled : 1;           /* Cannot be disabled */
   } Cdc;                        /* 5 */
   struct {
-    bool enabled : 1;
+    bool enabled : 1;           /* Cannot be disabled */
   } WebUSB;                     /* 6 */
   struct {
     bool enabled : 1;
+    /* bool buffered : 1; */          /* Enable/Disable ASID buffering by default (protocal can enable this) */
   } Asid;                       /* 7 */
   struct {
     bool enabled : 1;
@@ -176,33 +172,31 @@ typedef struct Config {
   .refresh_rate = HZ_DEFAULT, \
   .raster_rate = R_DEFAULT, \
   .socketOne = { \
-    .chiptype = 0x0,  /* real */ \
-    .clonetype = 0x0, /* disabled */ \
+    .chiptype = 1,  /* unknown */ \
     .sid1 = { \
       .id = 0, \
       .addr = 0x00, \
       .type = 0,  /* unknown */ \
     }, \
     .sid2 = { \
-      .id = -1, \
+      .id = 0xFF, \
       .addr = 0xFF, \
-      .type = 0,  /* n/a */ \
+      .type = 1,  /* n/a */ \
     }, \
     .enabled = true, \
     .dualsid = false, \
   }, \
   .socketTwo = { \
-    .chiptype = 0x0,  /* real */ \
-    .clonetype = 0x0, /* disabled */ \
+    .chiptype = 1,  /* unknown */ \
     .sid1 = { \
       .id = 1, \
       .addr = 0x20, \
       .type = 0,  /* unknown */ \
     }, \
     .sid2 = { \
-      .id = -1, \
+      .id = 0xFF, \
       .addr = 0xFF, \
-      .type = 0,  /* n/a */ \
+      .type = 1,  /* n/a */ \
     }, \
     .enabled = true, \
     .dualsid = false, \
@@ -224,7 +218,8 @@ typedef struct Config {
     .enabled = true \
   }, \
   .Asid = { \
-    .enabled = true \
+    .enabled = true, \
+    /* .buffered = false */ \
   }, \
   .Midi = { \
     .enabled = true \
@@ -273,7 +268,7 @@ typedef struct RuntimeCFG {
   /* contains the physical sid order */
   uint8_t sidid[4];    /* config_bus.c:apply_bus_config() */
   /* contains the sid address in configured sid order */
-  uint8_t sidaddr[4];  /* config_bus.c:apply_bus_config() */ // NOTE: UNUSED, FOR FUTURE USE
+  uint8_t sidaddr[4];  /* config_bus.c:apply_bus_config() -> used in Midi handler! */
   /* contains the sid address masks */
   uint8_t sidmask[4];  /* config_bus.c:apply_bus_config() */
   uint8_t addrmask[4]; /* config_bus.c:apply_bus_config() */
@@ -361,7 +356,7 @@ enum
   UPLOAD_SID_SIZE  = 0xD3,  /* Packet containing the actual file size */
 
   /* Internal SID player */
-  SID_PLAYER_TUNE  = 0xE0,  /* Load SID file into SID player memory and initialize internal SID player */
+  SID_PLAYER_TUNE  = 0xE0,  /* Load SID file into SID player memory and initialise internal SID player */
   SID_PLAYER_START = 0xE1,  /* Start SID file play */
   SID_PLAYER_STOP  = 0xE2,  /* Stop SID file play */
   SID_PLAYER_PAUSE = 0xE3,  /* Pause/Unpause SID file play */

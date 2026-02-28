@@ -25,6 +25,7 @@
 
 
 #include "globals.h"
+#include "config_constants.h"
 #include "config.h"
 #include "usbsid.h"
 #include "midi.h"
@@ -33,26 +34,23 @@
 
 
 /* config.c */
+extern const char *project_version;
+extern const char *pcb_version;
 extern Config usbsid_config;
 extern RuntimeCFG cfg;
-extern char *project_version;
-extern char *pcb_version;
-
-/* String constants for logging */
-const char __in_flash("usbsid_vars") *sidtypes[5] = { "UNKNOWN", "N/A", "MOS8580", "MOS6581", "FMOpl" };
-const char __in_flash("usbsid_vars") *chiptypes[2] = { "Real", "Clone" };
-const char __in_flash("usbsid_vars") *clonetypes[8] = { "Disabled", "Other", "SKPico", "ARMSID", "FPGASID", "RedipSID", "PDsid", "SwinSID" };
-const char __in_flash("usbsid_vars") *int_ext[2] = { "Internal", "External" };
-const char __in_flash("usbsid_vars") *enabled[2] = { "Disabled", "Enabled" };
-const char __in_flash("usbsid_vars") *true_false[2] = { "False", "True" };
-const char __in_flash("usbsid_vars") *single_dual[2] = { "Dual SID", "Single SID" };
-const char __in_flash("usbsid_vars") *mono_stereo[2] = { "Mono", "Stereo" };
 
 
-void print_cfg(const uint8_t *buf, size_t len)
+/**
+ * @brief Print an array containing a
+ *        configuration of supplied length
+ *
+ * @param uint8_t *buf
+ * @param size_t len
+ */
+void print_cfg(const uint8_t *buf, size_t len, bool newline)
 {
-  usNFO("\n");
-  usCFG("[PRINT CFG START]\n");
+  if (newline) usNFO("\n");
+  usCFG("Configuration buffer:\n");
   for (size_t i = 0; i < len; ++i) {
     if (i == 0)
       usNFO("[R%03d] ", i);
@@ -65,26 +63,29 @@ void print_cfg(const uint8_t *buf, size_t len)
       usNFO(" ");
     }
   }
-  usCFG("[PRINT CFG END]\n");
 
   return;
 }
 
+/**
+ * @brief Prints configuration flash addresses
+ *
+ */
 void print_cfg_addr(void)
 {
   usNFO("\n");
-  usCFG("[START PRINT CONFIG MEMORY LOCATIONS]\n");
-  usNFO("[XIP_BASE] 0x%X (%u)\n\
-[PICO_FLASH_SIZE_BYTES] 0x%X (%u)\n\
-[FLASH_PAGE_SIZE] 0x%X (%u)\n\
-[FLASH_SECTOR_SIZE] 0x%X (%u)\n\
-[ADDR_PERSISTENT_BASE_ADDR] 0x%X (%u)\n\
-[FLASH_PERSISTENT_OFFSET] 0x%X (%u)\n\
-[FLASH_PERSISTENT_SIZE] 0x%X (%u)\n\
-[FLASH_CONFIG_OFFSET] 0x%X (%u)\n\
-[XIP_BASE + FLASH_CONFIG_OFFSET] 0x%X (%u)\n\
-[CONFIG_SIZE] 0x%X (%u)\n\
-[SIZEOF_CONFIG] 0x%X (%u)\n",
+  usCFG("USBSID-Pico Memory locations:\n");
+  usNFO("  XIP_BASE = 0x%X (%u)\n\
+  PICO_FLASH_SIZE_BYTES = 0x%X (%u)\n\
+  FLASH_PAGE_SIZE = 0x%X (%u)\n\
+  FLASH_SECTOR_SIZE = 0x%X (%u)\n\
+  ADDR_PERSISTENT_BASE_ADDR = 0x%X (%u)\n\
+  FLASH_PERSISTENT_OFFSET = 0x%X (%u)\n\
+  FLASH_PERSISTENT_SIZE = 0x%X (%u)\n\
+  FLASH_CONFIG_OFFSET = 0x%X (%u)\n\
+  XIP_BASE + FLASH_CONFIG_OFFSET = 0x%X (%u)\n\
+  CONFIG_SIZE = 0x%X (%u)\n\
+  SIZEOF_CONFIG = 0x%X (%u)\n",
     XIP_BASE, XIP_BASE, PICO_FLASH_SIZE_BYTES, PICO_FLASH_SIZE_BYTES,
     FLASH_PAGE_SIZE, FLASH_PAGE_SIZE, FLASH_SECTOR_SIZE, FLASH_SECTOR_SIZE,
     ADDR_PERSISTENT_BASE_ADDR, ADDR_PERSISTENT_BASE_ADDR,
@@ -92,141 +93,168 @@ void print_cfg_addr(void)
     FLASH_CONFIG_OFFSET, FLASH_CONFIG_OFFSET,
     (XIP_BASE + FLASH_CONFIG_OFFSET), (XIP_BASE + FLASH_CONFIG_OFFSET),
     CONFIG_SIZE, CONFIG_SIZE, sizeof(Config), sizeof(Config));
-  usCFG("[END PRINT CONFIG MEMORY LOCATIONS]\n");
   return;
 }
 
+/**
+ * @brief Prints Pico or Pico2 features
+ *
+ */
 void print_pico_features(void)
 {
-  usNFO("\n");
-  usCFG("[START PRINT PICO DEFAULT FEATURES]\n");
+  usNFO("\n");  /* new line before the actual features are printed */
+  usCFG("RaspberryPi Pico features:\n");
 
-  usNFO("PICO_PIO_VERSION = %d\n", PICO_PIO_VERSION);  /* pio.h */
+  usCFG("  PIO version = %d\n", PICO_PIO_VERSION);  /* pio.h */
   #if defined(PICO_DEFAULT_LED_PIN)
-  usNFO("PICO_DEFAULT_LED_PIN = %d\n", PICO_DEFAULT_LED_PIN);  /* pico*.h */
+  usCFG("  Default LED pin = %d\n", PICO_DEFAULT_LED_PIN);  /* pico*.h */
   #elif defined(CYW43_WL_GPIO_LED_PIN)
-  usNFO("CYW43_WL_GPIO_LED_PIN = %d\n", CYW43_WL_GPIO_LED_PIN);  /* pico*.h */
+  usCFG("  WiFi LED pin = %d\n", CYW43_WL_GPIO_LED_PIN);  /* pico*.h */
   #endif
-  usNFO("LED_PWM = %d\n", LED_PWM);  /* config.h */
+  usCFG("  PWM on LED = %d\n", LED_PWM);  /* config.h */
 
-  usCFG("[END PRINT PICO DEFAULT FEATURES]\n");
   return;
 }
 
-void print_config_settings(void)
+/**
+ * @brief Prints a formatted overview of the active configuration
+ *
+ */
+void print_config_overview(void)
 {
-  usNFO("\n");  /* new line before the actual settings are printed */
-  usCFG("[START PRINT CONFIG SETTINGS]\n");
-
-  usNFO("[USBSID PCB VERSION] %s\n", pcb_version);
-  usNFO("[USBSID FIRMWARE VERSION] %s\n", project_version);
-
-  usNFO("[CLOCK] %s @%d\n",
-    int_ext[(int)usbsid_config.external_clock],
-    (int)usbsid_config.clock_rate);
-  usNFO("[CLOCK RATE LOCKED] %s\n",
-    true_false[(int)usbsid_config.lock_clockrate]);
-  usNFO("[RASTER RATE] @%d\n",
+  usNFO("\n");  /* new line before the actual overview is printed */
+  usCFG("Config Overview:\n");
+  usCFG("  PCB version = v%s\n", pcb_version);
+  usCFG("  Firmware version = v%s\n", project_version);
+  usCFG("\n");
+  usCFG("  %s C64 rate = %d\n",
+    in_ext_str((int)usbsid_config.external_clock), (int)usbsid_config.clock_rate);
+  usCFG("  Clock rate = %s\n",
+    locked_str((int)usbsid_config.lock_clockrate));
+  usCFG("  Raster rate = %d\n",
     (int)usbsid_config.raster_rate);
-
-  usNFO("[SOCKET ONE] %s as %s\n",
-    enabled[(int)usbsid_config.socketOne.enabled],
-    ((int)usbsid_config.socketOne.dualsid == 1 ? single_dual[0] : single_dual[1]));
-  usNFO("[SOCKET ONE] CHIP TYPE: %s, CLONE TYPE: %s\n",
-    chiptypes[usbsid_config.socketOne.chiptype],
-    clonetypes[usbsid_config.socketOne.clonetype]);
-  usNFO("[SOCKET ONE] SID 1 TYPE: %s, SID 2 TYPE: %s\n",
-    sidtypes[usbsid_config.socketOne.sid1.type],
-    sidtypes[usbsid_config.socketOne.sid2.type]);
-  usNFO("[SOCKET ONE] SID 1 ID: %d, SID 2 ID: %d\n",
-    usbsid_config.socketOne.sid1.id,
-    usbsid_config.socketOne.sid2.id);
-  usNFO("[SOCKET ONE] SID 1 ADDR: 0x%02X, SID 2 ADDR: 0x%02X\n",
-    usbsid_config.socketOne.sid1.addr,
-    usbsid_config.socketOne.sid2.addr);
-  usNFO("[SOCKET TWO] %s as %s\n",
-    enabled[(int)usbsid_config.socketTwo.enabled],
-    ((int)usbsid_config.socketTwo.dualsid == 1 ? single_dual[0] : single_dual[1]));
-  usNFO("[SOCKET TWO] CHIP TYPE: %s, CLONE TYPE: %s\n",
-    chiptypes[usbsid_config.socketTwo.chiptype],
-    clonetypes[usbsid_config.socketTwo.clonetype]);
-  usNFO("[SOCKET TWO] SID 1 TYPE: %s, SID 2 TYPE: %s\n",
-    sidtypes[usbsid_config.socketTwo.sid1.type],
-    sidtypes[usbsid_config.socketTwo.sid2.type]);
-  usNFO("[SOCKET ONE] SID 1 ID: %d, SID 2 ID: %d\n",
-    usbsid_config.socketTwo.sid1.id,
-    usbsid_config.socketTwo.sid2.id);
-  usNFO("[SOCKET ONE] SID 1 ADDR: 0x%02X, SID 2 ADDR: 0x%02X\n",
-    usbsid_config.socketTwo.sid1.addr,
-    usbsid_config.socketTwo.sid2.addr);
-  usNFO("[SOCKET TWO AS ONE (MIRRORED)] %s\n",
-    true_false[(int)usbsid_config.mirrored]);
-
-  usNFO("[LED] %s, Idle breathe? %s\n",
-    enabled[(int)usbsid_config.LED.enabled],
-    true_false[(int)usbsid_config.LED.idle_breathe]);
-  usNFO("[RGBLED] %s, Idle breathe? %s\n",
-    enabled[(int)usbsid_config.RGBLED.enabled],
-    true_false[(int)usbsid_config.RGBLED.idle_breathe]);
-  usNFO("[RGBLED SIDTOUSE] %d\n",
+  usCFG("\n");
+  usCFG("  Socket One is %s as %s\n",
+    switch_str((int)usbsid_config.socketOne.enabled),
+    dualsingle_str((int)usbsid_config.socketOne.dualsid));
+  usCFG("  Chip is %s\n",
+    chip_type_name((int)usbsid_config.socketOne.chiptype));
+  if (usbsid_config.socketOne.enabled)
+    usCFG("      %s as SID1 @ addr $%02x with id %d\n",
+      sid_type_name((int)usbsid_config.socketOne.sid1.type),
+      usbsid_config.socketOne.sid1.addr,
+      usbsid_config.socketOne.sid1.id);
+  if (usbsid_config.socketOne.enabled && usbsid_config.socketOne.dualsid)
+    usCFG("      %s as SID2 @ addr $%02x with id %d\n",
+      sid_type_name((int)usbsid_config.socketOne.sid2.type),
+      usbsid_config.socketOne.sid2.addr,
+      usbsid_config.socketOne.sid2.id);
+  usCFG("  Socket Two is %s as %s\n",
+    switch_str((int)usbsid_config.socketTwo.enabled),
+    dualsingle_str((int)usbsid_config.socketTwo.dualsid));
+  usCFG("  Chip is %s\n",
+    chip_type_name((int)usbsid_config.socketTwo.chiptype));
+  if (usbsid_config.socketTwo.enabled)
+    usCFG("      %s as SID1 @ addr $%02x with id %d\n",
+      sid_type_name((int)usbsid_config.socketTwo.sid1.type),
+      usbsid_config.socketTwo.sid1.addr,
+      usbsid_config.socketTwo.sid1.id);
+  if (usbsid_config.socketTwo.enabled && usbsid_config.socketTwo.dualsid)
+    usCFG("      %s as SID2 @ addr $%02x with id %d\n",
+      sid_type_name((int)usbsid_config.socketTwo.sid2.type),
+      usbsid_config.socketTwo.sid2.addr,
+      usbsid_config.socketTwo.sid2.id);
+  usCFG("  Mirror Socket Two to Socket One = %s\n", switch_str(usbsid_config.mirrored));
+  usCFG("\n");
+  usCFG("  FMOpl is %s\n",
+    switch_str((int)usbsid_config.FMOpl.enabled));
+  if (usbsid_config.FMOpl.enabled)
+    usCFG("  FMOpl available @ SID %d\n",
+      (int)usbsid_config.FMOpl.sidno);
+  usCFG("\n");
+#if defined(HAS_AUDIOSWITCH)
+  usCFG("  Audio switch is set to %s\n",
+    monostereo_str((int)usbsid_config.stereo_en));
+  usCFG("  Audio switch position = %s\n",
+    locked_str((int)usbsid_config.lock_audio_sw));
+#endif
+  usCFG("\n");
+  usCFG("  Pico LED is %s, Breathing effect when idle? %s\n",
+    switch_str((int)usbsid_config.LED.enabled),
+    boolean_str((int)usbsid_config.LED.idle_breathe));
+#ifdef USE_RGB
+  usCFG("  Pico RGB LED is %s, Breathing effect when idle? %s\n",
+    switch_str((int)usbsid_config.RGBLED.enabled),
+    boolean_str((int)usbsid_config.RGBLED.idle_breathe));
+  usCFG("  RGB LED uses SID %d\n",
     (int)usbsid_config.RGBLED.sid_to_use);
-  usNFO("[RGBLED BRIGHTNESS] %d\n",
+  usCFG("  RGB LED brightness = %d\n",
     (int)usbsid_config.RGBLED.brightness);
+#else
+  usCFG("  Pico RGB LED not supported\n");
+#endif
+  usCFG("\n");
+  usCFG("  CDC feature = %s\n",
+    switch_str((int)usbsid_config.Cdc.enabled));
+  usCFG("  WebUSB feature = %s\n",
+    switch_str((int)usbsid_config.WebUSB.enabled));
+  usCFG("  Midi feature =  %s\n",
+    switch_str((int)usbsid_config.Midi.enabled));
+  usCFG("  ASID feature = %s\n",
+    switch_str((int)usbsid_config.Asid.enabled));
 
-  usNFO("[CDC] %s\n",
-    enabled[(int)usbsid_config.Cdc.enabled]);
-  usNFO("[WebUSB] %s\n",
-    enabled[(int)usbsid_config.WebUSB.enabled]);
-  usNFO("[Asid] %s\n",
-    enabled[(int)usbsid_config.Asid.enabled]);
-  usNFO("[Midi] %s\n",
-    enabled[(int)usbsid_config.Midi.enabled]);
-
-  usNFO("[FMOpl] %s\n",
-    enabled[(int)usbsid_config.FMOpl.enabled]);
-  usNFO("[FMOpl] SIDno %d\n",
-    usbsid_config.FMOpl.sidno);
-
-  #if defined(HAS_AUDIOSWITCH)
-  usNFO("[AUDIO_SWITCH] %s\n",
-    mono_stereo[(int)usbsid_config.stereo_en]);
-  usNFO("[AUDIO_SWITCH_LOCKED] %s\n",
-    true_false[(int)usbsid_config.lock_audio_sw]);
-  #endif
-
-  usCFG("[END PRINT CONFIG SETTINGS]\n");
   return;
 }
 
-void print_socket_config(void)
+/**
+ * @brief Prints a summary of the active socket configuration
+ *
+ */
+void print_config_summary(void)
 {
-  usNFO("\n");  /* new line before the actual socket settings are printed */
-  usCFG("[START PRINT SOCKET CONFIG]\n");
+  usNFO("\n");  /* new line before the actual summary is printed */
+  usCFG("Config Summary:\n");
+  usCFG("  S1: en=%d dual=%d chip=%d\n",
+    usbsid_config.socketOne.enabled, usbsid_config.socketOne.dualsid, usbsid_config.socketOne.chiptype);
+  usCFG("      SID1: id=%d addr=0x%02x type=%d\n",
+    usbsid_config.socketOne.sid1.id, usbsid_config.socketOne.sid1.addr, usbsid_config.socketOne.sid1.type);
+  usCFG("      SID2: id=%d addr=0x%02x type=%d\n",
+    usbsid_config.socketOne.sid2.id, usbsid_config.socketOne.sid2.addr, usbsid_config.socketOne.sid2.type);
+  usCFG("  S2: en=%d dual=%d chip=%d\n",
+    usbsid_config.socketTwo.enabled, usbsid_config.socketTwo.dualsid, usbsid_config.socketTwo.chiptype);
+  usCFG("      SID1: id=%d addr=0x%02x type=%d\n",
+    usbsid_config.socketTwo.sid1.id, usbsid_config.socketTwo.sid1.addr, usbsid_config.socketTwo.sid1.type);
+  usCFG("      SID2: id=%d addr=0x%02x type=%d\n",
+    usbsid_config.socketTwo.sid2.id, usbsid_config.socketTwo.sid2.addr, usbsid_config.socketTwo.sid2.type);
+  usCFG("  Mirrored: %d\n", usbsid_config.mirrored);
 
-  usNFO("SOCK_ONE EN: %s SOCK_TWO EN: %s\nACT_AS_ONE: %s\nNO SIDS\nSOCK_ONE #%d\nSOCK_TWO #%d\nTOTAL #%d\n",
-    true_false[cfg.sock_one], true_false[cfg.sock_two], true_false[cfg.mirrored],
+  return;
+}
+
+/**
+ * @brief Prints a summary of the active runtime configuration
+ *
+ */
+void print_runtime_summary(void)
+{
+  usNFO("\n");  /* new line before the actual summary is printed */
+  usCFG("Runtime Summary:\n");
+  usCFG("  Sockets: s1=%d s2=%d | s1_dual=%d s2_dual=%d | mirrored=%d\n",
+    cfg.sock_one, cfg.sock_two, cfg.sock_one_dual, cfg.sock_two_dual, cfg.mirrored);
+  usCFG("  SID's:   s1=%d s2=%d total=%d\n",
     cfg.sids_one, cfg.sids_two, cfg.numsids);
+  usCFG("  Chips:   s1=%d s2=%d | FMOpl: en=%d sid=%d\n",
+    cfg.chip_one, cfg.chip_two, cfg.fmopl_enabled, cfg.fmopl_sid);
+  usCFG("  IDs:     [0,1,2,3] -> slots [%d,%d,%d,%d]\n",
+    cfg.ids[0], cfg.ids[1], cfg.ids[2], cfg.ids[3]);
+  usCFG("  Addr:    [0x%02x,0x%02x,0x%02x,0x%02x]\n",
+    cfg.sidaddr[0], cfg.sidaddr[1], cfg.sidaddr[2], cfg.sidaddr[3]);
+  usCFG("  Type:    [%d,%d,%d,%d]\n",
+    cfg.sidtype[0], cfg.sidtype[1], cfg.sidtype[2], cfg.sidtype[3]);
+  usCFG("  Bus:     one=0b%03b/0x%02x   two=0b%03b/0x%02x\n",
+    cfg.one, cfg.one_mask, cfg.two, cfg.two_mask);
+  usCFG("           three=0b%03b/0x%02x four=0b%03b/0x%02x\n",
+    cfg.three, cfg.three_mask, cfg.four, cfg.four_mask);
 
-  usCFG("[END PRINT SOCKET CONFIG]\n");
-  return;
-}
-
-void print_bus_config(void)
-{
-  usNFO("\n");  /* new line before the actual bus config is printed */
-  usCFG("[START PRINT BUS CONFIG]\n");
-
-  usNFO("BUS\nONE:   %02x 0b"PRINTF_BINARY_PATTERN_INT8"\nTWO:   %02x 0b"PRINTF_BINARY_PATTERN_INT8"\nTHREE: %02x 0b"PRINTF_BINARY_PATTERN_INT8"\nFOUR:  %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n",
-    cfg.one, PRINTF_BYTE_TO_BINARY_INT8(cfg.one),
-    cfg.two, PRINTF_BYTE_TO_BINARY_INT8(cfg.two),
-    cfg.three, PRINTF_BYTE_TO_BINARY_INT8(cfg.three),
-    cfg.four, PRINTF_BYTE_TO_BINARY_INT8(cfg.four));
-  usNFO("ADDRESS MASKS\n");
-  usNFO("MASK_ONE:   0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", cfg.one_mask, PRINTF_BYTE_TO_BINARY_INT8(cfg.one_mask));
-  usNFO("MASK_TWO:   0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", cfg.two_mask, PRINTF_BYTE_TO_BINARY_INT8(cfg.two_mask));
-  usNFO("MASK_THREE: 0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", cfg.three_mask, PRINTF_BYTE_TO_BINARY_INT8(cfg.three_mask));
-  usNFO("MASK_FOUR:  0x%02x 0b"PRINTF_BINARY_PATTERN_INT8"\n", cfg.four_mask, PRINTF_BYTE_TO_BINARY_INT8(cfg.four_mask));
-
-  usCFG("[END PRINT BUS CONFIG]\n");
   return;
 }

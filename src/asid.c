@@ -39,6 +39,7 @@
 #include "midi.h"
 #include "asid.h"
 #include "globals.h"
+#include "config_constants.h"
 #include "config.h"
 #include "logging.h"
 
@@ -46,7 +47,6 @@
 /* config.c */
 extern Config usbsid_config;
 extern RuntimeCFG cfg;
-extern char *sidtypes[5];
 
 /* gpio.c */
 extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
@@ -425,7 +425,7 @@ void handle_asid_typemessage(uint8_t* buffer)
      0xF0, 0x2D, 0x32, SIDNO, SIDTYPE, 0x7F
   */
   int sidtype = ((buffer[1] == 0) ? 3 : (buffer[1] == 1) ? 2 : 0);
-  usASID("Tune SID %d type: %s\n", buffer[0], sidtypes[sidtype]);
+  usASID("Tune SID %d type: %s\n", buffer[0], sid_type_name(sidtype));
   return;
 }
 

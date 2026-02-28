@@ -69,11 +69,11 @@ queue_t cynthcart_queue;
 const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT;
 
 
-/* Initialize the midi handlers */
+/* Initialise the midi handlers */
 void midi_init(void)
 {
   usNFO("\n");
-  usNFO("[MIDI] Init start\n");
+  usNFO("[MIDI] Init\n");
 
   /* Set initial stream state and index */
   midimachine.bus = FREE;
@@ -88,7 +88,7 @@ void midi_init(void)
   /* Start the processor of midi buffers */
   midi_processor_init();
 
-  usNFO("[MIDI] Init finished\n");
+  return;
 }
 
 #ifdef ONBOARD_EMULATOR
@@ -167,7 +167,7 @@ inline void handle_emulator_cc(void)
 
 /* Processes a 1 byte incoming midi buffer
  * Figures out if we're receiving midi or sysex */
-inline void midi_buffer_task(uint8_t buffer)
+static inline void midi_buffer_task(uint8_t buffer)
 {
   if (midimachine.index != 0) {
     if (midimachine.type != SYSEX) usMCMD(" [B%d]$%02x#%03d", midimachine.index, buffer, buffer);

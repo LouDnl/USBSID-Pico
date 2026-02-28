@@ -741,7 +741,7 @@ void midi_cc_init(void)
 
 void midi_processor_init(void)
 {
-  usCFG("Start Midi handler init\n");
+  usNFO("[MIDI] Handler init\n");
 
   /* NOTE: Temporary - always init defaults */
   memcpy(&CC, &midi_ccvalues_defaults, sizeof(midi_ccvalues)); /* TODO: midi.c and midi_handler.c must always use the same mapping */
@@ -755,8 +755,6 @@ void midi_processor_init(void)
   }
 
   midi_cc_init();
-
-  usCFG("End Midi handler init\n");
 
   return;
 }

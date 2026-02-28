@@ -25,6 +25,7 @@
 
 
 #include "globals.h"
+#include "config_constants.h"
 #include "config.h"
 #include "usbsid.h"
 #include "midi.h"
@@ -33,522 +34,478 @@
 
 
 /* config.c */
-extern void save_load_apply_config(bool at_boot, bool print_cfg);
+extern ConfigError apply_config(bool at_boot);
 extern Config usbsid_config;
 extern RuntimeCFG cfg;
 
 /* config_bus.c */
-extern void apply_bus_config(bool quiet);
-extern uint8_t sidaddr_default[4];
+extern void apply_runtime_config(const Config *config, RuntimeCFG *rt);
 
 /* sid.c */
 extern void reset_sid_registers(void);
 
 /* Pre declarations */
-void apply_socket_change(bool quiet);
+ConfigError validate_config(void);
+Socket default_socket(int id);
 
 
-/* Called from config.c:apply_config, config.c:apply_socket_change and set_socket_config */
-void verify_socket_settings(void)
+/**
+ * @brief Returns the FMOpl socket SID id
+ *
+ * @return int id
+ */
+int verify_fmopl_sidno(void)
 {
-  /* Pre applying default SocketOne settings if needed */
-  if (usbsid_config.socketOne.enabled == true) {
-    if (usbsid_config.socketOne.dualsid == true) {
-      if (usbsid_config.socketOne.chiptype != 1) {
-        usbsid_config.socketOne.chiptype = 1;  /* chiptype cannot be real with dualsid */
-      }
-      if (usbsid_config.socketOne.clonetype == 0) {
-        usbsid_config.socketOne.clonetype = 1;  /* clonetype cannot be disabled with dualsid */
-      }
-    } else {
-      if (usbsid_config.socketOne.chiptype == 1) {
-        if (usbsid_config.socketOne.clonetype == 0) {
-          usbsid_config.socketOne.clonetype = 1;  /* clonetype cannot be disabled when chiptype is clone */
-        }
-      } else {
-        usbsid_config.socketOne.clonetype = 0;  /* clonetype cannot be anything else when chiptype is real */
-      }
-    }
-  }
-  /* Pre applying default SocketTwo settings if needed */
-  if (usbsid_config.socketTwo.enabled == true) {
-    if (usbsid_config.socketTwo.dualsid == true) {
-      if (usbsid_config.socketTwo.chiptype != 1) {
-        usbsid_config.socketTwo.chiptype = 1;  /* chiptype cannot be real with dualsid */
-      }
-      if (usbsid_config.socketTwo.clonetype == 0) {
-        usbsid_config.socketTwo.clonetype = 1;  /* clonetype cannot be disabled with dualsid */
-      }
-    } else {
-      if (usbsid_config.socketTwo.chiptype == 1) {
-        if (usbsid_config.socketTwo.clonetype == 0) {
-          usbsid_config.socketTwo.clonetype = 1;  /* clonetype cannot be disabled when chiptype is clone */
-        }
-      } else {
-        usbsid_config.socketTwo.clonetype = 0;  /* clonetype cannot be anything else when chiptype is real */
-      }
+  const SIDChip *sids[4] = {
+    &usbsid_config.socketOne.sid1,
+    &usbsid_config.socketOne.sid2,
+    &usbsid_config.socketTwo.sid1,
+    &usbsid_config.socketTwo.sid2,
+  };
+
+  for (int i = 0; i < 4; i++) {
+    if (sids[i]->type == SID_FMOPL && sids[i]->addr != 0xFF) {
+      return i + 1;  /* Return 1-based SID number */
     }
   }
 
-  return;
+  return -1;
 }
 
-void verify_chipdetection_results(bool quiet)
-{ /* Is run only from sid_detection.c:auto_detect_routine after detection in auto_config mode */
-  if (!quiet) usCFG("[SID] VERIFY SOCKET DETECTION RESULTS\n");
-  /* Socket One */
-  if (usbsid_config.socketOne.sid1.type != 0 && usbsid_config.socketOne.sid2.type == 1) {
-    /* Unidentified SID as sid2? */
-    usbsid_config.socketOne.dualsid = false; /* Disable dualsid */
-  }
-  if (usbsid_config.socketOne.sid1.type == 0 && usbsid_config.socketOne.sid2.type == 1) {
-    /* 2 unidentified SID's and chiptype is Real and clonetype is Disabled? */
-    if (usbsid_config.socketOne.chiptype == 0 && usbsid_config.socketOne.clonetype == 0) {
-      usbsid_config.socketOne.enabled = false; /* Disable the socket */
-    }
-  }
-  if (!quiet) usCFG("[SID] SOCKET ONE CHIPTYPE: %d CLONETYPE: %d ENABLED: %d DUALSID: %d\n",
-    usbsid_config.socketOne.chiptype, usbsid_config.socketOne.clonetype,
-    usbsid_config.socketOne.enabled, usbsid_config.socketOne.dualsid);
-
-  /* Socket Two */
-  if (usbsid_config.socketTwo.sid1.type != 0 && usbsid_config.socketTwo.sid2.type == 1) {
-    /* Unidentified SID as sid2? */
-    usbsid_config.socketTwo.dualsid = false; /* Disable dualsid */
-  }
-  if (usbsid_config.socketTwo.sid1.type == 0 && usbsid_config.socketTwo.sid2.type == 1) {
-    /* 2 unidentified SID's and chiptype is Real and clonetype is Disabled? */
-    if (usbsid_config.socketTwo.chiptype == 0 && usbsid_config.socketTwo.clonetype == 0) {
-      usbsid_config.socketTwo.enabled = false; /* Disable the socket */
-    }
-  }
-  if (!quiet) usCFG("[SID] SOCKET TWO CHIPTYPE: %d CLONETYPE: %d ENABLED: %d DUALSID: %d\n",
-    usbsid_config.socketTwo.chiptype, usbsid_config.socketTwo.clonetype,
-    usbsid_config.socketTwo.enabled, usbsid_config.socketTwo.dualsid);
-}
-
-void verify_sid_addr(bool quiet)
-{ /* Is run only from sid_detection.c:auto_detect_routine after detection in auto_config mode */
-  if (!quiet) usCFG("[SID] REASSIGN SID ADDRESS AND ID BY SOCKET CONFIG\n");
-  /* Socket One */
-  if (usbsid_config.socketOne.enabled) {
-    if (usbsid_config.socketOne.dualsid) {
-      usbsid_config.socketOne.sid1.addr = 0x00;
-      usbsid_config.socketOne.sid2.addr = 0x20;
-      usbsid_config.socketOne.sid1.id = 0;
-      usbsid_config.socketOne.sid2.id = 1;
-    } else {
-      usbsid_config.socketOne.sid1.addr = 0x00;
-      usbsid_config.socketOne.sid2.addr = 0xFF;
-      usbsid_config.socketOne.sid1.id = 0;
-      usbsid_config.socketOne.sid2.id = 0xFF;
-    }
-  } else {
-    usbsid_config.socketOne.sid1.addr = 0xFF;
-    usbsid_config.socketOne.sid2.addr = 0xFF;
-    usbsid_config.socketOne.sid1.id = 0xFF;
-    usbsid_config.socketOne.sid2.id = 0xFF;
-  }
-  /* Socket Two */
-  if (usbsid_config.socketTwo.enabled) {
-    if (usbsid_config.socketTwo.dualsid) {
-      if (usbsid_config.socketOne.enabled) {
-        if (usbsid_config.socketOne.dualsid) {
-          usbsid_config.socketTwo.sid1.addr = 0x40;
-          usbsid_config.socketTwo.sid2.addr = 0x60;
-          usbsid_config.socketTwo.sid1.id = 2;
-          usbsid_config.socketTwo.sid2.id = 3;
-        } else {
-          usbsid_config.socketTwo.sid1.addr = 0x20;
-          usbsid_config.socketTwo.sid2.addr = 0x40;
-          usbsid_config.socketTwo.sid1.id = 1;
-          usbsid_config.socketTwo.sid2.id = 2;
-        }
-      } else {
-        usbsid_config.socketTwo.sid1.addr = 0x00;
-        usbsid_config.socketTwo.sid2.addr = 0x20;
-        usbsid_config.socketTwo.sid1.id = 0;
-        usbsid_config.socketTwo.sid2.id = 1;
-      }
-    } else {
-      if (usbsid_config.socketOne.enabled) {
-        if (usbsid_config.socketOne.dualsid) {
-          usbsid_config.socketTwo.sid1.addr = 0x40;
-          usbsid_config.socketTwo.sid1.id = 2;
-        } else {
-          usbsid_config.socketTwo.sid1.addr = 0x20;
-          usbsid_config.socketTwo.sid1.id = 1;
-        }
-      } else {
-        usbsid_config.socketTwo.sid1.addr = 0x00;
-        usbsid_config.socketTwo.sid1.id = 0;
-      }
-      usbsid_config.socketTwo.sid2.addr = 0xFF;
-      usbsid_config.socketTwo.sid2.id = 0xFF;
-    }
-  } else {
-    usbsid_config.socketTwo.sid1.addr = 0xFF;
-    usbsid_config.socketTwo.sid2.addr = 0xFF;
-    usbsid_config.socketTwo.sid1.id = 0xFF;
-    usbsid_config.socketTwo.sid2.id = 0xFF;
-  }
-}
-
-static void autoset_sid_default_address(void)
-{ /* NOTE: DO NOT USE, UNTESTED AND UNUSED */
-  int id = usbsid_config.socketOne.sid1.id;
-  usbsid_config.socketOne.sid1.addr = (id != 255 ? sidaddr_default[id] : 0xFF);
-  id = usbsid_config.socketOne.sid2.id;
-  usbsid_config.socketOne.sid2.addr = (id != 255 ? sidaddr_default[id] : 0xFF);
-  id = usbsid_config.socketTwo.sid1.id;
-  usbsid_config.socketTwo.sid1.addr = (id != 255 ? sidaddr_default[id] : 0xFF);
-  id = usbsid_config.socketTwo.sid2.id;
-  usbsid_config.socketTwo.sid2.addr = (id != 255 ? sidaddr_default[id] : 0xFF);
-
-  return;
-}
-
-static void autoset_sid_id(void)
-{ /* NOTE: DO NOT USE, UNTESTED AND UNUSED */
-  /* Set SID id's based on above config */
-  // cfg.sidid[0] = (cfg.sock_one ? 0 : -1);
-  // cfg.sidid[1] = ((cfg.sock_one && cfg.sock_one_dual) ? 1 : -1);
-  // cfg.sidid[2] = (cfg.mirrored ? 0
-  //   : (cfg.sock_two && cfg.sock_one && cfg.sock_one_dual) ? 2
-  //   : (cfg.sock_two && !cfg.sock_one) ? 0
-  //   : (cfg.sock_two && cfg.sock_one && !cfg.sock_one_dual) ? 1
-  //   : -1);
-  // cfg.sidid[3] = (cfg.mirrored ? 1
-  //   : (cfg.sock_two && cfg.sock_two_dual && cfg.sock_one && cfg.sock_one_dual) ? 3
-  //   : (cfg.sock_two && cfg.sock_two_dual && !cfg.sock_one) ? 1
-  //   : (cfg.sock_two && cfg.sock_two_dual && cfg.sock_one && !cfg.sock_one_dual) ? 2
-  //   : -1);
-  // usbsid_config.socketOne.sid1.id = cfg.sidid[0];
-  // usbsid_config.socketOne.sid2.id = cfg.sidid[1];
-  // usbsid_config.socketTwo.sid1.id = cfg.sidid[2];
-  // usbsid_config.socketTwo.sid2.id = cfg.sidid[3];
-
-  return;
-}
-
-static uint8_t address_to_id(uint8_t addr)
-{ /* NOTE: DO NOT USE, UNTESTED AND UNUSED */
-  switch (addr) {
-    case 0x00:
-      return 0;
-    case 0x20:
-      return 1;
-    case 0x40:
-      return 2;
-    case 0x60:
-      return 3;
-    default:
-      return 0;
-  }
-  return 0;
-}
-
-static void set_sid_addr_id(int socket, int sid, uint8_t addr)
-{ /* NOTE: DO NOT USE, UNTESTED AND UNUSED */
-
-  switch (socket) {
-    case 1:
-      switch (sid) {
-        case 1:
-          usbsid_config.socketOne.sid1.id = address_to_id(addr);
-          usbsid_config.socketOne.sid1.addr = addr;
-          break;
-        case 2:
-          usbsid_config.socketOne.sid2.addr = addr;
-          usbsid_config.socketOne.sid2.id = address_to_id(addr);
-          break;
-      }
-      break;
-    case 2:
-      switch (sid) {
-        case 1:
-          usbsid_config.socketTwo.sid1.addr = addr;
-          usbsid_config.socketTwo.sid1.id = address_to_id(addr);
-          break;
-        case 2:
-          usbsid_config.socketTwo.sid2.addr = addr;
-          usbsid_config.socketTwo.sid2.id = address_to_id(addr);
-          break;
-      }
-      break;
-  }
-  return;
-}
-
-void set_sid_id_addr(int socket, int sid, int id)
-{ /* Used for socket configuration */
-  switch (socket) {
-    case 1:
-      switch (sid) {
-        case 1:
-          usbsid_config.socketOne.sid1.id = id;
-          usbsid_config.socketOne.sid1.addr = sidaddr_default[id];
-          break;
-        case 2:
-          usbsid_config.socketOne.sid2.id = id;
-          usbsid_config.socketOne.sid2.addr = sidaddr_default[id];
-          break;
-      }
-      break;
-    case 2:
-      switch (sid) {
-        case 1:
-          usbsid_config.socketTwo.sid1.id = id;
-          usbsid_config.socketTwo.sid1.addr = sidaddr_default[id];
-          break;
-        case 2:
-          usbsid_config.socketTwo.sid2.id = id;
-          usbsid_config.socketTwo.sid2.addr = sidaddr_default[id];
-          break;
-      }
-      break;
-  }
+/**
+ * @brief Apply FMOpl configuration
+ * @note changes both Config and RuntimeCFG
+ *
+ */
+void apply_fmopl_config(void)
+{
+  int fmopl_sid = verify_fmopl_sidno();
+  cfg.fmopl_sid = fmopl_sid;
+  cfg.fmopl_enabled = (fmopl_sid != -1);
+  usbsid_config.FMOpl.sidno = fmopl_sid;
+  usbsid_config.FMOpl.enabled = cfg.fmopl_enabled;
   return;
 }
 
 /**
- * @brief Flip socket id's and addresses at runtime
+ * @brief Convert SID address to default socket SID id
+ *
+ * @param uint8_t addr
+ * @return uint8_t id
+ */
+uint8_t address_to_sid_id(uint8_t addr)
+{
+  switch (addr) {
+    case 0x00: return 0;
+    case 0x20: return 1;
+    case 0x40: return 2;
+    case 0x60: return 3;
+    default:   return 0xFF;
+  }
+}
+
+/**
+ * @brief Convert socket SID id to SID address
+ *
+ * @param uint8_t id
+ * @return uint8_t address
+ */
+uint8_t sid_id_to_address(uint8_t id)
+{
+  if (id < 4) {
+    return sid_addresses[id];
+  }
+  return 0xFF;
+}
+
+/**
+ * @brief Apply addresses to socket SID's
+ *
+ */
+void apply_sid_addresses(void)
+{
+  /* Build index from socket flags */
+  int idx = (
+    (usbsid_config.socketOne.enabled ? 1 : 0) << 3)
+    | ((usbsid_config.socketOne.dualsid ? 1 : 0) << 2)
+    | ((usbsid_config.socketTwo.enabled ? 1 : 0) << 1)
+    | ((usbsid_config.socketTwo.dualsid ? 1 : 0)
+  );
+
+  /* Lookup addresses from table */
+  const uint8_t *addrs = address_table[idx];
+
+  /* Apply to config */
+  usbsid_config.socketOne.sid1.addr = addrs[0];
+  usbsid_config.socketOne.sid2.addr = addrs[1];
+  usbsid_config.socketTwo.sid1.addr = addrs[2];
+  usbsid_config.socketTwo.sid2.addr = addrs[3];
+
+  /* Compute IDs from addresses */
+  usbsid_config.socketOne.sid1.id = address_to_sid_id(addrs[0]);
+  usbsid_config.socketOne.sid2.id = address_to_sid_id(addrs[1]);
+  usbsid_config.socketTwo.sid1.id = address_to_sid_id(addrs[2]);
+  usbsid_config.socketTwo.sid2.id = address_to_sid_id(addrs[3]);
+
+  /* Set disabled SID types to N/A */
+  if (addrs[0] == 0xFF) usbsid_config.socketOne.sid1.type = SID_NA;
+  if (addrs[1] == 0xFF) usbsid_config.socketOne.sid2.type = SID_NA;
+  if (addrs[2] == 0xFF) usbsid_config.socketTwo.sid1.type = SID_NA;
+  if (addrs[3] == 0xFF) usbsid_config.socketTwo.sid2.type = SID_NA;
+
+  usCFG("SID addresses applied: S1.1=0x%02X S1.2=0x%02X S2.1=0x%02X S2.2=0x%02X (idx=%d)\n",
+  addrs[0], addrs[1], addrs[2], addrs[3], idx);
+
+    return;
+}
+
+/**
+ * @brief Apply Chip and SID detection results
+ *
+ * @param DetectionResult *det
+ * @return ConfigError config validation
+ */
+ConfigError apply_detection_results(const DetectionResult *det)
+{
+  if (!det->success) {
+    return det->error != CFG_OK ? det->error : CFG_ERR_DETECTION_FAILED;
+  }
+
+  /* Apply Socket 1 results */
+  usbsid_config.socketOne.chiptype = det->socket[0].chiptype;
+  usbsid_config.socketOne.dualsid = det->socket[0].supports_dual;
+  usbsid_config.socketOne.enabled = det->socket[0].present;
+  usbsid_config.socketOne.sid1.type = det->socket[0].sid1_type;
+  usbsid_config.socketOne.sid2.type = det->socket[0].sid2_type;
+
+  /* Apply Socket 2 results */
+  usbsid_config.socketTwo.chiptype = det->socket[1].chiptype;
+  usbsid_config.socketTwo.dualsid = det->socket[1].supports_dual;
+  usbsid_config.socketTwo.enabled = det->socket[1].present;
+  usbsid_config.socketTwo.sid1.type = det->socket[1].sid1_type;
+  usbsid_config.socketTwo.sid2.type = det->socket[1].sid2_type;
+
+  /* Ensure at least one socket is enabled */
+  if (!usbsid_config.socketOne.enabled && !usbsid_config.socketTwo.enabled) {
+    /* Fallback: enable both sockets with unknown chips */
+    usbsid_config.socketOne.enabled = true;
+    usbsid_config.socketOne.chiptype = CHIP_UNKNOWN;
+    usbsid_config.socketTwo.enabled = true;
+    usbsid_config.socketTwo.chiptype = CHIP_UNKNOWN;
+  }
+
+  /* Recompute addresses based on new config */
+  apply_sid_addresses();
+
+  return validate_config();
+}
+
+/**
+ * @brief Validate socket configuration for provided socket
+ *
+ * @param Socket *socket
+ * @param int socket_num
+ * @return ConfigError
+ */
+ConfigError validate_socket(const Socket *socket, int socket_num)
+{
+  if (socket == NULL) {
+    return CFG_ERR_NULL_POINTER;
+  }
+
+  /* DualSID requires clone chiptype (real SIDs can't do dual) */
+  if (socket->dualsid && socket->chiptype == CHIP_REAL) {
+    usERR("Valdation error, Socket %d: DualSID on real chip\n", socket_num);
+    return CFG_ERR_DUALSID_ON_REAL;
+  }
+
+  /* If socket enabled, primary SID must have valid address */
+  if (socket->enabled && socket->sid1.addr == 0xFF) {
+    usERR("Valdation error, Socket %d: Enabled but primary SID disabled\n", socket_num);
+    return CFG_ERR_PRIMARY_SID_DISABLED;
+  }
+
+  return CFG_OK;
+}
+
+/**
+ * @brief Validate the global configuration
+ *
+ * @return ConfigError
+ */
+ConfigError validate_config(void)
+{
+  /* At least one socket must be enabled */
+  if (!usbsid_config.socketOne.enabled && !usbsid_config.socketTwo.enabled) {
+    usERR("Valdation error, both sockets disabled!\n");
+    return CFG_ERR_BOTH_SOCKETS_DISABLED;
+  }
+
+  /* Validate each socket independently
+   * falls back to default configuration
+   * if there is a configuration error */
+  ConfigError err;
+SOCKONE:;
+  err = validate_socket(&usbsid_config.socketOne, 1);
+  if (err != CFG_OK) {
+    usbsid_config.socketOne = default_socket(1);
+    goto SOCKONE;
+  }
+SOCKTWO:;
+  err = validate_socket(&usbsid_config.socketTwo, 2);
+  if (err != CFG_OK) {
+    usbsid_config.socketTwo = default_socket(2);
+    goto SOCKTWO;
+  }
+
+  /* Check for address conflicts (unless mirrored) */
+  if (!usbsid_config.mirrored) {
+    uint8_t addrs[4] = {
+      usbsid_config.socketOne.sid1.addr,
+      usbsid_config.socketOne.sid2.addr,
+      usbsid_config.socketTwo.sid1.addr,
+      usbsid_config.socketTwo.sid2.addr,
+    };
+
+    for (int i = 0; i < 4; i++) {
+      if (addrs[i] == 0xFF) continue;  /* Skip disabled slots */
+      for (int j = i + 1; j < 4; j++) {
+        if (addrs[j] == 0xFF) continue;
+        if (addrs[i] == addrs[j]) {
+          usERR("Address conflict: slot %d and %d both at 0x%02X\n",
+            i, j, addrs[i]);
+          return CFG_ERR_ADDRESS_CONFLICT;
+        }
+      }
+    }
+  }
+
+  /* At least one SID must be usable (not N/A type) */
+  bool has_usable_sid = false;
+
+  if (usbsid_config.socketOne.enabled) {
+    if (usbsid_config.socketOne.sid1.type != SID_NA && usbsid_config.socketOne.sid1.addr != 0xFF) {
+      has_usable_sid = true;
+    }
+    if (usbsid_config.socketOne.dualsid &&
+      usbsid_config.socketOne.sid2.type != SID_NA && usbsid_config.socketOne.sid2.addr != 0xFF) {
+      has_usable_sid = true;
+    }
+  }
+  if (usbsid_config.socketTwo.enabled) {
+    if (usbsid_config.socketTwo.sid1.type != SID_NA && usbsid_config.socketTwo.sid1.addr != 0xFF) {
+      has_usable_sid = true;
+    }
+    if (usbsid_config.socketTwo.dualsid &&
+      usbsid_config.socketTwo.sid2.type != SID_NA && usbsid_config.socketTwo.sid2.addr != 0xFF) {
+      has_usable_sid = true;
+    }
+  }
+
+  /* Allow unknown SID types (detection might not have run yet) */
+  if (!has_usable_sid) {
+    /* Check if any SID has unknown type (acceptable pre-detection) */
+    bool has_unknown = (
+      usbsid_config.socketOne.enabled && usbsid_config.socketOne.sid1.type == SID_UNKNOWN)
+      || (usbsid_config.socketTwo.enabled && usbsid_config.socketTwo.sid1.type == SID_UNKNOWN
+    );
+    if (!has_unknown) {
+      usERR("No usable SID found!\n");
+      return CFG_ERR_NO_VALID_SID;
+    }
+  }
+
+  return CFG_OK;
+}
+
+/**
+ * @brief Flip socket addresses and id's at runtime
  *
  */
 void flip_sockets(void)
 {
-  uint8_t ids[4] = {
-    usbsid_config.socketOne.sid1.id,
-    usbsid_config.socketOne.sid2.id,
-    usbsid_config.socketTwo.sid1.id,
-    usbsid_config.socketTwo.sid2.id
-  };
-  usbsid_config.socketOne.sid1.id = ids[2];
-  usbsid_config.socketOne.sid1.addr = sidaddr_default[ids[2]];
-  usbsid_config.socketOne.sid2.id = ids[3];
-  usbsid_config.socketOne.sid2.addr = sidaddr_default[ids[3]];
-  usbsid_config.socketTwo.sid1.id = ids[0];
-  usbsid_config.socketTwo.sid1.addr = sidaddr_default[ids[0]];
-  usbsid_config.socketTwo.sid2.id = ids[1];
-  usbsid_config.socketTwo.sid2.addr = sidaddr_default[ids[1]];
-  extern void apply_bus_config(bool quiet);
-  apply_bus_config(false);
+  /* Swap IDs between sockets */
+  uint8_t tmp_id;
+  uint8_t tmp_addr;
+
+  /* Swap SID1 */
+  tmp_id = usbsid_config.socketOne.sid1.id;
+  tmp_addr = usbsid_config.socketOne.sid1.addr;
+  usbsid_config.socketOne.sid1.id = usbsid_config.socketTwo.sid1.id;
+  usbsid_config.socketOne.sid1.addr = usbsid_config.socketTwo.sid1.addr;
+  usbsid_config.socketTwo.sid1.id = tmp_id;
+  usbsid_config.socketTwo.sid1.addr = tmp_addr;
+
+  /* Swap SID2 */
+  tmp_id = usbsid_config.socketOne.sid2.id;
+  tmp_addr = usbsid_config.socketOne.sid2.addr;
+  usbsid_config.socketOne.sid2.id = usbsid_config.socketTwo.sid2.id;
+  usbsid_config.socketOne.sid2.addr = usbsid_config.socketTwo.sid2.addr;
+  usbsid_config.socketTwo.sid2.id = tmp_id;
+  usbsid_config.socketTwo.sid2.addr = tmp_addr;
+
+  apply_runtime_config(&usbsid_config,&cfg);
+
   /* Reset SID registers after fiddling with the socket configuration */
   reset_sid_registers();
-  return;
-}
 
-/* Called from apply_config apply_socket_change */
-int verify_fmopl_sidno(void)
-{ /* TODO: THIS USES CONFIG AND RUNTIMECFG CROSSED, THIS MUST BE CONFIG ONLY */
-  int fmoplsidno = -1;
-  // if (usbsid_config.FMOpl.enabled) {
-  if (usbsid_config.socketOne.enabled) {
-    if ((usbsid_config.socketOne.chiptype == 1) && (cfg.sids_one >= 1)) {
-      if (usbsid_config.socketOne.sid1.type == 4) {
-        fmoplsidno = 1;
-        return fmoplsidno;
-      } else if ((usbsid_config.socketOne.sid2.type == 4) && (cfg.sids_one == 2)) {
-        fmoplsidno = 2;
-        return fmoplsidno;
-      }
-    }
-  }
-  if (usbsid_config.socketTwo.enabled) {// && (fmoplsidno == -1)) {
-    if ((usbsid_config.socketTwo.chiptype == 1) && (cfg.sids_two >= 1)) {
-      if (usbsid_config.socketTwo.sid1.type == 4) {
-        fmoplsidno = (cfg.sids_one == 0)
-        ? 1 : (cfg.sids_one == 1)
-        ? 2 : (cfg.sids_one == 2)
-        ? 3 : 0;
-        return fmoplsidno;
-      } else if (usbsid_config.socketTwo.sid2.type == 4 && (cfg.sids_two == 2)) {
-        fmoplsidno = (cfg.sids_one == 0)
-        ? 2 : (cfg.sids_one == 1)
-        ? 3 : (cfg.sids_one == 2)
-        ? 4 : 0;
-        return fmoplsidno;
-      }
-    }
-  }
-  // }
-  return fmoplsidno;
-}
-
-void apply_fmopl_config(bool quiet)
-{ /* TODO: REWORK */
-  if (!quiet) usCFG("Checking for optional FMOpl\n");
-  /* FMOpl */
-  int fmoplsid = verify_fmopl_sidno();
-  if (fmoplsid != -1) {
-    if (!quiet) usCFG("FMOpl @ SIDNO %d\n", fmoplsid);
-    cfg.fmopl_enabled = usbsid_config.FMOpl.enabled = true;
-    usbsid_config.FMOpl.sidno = cfg.fmopl_sid = fmoplsid;
-  } else {
-    cfg.fmopl_enabled = usbsid_config.FMOpl.enabled = false;
-    usbsid_config.FMOpl.sidno = cfg.fmopl_sid = -1;
-  }
-}
-
-void set_socket_config(uint8_t cmd, bool s1en, bool s1dual, uint8_t s1chip, bool s2en, bool s2dual, uint8_t s2chip, bool mirror)
-{
-  usbsid_config.socketOne.enabled = s1en;
-  usbsid_config.socketOne.dualsid = s1dual;
-  usbsid_config.socketOne.chiptype = s1chip;  /* Chiptype must be clone for dualsid to work! */
-  if (s1en) {
-    /* Set sid types to unknown if set to N/A */
-    usbsid_config.socketOne.sid1.type = (usbsid_config.socketOne.sid1.type == 1 ? 0 : usbsid_config.socketOne.sid1.type);
-    if (s1dual)
-      usbsid_config.socketOne.sid2.type = (usbsid_config.socketOne.sid2.type == 1 ? 0 : usbsid_config.socketOne.sid2.type);
-  }
-  usbsid_config.socketTwo.enabled = s2en;
-  usbsid_config.socketTwo.dualsid = s2dual;
-  usbsid_config.socketTwo.chiptype = s2chip;  /* Chiptype must be clone for dualsid to work! */
-  if (s2en) {
-    /* Set sid types to unknown if set to N/A */
-    usbsid_config.socketOne.sid1.type = (usbsid_config.socketOne.sid1.type == 1 ? 0 : usbsid_config.socketOne.sid1.type);
-    if (s2dual)
-      usbsid_config.socketOne.sid2.type = (usbsid_config.socketOne.sid2.type == 1 ? 0 : usbsid_config.socketOne.sid2.type);
-  }
-  usbsid_config.mirrored = mirror;
-  /* PCB v1.3 will lock Audio to Stereo in mirrored mode :) */
-  #if defined(HAS_AUDIOSWITCH)
-  if (mirror) {
-    usbsid_config.stereo_en = true;
-    usbsid_config.lock_audio_sw = true;
-  }
-  #endif
-
-  verify_socket_settings();
-  verify_chipdetection_results(true);
-  verify_sid_addr(true);
-
-  if (cmd == 0) {
-    save_load_apply_config(false, true);
-  } else if (cmd == 1) {
-    apply_socket_change(false);
-  }
-  /* Reset SID registers after fiddling with the socket configuration */
-  reset_sid_registers();
-  return;
-}
-
-void apply_socket_config(bool quiet)
-{
-  if (!quiet) usCFG("Applying socket settings\n");
-  cfg.mirrored = usbsid_config.mirrored;
-
-  cfg.sock_one = usbsid_config.socketOne.enabled;
-  cfg.sock_one_dual = usbsid_config.socketOne.dualsid;
-  cfg.chip_one = usbsid_config.socketOne.chiptype;  /* Chiptype must be clone for dualsid to work! */
-
-  if (!cfg.mirrored) {
-    cfg.sock_two = usbsid_config.socketTwo.enabled;
-    cfg.sock_two_dual = usbsid_config.socketTwo.dualsid;
-    cfg.chip_two = usbsid_config.socketTwo.chiptype;  /* Chiptype must be clone for dualsid to work! */
-  } else {
-    if (cfg.sock_one_dual == true) {
-      cfg.sock_two = usbsid_config.socketOne.enabled;
-      cfg.sock_two_dual = usbsid_config.socketOne.dualsid;
-      cfg.chip_two = usbsid_config.socketOne.chiptype;  /* Chiptype must be clone for dualsid to work! */
-    } else {
-      cfg.sock_two = usbsid_config.socketTwo.enabled;
-      cfg.sock_two_dual = usbsid_config.socketTwo.dualsid;
-      cfg.chip_two = usbsid_config.socketTwo.chiptype;  /* Chiptype must be clone for dualsid to work! */
-    }
-  }
-
-  if (!cfg.mirrored) {
-    cfg.sids_one = (cfg.sock_one == true) ? (cfg.sock_one_dual == true) ? 2 : 1 : 0;
-    cfg.sids_two = (cfg.sock_two == true) ? (cfg.sock_two_dual == true) ? 2 : 1 : 0;
-    cfg.numsids = (cfg.sids_one + cfg.sids_two);
-  } else {
-    /* Mirrored (act-as-one) overrules everything at runtime :) */
-    if (cfg.sock_one_dual == true) {
-      cfg.sids_one = cfg.sids_two = cfg.numsids = 2;
-    } else {
-      cfg.sids_one = cfg.sids_two = cfg.numsids = 1;
-    }
-
-  }
-  return;
-}
-
-void apply_socket_change(bool quiet)
-{
-  verify_socket_settings();
-  apply_socket_config(quiet);
-  apply_bus_config(quiet);
   return;
 }
 
 /**
- * @brief Checks the applied socket config
- * for anomalies and returns true if found
+ * @brief Helper funtion to apply requested socket preset
+ *
+ * @param SocketPreset preset
+ * @return ConfigError
  */
-bool check_socket_config_errors(void)
+static ConfigError apply_socket_preset(SocketPreset preset)
 {
-  bool has_error = false;
-  /* Cannot have both sockets disabled */
-  if (!usbsid_config.socketOne.enabled
-    && !usbsid_config.socketTwo.enabled) {
-    has_error = true;
+  if (preset < 0 || preset >= PRESET_COUNT) {
+    return CFG_ERR_INVALID_PRESET;
   }
-  /* Cannot have all 0xFF id's */
-  if (usbsid_config.socketOne.sid1.id == 0xFF
-    && usbsid_config.socketOne.sid2.id == 0xFF
-    && usbsid_config.socketTwo.sid1.id == 0xFF
-    && usbsid_config.socketTwo.sid2.id == 0xFF) {
-    has_error = true;
+
+  const PresetDef *p = &socket_presets[preset];
+
+  /* Apply preset flags */
+  usbsid_config.socketOne.enabled = p->s1_enabled;
+  usbsid_config.socketOne.dualsid = p->s1_dual;
+  usbsid_config.socketTwo.enabled = p->s2_enabled;
+  usbsid_config.socketTwo.dualsid = p->s2_dual;
+  usbsid_config.mirrored = p->mirrored;
+
+  /* Validate dualsid/chiptype compatibility */
+  if (p->s1_dual && usbsid_config.socketOne.chiptype == CHIP_REAL) {
+    /* Upgrade to unknown clone if needed for dualsid */
+    usbsid_config.socketOne.chiptype = CHIP_UNKNOWN;
   }
-  /* Cannot have all 0xFF addresses */
-  if (usbsid_config.socketOne.sid1.addr == 0xFF
-    && usbsid_config.socketOne.sid2.addr == 0xFF
-    && usbsid_config.socketTwo.sid1.addr == 0xFF
-    && usbsid_config.socketTwo.sid2.addr == 0xFF) {
-    has_error = true;
+  if (p->s2_dual && usbsid_config.socketTwo.chiptype == CHIP_REAL) {
+    /* Upgrade to unknown clone if needed for dualsid */
+    usbsid_config.socketTwo.chiptype = CHIP_UNKNOWN;
   }
-  /* Cannot have all SID types at N/A */
-  if (usbsid_config.socketOne.sid1.type == 1
-    && usbsid_config.socketOne.sid2.type == 1
-    && usbsid_config.socketTwo.sid1.type == 1
-    && usbsid_config.socketTwo.sid2.type == 1) {
-    has_error = true;
+
+  /* Compute addresses for this preset */
+  apply_sid_addresses();
+
+  /* Validate the result */
+  ConfigError err = validate_config();
+  if (err != CFG_OK) {
+    usERR("Preset '%s' validation failed: %s\n", preset_name(preset), config_error_str(err));
+  } else {
+    usCFG("Preset applied: %s\n", preset_name(preset));
   }
-  return has_error;
+
+  return err;
+}
+
+/**
+ * @brief Helper function to detect an active preset
+ *
+ * @return SocketPreset
+ */
+static SocketPreset detect_current_preset(void)
+{
+  for (int i = 0; i < PRESET_COUNT; i++) {
+    const PresetDef *p = &socket_presets[i];
+    if (usbsid_config.socketOne.enabled == p->s1_enabled &&
+      usbsid_config.socketOne.dualsid == p->s1_dual &&
+      usbsid_config.socketTwo.enabled == p->s2_enabled &&
+      usbsid_config.socketTwo.dualsid == p->s2_dual &&
+      usbsid_config.mirrored == p->mirrored) {
+      return (SocketPreset)i;
+    }
+  }
+
+  return PRESET_COUNT;  /* No match */
+}
+
+/**
+ * @brief Apply requested preset only if not already active
+ *
+ * @param SocketPreset preset
+ * @param bool at_boot
+ * @return ConfigError
+ */
+ConfigError apply_preset(SocketPreset preset, bool at_boot)
+{
+  SocketPreset pre = detect_current_preset();
+  if (pre == preset) {
+    return CFG_ERR_EQUAL_PRESET;
+  }
+
+  ConfigError err = apply_socket_preset(preset);
+  if (err != CFG_OK) {
+    return err;
+  }
+
+  return apply_config(at_boot);
+}
+
+/**
+ * @brief Wraps around apply_preset for non boot presets
+ *
+ * @param SocketPreset preset
+ */
+void apply_preset_wrapper(SocketPreset preset) // ISSUE: This routine seems to break if you switch from quad to dual back to quad
+{
+  err = apply_preset(preset, false);
+  if (err != CFG_OK) {
+    usERR("Applying preset error: %s\n", config_error_str(err));
+  }
+  return;
+}
+
+/**
+ * @brief Returns default Socket configuration
+ *
+ * @param int id, the socket id 1 or 2
+ */
+Socket default_socket(int id)
+{
+  const SIDChip s1s1 = {
+    .id = 0,
+    .addr = 0x00,
+    .type = SID_UNKNOWN,
+  };
+  const SIDChip s2s1 = {
+    .id = 1,
+    .addr = 0x20,
+    .type = SID_UNKNOWN,
+  };
+  const SIDChip sNs2 = {
+    .id = 0xff,
+    .addr = 0xff,
+    .type = SID_NA,
+  };
+  Socket socket_conf = {
+    .enabled = true,
+    .dualsid = false,
+    .chiptype = CHIP_REAL,
+    .sid1 = (id == 1 ? s1s1 : s2s1),
+    .sid2 = sNs2,
+  };
+  return socket_conf;
 }
 
 /**
  * @brief Applies the default socket
- * and runtime configuration if required
+ *        and runtime configuration if required
  */
 void socket_config_fallback(void)
 {
-  usCFG("[SET DEFAULT FALLBACK SOCKET CONFIG]\n");
+  usCFG("Applying socket fallback configuration\n");
   /* Socket One */
-  usbsid_config.socketOne.chiptype = 2;     /* unknown */
-  usbsid_config.socketOne.clonetype = 0;    /* disabled */
-  usbsid_config.socketOne.sid1.id = 0;      /* enabled */
-  usbsid_config.socketOne.sid1.addr = 0x00; /* enabled */
-  usbsid_config.socketOne.sid1.type = 0;    /* unknown */
-  usbsid_config.socketOne.sid2.id = 0xFF;   /* disabled */
-  usbsid_config.socketOne.sid2.addr = 0xFF; /* disabled */
-  usbsid_config.socketOne.sid2.type = 0;    /* unknown */
-  usbsid_config.socketOne.enabled = true;
-  usbsid_config.socketOne.dualsid = false;
+  usbsid_config.socketOne = default_socket(1);
   /* Socket Two */
-  usbsid_config.socketTwo.chiptype = 2;     /* unknown */
-  usbsid_config.socketTwo.clonetype = 0;    /* disabled */
-  usbsid_config.socketTwo.sid1.id = 1;      /* enabled */
-  usbsid_config.socketTwo.sid1.addr = 0x20; /* enabled */
-  usbsid_config.socketTwo.sid1.type = 0;    /* unknown */
-  usbsid_config.socketTwo.sid2.id = 0xFF;   /* disabled */
-  usbsid_config.socketTwo.sid2.addr = 0xFF; /* disabled */
-  usbsid_config.socketTwo.sid2.type = 0;    /* unknown */
-  usbsid_config.socketTwo.enabled = true;
-  usbsid_config.socketTwo.dualsid = false;
+  usbsid_config.socketTwo = default_socket(2);
   /* General */
   usbsid_config.mirrored = false;
 
-  apply_bus_config(true); /* Quietly apply the bus config */
+  RuntimeCFG new_cfg;
+  // apply_runtime_config(&usbsid_config,&cfg);
+  apply_runtime_config(&usbsid_config, &new_cfg); /* Quietly apply the bus config */
+  uint32_t irq = save_and_disable_interrupts();
+  memcpy(&cfg, &new_cfg, sizeof(RuntimeCFG));
+  restore_interrupts(irq);
+
+  return;
 }

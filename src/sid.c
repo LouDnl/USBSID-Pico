@@ -52,7 +52,7 @@ extern void clockcycle_delay(uint32_t n_cycles);
 extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
 
 /* (hot) locals */
-static volatile bool paused_state, reset_state;
+static volatile bool paused_state, reset_state, muted_state;
 static uint8_t volume_state[4] = {0};
 
 
@@ -130,6 +130,26 @@ void set_paused_state(bool state)
 bool get_paused_state(void)
 {
   return paused_state;
+}
+
+/**
+ * @brief Set the muted state to true or false
+ *
+ * @param state Boolean
+ */
+void set_muted_state(bool state)
+{
+  muted_state = state;
+  return;
+}
+
+/**
+ * @brief Get the muted state value
+ *
+ */
+bool get_muted_state(void)
+{
+  return muted_state;
 }
 
 /**
