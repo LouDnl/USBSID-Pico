@@ -127,7 +127,7 @@ void print_config_overview(void)
   usCFG("  PCB version = v%s\n", pcb_version);
   usCFG("  Firmware version = v%s\n", project_version);
   usCFG("\n");
-  usCFG("  %s C64 rate = %d\n",
+  usCFG("  %s C64 clockrate = %d\n",
     in_ext_str((int)usbsid_config.external_clock), (int)usbsid_config.clock_rate);
   usCFG("  Clock rate = %s\n",
     locked_str((int)usbsid_config.lock_clockrate));

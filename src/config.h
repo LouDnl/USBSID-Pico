@@ -125,11 +125,11 @@ typedef struct Config {
   int default_config;
   uint8_t config_saveid;
   /* Don't care from here */
-  uint32_t clock_rate;         /* clock speed identifier */
-  uint16_t refresh_rate;       /* refresh rate identifier based on clockspeed ~ not configurable */
-  uint16_t raster_rate;        /* raster rate identifier based on clockspeed ~ not configurable */
-  Socket   socketOne;          /* 1 */
-  Socket   socketTwo;          /* 2 */
+  uint32_t clock_rate;          /* clock speed identifier */
+  uint16_t refresh_rate;        /* refresh rate identifier based on clockspeed ~ not configurable */
+  uint16_t raster_rate;         /* raster rate identifier based on clockspeed ~ not configurable */
+  Socket   socketOne;           /* 1 */
+  Socket   socketTwo;           /* 2 */
   struct {
     bool enabled : 1;
     bool idle_breathe : 1;

@@ -73,7 +73,7 @@ static const char __in_flash("us_statics") *chiptypes[] = {
   [CHIP_ARM2SID]  = "ARM2SID",
   [CHIP_FPGASID]  = "FPGASID",
   [CHIP_REDIPSID] = "RedipSID",
-  [CHIP_PDSID]    = "PDsid",
+  [CHIP_PDSID]    = "PDSID",
   [CHIP_BACKSID]  = "BackSID",
 };
 
