@@ -1049,12 +1049,12 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       }
       break;
     case TEST_FN3:
-      usCFG("[SID MEMORY]\n");
-      for (uint i = 0; i < (4*0x20); i++) {
-        if (i!=0 && i%0x20 == 0) { usCFG("\n");};
-        usCFG("$%02X ", sid_memory[i]);
+      usNFO("[SID MEMORY]\n");
+      for (uint i = 0; i < SID_MEMORY_SIZE; i++) {
+        if (i!=0 && i%0x20 == 0) { usNFO("\n");};
+        usNFO("$%02X ", sid_memory[i]);
       }
-      usCFG("\n");
+      usNFO("\n");
       break;
     case FPGASID: break; /* Reserved for config implementation */
     case SKPICO: break;  /* Reserved for config implementation */

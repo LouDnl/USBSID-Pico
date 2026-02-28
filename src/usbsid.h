@@ -114,6 +114,10 @@
  */
 #define BYTES_TO_SEND 1
 
+/* C64 memory storage sizes */
+#define C64_MEMORY_SIZE 0x10000 /* 64KB e.g. 65536 bytes */
+#define SID_MEMORY_SIZE 0x80    /* 4 * 0x20 = 4 * 32 e.g. 128 bytes */
+
 
 #ifdef __cplusplus
   }

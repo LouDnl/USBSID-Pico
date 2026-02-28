@@ -52,7 +52,7 @@ extern void clockcycle_delay(uint32_t n_cycles);
 extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
 
 /* (hot) locals */
-static bool paused_state, reset_state;
+static volatile bool paused_state, reset_state;
 static uint8_t volume_state[4] = {0};
 
 
@@ -79,7 +79,7 @@ void init_sid_chips(void)
  */
 void clear_sid_memory(void)
 {
-  memset(sid_memory, 0, count_of(sid_memory));
+  memset(sid_memory, 0, SID_MEMORY_SIZE);
   return;
 }
 
@@ -228,7 +228,7 @@ void reset_sid(void)
   set_reset_state(true);
   set_paused_state(false);
   memset(volume_state, 0, 4);
-  memset(sid_memory, 0, count_of(sid_memory));
+  memset(sid_memory, 0, SID_MEMORY_SIZE);
   cPIN(RES);
   if (cfg.chip_one == 0 || cfg.chip_two == 0) {
     /* 10x PHI1(02) cycles as per datasheet for REAL SIDs only */
@@ -257,7 +257,7 @@ void clear_sid_registers(int sidno)
   for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
     cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0x0, 6);
   }
-  memset(sid_memory, 0, (4 * 0x20));
+  memset(sid_memory, 0, SID_MEMORY_SIZE);
   return;
 }
 
