@@ -41,7 +41,7 @@ extern uint8_t *wusb_itf;
 extern uint8_t *write_buffer_p;
 extern double cpu_mhz, cpu_us;
 extern double sid_hz, sid_mhz, sid_us;
-#ifdef ONBOARD_EMULATOR
+#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
 extern uint8_t *sid_memory;
 #else
 extern uint8_t sid_memory[];
@@ -49,7 +49,7 @@ extern uint8_t sid_memory[];
 extern queue_t sidtest_queue;
 extern bool auto_config;
 #if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
-/* Offload Vu to Cora1 when running C64 on Core2 */
+/* Offload Vu to Core1 when running C64 on Core2 */
 extern volatile bool offload_ledrunner;
 #endif
 

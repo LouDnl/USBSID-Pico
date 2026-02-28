@@ -48,7 +48,7 @@
 // #define NOTELO(n) (musical_scale_values[(n - ((n >= 0x81) ? 0x80 : 0))] & 0xFF)
 
 /* usbsid.c */
-#ifdef ONBOARD_EMULATOR
+#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
 extern uint8_t *sid_memory;
 #else
 extern uint8_t sid_memory[];

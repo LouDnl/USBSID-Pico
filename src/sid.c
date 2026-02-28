@@ -31,10 +31,10 @@
 
 
 /* usbsid.c */
-#ifdef ONBOARD_EMULATOR
+#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
 extern uint8_t *sid_memory;
 #else
-extern uint8_t sid_memory[(0x20 * 4)];
+extern uint8_t sid_memory[];
 #endif
 extern volatile int usbdata;
 
