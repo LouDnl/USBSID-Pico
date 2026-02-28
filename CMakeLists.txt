@@ -362,7 +362,8 @@ set(TARGET_INCLUDE_DIRS PRIVATE
 ### Embedded player stuffs
 if(ONBOARD_SIDPLAYER EQUAL 1)
   # NOTICE: SIDPLAYER REQUIRES FULL OPTIMIZATIONS!!
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+  # NOTE TO SELF: -O3 is already set in COMPILE_OPTS and applied via target_compile_options()
+  # NOTE TO SELF: Do NOT use set(CMAKE_CXX_FLAGS ...) here as it strips Pico SDK architecture flags!
   ## Set sidplayer list directory
   if(NOT ${EMUDIR} STREQUAL "")
     set(USPLAYER_LIST_DIR ${EMUDIR})
@@ -379,13 +380,16 @@ if(ONBOARD_SIDPLAYER EQUAL 1)
 
   ### Build psiddrv header
   add_custom_command(
-    OUTPUT psiddrv.h
+    # Use absolute paths
+    OUTPUT ${USPLAYER_LIST_DIR}/src/psiddrv/psiddrv.h
     COMMAND $(MAKE) all
+    # Remove built .o65 to ensure the linker does not accidentally pick it up
+    COMMAND ${CMAKE_COMMAND} -E rm -f ${USPLAYER_LIST_DIR}/src/psiddrv/psiddrv.o65
     WORKING_DIRECTORY ${USPLAYER_LIST_DIR}/src/psiddrv/
   )
   add_custom_target(
     RSIDDriver ALL
-    DEPENDS psiddrv.h
+    DEPENDS ${USPLAYER_LIST_DIR}/src/psiddrv/psiddrv.h
   )
 
   ### Add some fancy shmancy necromancy
@@ -532,6 +536,11 @@ project(${PROJECT_NAME} C CXX ASM)
 ### init sdk
 pico_sdk_init()
 
+# Explicitely force pioasm to complete before any firmware targets on clean builds
+if(TARGET pioasmBuild)
+  set(PIOASM_DEPENDENCY pioasmBuild)
+endif()
+
 ### Include
 include_directories(".")
 
@@ -638,6 +647,14 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   pico_generate_pio_header(${BUILD} ${PIO_COUNTER})
   if(PICOTYPE STREQUAL "RGB")
     pico_generate_pio_header(${BUILD} ${PIO_RGB})
+  endif()
+  # rsiddrv dependency for sidplayer
+  if(ONBOARD_SIDPLAYER EQUAL 1)
+    add_dependencies(${BUILD} RSIDDriver)
+  endif()
+  # force pioasm to build first on clean builds
+  if(DEFINED PIOASM_DEPENDENCY)
+    add_dependencies(${BUILD} ${PIOASM_DEPENDENCY})
   endif()
   # source files to compile
   target_sources(${BUILD} PUBLIC ${SOURCEFILES})
