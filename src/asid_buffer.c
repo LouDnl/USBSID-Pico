@@ -98,12 +98,12 @@ typedef struct {
 static ring_buffer_t __not_in_flash("asid_buffer") asid_ringbuffer;
 
 /* Dynamic ring buffer sizing */
-static const uint16_t RING_SIZE_MIN = (10 * 224);     /* 2240 bytes - minimum size */
-static const uint16_t RING_SIZE_DEFAULT = (20 * 224); /* 4480 bytes - default/starting size */
-static const uint16_t RING_SIZE_MAX = (150 * 224);    /* 33600 bytes - maximum size (~150 frames, ~33KB) */
-static const uint16_t RING_SIZE_STEP = (20 * 224);    /* 4480 bytes - grow/shrink increment */
-volatile uint16_t ring_size = RING_SIZE_DEFAULT;      /* Current effective size */
-static uint16_t ring_size_allocated = 0;              /* Actual allocated size */
+static const uint16_t RING_SIZE_MIN = (10 * 224);       /* 2240 bytes - minimum size */
+static const uint16_t RING_SIZE_DEFAULT = (20 * 224);   /* 4480 bytes - default/starting size */
+static const uint16_t RING_SIZE_MAX = (150 * 224);      /* 33600 bytes - maximum size (~150 frames, ~33KB) */
+static const uint16_t RING_SIZE_STEP = (20 * 224);      /* 4480 bytes - grow/shrink increment */
+volatile static uint16_t ring_size = RING_SIZE_DEFAULT; /* Current effective size */
+static uint16_t ring_size_allocated = 0;                /* Actual allocated size */
 
 
 /**
