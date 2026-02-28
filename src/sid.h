@@ -34,7 +34,6 @@
 
 /* Default includes */
 #include <stdint.h>
-#include "pico/util/queue.h"
 
 
 /* Queues */

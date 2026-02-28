@@ -23,6 +23,8 @@
  *
  */
 
+#include "pico/util/queue.h"
+
 #include "globals.h"
 #include "config.h"
 #include "usbsid.h"
