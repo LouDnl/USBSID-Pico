@@ -134,6 +134,7 @@ void deinit_asid_buffer(void)
     stop_buffer_pio();
     buffer_started = false;
   }
+  return;
 }
 
 /**
@@ -141,9 +142,10 @@ void deinit_asid_buffer(void)
  */
 void asid_init(void)
 {
+  usNFO("[ASID] Init\n");
   if (!default_order_on_start) reset_asid_to_writeorder();  /* Set defaults once on boot */
   else { ring_buffer_reset_size(); reset_arrival_tracking(); }
-  usNFO("[ASID] Initialized\n");
+  return;
 }
 
 /* Pling, plong, ploink!? */
@@ -347,7 +349,7 @@ void handle_asid_writeorder_config(uint8_t* buffer)
  * @param int buffering
  * @param uint16_t framedelta_us
  */
-inline void set_asid_env(int refresh_rate, int speed_multiplier, int custom_speed, int buffering, uint16_t framedelta_us)
+static inline void set_asid_env(int refresh_rate, int speed_multiplier, int custom_speed, int buffering, uint16_t framedelta_us)
 {
   (void)speed_multiplier; /* Not used */
   (void)custom_speed;     /* Not used */
