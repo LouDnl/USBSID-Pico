@@ -63,7 +63,7 @@ extern uint8_t cycled_write_operation(uint8_t address, uint8_t data, uint16_t cy
 /* midi.c */
 extern const midi_ccvalues midi_ccvalues_defaults;
 
-/* Initialize variables */
+/* Initialise variables */
 typedef struct Voice_m {
    uint8_t note_index;
    int8_t keyno;
@@ -746,7 +746,7 @@ void midi_processor_init(void)
   /* NOTE: Temporary - always init defaults */
   memcpy(&CC, &midi_ccvalues_defaults, sizeof(midi_ccvalues)); /* TODO: midi.c and midi_handler.c must always use the same mapping */
 
-  /* Explicitly initialize auto_gate - static initializer is unreliable with `-O3` */
+  /* Explicitly initialise auto_gate - static initialiser is unreliable with `-O3` */
   for (int i = 0; i < 4; i++) {
     msid.sid[i].auto_gate = true;
     msid.sid[i].v[0].keyno = -1;

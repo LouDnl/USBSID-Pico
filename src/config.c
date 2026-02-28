@@ -715,7 +715,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       //   for (int j = 0; j < 32; j++) {
       //     /* ISSUE: this only loads 1 channel state and should actually save all channel states */
       //     midimachine.channel_states[curr_midi_channel][i][j] = usbsid_config.Midi.sid_states[i][j];
-      //     midimachine.channelkey_states[curr_midi_channel][i][i] = 0;  /* Make sure extras is always initialized @ zero */
+      //     midimachine.channelkey_states[curr_midi_channel][i][i] = 0;  /* Make sure extras is always initialised @ zero */
       //     usCFG(" %02x", midimachine.channel_states[curr_midi_channel][i][j]);
       //     midi_bus_operation((0x20 * i) | j, midimachine.channel_states[curr_midi_channel][i][j]);
       //   }

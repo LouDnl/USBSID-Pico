@@ -48,7 +48,7 @@ static inline uint32_t read_bus(void)
 }
 
 /**
- * @brief Initialize default GPIO states at boot
+ * @brief Initialise default GPIO states at boot
  *
  */
 void init_gpio(void)

@@ -217,14 +217,14 @@ void reset_reason(void)
 
 /* SETUP */
 
-/* Initialize debug logging if enabled */
+/* Initialise debug logging if enabled */
 void init_logging(void)
 {
   #if defined(USBSID_UART)
   stdio_uart_init_full(uart0, BAUD_RATE, TX, RX);
   sleep_ms(100);  /* leave time for uart to settle */
   stdio_flush();
-  usNFO("[NFO] Uart logging initialized\n");
+  usNFO("[NFO] Uart logging initialised\n");
   #endif
   return;
 }
@@ -730,7 +730,7 @@ void core1_main(void)
   queue_init(&logging_queue, sizeof(writelogging_queue_entry_t), 16384);  /* 16384 entries deep so we don't skip any writes */
   #endif
 
-  /* Initialize PIO Uart */
+  /* Initialise PIO Uart */
   #ifdef USE_PIO_UART
   init_uart();
   #endif
@@ -926,19 +926,19 @@ int main()
   usBOOT("Setup PIO bus\n");
   setup_piobus();
   /* Sync PIOS */
-  usBOOT("Synchronize PIO's\n");
+  usBOOT("Synchronise PIO's\n");
   sync_pios(true);
   /* Init DMA */
   usBOOT("Setup DMA channels\n");
   setup_dmachannels();
   /* Start the VU */
-  usBOOT("Initialize Vu\n");
+  usBOOT("Initialise Vu\n");
   init_vu();
   /* Init midi */
-  usBOOT("Initialize Midi\n");
+  usBOOT("Initialise Midi\n");
   midi_init();
   /* Init ASID */
-  usBOOT("Initialize ASID\n");
+  usBOOT("Initialise ASID\n");
   asid_init();
   /* Enable SID chips */
   usBOOT("Enable SID chips\n");

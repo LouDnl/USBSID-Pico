@@ -81,7 +81,7 @@ static inline void uart_rx_program_init(uint pin, uint baud)
   /* SM transmits 1 bit per 8 execution cycles. */
   float div = (float)clock_get_hz(clk_sys) / (8 * baud);
   sm_config_set_clkdiv(&uartrx_config, div);
-  /* Initialize and enable statemachine */
+  /* Initialise and enable statemachine */
   pio_sm_init(uart_pio, sm_uartrx, offset_uartrx, &uartrx_config);
   pio_sm_set_enabled(uart_pio, sm_uartrx, true);
   return;

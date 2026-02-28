@@ -96,7 +96,7 @@ void reset_asid_to_writeorder(void)
 }
 
 /**
- * @brief Initialize the asid buffer
+ * @brief Initialise the asid buffer
  *
  * @param uint16_t framedelta_us ~ the rate to set the buffer to
  */
@@ -121,7 +121,7 @@ void init_asid_buffer(uint16_t framedelta_us)
 }
 
 /**
- * @brief De-initialize the asid buffer
+ * @brief De-initialise the asid buffer
  */
 void deinit_asid_buffer(void)
 {
@@ -137,7 +137,7 @@ void deinit_asid_buffer(void)
 }
 
 /**
- * @brief Initialize ASID on boot
+ * @brief Initialise ASID on boot
  */
 void asid_init(void)
 {

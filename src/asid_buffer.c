@@ -486,7 +486,7 @@ void __not_in_flash_func(buffer_irq_handler)(void)
 }
 
 /**
- * @brief initialize the buffer irq
+ * @brief initialise the buffer irq
  * @note sets the interrupt number and handler
  * @note sets the irq source and enables the irq
  */
@@ -505,7 +505,7 @@ void init_buffer_irq(void)
 }
 
 /**
- * @brief initializes the raster_pio
+ * @brief initialises the raster_pio
  * @note also claims the pio statemachine
  */
 void init_buffer_pio(void)
@@ -659,7 +659,7 @@ static uint8_t __not_in_flash_func(ring_get)(void)
 }
 
 /**
- * @brief intialize the ring buffer
+ * @brief intialise the ring buffer
  * @note Allocates maximum size upfront to allow dynamic growth
  */
 void asid_ring_init(void)
@@ -675,14 +675,14 @@ void asid_ring_init(void)
     ring_size = RING_SIZE_DEFAULT;  /* Start with default logical size */
     asid_ringbuffer.is_allocated = true;
     ring_buffer_reset();
-    usASID("Ringbuffer initialized (allocated=%u, effective=%u)\n",
+    usASID("Ringbuffer initialised (allocated=%u, effective=%u)\n",
       ring_size_allocated, ring_size);
   }
   return;
 }
 
 /**
- * @brief de-intialize the ring buffer
+ * @brief de-intialise the ring buffer
  */
 void asid_ring_deinit(void)
 {
