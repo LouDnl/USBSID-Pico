@@ -702,6 +702,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
  * Core 1 -> set SYNC_CORE1_STAGE2
  * Core 1 -> poll for SYNC_CORE0_STAGE2
  * Core 0 -> init GPIO, SID clock, PIO, DMA, etc.
+ * Core 0 -> boot finished uart log
  * Core 0 -> set SYNC_CORE0_STAGE2
  * Core 0 -> enter while loop
  * Core 1 -> enter while loop
@@ -969,18 +970,24 @@ int main()
   usBOOT("Reset SID registers\n");
   reset_sid_registers(); /* WARNING: Might cause issues! */
 
+  {
+    extern const char *us_product;
+    extern const char *project_version;
+    usNFO("\n");
+#ifdef ONBOARD_EMULATOR
+    usDBG("Firmware is compiled with Cynthcart support\n");
+#endif
+#ifdef ONBOARD_SIDPLAYER
+    usDBG("Firmware is compiled with onboard SID player\n");
+#endif
+    usDBG("%s v%s Started successfully\n\n", us_product, project_version);
+  }
+
   /* Signal Core 1 to enter main loop (sync point 2) */
   usBOOT("<CORE 0> Signaling core1 ~ 2\n");
   __dmb();  /* Memory barrier after read */
   core_sync_state = SYNC_CORE0_STAGE2;
   __sev();  /* Signal event to wake Core 1 from WFE */
-
-  {
-    extern const char *us_product;
-    extern const char *project_version;
-    usNFO("\n");
-    usDBG("%s v%s Started successfully\n\n", us_product, project_version);
-  }
 
   /* Loop IO tasks forever */
   while (1) {
