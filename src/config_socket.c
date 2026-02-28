@@ -447,7 +447,7 @@ ConfigError apply_preset(SocketPreset preset, bool at_boot)
  */
 void apply_preset_wrapper(SocketPreset preset) // ISSUE: This routine seems to break if you switch from quad to dual back to quad
 {
-  err = apply_preset(preset, false);
+  ConfigError err = apply_preset(preset, false);
   if (err != CFG_OK) {
     usERR("Applying preset error: %s\n", config_error_str(err));
   }
