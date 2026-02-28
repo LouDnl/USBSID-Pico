@@ -74,6 +74,7 @@ static int usid_dev = -1;
 static const enum config_clockrates clockrates[] = { DEFAULT, PAL, NTSC, DREAN, NTSC2 };
 static uint32_t read_clock_rate;
 static char version[64] = {0};
+static char pcb_version[64] = {0};
 static char project_version[64] = {0};
 static uint8_t config[256] = {0};
 static uint8_t socket_config[10] = {0};
@@ -130,12 +131,27 @@ static int import_ini(void* user, const char* section, const char* name, const c
   int p = 0;
   Config* ini_config = (Config*)user;
   #define MATCH(s, n) strcmp(section, s) == 0 && strcmp(name, n) == 0
+  /* Clockrate */
   if (MATCH("General", "clock_rate")) {
     ini_config->clock_rate = atoi(value);
   }
   if (MATCH("General", "lock_clockrate")) {
     p = value_position(value, truefalse);
     if (p != 666) ini_config->lock_clockrate = p;
+  }
+
+  /* SocketOne */
+  if (MATCH("socketOne", "chiptype")) {
+    p = value_position(value, chiptypes);
+    if (p != 666) ini_config->socketOne.chiptype = p;
+  }
+  if (MATCH("socketOne", "sid1type")) {
+    p = value_position(value, sidtypes);
+    if (p != 666) ini_config->socketOne.sid1.type = p;
+  }
+  if (MATCH("socketOne", "sid2type")) {
+    p = value_position(value, sidtypes);
+    if (p != 666) ini_config->socketOne.sid2.type = p;
   }
   if (MATCH("socketOne", "enabled")) {
     p = value_position(value, truefalse);
@@ -145,21 +161,19 @@ static int import_ini(void* user, const char* section, const char* name, const c
     p = value_position(value, enabled);
     if (p != 666) ini_config->socketOne.dualsid = p;
   }
-  if (MATCH("socketOne", "chiptype")) {
+
+  /* SocketTwo */
+  if (MATCH("socketTwo", "chiptype")) {
     p = value_position(value, chiptypes);
-    if (p != 666) ini_config->socketOne.chiptype = p;
+    if (p != 666) ini_config->socketTwo.chiptype = p;
   }
-  if (MATCH("socketOne", "clonetype")) {
-    p = value_position(value, clonetypes);
-    if (p != 666) ini_config->socketOne.clonetype = p;
-  }
-  if (MATCH("socketOne", "sid1type")) {
+  if (MATCH("socketTwo", "sid1type")) {
     p = value_position(value, sidtypes);
-    if (p != 666) ini_config->socketOne.sid1type = p;
+    if (p != 666) ini_config->socketTwo.sid1.type = p;
   }
-  if (MATCH("socketOne", "sid2type")) {
+  if (MATCH("socketTwo", "sid2type")) {
     p = value_position(value, sidtypes);
-    if (p != 666) ini_config->socketOne.sid2type = p;
+    if (p != 666) ini_config->socketTwo.sid2.type = p;
   }
   if (MATCH("socketTwo", "enabled")) {
     p = value_position(value, truefalse);
@@ -169,26 +183,15 @@ static int import_ini(void* user, const char* section, const char* name, const c
     p = value_position(value, enabled);
     if (p != 666) ini_config->socketTwo.dualsid = p;
   }
-  if (MATCH("socketTwo", "chiptype")) {
-    p = value_position(value, chiptypes);
-    if (p != 666) ini_config->socketTwo.chiptype = p;
-  }
-  if (MATCH("socketTwo", "clonetype")) {
-    p = value_position(value, clonetypes);
-    if (p != 666) ini_config->socketTwo.clonetype = p;
-  }
-  if (MATCH("socketTwo", "sid1type")) {
-    p = value_position(value, sidtypes);
-    if (p != 666) ini_config->socketTwo.sid1type = p;
-  }
-  if (MATCH("socketTwo", "sid2type")) {
-    p = value_position(value, sidtypes);
-    if (p != 666) ini_config->socketTwo.sid2type = p;
-  }
-  if (MATCH("socketTwo", "act_as_one")) {
+
+  /* Mirroring */
+  if (MATCH("socketTwo", "mirrored")
+     || MATCH("socketTwo", "act_as_one")) { /* Backwards compatibility */
     p = value_position(value, truefalse);
-    if (p != 666) ini_config->socketTwo.act_as_one = p;
+    if (p != 666) ini_config->mirrored = p;
   }
+
+  /* LED */
   if (MATCH("LED", "enabled")) {
     p = value_position(value, truefalse);
     if (p != 666) ini_config->LED.enabled = p;
@@ -197,6 +200,8 @@ static int import_ini(void* user, const char* section, const char* name, const c
     p = value_position(value, truefalse);
     if (p != 666) ini_config->LED.idle_breathe = p;
   }
+
+  /* RGBLED */
   if (MATCH("RGBLED", "enabled")) {
     p = value_position(value, truefalse);
     if (p != 666) ini_config->RGBLED.enabled = p;
@@ -213,10 +218,14 @@ static int import_ini(void* user, const char* section, const char* name, const c
     p = atoi(value);
     if (p >= 1 && p <= 4) ini_config->RGBLED.sid_to_use = p;
   }
+
+  /* FMOpl */
   if (MATCH("FMOPL", "enabled")) {
     p = value_position(value, truefalse);
     if (p != 666) ini_config->FMOpl.enabled = p;
   }
+
+  /* Audio switch (v1.3+) */
   if (MATCH("Audioswitch", "set_to")) {
     p = value_position(value, mono_stereo);
     if (p != 666) ini_config->stereo_en = p;
@@ -225,6 +234,7 @@ static int import_ini(void* user, const char* section, const char* name, const c
     p = value_position(value, truefalse);
     if (p != 666) ini_config->lock_audio_sw = p;
   }
+
   if (debug == 1) {
     printf("SECTION: %s NAME: %s VALUE: %s\n", section, name, value);
   }
@@ -243,48 +253,50 @@ void write_config_ini(Config * config, char * filename)
     fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
     fprintf(f, "lock_clockrate = %s\n", truefalse[config->lock_clockrate]);
     fprintf(f, "\n");
+
     fprintf(f, "[socketOne]\n");
     fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
     fprintf(f, "enabled = %s\n", truefalse[config->socketOne.enabled]);
     fprintf(f, "; Possible options: %s, %s\n", enabled[0], enabled[1]);
     fprintf(f, "dualsid = %s\n", enabled[config->socketOne.dualsid]);
-    fprintf(f, "; Possible chiptypes: %s, %s\n", chiptypes[0], chiptypes[1]);
+    fprintf(f, "; Possible chiptypes: %s, %s, %s, %s, %s, %s, %s, %s, %s\n",
+            chiptypes[0], chiptypes[1], chiptypes[2],
+            chiptypes[3], chiptypes[4], chiptypes[5],
+            chiptypes[6], chiptypes[7], chiptypes[8]);
     fprintf(f, "chiptype = %s\n", chiptypes[config->socketOne.chiptype]);
-    fprintf(f, "; Possible clonetypes: %s, %s, %s, %s, %s, %s\n",
-            clonetypes[0], clonetypes[1], clonetypes[2],
-            clonetypes[3], clonetypes[4], clonetypes[5]);
-    fprintf(f, "clonetype = %s\n", clonetypes[config->socketOne.clonetype]);
     fprintf(f, "; Possible sidtypes: %s, %s, %s, %s, %s\n",
             sidtypes[0], sidtypes[1], sidtypes[2],
             sidtypes[3], sidtypes[4]);
-    fprintf(f, "sid1type = %s\n", sidtypes[config->socketOne.sid1type]);
-    fprintf(f, "sid2type = %s\n", sidtypes[config->socketOne.sid2type]);
+    fprintf(f, "sid1type = %s\n", sidtypes[config->socketOne.sid1.type]);
+    fprintf(f, "sid2type = %s\n", sidtypes[config->socketOne.sid2.type]);
     fprintf(f, "\n");
+
     fprintf(f, "[socketTwo]\n");
     fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
     fprintf(f, "enabled = %s\n", truefalse[config->socketTwo.enabled]);
     fprintf(f, "; Possible options: %s, %s\n", enabled[0], enabled[1]);
     fprintf(f, "dualsid = %s\n", enabled[config->socketTwo.dualsid]);
-    fprintf(f, "; Possible chiptypes: %s, %s\n", chiptypes[0], chiptypes[1]);
+    fprintf(f, "; Possible chiptypes: %s, %s, %s, %s, %s, %s, %s, %s, %s\n",
+            chiptypes[0], chiptypes[1], chiptypes[2],
+            chiptypes[3], chiptypes[4], chiptypes[5],
+            chiptypes[6], chiptypes[7], chiptypes[8]);
     fprintf(f, "chiptype = %s\n", chiptypes[config->socketTwo.chiptype]);
-    fprintf(f, "; Possible clonetypes: %s, %s, %s, %s, %s, %s\n",
-            clonetypes[0], clonetypes[1], clonetypes[2],
-            clonetypes[3], clonetypes[4], clonetypes[5]);
-    fprintf(f, "clonetype = %s\n", clonetypes[config->socketTwo.clonetype]);
     fprintf(f, "; Possible sidtypes: %s, %s, %s, %s, %s\n",
             sidtypes[0], sidtypes[1], sidtypes[2],
             sidtypes[3], sidtypes[4]);
-    fprintf(f, "sid1type = %s\n", sidtypes[config->socketTwo.sid1type]);
-    fprintf(f, "sid2type = %s\n", sidtypes[config->socketTwo.sid2type]);
+    fprintf(f, "sid1type = %s\n", sidtypes[config->socketTwo.sid1.type]);
+    fprintf(f, "sid2type = %s\n", sidtypes[config->socketTwo.sid2.type]);
     fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
-    fprintf(f, "act_as_one = %s\n", truefalse[config->socketTwo.act_as_one]);
+    fprintf(f, "mirrored = %s\n", truefalse[config->mirrored]);
     fprintf(f, "\n");
+
     fprintf(f, "[LED]\n");
     fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
     fprintf(f, "enabled = %s\n", truefalse[config->LED.enabled]);
     fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
     fprintf(f, "idle_breathe = %s\n", truefalse[config->LED.idle_breathe]);
     fprintf(f, "\n");
+
     fprintf(f, "[RGBLED]\n");
     fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
     fprintf(f, "enabled = %s\n", truefalse[config->RGBLED.enabled]);
@@ -295,10 +307,12 @@ void write_config_ini(Config * config, char * filename)
     fprintf(f, "; Possible sids to use are 1, 2, 3 or 4\n");
     fprintf(f, "sid_to_use = %d\n", config->RGBLED.sid_to_use);
     fprintf(f, "\n");
+
     fprintf(f, "[FMOPL]\n");
     fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
     fprintf(f, "enabled = %s\n", truefalse[config->FMOpl.enabled]);
     fprintf(f, "\n");
+
     fprintf(f, "[Audioswitch]\n");
     fprintf(f, "; Possible options: %s, %s\n", mono_stereo[0], mono_stereo[1]);
     fprintf(f, "set_to = %s\n", mono_stereo[config->stereo_en]);
@@ -464,18 +478,18 @@ void write_config(Config * config)
   write_config_command(SET_CONFIG,0x1,0x0,config->socketOne.enabled,0);
   write_config_command(SET_CONFIG,0x1,0x1,config->socketOne.dualsid,0);
   write_config_command(SET_CONFIG,0x1,0x2,config->socketOne.chiptype,0);
-  write_config_command(SET_CONFIG,0x1,0x3,config->socketOne.clonetype,0);
-  write_config_command(SET_CONFIG,0x1,0x4,config->socketOne.sid1type,0);
-  write_config_command(SET_CONFIG,0x1,0x5,config->socketOne.sid2type,0);
+  /* write_config_command(SET_CONFIG,0x1,0x3,config->socketOne.clonetype,0); */
+  write_config_command(SET_CONFIG,0x1,0x4,config->socketOne.sid1.type,0);
+  write_config_command(SET_CONFIG,0x1,0x5,config->socketOne.sid2.type,0);
 
   /* socketTwo */
   write_config_command(SET_CONFIG,0x2,0x0,config->socketTwo.enabled,0);
   write_config_command(SET_CONFIG,0x2,0x1,config->socketTwo.dualsid,0);
   write_config_command(SET_CONFIG,0x2,0x2,config->socketTwo.chiptype,0);
-  write_config_command(SET_CONFIG,0x2,0x3,config->socketTwo.clonetype,0);
-  write_config_command(SET_CONFIG,0x2,0x4,config->socketTwo.sid1type,0);
-  write_config_command(SET_CONFIG,0x2,0x5,config->socketTwo.sid2type,0);
-  write_config_command(SET_CONFIG,0x2,0x6,config->socketTwo.act_as_one,0);
+  /* write_config_command(SET_CONFIG,0x2,0x3,config->socketTwo.clonetype,0); */
+  write_config_command(SET_CONFIG,0x2,0x4,config->socketTwo.sid1.type,0);
+  write_config_command(SET_CONFIG,0x2,0x5,config->socketTwo.sid2.type,0);
+  write_config_command(SET_CONFIG,0x2,0x6,config->mirrored,0);
 
   /* LED */
   write_config_command(SET_CONFIG,0x3,0x0,config->LED.enabled,0);
@@ -553,8 +567,15 @@ void read_version(uint8_t cmd, int print_version)
     version[i] = read_data_uber[i];
   }
   if (len == 128 && read_data_uber[0] == cmd) len = read_chars(read_data_uber, count_of(read_data_uber));
-  memcpy(&project_version[0], &version[1], count_of(project_version) - 1);
-  if(print_version == 1 || debug == 1) printf("v%s\n", project_version);
+  if (cmd == USBSID_VERSION) {
+    memcpy(&project_version[0], &version[1], count_of(project_version) - 1);
+    if (print_version == 1 || debug == 1) printf("v%s\n", project_version);
+  }
+  if (cmd == US_PCB_VERSION) {
+    memcpy(&pcb_version[0], &version[1], count_of(pcb_version) - 1);
+    if (print_version == 1 || debug == 1) printf("v%s\n", pcb_version);
+  }
+
   if(debug == 1) print_cfg_buffer(read_data_uber, 128);
   return;
 }
@@ -591,13 +612,13 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
         usbsid_config.socketOne.chiptype = buff[i];
         break;
       case 13:
-        usbsid_config.socketOne.clonetype = buff[i];
+        // usbsid_config.socketOne.clonetype = buff[i];
         break;
       case 14:
-        usbsid_config.socketOne.sid1type = buff[i];
+        usbsid_config.socketOne.sid1.type = buff[i];
         break;
       case 15:
-        usbsid_config.socketOne.sid2type = buff[i];
+        usbsid_config.socketOne.sid2.type = buff[i];
         break;
       case 20:
         usbsid_config.socketTwo.enabled = buff[i];
@@ -606,19 +627,19 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
         usbsid_config.socketTwo.dualsid = buff[i];
         break;
       case 22:
-        usbsid_config.socketTwo.act_as_one = buff[i];
+        usbsid_config.mirrored = buff[i];
         break;
       case 23:
         usbsid_config.socketTwo.chiptype = buff[i];
         break;
       case 24:
-        usbsid_config.socketTwo.clonetype = buff[i];
+        // usbsid_config.socketTwo.clonetype = buff[i];
         break;
       case 25:
-        usbsid_config.socketTwo.sid1type = buff[i];
+        usbsid_config.socketTwo.sid1.type = buff[i];
         break;
       case 26:
-        usbsid_config.socketTwo.sid2type = buff[i];
+        usbsid_config.socketTwo.sid2.type = buff[i];
         break;
       case 30:
         usbsid_config.LED.enabled = buff[i];
@@ -683,90 +704,107 @@ void set_socketcfg_from_buffer(const uint8_t * buff, size_t len)
   usbsid_config.socketOne.enabled    = (socket_config[2] >> 4) & 0xF;
   usbsid_config.socketOne.dualsid    = (socket_config[2] & 0xF);
   usbsid_config.socketOne.chiptype   = (socket_config[3] >> 4) & 0xF;
-  usbsid_config.socketOne.clonetype  = (socket_config[3] & 0xF);
-  usbsid_config.socketOne.sid1type   = (socket_config[4] >> 4) & 0xF;
-  usbsid_config.socketOne.sid2type   = (socket_config[4] & 0xF);
+  // usbsid_config.socketOne.clonetype  = (socket_config[3] & 0xF);
+  usbsid_config.socketOne.sid1.type   = (socket_config[4] >> 4) & 0xF;
+  usbsid_config.socketOne.sid2.type   = (socket_config[4] & 0xF);
 
   usbsid_config.socketTwo.enabled    = (socket_config[5] >> 4) & 0xF;
   usbsid_config.socketTwo.dualsid    = (socket_config[5] & 0xF);
   usbsid_config.socketTwo.chiptype   = (socket_config[6] >> 4) & 0xF;
-  usbsid_config.socketTwo.clonetype  = (socket_config[6] & 0xF);
-  usbsid_config.socketTwo.sid1type   = (socket_config[7] >> 4) & 0xF;
-  usbsid_config.socketTwo.sid2type   = (socket_config[7] & 0xF);
+  // usbsid_config.socketTwo.clonetype  = (socket_config[6] & 0xF);
+  usbsid_config.socketTwo.sid1.type   = (socket_config[7] >> 4) & 0xF;
+  usbsid_config.socketTwo.sid2.type   = (socket_config[7] & 0xF);
 
-  usbsid_config.socketTwo.act_as_one = (socket_config[8] & 0xF);
+  usbsid_config.mirrored = (socket_config[8] & 0xF);
 
   return;
 }
 
 void print_config(void)
 {
-  if (project_version[0] != 0) printf("[CONFIG] USBSID-Pico version is: %s\n", project_version);
-  printf("[CONFIG] SID Clock is: %s\n", intext[usbsid_config.external_clock]);
-  if (usbsid_config.external_clock == 0) {
-    printf("[CONFIG] SID Clock speed set @ %dHz\n", (int)usbsid_config.clock_rate);
-  } else {
-    printf("[CONFIG] SID Clock externl defaults to 1MHz\n");
-  }
-  printf("[CONFIG] [CLOCK RATE LOCKED] %s\n",
-    truefalse[(int)usbsid_config.lock_clockrate]);
-  printf("[CONFIG] [SOCKET ONE] %s as %s\n",
+  printf("Config Overview:\n");
+  if (pcb_version[0] != 0) printf("  PCB version = v%s\n", pcb_version);
+  if (project_version[0] != 0) printf("  Firmware version = v%s\n", project_version);
+  printf("  %s C64 clockrate = %d\n",
+    intext[(int)usbsid_config.external_clock], (int)usbsid_config.clock_rate);
+  printf("  Clock rate = %s\n",
+    locked[(int)usbsid_config.lock_clockrate]);
+  // printf("  Raster rate = %d\n",
+  //   (int)usbsid_config.raster_rate);
+  printf("\n");
+  printf("  Socket One is %s as %s\n",
     enabled[(int)usbsid_config.socketOne.enabled],
     us_socket[(int)usbsid_config.socketOne.dualsid]);
-  printf("[CONFIG] [SOCKET ONE] CHIP TYPE: %s, CLONE TYPE: %s\n",
-    chiptypes[usbsid_config.socketOne.chiptype],
-    clonetypes[usbsid_config.socketOne.clonetype]);
-  printf("[CONFIG] [SOCKET ONE] SID 1 TYPE: %s, SID 2 TYPE: %s\n",
-    sidtypes[usbsid_config.socketOne.sid1type],
-    sidtypes[usbsid_config.socketOne.sid2type]);
-  printf("[CONFIG] [SOCKET TWO] %s as %s\n",
+  printf("  Chip is %s\n",
+    chiptypes[(int)usbsid_config.socketOne.chiptype]);
+  if (usbsid_config.socketOne.enabled)
+    printf("      %s as SID1 @ addr $%02x with id %d\n",
+      sidtypes[(int)usbsid_config.socketOne.sid1.type],
+      usbsid_config.socketOne.sid1.addr,
+      usbsid_config.socketOne.sid1.id);
+  if (usbsid_config.socketOne.enabled && usbsid_config.socketOne.dualsid)
+    printf("      %s as SID2 @ addr $%02x with id %d\n",
+      sidtypes[(int)usbsid_config.socketOne.sid2.type],
+      usbsid_config.socketOne.sid2.addr,
+      usbsid_config.socketOne.sid2.id);
+  printf("  Socket Two is %s as %s\n",
     enabled[(int)usbsid_config.socketTwo.enabled],
     us_socket[(int)usbsid_config.socketTwo.dualsid]);
-  printf("[CONFIG] [SOCKET TWO] CHIP TYPE: %s, CLONE TYPE: %s\n",
-    chiptypes[usbsid_config.socketTwo.chiptype],
-    clonetypes[usbsid_config.socketTwo.clonetype]);
-  printf("[CONFIG] [SOCKET TWO] SID 1 TYPE: %s, SID 2 TYPE: %s\n",
-   sidtypes[usbsid_config.socketTwo.sid1type],
-    sidtypes[usbsid_config.socketTwo.sid2type]);
-  printf("[CONFIG] [SOCKET TWO AS ONE] %s\n",
-    truefalse[(int)usbsid_config.socketTwo.act_as_one]);
-
-  printf("[CONFIG] [LED] %s, Idle breathe? %s\n",
+  printf("  Chip is %s\n",
+    chiptypes[(int)usbsid_config.socketTwo.chiptype]);
+  if (usbsid_config.socketTwo.enabled)
+    printf("      %s as SID1 @ addr $%02x with id %d\n",
+      sidtypes[(int)usbsid_config.socketTwo.sid1.type],
+      usbsid_config.socketTwo.sid1.addr,
+      usbsid_config.socketTwo.sid1.id);
+  if (usbsid_config.socketTwo.enabled && usbsid_config.socketTwo.dualsid)
+    printf("      %s as SID2 @ addr $%02x with id %d\n",
+      sidtypes[(int)usbsid_config.socketTwo.sid2.type],
+      usbsid_config.socketTwo.sid2.addr,
+      usbsid_config.socketTwo.sid2.id);
+  printf("  Mirror Socket Two to Socket One = %s\n", enabled[usbsid_config.mirrored]);
+  printf("\n");
+  printf("  FMOpl is %s\n",
+    enabled[(int)usbsid_config.FMOpl.enabled]);
+  if (usbsid_config.FMOpl.enabled)
+    printf("  FMOpl available @ SID %d\n",
+      (int)usbsid_config.FMOpl.sidno);
+  printf("\n");
+  printf("  Audio switch is set to %s\n",
+    mono_stereo[(int)usbsid_config.stereo_en]);
+  printf("  Audio switch position = %s\n",
+    locked[(int)usbsid_config.lock_audio_sw]);
+  printf("\n");
+  printf("  Pico LED is %s, Breathing effect when idle? %s\n",
     enabled[(int)usbsid_config.LED.enabled],
     truefalse[(int)usbsid_config.LED.idle_breathe]);
-  printf("[CONFIG] [RGBLED] %s, Idle breathe? %s\n",
+  printf("  Pico RGB LED is %s, Breathing effect when idle? %s\n",
     enabled[(int)usbsid_config.RGBLED.enabled],
     truefalse[(int)usbsid_config.RGBLED.idle_breathe]);
-  printf("[CONFIG] [RGBLED SIDTOUSE] %d\n",
+  printf("  RGB LED uses SID %d\n",
     (int)usbsid_config.RGBLED.sid_to_use);
-  printf("[CONFIG] [RGBLED BRIGHTNESS] %d\n",
+  printf("  RGB LED brightness = %d\n",
     (int)usbsid_config.RGBLED.brightness);
-
-  printf("[CONFIG] [CDC] %s\n",
+  printf("\n");
+  printf("  CDC feature = %s\n",
     enabled[(int)usbsid_config.Cdc.enabled]);
-  printf("[CONFIG] [WebUSB] %s\n",
+  printf("  WebUSB feature = %s\n",
     enabled[(int)usbsid_config.WebUSB.enabled]);
-  printf("[CONFIG] [Asid] %s\n",
-    enabled[(int)usbsid_config.Asid.enabled]);
-  printf("[CONFIG] [Midi] %s\n",
+  printf("  Midi feature =  %s\n",
     enabled[(int)usbsid_config.Midi.enabled]);
-
-  printf("[CONFIG] [FMOpl] %s\n",
-    enabled[(int)usbsid_config.FMOpl.enabled]);
-  printf("[CONFIG] [FMOpl] SIDno %d\n",
-    usbsid_config.FMOpl.sidno);
-  printf("[CONFIG] [AUDIO_SWITCH] %s\n",
-    mono_stereo[(int)usbsid_config.stereo_en]);
-  printf("[CONFIG] [AUDIO_SWITCH_LOCKED] %s\n",
-    truefalse[(int)usbsid_config.lock_audio_sw]);
+  printf("  ASID feature = %s\n",
+    enabled[(int)usbsid_config.Asid.enabled]);
     return;
 }
 
-void sid_autodetect(uint8_t detection_routine)
+void sid_autodetect(uint8_t detection_routine, uint8_t address)
 {
   config_buffer[1] = DETECT_SIDS;
-  config_buffer[2] = detection_routine;
+  config_buffer[2] = ((detection_routine == 255) ? 0 : 1);
+  config_buffer[3] = detection_routine;
+  config_buffer[4] = address;
   write_chars(config_buffer, count_of(config_buffer));
+  if (config_buffer[2] == 1) return;
 
   int len;
   len = read_chars(read_data_uber, count_of(read_data_uber));
@@ -844,53 +882,56 @@ void read_socket_config(void)
   return;
 }
 
-void apply_default_socket_settings(void)
+/**
+ * @brief Returns default Socket configuration
+ *
+ * @param int id, the socket id 1 or 2
+ */
+Socket default_socket(int id)
 {
-  /* Pre applying default socket settings if needed */
-  if (usbsid_config.socketOne.enabled == true) {
-    if (usbsid_config.socketOne.dualsid == true) {
-      if (usbsid_config.socketOne.chiptype != 1)
-        usbsid_config.socketOne.chiptype = 1;  /* chiptype cannot be real with dualsid */
-      if (usbsid_config.socketOne.clonetype == 0)
-        usbsid_config.socketOne.clonetype = 1;  /* clonetype cannot be disabled with dualsid */
-    } else {
-      if (usbsid_config.socketOne.chiptype == 1) {
-        if (usbsid_config.socketOne.clonetype == 0) {
-          usbsid_config.socketOne.clonetype = 1;  /* clonetype cannot be disabled when chiptype is clone */
-        }
-      } else {
-        usbsid_config.socketOne.clonetype = 0;  /* clonetype cannot be anything else when chiptype is real */
-      }
-    }
-  }
-  /* Pre applying default socket settings if needed */
-  if (usbsid_config.socketTwo.enabled == true) {
-    if (usbsid_config.socketTwo.dualsid == true) {
-      if (usbsid_config.socketTwo.chiptype != 1)
-        usbsid_config.socketTwo.chiptype = 1;  /* chiptype cannot be real with dualsid */
-      if (usbsid_config.socketTwo.clonetype == 0) {
-        usbsid_config.socketTwo.clonetype = 1;  /* clonetype cannot be disabled with dualsid */
-      }
-    } else {
-      if (usbsid_config.socketTwo.chiptype == 1) {
-        if (usbsid_config.socketTwo.clonetype == 0) {
-          usbsid_config.socketTwo.clonetype = 1;  /* clonetype cannot be disabled when chiptype is clone */
-        }
-      } else {
-        usbsid_config.socketTwo.clonetype = 0;  /* clonetype cannot be anything else when chiptype is real */
-      }
-    }
-  }
+  const SIDChip s1s1 = {
+    .id = 0,
+    .addr = 0x00,
+    .type = 0,
+  };
+  const SIDChip s2s1 = {
+    .id = 1,
+    .addr = 0x20,
+    .type = 0,
+  };
+  const SIDChip sNs2 = {
+    .id = 0xff,
+    .addr = 0xff,
+    .type = 1,
+  };
+  Socket socket_conf = {
+    .enabled = true,
+    .dualsid = false,
+    .chiptype = 0,
+    .sid1 = (id == 1 ? s1s1 : s2s1),
+    .sid2 = sNs2,
+  };
+  return socket_conf;
 }
 
-void print_socket_config(void)
+void apply_default_socket_settings(void)
+{
+  /* Socket One */
+  usbsid_config.socketOne = default_socket(1);
+  /* Socket Two */
+  usbsid_config.socketTwo = default_socket(2);
+  /* General */
+  usbsid_config.mirrored = false;
+}
+
+void print_socket_config(void) /* TODO: FINISH */
 {
   int sock_one = 0, sock_two = 0, sids_one = 0, sids_two = 0, numsids = 0, act_as_one = 0;
   uint8_t one = 0, two = 0, three = 0, four = 0;
   uint8_t one_mask = 0, two_mask = 0, three_mask = 0, four_mask = 0;
   apply_default_socket_settings();
 
-  act_as_one = usbsid_config.socketTwo.act_as_one;
+  act_as_one = usbsid_config.mirrored;
 
   sock_one = usbsid_config.socketOne.enabled;
   sock_two = usbsid_config.socketTwo.enabled;
@@ -971,38 +1012,38 @@ void print_socket_config(void)
     }
   }
 
-  printf("[SOCK_ONE EN] %s [SOCK_TWO EN] %s [ACT_AS_ONE] %s\n[NO SIDS] [SOCK_ONE] #%d [SOCK_TWO] #%d [TOTAL] #%d\n",
-    (sock_one ? truefalse[0] : truefalse[1]),
-    (sock_two ? truefalse[0] : truefalse[1]),
-    (act_as_one ? truefalse[0] : truefalse[1]),
-    sids_one, sids_two, numsids);
+  // printf("[SOCK_ONE EN] %s [SOCK_TWO EN] %s [ACT_AS_ONE] %s\n[NO SIDS] [SOCK_ONE] #%d [SOCK_TWO] #%d [TOTAL] #%d\n",
+  //   (sock_one ? truefalse[0] : truefalse[1]),
+  //   (sock_two ? truefalse[0] : truefalse[1]),
+  //   (act_as_one ? truefalse[0] : truefalse[1]),
+  //   sids_one, sids_two, numsids);
 
-  printf("[BUS CONFIG]\n[ONE]   %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n[TWO]   %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n[THREE] %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n[FOUR]  %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n",
-    one, PRINTF_BYTE_TO_BINARY_INT8(one),
-    two, PRINTF_BYTE_TO_BINARY_INT8(two),
-    three, PRINTF_BYTE_TO_BINARY_INT8(three),
-    four, PRINTF_BYTE_TO_BINARY_INT8(four));
+  // printf("[BUS CONFIG]\n[ONE]   %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n[TWO]   %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n[THREE] %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n[FOUR]  %02x 0b"PRINTF_BINARY_PATTERN_INT8"\n",
+  //   one, PRINTF_BYTE_TO_BINARY_INT8(one),
+  //   two, PRINTF_BYTE_TO_BINARY_INT8(two),
+  //   three, PRINTF_BYTE_TO_BINARY_INT8(three),
+  //   four, PRINTF_BYTE_TO_BINARY_INT8(four));
 
-  printf("[CONFIG] [SOCKET ONE] %s as %s\n",
-    enabled[usbsid_config.socketOne.enabled],
-    us_socket[usbsid_config.socketOne.dualsid]);
-  printf("[CONFIG] [SOCKET ONE] CHIP TYPE: %s, CLONE TYPE: %s\n",
-    chiptypes[usbsid_config.socketOne.chiptype],
-    clonetypes[usbsid_config.socketOne.clonetype]);
-  printf("[CONFIG] [SOCKET ONE] SID 1 TYPE: %s, SID 2 TYPE: %s\n",
-    sidtypes[usbsid_config.socketOne.sid1type],
-    sidtypes[usbsid_config.socketOne.sid2type]);
-  printf("[CONFIG] [SOCKET TWO] %s as %s\n",
-    enabled[usbsid_config.socketTwo.enabled],
-    us_socket[usbsid_config.socketTwo.dualsid]);
-  printf("[CONFIG] [SOCKET TWO] CHIP TYPE: %s, CLONE TYPE: %s\n",
-    chiptypes[usbsid_config.socketTwo.chiptype],
-    clonetypes[usbsid_config.socketTwo.clonetype]);
-  printf("[CONFIG] [SOCKET TWO] SID 1 TYPE: %s, SID 2 TYPE: %s\n",
-    sidtypes[usbsid_config.socketTwo.sid1type],
-    sidtypes[usbsid_config.socketTwo.sid2type]);
-  printf("[CONFIG] [SOCKET TWO AS ONE] %s\n",
-    truefalse[usbsid_config.socketTwo.act_as_one]);
+  // printf("[CONFIG] [SOCKET ONE] %s as %s\n",
+  //   enabled[usbsid_config.socketOne.enabled],
+  //   us_socket[usbsid_config.socketOne.dualsid]);
+  // printf("[CONFIG] [SOCKET ONE] CHIP TYPE: %s, CLONE TYPE: %s\n",
+  //   chiptypes[usbsid_config.socketOne.chiptype],
+  //   clonetypes[usbsid_config.socketOne.clonetype]);
+  // printf("[CONFIG] [SOCKET ONE] SID 1 TYPE: %s, SID 2 TYPE: %s\n",
+  //   sidtypes[usbsid_config.socketOne.sid1type],
+  //   sidtypes[usbsid_config.socketOne.sid2type]);
+  // printf("[CONFIG] [SOCKET TWO] %s as %s\n",
+  //   enabled[usbsid_config.socketTwo.enabled],
+  //   us_socket[usbsid_config.socketTwo.dualsid]);
+  // printf("[CONFIG] [SOCKET TWO] CHIP TYPE: %s, CLONE TYPE: %s\n",
+  //   chiptypes[usbsid_config.socketTwo.chiptype],
+  //   clonetypes[usbsid_config.socketTwo.clonetype]);
+  // printf("[CONFIG] [SOCKET TWO] SID 1 TYPE: %s, SID 2 TYPE: %s\n",
+  //   sidtypes[usbsid_config.socketTwo.sid1type],
+  //   sidtypes[usbsid_config.socketTwo.sid2type]);
+  // printf("[CONFIG] [SOCKET TWO AS ONE] %s\n",
+  //   truefalse[usbsid_config.socketTwo.act_as_one]);
 }
 
 /* -----SIDKICK-pico----- */
@@ -1546,12 +1587,16 @@ void print_help(void)
   printf("  -rs,      --read-sock-config  : Read and print USBSID-Pico socket config settings only\n");
   printf("  -rn,      --read-num-sids     : Read and print USBSID-Pico configured number of SID's only\n");
   printf("  -dsid N,  --detect-sid-types N: Send SID autodetect command to device, returns the config as with '-r' afterwards\n");
-  printf("                                  0: Cycle exact detection routine 1 (Real SIDs)\n");
-  printf("                                  1: Cycle exact detection routine 2 (Clones & Real SIDs)\n");
-  printf("                                  2: Detection routine (Clones)\n");
-  printf("                                  3: Unsafe detection routine\n");
+  printf("                                  Leave N empty for sid detection in both sockets (updates but does not save config)\n");
+  printf("                                  Provide N to detect with a method below (does not update config, logs to uart)\n");
+  printf("                                  0: Voice 3 oscillator detection routine\n");
+  printf("                                  1: Voice 3 waveform detection routine\n");
+  printf("                                  2: Reflex detection routine\n");
+  printf("                                  3: Voice 3 delayed waveform detection routine (Some clones)\n");
   printf("  -dclone,  --detect-clone-types: Send clone autodetect command to device, returns the config as with '-r' afterwards\n");
-  printf("  -auto,    --auto-detect-all   : Send run autodetection routine command to device and reboot\n");
+  printf("  -auto N,  --auto-detect-all N : Send run autodetection routine command to device and reboot\n");
+  printf("                                  0: Save, load and apply config\n");
+  printf("                                  1: Save to flash and reboot (default if not supplied)\n");
   printf("  -w,       --write-config      : Write single config item to USBSID-Pico (will read the full config first!)\n");
   printf("  -a,       --apply-config      : Apply the current config settings (from USBSID-Pico memory) that you changed with '-w'\n");
   printf("  -s,       --save-config       : Send the save config command to USBSID-Pico\n");
@@ -1596,13 +1641,11 @@ void print_help(void)
   printf("  -en N,    --enabled N         : Socket is Enabled (1) or Disabled (0)\n");
   printf("  -d N,     --dualsid N         : DualSID is On (1) or Off (0)\n");
   printf("  -chip N,  --chiptype N        : Set the socket chiptype to:\n");
-  printf("                                  0: %s, 1: %s\n", chiptypes[0], chiptypes[1]);
-  printf("  -clone N, --clonetype N       : If chiptype is 'Clone' set the clonetype to:\n");
-  printf("                                  0: %s, 1: %s, 2: %s, 3: %s, 4: %s, 5: %s\n",
-         clonetypes[0], clonetypes[1], clonetypes[2], clonetypes[3], clonetypes[4], clonetypes[5]);
-  printf("  -sid1 N,  --sid1type N        : Set the 1st SID type for the socket to:\n");
   printf("                                  0: %s, 1: %s, 2: %s, 3: %s, 4: %s\n",
-         sidtypes[0], sidtypes[1], sidtypes[2], sidtypes[3], sidtypes[4]);
+         chiptypes[0], chiptypes[1], chiptypes[2], chiptypes[3], chiptypes[4]);
+  printf("                                  5: %s, 6: %s, 7: %s, 8: %s\n",
+         chiptypes[5], chiptypes[6], chiptypes[7], chiptypes[8]);
+  printf("  -sid1 N,  --sid1type N        : Set the 1st SID type for the socket to:\n");
   printf("  -sid2 N,  --sid2type N        : Set the 2nd SID type for the socket to:\n");
   printf("                                  0: %s, 1: %s, 2: %s, 3: %s, 4: %s\n",
          sidtypes[0], sidtypes[1], sidtypes[2], sidtypes[3], sidtypes[4]);
@@ -1733,6 +1776,8 @@ void config_usbsidpico(int argc, char **argv)
         print_config();
       }
       printf("Reading config\n");
+      read_version(US_PCB_VERSION, 0);
+      read_version(USBSID_VERSION, 0);
       read_config();
       printf("Printing config\n");
       print_config();
@@ -1896,7 +1941,17 @@ void config_usbsidpico(int argc, char **argv)
       }
       printf("\n");
 
-      if (cmd <= 0xF0) {
+      if (cmd < 0xF0) {
+        printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", cmd, a, b, c, d);
+        uint8_t buf[5] = { cmd, a, b, c, d };
+        write_chars(buf, count_of(buf));
+        if ((cmd & 0xF0) == 0x40 || cmd == 0xC4) {
+          int len;
+          memset(read_data, 0, count_of(read_data));
+          len = read_chars(read_data, count_of(read_data));
+          printf("[R %u] %02X\n", len, read_data[0]);
+        }
+      } else if (cmd == 0xF0) {
         printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", cmd, a, b, c, d);
         uint8_t buf[5] = { cmd, a, b, c, d };
         write_chars(buf, count_of(buf));
@@ -1930,13 +1985,22 @@ void config_usbsidpico(int argc, char **argv)
       break;
     }
     if (!strcmp(argv[param_count], "-dsid") || !strcmp(argv[param_count], "--detect-sid-types")) {
-      int detection_routine = 0;
-      if (argc != param_count+1) {
-        param_count++;
-        detection_routine = atoi(argv[param_count++]);
+      uint8_t detection_routine = 255;
+      if (argv[param_count+1] != NULL) {
+        detection_routine = strtol(argv[++param_count], NULL, 10);
       }
-      printf("Sending autodetect SID's command with routine '%u' to USBSID-Pico and reading config\n", detection_routine);
-      sid_autodetect(detection_routine);
+      uint8_t address = 255;
+      if (argv[param_count+1] != NULL) {
+        address = strtol(argv[++param_count], NULL, 16);
+      } else { address = 0x00; }
+      if (detection_routine == 255) {
+        printf("Sending autodetect SID's command to USBSID-Pico and reading config\n");
+        sid_autodetect(detection_routine,0x00);
+      } else {
+        printf("Sending autodetect SID's command with routine '%d' @ $%02x to USBSID-Pico and reading config\n",
+          detection_routine, address);
+        sid_autodetect(detection_routine,address);
+      }
       printf("Printing config\n");
       print_config();
       break;
@@ -1949,10 +2013,11 @@ void config_usbsidpico(int argc, char **argv)
       break;
     }
     if (!strcmp(argv[param_count], "-auto") || !strcmp(argv[param_count], "--auto-detect-all")) {
-      printf("Sending start autodetection and reboot command to USBSID-Pico\n");
-      run_autodetection(true);
-      /* printf("Printing config\n"); */
-      /* print_config(); */
+      bool reboot = ((argv[param_count+1] != NULL) && !startsWith(argv[param_count+1], "-")) ? atoi(argv[++param_count]) : 1;
+      printf("Sending start autodetection and reboot command to USBSID-Pico (%s)\n", (reboot?"with reboot":"without reboot"));
+      run_autodetection(reboot);
+      printf("Printing config\n");
+      print_config();
       break;
     }
 
@@ -2111,7 +2176,7 @@ void config_usbsidpico(int argc, char **argv)
               printf("%d ?\n", socket_pointer->clonetype);
               printf("%d ?\n", socket_pointer->sid1type);
               printf("%d ?\n", socket_pointer->sid2type);
-              if (socket == 2) printf("%d ?\n", usbsid_config.socketTwo.act_as_one);
+              if (socket == 2) printf("%d ?\n", usbsid_config.mirrored);
               goto exit;
             }
 
@@ -2126,9 +2191,9 @@ void config_usbsidpico(int argc, char **argv)
                 printf("%d is not an enable option!\n", asone);
                 goto exit;
               }
-              printf("Set SocketTwo act-as-one from %s to: %s\n", enabled[usbsid_config.socketTwo.act_as_one], enabled[asone]);
-              usbsid_config.socketTwo.act_as_one = asone;
-              write_config_command(SET_CONFIG, 0x2, 0x6, usbsid_config.socketTwo.act_as_one, 0);
+              printf("Set SocketTwo act-as-one from %s to: %s\n", enabled[usbsid_config.mirrored], enabled[asone]);
+              usbsid_config.mirrored = asone;
+              write_config_command(SET_CONFIG, 0x2, 0x6, usbsid_config.mirrored, 0);
               continue;
             }
 
@@ -2183,22 +2248,22 @@ void config_usbsidpico(int argc, char **argv)
               continue;
             }
 
-            if (!strcmp(argv[p], "-clone") || !strcmp(argv[p], "--clonetype")) {
-              p++;
-              if (argv[p] == NULL) {
-                printf ("No argument supplied for option '%s'\n", argv[--p]);
-                goto exit;
-              }
-              int t = atoi(argv[p]);
-              if (t >= count_of(clonetypes)) {
-                printf("%d is not an clonetype option!\n", t);
-                goto exit;
-              }
-              printf("Set Socket%s clonetype from %s to: %s\n", str, clonetypes[socket_pointer->clonetype], clonetypes[t]);
-              socket_pointer->clonetype = t;
-              write_config_command(SET_CONFIG, socket, 0x3, socket_pointer->clonetype, 0x0);
-              continue;
-            }
+            // if (!strcmp(argv[p], "-clone") || !strcmp(argv[p], "--clonetype")) {
+            //   p++;
+            //   if (argv[p] == NULL) {
+            //     printf ("No argument supplied for option '%s'\n", argv[--p]);
+            //     goto exit;
+            //   }
+            //   int t = atoi(argv[p]);
+            //   if (t >= count_of(clonetypes)) {
+            //     printf("%d is not an clonetype option!\n", t);
+            //     goto exit;
+            //   }
+            //   printf("Set Socket%s clonetype from %s to: %s\n", str, clonetypes[socket_pointer->clonetype], clonetypes[t]);
+            //   socket_pointer->clonetype = t;
+            //   write_config_command(SET_CONFIG, socket, 0x3, socket_pointer->clonetype, 0x0);
+            //   continue;
+            // }
 
             if (!strcmp(argv[p], "-sid1") || !strcmp(argv[p], "--sid1type")) {
               p++;
