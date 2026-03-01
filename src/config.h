@@ -128,6 +128,7 @@ typedef struct Config {
   uint32_t clock_rate;          /* clock speed identifier */
   uint16_t refresh_rate;        /* refresh rate identifier based on clockspeed ~ not configurable */
   uint16_t raster_rate;         /* raster rate identifier based on clockspeed ~ not configurable */
+  uint8_t  last_preset;         /* last applied preset */
   Socket   socketOne;           /* 1 */
   Socket   socketTwo;           /* 2 */
   struct {
@@ -171,6 +172,7 @@ typedef struct Config {
   .clock_rate = DEFAULT, \
   .refresh_rate = HZ_DEFAULT, \
   .raster_rate = R_DEFAULT, \
+  .last_preset = 2, /* PRESET_DUAL_BOTH */ \
   .socketOne = { \
     .chiptype = 1,  /* unknown */ \
     .sid1 = { \

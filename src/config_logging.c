@@ -134,6 +134,9 @@ void print_config_overview(void)
   usCFG("  Raster rate = %d\n",
     (int)usbsid_config.raster_rate);
   usCFG("\n");
+  usCFG("  Last applied preset is: %s\n",
+    preset_name((int)usbsid_config.last_preset));
+  usCFG("\n");
   usCFG("  Socket One is %s as %s\n",
     switch_str((int)usbsid_config.socketOne.enabled),
     dualsingle_str((int)usbsid_config.socketOne.dualsid));

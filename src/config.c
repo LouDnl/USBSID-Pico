@@ -206,14 +206,14 @@ void read_config(Config* config)
   config_array[10] = (int)config->socketOne.enabled;
   config_array[11] = (int)config->socketOne.dualsid;
   config_array[12] = config->socketOne.chiptype;
-  config_array[13] = 0xff; /* unused */
+  config_array[13] = (config->socketOne.sid1.id | (config->socketOne.sid2.id << 4));
   config_array[14] = config->socketOne.sid1.type;
   config_array[15] = config->socketOne.sid2.type;
   config_array[20] = (int)config->socketTwo.enabled;
   config_array[21] = (int)config->socketTwo.dualsid;
   config_array[22] = (int)config->mirrored;
   config_array[23] = config->socketTwo.chiptype;
-  config_array[24] = 0xff; /* unused */
+  config_array[24] = (config->socketTwo.sid1.id | (config->socketTwo.sid2.id << 4));
   config_array[25] = config->socketTwo.sid1.type;
   config_array[26] = config->socketTwo.sid2.type;
   config_array[30] = (int)config->LED.enabled;
@@ -683,7 +683,11 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       break;
     case MIRRORED_SID:
       usCFG("[CMD] MIRRORED_SID\n");
-      apply_preset_wrapper(PRESET_MIRRORED);
+      if (buffer[1] == 0) {
+        apply_preset_wrapper(PRESET_MIRRORED);
+      } else {
+        apply_preset_wrapper(PRESET_MIRRORED_DUAL);
+      }
       break;
     case DUAL_SID:
       usCFG("[CMD] DUAL_SID\n");

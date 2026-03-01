@@ -125,7 +125,7 @@ uint8_t sid_id_to_address(uint8_t id)
 void apply_sid_addresses(void)
 {
   /* Build index from socket flags */
-  int idx = (
+  int idx = ( /* TODO: Add support for mixed and reversed quad sid */
     (usbsid_config.socketOne.enabled ? 1 : 0) << 3)
     | ((usbsid_config.socketOne.dualsid ? 1 : 0) << 2)
     | ((usbsid_config.socketTwo.enabled ? 1 : 0) << 1)
@@ -394,6 +394,7 @@ static ConfigError apply_socket_preset(SocketPreset preset)
     usCFG("Preset applied: %s\n", preset_name(preset));
   }
 
+  usbsid_config.last_preset = preset;
   return err;
 }
 
@@ -425,7 +426,7 @@ static SocketPreset detect_current_preset(void)
  * @param bool at_boot
  * @return ConfigError
  */
-ConfigError apply_preset(SocketPreset preset, bool at_boot)
+static ConfigError apply_preset(SocketPreset preset, bool at_boot)
 {
   SocketPreset pre = detect_current_preset();
   if (pre == preset) {
@@ -442,13 +443,26 @@ ConfigError apply_preset(SocketPreset preset, bool at_boot)
 
 /**
  * @brief Wraps around apply_preset for non boot presets
+ *        called from config.c:handle_config_request() only!!
  *
  * @param SocketPreset preset
  */
-void apply_preset_wrapper(SocketPreset preset) // ISSUE: This routine seems to break if you switch from quad to dual back to quad
+void apply_preset_wrapper(SocketPreset preset)
 {
+  /* Backup global */
+  uint32_t irq = save_and_disable_interrupts();
+  Config backup_cfg;
+  memcpy(&backup_cfg, &usbsid_config, sizeof(Config));
+  restore_interrupts(irq);
+  /* Run autodetection before applying preset,
+     this will ensure supporting chips and sids, etc */
+  extern ConfigError sid_auto_detect(bool at_boot);
+  sid_auto_detect(false);
+
+  /* Now apply the preset */
   ConfigError err = apply_preset(preset, false);
   if (err != CFG_OK) {
+    memcpy(&usbsid_config, &backup_cfg, sizeof(Config)); /* Reset the config back */
     usERR("Applying preset error: %s\n", config_error_str(err));
   }
   return;

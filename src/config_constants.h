@@ -165,7 +165,7 @@ typedef struct DetectionResult {
 /* Externalise me whatever! */
 
 extern const PresetDef __in_flash("us_presets") socket_presets[];
-extern const uint8_t __in_flash("us_uints") address_table[16][4];
+extern const uint8_t __in_flash("us_uints") address_table[19][4];
 extern const uint8_t __in_flash("us_uints") sid_addresses[];
 
 
