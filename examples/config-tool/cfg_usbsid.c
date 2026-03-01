@@ -582,6 +582,7 @@ void read_version(uint8_t cmd, int print_version)
 
 void set_cfg_from_buffer(const uint8_t * buff, size_t len)
 {
+  const uint8_t sid_addresses[4] = { 0x00, 0x20, 0x40, 0x60 };
   static uint32_t clockrate = 0;
   for (int i = 0; i < (int)len; ++i) {
     if (debug == 1) {
@@ -612,7 +613,10 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
         usbsid_config.socketOne.chiptype = buff[i];
         break;
       case 13:
-        // usbsid_config.socketOne.clonetype = buff[i];
+        usbsid_config.socketOne.sid1.id = (buff[i] & 0xF);
+        usbsid_config.socketOne.sid2.id = ((buff[i] & 0xF0) >> 4);
+        usbsid_config.socketOne.sid1.addr = ((usbsid_config.socketOne.sid1.id < 4) ? sid_addresses[usbsid_config.socketOne.sid1.id] : 0xFF);
+        usbsid_config.socketOne.sid2.addr = ((usbsid_config.socketOne.sid2.id < 4) ? sid_addresses[usbsid_config.socketOne.sid2.id] : 0xFF);
         break;
       case 14:
         usbsid_config.socketOne.sid1.type = buff[i];
@@ -633,7 +637,10 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
         usbsid_config.socketTwo.chiptype = buff[i];
         break;
       case 24:
-        // usbsid_config.socketTwo.clonetype = buff[i];
+        usbsid_config.socketTwo.sid1.id = (buff[i] & 0xF);
+        usbsid_config.socketTwo.sid2.id = ((buff[i] & 0xF0) >> 4);
+        usbsid_config.socketTwo.sid1.addr = ((usbsid_config.socketTwo.sid1.id < 4) ? sid_addresses[usbsid_config.socketTwo.sid1.id] : 0xFF);
+        usbsid_config.socketTwo.sid2.addr = ((usbsid_config.socketTwo.sid2.id < 4) ? sid_addresses[usbsid_config.socketTwo.sid2.id] : 0xFF);
         break;
       case 25:
         usbsid_config.socketTwo.sid1.type = buff[i];
@@ -1716,8 +1723,8 @@ void config_usbsidpico(int argc, char **argv)
       }
       goto exit;
     }
-    if (!strcmp(argv[param_count], "-q")) {
-      quickchange = 1;
+    if (!strcmp(argv[param_count], "-q")) { /* NOTE: Re-used for flipped? */
+      quickchange = 1; // TODO: Remove, this is deprecated!
     };
     if (!strcmp(argv[param_count], "-single") || !strcmp(argv[param_count], "--single-sid")) {
       printf("Set USBSID-Pico config to single SID @ Socket One\n");
@@ -1762,6 +1769,7 @@ void config_usbsidpico(int argc, char **argv)
     if (!strcmp(argv[param_count], "-mirrored") || !strcmp(argv[param_count], "--mirrored-sid")) {
       printf("Set USBSID-Pico config to single -> dual mirrored SID\n");
       write_config_command(MIRRORED_SID, quickchange, 0 ,0 ,0);
+      /* TODO: Add support for PRESET_MIRRORED_DUAL */
       goto exit;
     }
     if (!strcmp(argv[param_count], "-flip") || !strcmp(argv[param_count], "--flip-sockets")) {
