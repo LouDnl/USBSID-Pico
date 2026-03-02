@@ -169,7 +169,7 @@ const PresetDef __in_flash("us_presets") socket_presets[] = {
  * Standard C64 addresses: 0x00=D400, 0x20=D420, 0x40=D440, 0x60=D460
  *
  */
-const uint8_t __in_flash("us_uints") address_table[19][4] = {
+const uint8_t __in_flash("us_uints") address_table[20][4] = {
   /* 0b1111: from left to right Sock1 EN, Sock1 Dual, Sock2 EN, Sock2 Dual */
   /* 0b0000: S1:off S1D:off S2:off S2D:off */ { 0xFF, 0xFF, 0xFF, 0xFF },  /*  0: Invalid - both disabled */
   /* 0b0001: S1:off S1D:off S2:off S2D:on  */ { 0xFF, 0xFF, 0xFF, 0xFF },  /*  1: Invalid - S2 disabled but dual */
