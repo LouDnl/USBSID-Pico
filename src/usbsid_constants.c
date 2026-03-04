@@ -148,16 +148,21 @@ static const char __in_flash("us_statics") *mono_stereo[] = {
  *
  */
 const PresetDef __in_flash("us_presets") socket_presets[] = {
-  [PRESET_SINGLE_S1]     = { true,  false, false, false, false },
-  [PRESET_SINGLE_S2]     = { false, false, true,  false, false },
-  [PRESET_DUAL_BOTH]     = { true,  false, true,  false, false },
-  [PRESET_DUAL_S1]       = { true,  true,  false, false, false },
-  [PRESET_DUAL_S2]       = { false, false, true,  true,  false },
-  [PRESET_TRIPLE_S1]     = { true,  true,  true,  false, false },
-  [PRESET_TRIPLE_S2]     = { true,  false, true,  true,  false },
-  [PRESET_QUAD]          = { true,  true,  true,  true,  false },
-  [PRESET_MIRRORED]      = { true,  false, true,  false, true  },
-  [PRESET_MIRRORED_DUAL] = { true,  true,  true,  true,  true  },
+  /* preset, s1_enabled, s1_dual, s2_enabled, s2_dual, mirrored, flipped, mixed */
+  [PRESET_SINGLE_S1]     = { true,  false, false, false, false, false, false },
+  [PRESET_SINGLE_S2]     = { false, false, true,  false, false, false, false },
+  [PRESET_DUAL_BOTH]     = { true,  false, true,  false, false, false, false },
+  [PRESET_DUAL_S1]       = { true,  true,  false, false, false, false, false },
+  [PRESET_DUAL_S2]       = { false, false, true,  true,  false, false, false },
+  [PRESET_TRIPLE_S1]     = { true,  true,  true,  false, false, false, false },
+  [PRESET_TRIPLE_S2]     = { true,  false, true,  true,  false, false, false },
+  [PRESET_QUAD]          = { true,  true,  true,  true,  false, false, false },
+  [PRESET_MIRRORED]      = { true,  false, true,  false, true,  false, false },
+  [PRESET_MIRRORED_DUAL] = { true,  true,  true,  true,  true,  false, false },
+  [PRESET_DUAL_FLIPPED]  = { true,  false, true,  false, false, true,  false },
+  [PRESET_QUAD_FLIPPED]  = { true,  true,  true,  true,  false, true,  false },
+  [PRESET_QUAD_MIXED]    = { true,  true,  true,  true,  false, false, true  },
+  [PRESET_QUAD_FLIPMIX]  = { true,  true,  true,  true,  false, true,  true  },
 };
 
 /**
@@ -187,11 +192,10 @@ const uint8_t __in_flash("us_uints") address_table[20][4] = {
   /* 0b1101: S1:on  S1D:on  S2:off S2D:on  */ { 0x00, 0x20, 0xFF, 0xFF },  /* 13: Invalid S2D, treat as S1 dual */
   /* 0b1110: S1:on  S1D:on  S2:on  S2D:off */ { 0x00, 0x20, 0x40, 0xFF },  /* 14: S1 dual, S2 single (3 SIDs) */
   /* 0b1111: S1:on  S1D:on  S2:on  S2D:on  */ { 0x00, 0x20, 0x40, 0x60 },  /* 15: Quad (4 SIDs) */
-  /* TODO: Finish, see config_socket.c:apply_sid_addresses() */
-  /* 0b1111: S1:on  S1D:on  S2:on  S2D:on  */ { 0x40, 0x60, 0x00, 0x20 },  /* 16: Quad (4 SIDs) Flipped */
-  /* 0b1111: S1:on  S1D:on  S2:on  S2D:on  */ { 0x20, 0xFF, 0x00, 0xFF },  /* 17: Dual (2 SIDs) Flipped */
+  /* 0b1010: S1:on  S1D:on  S2:on  S2D:on  */ { 0x20, 0xFF, 0x00, 0xFF },  /* 16: Dual (2 SIDs) Flipped */
+  /* 0b1111: S1:on  S1D:on  S2:on  S2D:on  */ { 0x40, 0x60, 0x00, 0x20 },  /* 17: Quad (4 SIDs) Flipped */
   /* 0b1111: S1:on  S1D:on  S2:on  S2D:on  */ { 0x00, 0x60, 0x20, 0x40 },  /* 18: Quad (4 SIDs) Mixed */
-  /* 0b1111: S1:on  S1D:on  S2:on  S2D:on  */ { 0x20, 0x60, 0x00, 0x40 },  /* 18: Quad (4 SIDs) Mixed flipped */
+  /* 0b1111: S1:on  S1D:on  S2:on  S2D:on  */ { 0x20, 0x60, 0x00, 0x40 },  /* 19: Quad (4 SIDs) Mixed flipped */
 };
 
 /**

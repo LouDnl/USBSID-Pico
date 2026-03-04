@@ -126,12 +126,20 @@ uint8_t sid_id_to_address(uint8_t id)
 void apply_sid_addresses(void)
 {
   /* Build index from socket flags */
-  int idx = ( /* TODO: Add support for mixed and reversed quad sid */
+  int idx = (
     (usbsid_config.socketOne.enabled ? 1 : 0) << 3)
     | ((usbsid_config.socketOne.dualsid ? 1 : 0) << 2)
     | ((usbsid_config.socketTwo.enabled ? 1 : 0) << 1)
     | ((usbsid_config.socketTwo.dualsid ? 1 : 0)
   );
+  /* Override with extended table entries for flipped/mixed variants */
+  if (idx == 10 && usbsid_config.flipped) {
+    idx = 16;  /* Dual Stereo Flipped */
+  } else if (idx == 15 && (usbsid_config.flipped || usbsid_config.mixed)) {
+    idx = 16
+      | (usbsid_config.flipped ? 1 : 0)  /* +1 → 17: Quad Flipped */
+      | (usbsid_config.mixed   ? 2 : 0); /* +2 → 18: Quad Mixed, +3 → 19: Both */
+  }
 
   /* Lookup addresses from table */
   const uint8_t *addrs = address_table[idx];
@@ -372,6 +380,8 @@ static ConfigError apply_socket_preset(SocketPreset preset)
   usbsid_config.socketTwo.enabled = p->s2_enabled;
   usbsid_config.socketTwo.dualsid = p->s2_dual;
   usbsid_config.mirrored = p->mirrored;
+  usbsid_config.flipped = p->flipped;
+  usbsid_config.mixed = p->mixed;
 
   /* Validate dualsid/chiptype compatibility */
   if (p->s1_dual && usbsid_config.socketOne.chiptype == CHIP_REAL) {
@@ -411,7 +421,9 @@ static SocketPreset detect_current_preset(void)
       usbsid_config.socketOne.dualsid == p->s1_dual &&
       usbsid_config.socketTwo.enabled == p->s2_enabled &&
       usbsid_config.socketTwo.dualsid == p->s2_dual &&
-      usbsid_config.mirrored == p->mirrored) {
+      usbsid_config.mirrored == p->mirrored &&
+      usbsid_config.flipped == p->flipped &&
+      usbsid_config.mixed == p->mixed) {
       return (SocketPreset)i;
     }
   }
@@ -512,6 +524,8 @@ void socket_config_fallback(void)
   usbsid_config.socketTwo = default_socket(2);
   /* General */
   usbsid_config.mirrored = false;
+  usbsid_config.flipped = false;
+  usbsid_config.mixed = false;
 
   RuntimeCFG new_cfg;
   // apply_runtime_config(&usbsid_config,&cfg);

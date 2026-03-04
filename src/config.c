@@ -98,7 +98,7 @@ void read_config(Config* config)
   config_array[15] = config->socketOne.sid2.type;
   config_array[20] = (int)config->socketTwo.enabled;
   config_array[21] = (int)config->socketTwo.dualsid;
-  config_array[22] = (int)config->mirrored;
+  config_array[22] = ((int)config->mirrored | ((int)config->flipped << 1) | ((int)config->mixed << 2));
   config_array[23] = config->socketTwo.chiptype;
   config_array[24] = (config->socketTwo.sid1.id | (config->socketTwo.sid2.id << 4));
   config_array[25] = config->socketTwo.sid1.type;
@@ -130,14 +130,14 @@ void read_socket_config(Config* config)
   socket_config_array[1] = 0x7F; /* Verification byte */
 
   socket_config_array[2] = ((int)config->socketOne.enabled << 4) | (int)config->socketOne.dualsid;
-  socket_config_array[3] = (config->socketOne.chiptype << 4) /* | config->socketOne.clonetype */;
+  socket_config_array[3] = config->socketOne.chiptype; /* TODO: Update driver code! */
   socket_config_array[4] = (config->socketOne.sid1.type << 4) | config->socketOne.sid2.type;
 
   socket_config_array[5] = ((int)config->socketTwo.enabled << 4) | (int)config->socketTwo.dualsid;
-  socket_config_array[6] = (config->socketTwo.chiptype << 4) /* | config->socketTwo.clonetype */;
+  socket_config_array[6] = config->socketTwo.chiptype; /* TODO: Update driver code! */
   socket_config_array[7] = (config->socketTwo.sid1.type << 4) | config->socketTwo.sid2.type;
 
-  socket_config_array[8] = (int)config->mirrored;
+  socket_config_array[8] = ((int)config->mirrored | ((int)config->flipped << 1) | ((int)config->mixed << 2)); /* TODO: Update driver code! */
 
   socket_config_array[9] = 0xFF;  /* Terminator byte */
 
@@ -423,7 +423,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
                 usbsid_config.socketTwo.sid2.type = buffer[3];
               }
               break;
-            case 6: /* mirrored */
+            case 6: /* mirrored */ /* NOTE: Pre v0.7.0 fw backwards compatibility */
               if (buffer[3] <= 1) { /* 1 or 0 */
                 usbsid_config.mirrored = (buffer[3] == 1) ? true : false;
               };
@@ -516,6 +516,21 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
           ? (bool)buffer[2]
           : false;  /* Default to unlocked incorrect value */
           break;
+        case 12: /* mirrored */
+          if (buffer[2] <= 1) { /* 1 or 0 */
+            usbsid_config.mirrored = (bool)buffer[2];
+          };
+          break;
+        case 13: /* flipped */
+          if (buffer[2] <= 1) { /* 1 or 0 */
+            usbsid_config.flipped = (bool)buffer[2];
+          };
+          break;
+        case 14: /* mixed */
+          if (buffer[2] <= 1) { /* 1 or 0 */
+            usbsid_config.mixed = (bool)buffer[2];
+          };
+          break;
         default:
           break;
       };
@@ -555,7 +570,10 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       }
       break;
     case SINGLE_SID:
-      int single_socket = ((buffer[2] == 1) ? 2 : 0);
+      int single_socket = (
+        ((buffer[1] == 1)
+        || (buffer[2] == 1)) /* NOTE: Pre v0.7.0 fw backwards compatibility */
+        ? 2 : 0);
       usCFG("[CMD] SINGLE_SID SOCKET %d\n", single_socket);
       if (single_socket == 2) {
         apply_preset_wrapper(PRESET_SINGLE_S2);
@@ -563,18 +581,33 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         apply_preset_wrapper(PRESET_SINGLE_S1);
       }
       break;
-    case FLIP_SOCKETS:
-      usCFG("[CMD] FLIP_SOCKETS\n");
-      extern void flip_sockets(void);
-      flip_sockets();
-      break;
     case MIRRORED_SID:
-      usCFG("[CMD] MIRRORED_SID\n");
+      usCFG("[CMD] MIRRORED_SID %s\n", ((buffer[1] == 0) ? "SingleSID" : "DualSID"));
       if (buffer[1] == 0) {
         apply_preset_wrapper(PRESET_MIRRORED);
       } else {
         apply_preset_wrapper(PRESET_MIRRORED_DUAL);
       }
+      break;
+    case DUAL_FLIPPED:
+      usCFG("[CMD] DUAL_FLIPPED\n");
+      apply_preset_wrapper(PRESET_DUAL_FLIPPED);
+      break;
+    case QUAD_FLIPPED:
+      usCFG("[CMD] QUAD_FLIPPED\n");
+      apply_preset_wrapper(PRESET_QUAD_FLIPPED);
+      break;
+    case QUAD_MIXED:
+      usCFG("[CMD] QUAD_MIXED\n");
+      apply_preset_wrapper(PRESET_QUAD_MIXED);
+      break;
+    case QUAD_FLIPMIX:
+      usCFG("[CMD] QUAD_FLIPMIX\n");
+      apply_preset_wrapper(PRESET_QUAD_FLIPMIX);
+      break;
+    case HOTFLIP_SOCKETS:
+      usCFG("[CMD] HOTFLIP_SOCKETS\n");
+      flip_sockets();
       break;
     case DUAL_SID:
       usCFG("[CMD] DUAL_SID\n");
