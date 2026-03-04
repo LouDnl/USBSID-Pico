@@ -25,31 +25,15 @@
 
 #include "pico/util/queue.h"
 
-#include "globals.h"
-#include "config.h"
-#include "usbsid.h"
-#include "sid.h"
-#include "logging.h"
+#include <globals.h>
+#include <usbsid.h>
+#include <config.h>
+#include <gpio_defs.h>
+#include <bus.h>
+#include <vu.h>
+#include <sid.h>
+#include <logging.h>
 
-
-/* usbsid.c */
-#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
-extern uint8_t *sid_memory;
-#else
-extern uint8_t sid_memory[];
-#endif
-extern volatile int usbdata;
-
-/* config.c */
-extern Config usbsid_config;
-extern RuntimeCFG cfg;
-
-/* vu.c */
-extern uint16_t vu;
-
-/* bus.c */
-extern void clockcycle_delay(uint32_t n_cycles);
-extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
 
 /* (hot) locals */
 static volatile bool paused_state, reset_state, muted_state;

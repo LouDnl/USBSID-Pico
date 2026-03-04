@@ -497,6 +497,7 @@ set(TARGET_LL
   hardware_pio
   hardware_pwm
   hardware_resets
+  hardware_structs
   hardware_sync
   hardware_timer
   hardware_uart

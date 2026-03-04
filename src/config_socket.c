@@ -23,31 +23,32 @@
  *
  */
 
+#include <globals.h>
+#include <usbsid_constants.h>
+#include <config.h>
+#include <config_bus.h>
+#include <midi.h>
+#include <sid.h>
+#include <sid_detection.h>
+#include <logging.h>
 
-#include "globals.h"
-#include "config_constants.h"
-#include "config.h"
-#include "usbsid.h"
-#include "midi.h"
-#include "sid.h"
-#include "logging.h"
-
-
-/* config.c */
-extern ConfigError apply_config(bool at_boot);
-extern Config usbsid_config;
-extern RuntimeCFG cfg;
-
-/* config_bus.c */
-extern void apply_runtime_config(const Config *config, RuntimeCFG *rt);
-
-/* sid.c */
-extern void reset_sid_registers(void);
 
 /* Pre declarations */
 ConfigError validate_config(void);
 Socket default_socket(int id);
 
+
+#if defined(ONBOARD_EMULATOR)
+/**
+ * @brief Helper function for retrieving the number of SID's configured
+ *
+ * @return uint8_t the number of sids configured
+ */
+uint8_t get_numsids(void)
+{
+  return cfg.numsids;
+}
+#endif /* ONBOARD_EMULATOR */
 
 /**
  * @brief Returns the FMOpl socket SID id
@@ -244,7 +245,6 @@ ConfigError validate_config(void)
   /* Validate each socket independently
    * falls back to default configuration
    * if there is a configuration error */
-  ConfigError err;
 SOCKONE:;
   err = validate_socket(&usbsid_config.socketOne, 1);
   if (err != CFG_OK) {
@@ -387,7 +387,7 @@ static ConfigError apply_socket_preset(SocketPreset preset)
   apply_sid_addresses();
 
   /* Validate the result */
-  ConfigError err = validate_config();
+  err = validate_config();
   if (err != CFG_OK) {
     usERR("Preset '%s' validation failed: %s\n", preset_name(preset), config_error_str(err));
   } else {
@@ -433,7 +433,7 @@ static ConfigError apply_preset(SocketPreset preset, bool at_boot)
     return CFG_ERR_EQUAL_PRESET;
   }
 
-  ConfigError err = apply_socket_preset(preset);
+  err = apply_socket_preset(preset);
   if (err != CFG_OK) {
     return err;
   }
@@ -456,11 +456,10 @@ void apply_preset_wrapper(SocketPreset preset)
   restore_interrupts(irq);
   /* Run autodetection before applying preset,
      this will ensure supporting chips and sids, etc */
-  extern ConfigError sid_auto_detect(bool at_boot);
   sid_auto_detect(false);
 
   /* Now apply the preset */
-  ConfigError err = apply_preset(preset, false);
+  err = apply_preset(preset, false);
   if (err != CFG_OK) {
     memcpy(&usbsid_config, &backup_cfg, sizeof(Config)); /* Reset the config back */
     usERR("Applying preset error: %s\n", config_error_str(err));

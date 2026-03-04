@@ -3,7 +3,7 @@
  * for interfacing one or two MOS SID chips and/or hardware SID emulators over
  * (WEB)USB with your computer, phone or ASID supporting player
  *
- * config_constants.c
+ * usbsid_constants.c
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
@@ -23,7 +23,7 @@
  *
  */
 
-#include <config_constants.h>
+#include <usbsid_constants.h>
 
 
 /**

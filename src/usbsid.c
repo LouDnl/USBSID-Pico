@@ -23,17 +23,28 @@
  *
  */
 
-#include "globals.h"
-#include "config_constants.h"
-#include "config.h"
-#include "usbsid.h"
-#include "midi.h"
-#include "sid.h"
-#include "logging.h"
+#include <globals.h> /* Includes macros, sid_defs & usbsid_defs */
+#include <usbsid.h>
+#include <usbsid_constants.h>
+#include <config.h>
+#include <gpio.h>
+#include <gpio_defs.h>
+#include <pio.h>
+#include <dma.h>
+#include <bus.h>
+#include <uart.h>
+#include <vu.h>
+#include <mcu.h>
+#include <sid.h>
+#include <sid_tests.h>
+#include <sid_detection.h>
+#include <midi.h>
+#include <asid.h>
+#include <logging.h>
 
 
-/* Double Tap */
-extern int flagged;  /* doubletap check */
+/* doubletap.c */
+extern int flagged;
 
 /* Declare variables ~ Do not change order to keep memory alignment! */
 uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);  /* 64 Bytes, 128 bytes aligned */
@@ -41,6 +52,7 @@ uint8_t __not_in_flash("usbsid_buffer") sid_buffer[MAX_BUFFER_SIZE] __aligned(2 
 uint8_t __not_in_flash("usbsid_buffer") read_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);   /* 64 Bytes, 128 bytes aligned */
 uint8_t __not_in_flash("usbsid_buffer") config_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE); /* 64 Bytes, 128 bytes aligned */
 uint8_t __not_in_flash("usbsid_buffer") uart_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);   /* 64 Bytes, 128 bytes aligned */
+uint8_t *write_buffer_p = write_buffer; /* Init pointer for external use */
 
 #if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
 /* Use full 64KB memory for C64 emulator and SID player */
@@ -64,108 +76,28 @@ volatile double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
 volatile bool auto_config = false;
 volatile bool offload_ledrunner = false;
 
-/* Init var pointers for external use */
-uint8_t (*write_buffer_p)[MAX_BUFFER_SIZE] = &write_buffer;
-
-/* config.c */
-extern void load_config(Config * config);
-extern void save_config_ext(void);
-extern void handle_config_request(uint8_t * buffer, uint32_t size);
-extern void print_config(void);
-extern ConfigError apply_config(bool at_boot);
-extern void detect_default_config();
-extern Config usbsid_config;
-extern RuntimeCFG cfg;
-extern bool first_boot;
-
-/* gpio.c */
-extern void init_gpio(void);
-
-/* pio.c */
-extern void setup_sidclock(void);
-extern void setup_piobus(void);
-extern void sync_pios(bool at_boot);
-
-/* dma.c */
-extern void setup_dmachannels(void);
-
-/* sid.c */
-extern bool get_reset_state(void);
-extern void set_muted_state(bool state);
-extern void pause_sid(void);
-extern void pause_sid_withmute(void);
-extern void mute_sid(void);
-extern void unmute_sid(void);
-extern void reset_sid(void);
-extern void reset_sid_registers(void);
-extern void enable_sid(bool unmute);
-extern void disable_sid(void);
-extern void clear_bus_all(void);
-
-/* bus.c */
-extern uint16_t cycled_delay_operation(uint16_t cycles);
-extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
-extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
-
-/* uart.c */
-#ifdef USE_PIO_UART
-extern void init_uart(void);
-#endif
-
-/* vu.c */
-extern volatile uint16_t vu;
-extern void init_vu(void);
-extern void led_runner(void);
-
-/* mcu.c */
-extern void mcu_reset(void);
-extern void mcu_jump_to_bootloader(void);
-
-/* sid_tests.c */
-extern bool running_tests;
-
-/* sid_detection.c */
-extern ConfigError sid_auto_detect(bool at_boot);
+/* Cynthcart emulator */
+#if defined(ONBOARD_EMULATOR)
+#include <emudore_emulator.h>
+volatile bool emulator_running = false;
+volatile bool starting_emulator = false;
+volatile bool stopping_emulator = false;
+#endif /* ONBOARD_EMULATOR */
 
 /* SID player */
-#ifdef ONBOARD_EMULATOR
-extern bool
-  emulator_running,
-  starting_emulator,
-  stopping_emulator;
-extern void start_cynthcart(void);
-extern unsigned int run_cynthcart(void);
-#endif /* ONBOARD_EMULATOR */
 #if defined(ONBOARD_SIDPLAYER)
+#include <usplayer.h>
 volatile bool sidplayer_init = false;
 volatile bool sidplayer_start = false;
 volatile bool sidplayer_playing = false;
 volatile bool sidplayer_stop = false;
 volatile bool sidplayer_next = false;
 volatile bool sidplayer_prev = false;
-extern uint8_t * sidfile; /* Temporary buffer to store incoming data */
-extern volatile int sidfile_size;
-extern volatile char tuneno;
-extern volatile bool is_prg;
-extern void load_prg(uint8_t * binary_, size_t binsize_, bool loop);
-extern void load_sidtune(uint8_t * sidfile, int sidfilesize, char subt);
-extern void init_sidplayer(void);
-extern void start_sidplayer(bool loop);
-extern void loop_sidplayer(void);
-extern void stop_sidplayer(void);
-extern void next_subtune(void);
-extern void previous_subtune(void);
+uint8_t * sidfile = NULL; /* Temporary buffer to store incoming data */
+volatile int sidfile_size = 0;
+volatile char tuneno = 0;
+volatile bool is_prg = false; /* Default to SID file */
 #endif /* ONBOARD_SIDPLAYER */
-
-/* midi.c */
-extern void midi_init(void);
-extern void process_stream(uint8_t *buffer, size_t size);
-
-/* asid.c */
-extern void asid_init(void);
-
-/* Midi init */
-midi_machine midimachine;
 
 /* Queues */
 queue_t sidtest_queue;
@@ -901,7 +833,7 @@ int main()
   /* Load config before init of USBSID settings ~ NOTE: This cannot be run from Core 1! */
   load_config(&usbsid_config);
   /* Apply saved config to used vars */
-  ConfigError err = apply_config(true);
+  err = apply_config(true);
   if (err != CFG_OK) {
     usERR("%s\n", config_error_str(err));
   };
@@ -990,8 +922,6 @@ int main()
   reset_sid_registers(); /* WARNING: Might cause issues! */
 
   {
-    extern const char *us_product;
-    extern const char *project_version;
     usNFO("\n");
 #ifdef ONBOARD_EMULATOR
     usDBG("Firmware is compiled with Cynthcart support\n");

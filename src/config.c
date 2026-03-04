@@ -23,155 +23,42 @@
  *
  */
 
-/* Hardware api's */
-#include "hardware/clocks.h"
-#include "hardware/flash.h"
-#include "hardware/sync.h"
+#include <globals.h>
+#include <usbsid.h>
+#include <usbsid_constants.h>
+#include <config.h>
+#include <gpio.h>
+#include <midi.h>
+#include <sid.h>
+#include <bus.h>
+#include <dma.h>
+#include <pio.h>
+#include <mcu.h>
+#include <sid_detection.h>
+#include <sid_cloneconfig.h>
+#include <sid_tests.h>
+#include <config_bus.h>
+#include <config_socket.h>
+#include <config_logging.h>
+#include <logging.h>
 
-#include "globals.h"
-#include "config.h"
-#include "usbsid.h"
-#include "midi.h"
-#include "sid.h"
-#include "logging.h"
-#include "config_constants.h"
+/* Cynthcart emulator */
+#if defined(ONBOARD_EMULATOR)
+#include <emudore_emulator.h>
+#endif /* ONBOARD_EMULATOR */
 
-
-/* usbsid.c */
-extern void cdc_write(volatile uint8_t * itf, uint32_t n);
-extern void webserial_write(volatile uint8_t * itf, uint32_t n);
-extern char rtype;
-extern uint8_t *cdc_itf;
-extern uint8_t *wusb_itf;
-extern uint8_t *write_buffer_p;
-extern double cpu_mhz, cpu_us;
-extern double sid_hz, sid_mhz, sid_us;
-#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
-extern uint8_t *sid_memory;
-#else
-extern uint8_t sid_memory[];
-#endif
-extern queue_t sidtest_queue;
-extern bool auto_config;
-#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
-/* Offload Vu to Core1 when running C64 on Core2 */
-extern volatile bool offload_ledrunner;
-#endif
-
-/* dma.c */
-extern void stop_dma_channels(void);
-extern void start_dma_channels(void);
-
-/* pio.c */
-extern void init_sidclock(void);
-extern void deinit_sidclock(void);
-extern void sync_pios(bool at_boot);
-extern void restart_bus_clocks(void);
-
-/* sid.c */
-extern void enable_sid(bool unmute);
-extern void disable_sid(void);
-extern void mute_sid(void);
-extern void unmute_sid(void);
-extern void reset_sid(void);
-extern void reset_sid_registers(void);
-
-/* bus.c */
-extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
-extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
-extern uint16_t cycled_delay_operation(uint16_t cycles);
-extern void restart_bus(void);
-
-/* gpio.c */
-extern void toggle_audio_switch(void);
-extern void set_audio_switch(bool state);
-
-/* mcu.c */
-extern void mcu_reset(void);
-
-/* midi.c */
-extern void midi_bus_operation(uint8_t a, uint8_t b);
-
-/* sid_detection.c */
-extern ConfigError sid_auto_detect(bool at_boot);
-extern ChipType detect_chiptype_at(uint8_t base_address);
-extern SIDType detect_sidtype_at(uint8_t base_address, uint8_t chiptype);
-extern bool detect_fmopl(uint8_t base_address);
-extern void auto_detect_routine(void);
-extern uint8_t detect_sid_model(uint8_t start_addr);
-extern uint8_t detect_sid_version(uint8_t start_addr);
-extern uint8_t detect_sid_reflex(uint8_t start_addr);
-extern uint8_t detect_sid_version_skpico_deprecated(uint8_t start_addr);
-
-/* sid_tests.c */
-extern void sid_test(int sidno, char test, char wf);
-extern bool running_tests;
-
-/* sid_cloneconfig.c */
-extern void read_fpgasid_configuration(uint8_t base_address);
-extern void read_skpico_configuration(uint8_t base_address, uint8_t profile);
-extern void reset_switch_pdsid_type(void);
-extern uint8_t read_pdsid_sid_type(uint8_t base_address);
-extern bool set_pdsid_sid_type(uint8_t base_address, uint8_t type);
-
-/* config_bus.c */
-extern void apply_runtime_config(const Config *config, RuntimeCFG *rt);
-
-/* config_socket.c */
-ConfigError validate_config(void);
-extern void socket_config_fallback(void);
-extern void apply_fmopl_config(void);
-void apply_preset_wrapper(SocketPreset preset);
-
-/* config_logging.c */
-extern void print_cfg(const uint8_t *buf, size_t len, bool newline);
-extern void print_cfg_addr(void);
-extern void print_pico_features(void);
-extern void print_config_overview(void);
-extern void print_config_summary(void);
-extern void print_runtime_summary(void);
-
-/* Config logging locals */
-void (*config_print[2])(void) = { print_cfg_addr, print_pico_features };
-
-/* Pre declarations */
-ConfigError apply_config(bool at_boot);
-void save_load_apply_config(bool at_boot);
-void save_config_ext(void);
-int return_clockrate(void);
-void apply_clockrate(int n_clock, bool suspend_sids);
-ConfigError err = 0;
 
 /* SID player */
-#ifdef ONBOARD_EMULATOR
-extern bool stop_cynthcart(void); /* TODO: Remove double declaration */
-extern void set_logging(int logid);
-extern void unset_logging(int logid);
-bool
-  emulator_running,
-  starting_emulator,
-  stopping_emulator;
-#endif /* ONBOARD_EMULATOR */
 #if defined(ONBOARD_SIDPLAYER)
-extern volatile bool
-  sidplayer_init,
-  sidplayer_start,
-  sidplayer_playing,
-  sidplayer_stop,
-  sidplayer_next,
-  sidplayer_prev;
-/* SID player locals */
-uint8_t * sidfile = NULL; /* Temporary buffer to store incoming data */
-volatile int sidfile_size = 0;
-volatile char tuneno = 0;
-volatile bool is_prg = false; /* Default to SID file */
 static int sidbytes_received = 0;
 static bool receiving_sidfile = 0;
 #endif /* ONBOARD_SIDPLAYER */
 
 /* Declare variables */
+static const Config usbsid_default_config = USBSID_DEFAULT_CONFIG_INIT;
 Config usbsid_config = {0};
 RuntimeCFG cfg = {0};
+ConfigError err = 0;
 volatile bool first_boot = false;
 const char __in_flash("us_vars") *project_version = PROJECT_VERSION;
 const char __in_flash("us_vars") *pcb_version = PCB_VERSION;
@@ -713,47 +600,9 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       usCFG("[CMD] TRIPLE_SID SOCKET 2\n");
       apply_preset_wrapper(PRESET_TRIPLE_S2);
       break;
-    case LOAD_MIDI_STATE:   /* Load from config into midimachine and apply to SIDs */
-      // usCFG("[CMD] LOAD_MIDI_STATE\n");
-      // for (int i = 0; i < 4; i++) {
-      //   usCFG("[SID %d]", (i + 1));
-      //   for (int j = 0; j < 32; j++) {
-      //     /* ISSUE: this only loads 1 channel state and should actually save all channel states */
-      //     midimachine.channel_states[curr_midi_channel][i][j] = usbsid_config.Midi.sid_states[i][j];
-      //     midimachine.channelkey_states[curr_midi_channel][i][i] = 0;  /* Make sure extras is always initialised @ zero */
-      //     usCFG(" %02x", midimachine.channel_states[curr_midi_channel][i][j]);
-      //     midi_bus_operation((0x20 * i) | j, midimachine.channel_states[curr_midi_channel][i][j]);
-      //   }
-      //   usCFG("\n");
-      // }
-      break;
-    case SAVE_MIDI_STATE:   /* Save from midimachine into config and save to flash */
-      // usCFG("[CMD] SAVE_MIDI_STATE\n");
-      // for (int i = 0; i < 4; i++) {
-      //   usCFG("[SID %d]", (i + 1));
-      //   for (int j = 0; j < 32; j++) {
-      //     /* ISSUE: this only loads 1 channel state and should actually save all channel states */
-      //     usbsid_config.Midi.sid_states[i][j] = midimachine.channel_states[curr_midi_channel][i][j];
-      //     usCFG(" %02x", usbsid_config.Midi.sid_states[i][j]);
-      //   }
-      //   usCFG("\n");
-      // }
-      // save_config(&usbsid_config);
-      break;
-    case RESET_MIDI_STATE:  /* Reset all settings to zero */
-      // usCFG("[CMD] RESET_MIDI_STATE\n");
-      // for (int i = 0; i < 4; i++) {
-      //   usCFG("[SID %d]", (i + 1));
-      //   for (int j = 0; j < 32; j++) {
-      //     // BUG: this only resets 1 channel state
-      //     usbsid_config.Midi.sid_states[i][j] = midimachine.channel_states[curr_midi_channel][i][j] = 0;
-      //     usCFG(" %02x", usbsid_config.Midi.sid_states[i][j]);
-      //     midi_bus_operation((0x20 * i) | j, midimachine.channel_states[curr_midi_channel][i][j]);
-      //   }
-      //   usCFG("\n");
-      // }
-      // save_config(&usbsid_config);
-      /* mcu_reset(); */
+    case LOAD_MIDI_STATE: /* Unused */
+    case SAVE_MIDI_STATE:
+    case RESET_MIDI_STATE:
       break;
     case SET_CLOCK:         /* Change SID clock frequency by array id */
       usCFG("[CMD] SET_CLOCK\n");
@@ -1017,7 +866,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       break;
     case TEST_FN2:
       uint8_t st = 0xFF;
-      #ifdef ONBOARD_EMULATOR
+      #if defined(ONBOARD_EMULATOR)
       if (buffer[1] == 0) {
         usCFG("START EMULATOR\n");
         emulator_running = false;
@@ -1038,12 +887,10 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       }
       #endif
       if (buffer[1] == 3) {
-        extern bool detect_armsid(uint8_t base_address);
         st = detect_armsid(buffer[2]);
         usCFG("[TEST FOUND] %02X\n", st);
       }
       if (buffer[1] == 5) {
-        extern uint32_t clockcycles(void);
         uint16_t dcyc = 1000;
         if (buffer[2] != 0 || buffer[3] != 0)
           dcyc = (buffer[2] << 8) | buffer[3];
@@ -1089,13 +936,10 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         read_skpico_configuration(buffer[2], buffer[3]);
       }
       if (buffer[1] == 0xA)  {
-        extern void print_backsid_filter_type(uint8_t base_address);
-        extern void print_backsid_version(uint8_t base_address);
         print_backsid_filter_type(buffer[2]);
         print_backsid_version(buffer[2]);
       }
       if (buffer[1] == 0xB) {
-        extern void set_backsid_filter_type(uint8_t base_address, uint8_t type);
         set_backsid_filter_type(buffer[2],buffer[3]);
       }
       if (buffer[1] == 0xC) {
@@ -1107,15 +951,14 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         usNFO("[PDSID] $%02x\n",result);
       }
       if (buffer[1] == 0xD) {
-        if(buffer[2] == 0) {
+        if (buffer[2] == 0) {
           print_config_overview();
-        } else {
+        } else if (buffer[2] == 1){
           print_config_summary();
           print_runtime_summary();
+        } else {
+          print_cfg_addr();
         }
-      }
-      if (buffer[1] == 0xE) {
-        config_print[buffer[2]]();
       }
       break;
     case TEST_FN3:

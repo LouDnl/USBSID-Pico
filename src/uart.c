@@ -30,23 +30,13 @@
 #ifdef USE_PIO_UART
 #if PICO_RP2350
 
-#include "globals.h"
-#include "uart.h"
-#include "logging.h"
+#include <globals.h>
+#include <usbsid.h>
+#include <bus.h>
+#include <sid.h>
+#include <uart.h>
+#include <logging.h>
 
-
-/* usbsid.c */
-extern uint8_t uart_buffer[64];
-extern int volatile usbdata;
-extern char ntype, dtype, uart;
-extern bool offload_ledrunner;
-
-/* gpio.c */
-extern uint16_t cycled_delay_operation(uint16_t cycles);
-extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
-extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
-extern uint16_t cycled_delayed_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
-extern void reset_sid(void);
 
 /* Locals */
 static PIO uart_pio = pio2;
@@ -237,6 +227,7 @@ void deinit_uart(void)
 
   return;
 }
+
 
 #endif /* PICO_RP2350 */
 #endif /* USE_PIO_UART */

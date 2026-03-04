@@ -23,19 +23,12 @@
  *
  */
 
-#include "globals.h"
-#include "config_constants.h"
-#include "config.h"
-#include "gpio.h"
-#include "logging.h"
-#include "sid.h"
-
-
-/* config.c */
-extern Config usbsid_config;
-
-/* config_logging.c */
-extern char *mono_stereo[2];
+#include <globals.h>
+#include <usbsid_constants.h>
+#include <config.h>
+#include <gpio_defs.h>
+#include <logging.h>
+#include <sid.h>
 
 
 /**

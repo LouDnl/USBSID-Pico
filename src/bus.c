@@ -23,45 +23,16 @@
  *
  */
 
+#include <globals.h>
+#include <usbsid.h>
+#include <logging.h>
+#include <config.h>
+#include <gpio_defs.h>
+#include <pio.h>
+#include <dma.h>
+#include <vu.h>
+#include <sid.h>
 
-#include "hardware/irq.h"    /* Hardware interrupt handling */
-
-#include "globals.h"
-
-#include "logging.h"
-#include "config.h"
-#include "pio.h"
-#include "sid.h"
-
-
-/* usbsid.c */
-#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
-extern uint8_t *sid_memory;
-#else
-extern uint8_t sid_memory[];
-#endif
-
-/* config.c */
-extern RuntimeCFG cfg;
-
-/* bus.c */
-extern bool get_muted_state(void);
-
-/* vu.c */
-extern uint16_t vu;
-
-/* dma.c */
-extern void setup_dmachannels(void);
-extern void unclaim_dma_channels(void);
-extern volatile uint32_t cycle_count_word;
-extern int dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay;
-
-/* pio.c */
-extern void setup_piobus(void);
-extern void sync_pios(bool at_boot);
-extern void stop_pios(void);
-extern PIO bus_pio;
-extern uint sm_control, sm_data, sm_clock, sm_delay;
 
 /* Direct Pio IRQ access */
 #define IRQState (pio0_hw->irq)

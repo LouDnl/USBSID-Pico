@@ -23,39 +23,18 @@
  *
  */
 
-#include "globals.h"
-#include "config_constants.h"
-#include "config.h"
-#include "usbsid.h"
-#include "sid.h"
-#include "logging.h"
-#include "sid_armsid.h"
-#include "sid_fpgasid.h"
-#include "sid_pdsid.h"
-#include "sid_backsid.h"
-
-
-/* config.c */
-extern ConfigError apply_config(bool at_boot);
-extern Config usbsid_config;
-extern RuntimeCFG cfg;
-
-/* config_socket.c */
-extern ConfigError apply_detection_results(const DetectionResult *det);
-extern Socket default_socket(int id);
-
-/* config_bus.c */
-extern void apply_runtime_config(const Config *config, RuntimeCFG *rt);
-
-/* bus.c */
-extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
-extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
-extern uint16_t cycled_delay_operation(uint16_t cycles);
-extern void clear_bus(int sidno);
-
-/* sid.c */
-extern void reset_sid_registers(void);
-extern void reset_sid(void);
+#include <globals.h>
+#include <usbsid_constants.h>
+#include <config.h>
+#include <bus.h>
+#include <config_socket.h>
+#include <config_bus.h>
+#include <logging.h>
+#include <sid.h>
+#include <sid_armsid.h>
+#include <sid_fpgasid.h>
+#include <sid_pdsid.h>
+#include <sid_backsid.h>
 
 
 /**
@@ -679,7 +658,7 @@ ConfigError sid_auto_detect(bool at_boot)
   DetectionResult det = detect_all();
 
   /* Apply results */
-  ConfigError err = apply_detection_results(&det); // TODO
+  err = apply_detection_results(&det);
   if (err != CFG_OK) {
     usERR("Detection results invalid: %s\n", config_error_str(err));
     return err;

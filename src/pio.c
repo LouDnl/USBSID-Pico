@@ -23,29 +23,15 @@
  *
  */
 
-/* Hardware api's */
-#include "hardware/clocks.h"
-#include "hardware/flash.h"
-#include "hardware/sync.h"
+#include <globals.h>
+#include <config.h>
+#include <logging.h>
+#include <gpio_defs.h>
+#include <gpio.h>
+#include <dma.h>
+#include <pio.h>
+#include <sid.h>
 
-#include "globals.h"
-#include "config.h"
-#include "logging.h"
-#include "pio.h"
-#include "sid.h"
-
-
-/* gpio.c */
-extern int detect_clocksignal(void);
-
-/* config.c */
-extern void verify_clockrate(void);
-extern Config usbsid_config;
-extern RuntimeCFG cfg;
-extern const char* pcb_version;
-
-/* dma.c */
-extern void setup_vu_dma(void);
 
 /* locals */
 const PIO bus_pio = pio0;

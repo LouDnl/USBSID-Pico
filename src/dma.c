@@ -23,17 +23,12 @@
  *
  */
 
+#include <globals.h>
+#include <logging.h>
+#include <config.h>
+#include <pio.h>
+#include <sid.h>
 
-#include "globals.h"
-#include "logging.h"
-#include "config.h"
-#include "pio.h"
-#include "sid.h"
-
-
-/* pio.c */
-extern const PIO bus_pio, clkcnt_pio;
-extern uint sm_control, sm_data, sm_clock, sm_delay, sm_clkcnt;
 
 /* DMA */
 int dma_tx_control = 0, dma_tx_data = 0, dma_rx_data = 0, dma_tx_delay = 0;
@@ -45,12 +40,9 @@ volatile uint32_t cycle_count_word;
 
 /* Shiny things */
 #if defined(PICO_DEFAULT_LED_PIN)
-extern const PIO led_pio;
-extern uint sm_pwmled;
 int dma_pwmled;
 volatile int pwm_value = 0;
 #if defined(USE_RGB)  /* No RGB LED on _w Pico's */
-extern uint sm_rgbled;
 int dma_rgbled;
 volatile uint32_t rgb_value = 0;
 #endif

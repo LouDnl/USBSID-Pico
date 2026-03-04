@@ -31,37 +31,21 @@
  *
  */
 
-
-#include "pico/multicore.h"
-#include "pico/util/queue.h"
-
 #include <math.h>
 
-#include "globals.h"
-#include "config.h"
-#include "logging.h"
-#include "sid.h"
-#include "midi.h"
-#include "midi_cc.h"
+#include <globals.h>
+#include <usbsid.h>
+#include <config.h>
+#include <bus.h>
+#include <logging.h>
+#include <sid.h>
+#include <midi.h>
+#include <midi_cc.h>
+#include <midi_handler.h>
+
 
 // #define NOTEHI(n) ((musical_scale_values[(n - ((n >= 0x81) ? 0x80 : 0))] & 0xFF00) >> 8)
 // #define NOTELO(n) (musical_scale_values[(n - ((n >= 0x81) ? 0x80 : 0))] & 0xFF)
-
-/* usbsid.c */
-#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
-extern uint8_t *sid_memory;
-#else
-extern uint8_t sid_memory[];
-#endif
-
-/* config.c */
-extern RuntimeCFG cfg;
-
-/* bus.c */
-extern uint8_t cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
-
-/* midi.c */
-extern const midi_ccvalues midi_ccvalues_defaults;
 
 /* Initialise variables */
 typedef struct Voice_m {
@@ -93,13 +77,13 @@ static midi_ccvalues CC;
 static void (*cc_func_ptr_array[128])(uint8_t a, uint8_t b);
 
 
-/* Helper functions */
-void midi_bus_operation_(uint8_t a, uint8_t b)
+/* Internal helper functions */
+static void midi_bus_operation_(uint8_t a, uint8_t b)
 {
   cycled_write_operation(a, b, 6);  /* 6 cycles constant for LDA 2 and STA 4 */
   return;
 }
-void midi_bus_operation(uint8_t a, uint8_t b)
+static void midi_bus_operation(uint8_t a, uint8_t b)
 {
   cycled_write_operation(a, b, 0);  /* 0 cycles constant for fast writing */
   return;

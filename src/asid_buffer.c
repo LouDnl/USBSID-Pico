@@ -38,20 +38,15 @@
 #include <pico/stdlib.h>
 #include <pico/malloc.h>
 
-#include "globals.h"
-#include "config.h"
-#include "pio.h"
-#include "gpio.h"
-#include "logging.h"
-#include "asid.h"
-#include "sid.h"
+#include <globals.h>
+#include <config.h>
+#include <bus.h>
+#include <pio.h>
+#include <gpio.h>
+#include <logging.h>
+#include <asid.h>
+#include <sid.h>
 
-
-/* config.c */
-extern Config usbsid_config;
-
-/* bus.c */
-extern uint32_t clockcycles(void);
 
 /* PIO */
 const PIO raster_pio = pio1;
@@ -430,9 +425,6 @@ void __not_in_flash_func(buffer_irq_handler)(void)
 {
   irq_prev_at = irq_now_at;
   irq_now_at = clockcycles();
-
-  /* inline extern as only used here */
-  extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
 
   /* Retrieve the current diff */
   int current_diff = ring_diff();

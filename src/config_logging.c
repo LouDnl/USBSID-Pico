@@ -23,21 +23,12 @@
  *
  */
 
-
-#include "globals.h"
-#include "config_constants.h"
-#include "config.h"
-#include "usbsid.h"
-#include "midi.h"
-#include "sid.h"
-#include "logging.h"
-
-
-/* config.c */
-extern const char *project_version;
-extern const char *pcb_version;
-extern Config usbsid_config;
-extern RuntimeCFG cfg;
+#include <globals.h>
+#include <usbsid_constants.h>
+#include <config.h>
+#include <midi.h>
+#include <sid.h>
+#include <logging.h>
 
 
 /**

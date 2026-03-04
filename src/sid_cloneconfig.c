@@ -23,37 +23,20 @@
  *
  */
 
-#include "globals.h"
-#include "config_constants.h"
-#include "config.h"
-#include "usbsid.h"
-#include "sid.h"
-#include "logging.h"
-#include "sid_fpgasid.h"
-#include "sid_skpico.h"
-#include "sid_pdsid.h"
-#include "sid_backsid.h"
+#include <globals.h>
+#include <usbsid_constants.h>
+#include <config.h>
+#include <gpio_defs.h>
+#include <bus.h>
+#include <sid.h>
+#include <sid_detection.h>
+#include <config_logging.h>
+#include <logging.h>
+#include <sid_fpgasid.h>
+#include <sid_skpico.h>
+#include <sid_pdsid.h>
+#include <sid_backsid.h>
 
-
-/* bus.c */
-extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
-extern uint8_t cycled_read_operation(uint8_t address, uint16_t cycles);
-
-/* sid.c */
-extern void clear_sid_memory(void);
-extern void clear_volume_state(void);
-extern void set_reset_state(bool state);
-extern void set_paused_state(bool state);
-
-/* sid_detection.c */
-extern bool detect_pdsid(uint8_t base_address, bool silent);
-
-/* config.c */
-extern Config usbsid_config;
-extern RuntimeCFG cfg;
-
-/* config_logging.c */
-extern void print_cfg(const uint8_t *buf, size_t len, bool newline);
 
 /* Init local variables */
 static uint8_t skpico_config[64] = {0xff};

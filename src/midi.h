@@ -97,9 +97,6 @@ extern const midi_ccvalues midi_ccvalues_defaults;
 void midi_init(void);
 void process_stream(uint8_t *buffer, size_t size);
 
-/* Functions from midi_handler.c */
-void midi_bus_operation(uint8_t a, uint8_t b);
-
 
 #ifdef __cplusplus
   }
