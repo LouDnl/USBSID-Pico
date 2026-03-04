@@ -71,6 +71,7 @@ enum {
   SID_PLAYER_PAUSE = 0xE3,  /* Pause/Unpause SID file play */
   SID_PLAYER_NEXT  = 0xE4,  /* Next SID subtune play */
   SID_PLAYER_PREV  = 0xE5,  /* Previous SID subtune play */
+  SID_PLAYER_TWO   = 0xE6,  /* Force play to play on socket two or sid two */
 
   FROM_STDIN       = 0x00,  /* Read data from stdin */
   SID_FILE         = 0x01,  /* File is SID */
@@ -286,6 +287,7 @@ void print_help(void)
   fprintf(stdout, "  sidtune.prg: send sidtune.prg to USBSID-Pico to start play (psid64 preferred!)\n");
   fprintf(stdout, "  -sid -: to read _SID_ file data from stdin instead of sidfile.sid (PRG not supported yet!)\n");
   fprintf(stdout, "  -t N: provide subtune number together with sid to set subtune (defaults to 1))\n");
+  fprintf(stdout, "  -f: Force play on second SID / socket (depends on USBSID-Pico configuration)\n");
   //  fprintf(stdout, "* -start: start play\n");
   fprintf(stdout, "-stop: stop play\n");
   //  fprintf(stdout, "* -pause: pause play\n");
@@ -331,6 +333,7 @@ int main(int argc, char* argv[])
   }
 
   bool sentfile = false;
+  bool forcetwo = false;
   bool sidfile = false;
   bool prgfile = false;
 
@@ -341,6 +344,13 @@ int main(int argc, char* argv[])
 
   if (usbsid_init()) {
     goto exit;
+  }
+
+  /* Check if we have a request to force play on SID2 / Socket2 etc. */
+  for(int a = 1; a < argc; a++) {
+    if(!strcmp(argv[a], "-f")) {
+      forcetwo = true;
+    }
   }
 
   for(int arg = 1; arg < argc; arg++) {
@@ -392,6 +402,13 @@ int main(int argc, char* argv[])
       sentfile = true;
     }
     if (sentfile) {
+      if (forcetwo) {
+        fprintf(stdout, "Forcing SID/Socket 2\n");
+        configbuff[1] = SID_PLAYER_TWO;
+        configbuff[2] = 0;
+        configbuff[3] = 0;
+        write_chars(configbuff, 5);
+      }
       {
         fprintf(stdout, "Setting subtune to ");
         configbuff[1] = SID_PLAYER_LOAD;
