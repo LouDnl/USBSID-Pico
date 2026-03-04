@@ -91,9 +91,11 @@ static void print_fpgasid_sidconfig(int slot, int sidno, uint8_t * configarray)
  */
 void read_fpgasid_configuration(uint8_t base_address)
 {
-  if ((usbsid_config.socketOne.chiptype != CHIP_FPGASID) || (usbsid_config.socketTwo.chiptype != CHIP_FPGASID)) {
-      usERR("No FPGASID configured, chip type %s (%d)\n",
-        base_address, chip_type_name((int)usbsid_config.socketOne.chiptype), usbsid_config.socketTwo.chiptype);
+  if ((usbsid_config.socketOne.chiptype != CHIP_FPGASID) && (usbsid_config.socketTwo.chiptype != CHIP_FPGASID)) {
+      usERR("No FPGASID configured, socketOne: %s (%d) socketTwo: %s (%d)\n",
+        chip_type_name((int)usbsid_config.socketOne.chiptype), usbsid_config.socketOne.chiptype,
+        chip_type_name((int)usbsid_config.socketTwo.chiptype), usbsid_config.socketTwo.chiptype
+      );
     return; /* Do nothing if no FPGASID configured */
   }
   static uint8_t idHi, idLo, cpld, fpga, pca, select_pins, idxa, idxb, flta, fltb;
