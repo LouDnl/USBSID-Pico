@@ -41,6 +41,7 @@
 
 /* Functions from sid_detection.c */
 ConfigError sid_auto_detect(bool at_boot);
+ConfigError sid_auto_detect_silent(void);
 ChipType    detect_chiptype_at(uint8_t base_address);
 SIDType     detect_sidtype_at(uint8_t base_address, uint8_t chiptype);
 bool        detect_fmopl(uint8_t base_address);

@@ -69,8 +69,8 @@ const char __in_flash("us_vars") *us_product = USBSID_PRODUCT;
 static uint8_t config_saveid = 0;
 /* 256 Bytes MAX == FLASH_PAGE_SIZE (Max storage size is 4096 bytes == FLASH_SECTOR_SIZE) */
 static uint8_t config_array[FLASH_PAGE_SIZE] = {0};
-/* 10 bytes is enough for now */
-static uint8_t socket_config_array[10];
+/* 12 bytes and counting */
+static uint8_t socket_config_array[SOCKET_BUFFER_SIZE];
 /* 64 byte array for copying the config version into */
 static uint8_t p_version_array[MAX_BUFFER_SIZE] = {0};
 /* Config magic verification storage */
@@ -85,38 +85,91 @@ void read_config(Config* config)
 
   config_array[0] = READ_CONFIG;  /* Initiator byte */
   config_array[1] = 0x7F;  /* Verification byte */
+
+  config_array[2] = 0x00; /* Unused */
+  config_array[3] = 0x00; /* Unused */
+  config_array[4] = 0x00; /* Unused */
+
+  /* Clockworx */
   config_array[5] = (int)config->lock_clockrate;
   config_array[6] = (int)config->external_clock;
   config_array[7] = (config->clock_rate >> 16) & BYTE;
   config_array[8] = (config->clock_rate >> 8) & BYTE;
   config_array[9] = config->clock_rate & BYTE;
+  /* Socket One */
   config_array[10] = (int)config->socketOne.enabled;
   config_array[11] = (int)config->socketOne.dualsid;
   config_array[12] = config->socketOne.chiptype;
   config_array[13] = (config->socketOne.sid1.id | (config->socketOne.sid2.id << 4));
   config_array[14] = config->socketOne.sid1.type;
   config_array[15] = config->socketOne.sid2.type;
+
+  config_array[16] = 0x00; /* Unused */
+  config_array[17] = 0x00; /* Unused */
+  config_array[18] = 0x00; /* Unused */
+  config_array[19] = 0x00; /* Unused */
+
+  /* Socket Two */
   config_array[20] = (int)config->socketTwo.enabled;
   config_array[21] = (int)config->socketTwo.dualsid;
-  config_array[22] = ((int)config->mirrored | ((int)config->flipped << 1) | ((int)config->mixed << 2));
+  config_array[22] = (int)config->mirrored; /* NOTE: Pre v0.7.0 fw backwards compatibility */
   config_array[23] = config->socketTwo.chiptype;
   config_array[24] = (config->socketTwo.sid1.id | (config->socketTwo.sid2.id << 4));
   config_array[25] = config->socketTwo.sid1.type;
   config_array[26] = config->socketTwo.sid2.type;
+
+  config_array[27] = 0x00; /* Unused */
+  config_array[28] = 0x00; /* Unused */
+  config_array[29] = 0x00; /* Unused */
+
+  /* Bright light, bright light!! */
   config_array[30] = (int)config->LED.enabled;
   config_array[31] = (int)config->LED.idle_breathe;
+
+  config_array[32] = 0x00; /* Unused */
+  config_array[33] = 0x00; /* Unused */
+  config_array[34] = 0x00; /* Unused */
+  config_array[35] = 0x00; /* Unused */
+  config_array[36] = 0x00; /* Unused */
+  config_array[37] = 0x00; /* Unused */
+  config_array[38] = 0x00; /* Unused */
+  config_array[39] = 0x00; /* Unused */
+
+  /* I can see colors! */
   config_array[40] = (int)config->RGBLED.enabled;
   config_array[41] = (int)config->RGBLED.idle_breathe;
   config_array[42] = config->RGBLED.brightness;
   config_array[43] = (int)config->RGBLED.sid_to_use;
+
+  config_array[44] = 0x00; /* Unused */
+  config_array[45] = 0x00; /* Unused */
+  config_array[46] = 0x00; /* Unused */
+  config_array[47] = 0x00; /* Unused */
+  config_array[48] = 0x00; /* Unused */
+  config_array[49] = 0x00; /* Unused */
+  config_array[50] = 0x00; /* Unused */
+
+  /* Stuffs */
   config_array[51] = (int)config->Cdc.enabled;
   config_array[52] = (int)config->WebUSB.enabled;
   config_array[53] = (int)config->Asid.enabled;
   config_array[54] = (int)config->Midi.enabled;
+
+  /* Stuff for keyboard people */
   config_array[55] = (int)config->FMOpl.enabled;
   config_array[56] = config->FMOpl.sidno;
+
+  /* Headphonez on! */
   config_array[57] = config->stereo_en;
   config_array[58] = config->lock_audio_sw;
+
+  config_array[59] = 0x00; /* Unused */
+
+  config_array[60] = ((int)config->mirrored | ((int)config->flipped << 1) | ((int)config->mixed << 2));
+
+  config_array[61] = 0x00; /* Unused */
+  config_array[62] = 0x00; /* Unused */
+
   config_array[63] = 0xFF;  /* Terminator byte */
 
   return;
@@ -126,20 +179,23 @@ void read_socket_config(Config* config)
 {
   memset(socket_config_array, 0, sizeof socket_config_array);  /* Make sure we don't send garbled old data */
 
-  socket_config_array[0] = READ_SOCKETCFG; /* Initiator byte */
-  socket_config_array[1] = 0x7F; /* Verification byte */
+  socket_config_array[0]  = READ_SOCKETCFG; /* Initiator byte */
+  socket_config_array[1]  = 0x7F; /* Verification byte */
 
-  socket_config_array[2] = ((int)config->socketOne.enabled << 4) | (int)config->socketOne.dualsid;
-  socket_config_array[3] = config->socketOne.chiptype; /* TODO: Update driver code! */
-  socket_config_array[4] = (config->socketOne.sid1.type << 4) | config->socketOne.sid2.type;
+  socket_config_array[2]  = ((int)config->socketOne.enabled << 4) | (int)config->socketOne.dualsid;
+  socket_config_array[3]  = (int)config->socketOne.chiptype;
+  socket_config_array[4]  = (config->socketOne.sid1.type << 4) | config->socketOne.sid2.type;
 
-  socket_config_array[5] = ((int)config->socketTwo.enabled << 4) | (int)config->socketTwo.dualsid;
-  socket_config_array[6] = config->socketTwo.chiptype; /* TODO: Update driver code! */
-  socket_config_array[7] = (config->socketTwo.sid1.type << 4) | config->socketTwo.sid2.type;
+  socket_config_array[5]  = ((int)config->socketTwo.enabled << 4) | (int)config->socketTwo.dualsid;
+  socket_config_array[6]  = (int)config->socketTwo.chiptype;
+  socket_config_array[7]  = (config->socketTwo.sid1.type << 4) | config->socketTwo.sid2.type;
 
-  socket_config_array[8] = ((int)config->mirrored | ((int)config->flipped << 1) | ((int)config->mixed << 2)); /* TODO: Update driver code! */
+  socket_config_array[8]  = ((int)config->socketOne.sid1.id | ((int)config->socketOne.sid2.id << 4));
+  socket_config_array[9]  = ((int)config->socketTwo.sid1.id | ((int)config->socketTwo.sid2.id << 4));
 
-  socket_config_array[9] = 0xFF;  /* Terminator byte */
+  socket_config_array[10] = ((int)config->mirrored | ((int)config->flipped << 1) | ((int)config->mixed << 2));
+
+  socket_config_array[11] = 0xFF;  /* Terminator byte */
 
   return;
 }
@@ -307,10 +363,13 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       break;
     case READ_CONFIG:
       usCFG("[CMD] READ_CONFIG\n");
-      /* ISSUE: Although 4 writes are performed, only the first 2 are received */
+      /* ISSUE:
+         It should send 4 packets of 64 bytes, but sends only 2 and a zero packet
+         Although 4 writes are performed, only the first 2 are received, (due to zero content data) */
       read_config(&usbsid_config);
       print_cfg(config_array, count_of(config_array), false);
-      int writes = count_of(config_array) / 64;  /* ISSUE: It should send 4 packets of 64 bytes, but sends only 2 and a zero packet */
+      /* TODO: Add check for terminator byte (end) or continue byte (moar packets coming in!) */
+      int writes = count_of(config_array) / 64;
       memset(write_buffer_p, 0, 64);
       for (int i = 0; i < writes; i++) {
         memcpy(write_buffer_p, config_array + (i * 64), 64);
@@ -320,10 +379,10 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case READ_SOCKETCFG:
       usCFG("[CMD] READ_SOCKETCFG\n");
       read_socket_config(&usbsid_config);
-      print_cfg(socket_config_array, 10, false);
+      print_cfg(socket_config_array, SOCKET_BUFFER_SIZE, false);
       memset(write_buffer_p, 0, 64);
-      memcpy(write_buffer_p, socket_config_array, 10);
-      write_back_data(10);
+      memcpy(write_buffer_p, socket_config_array, SOCKET_BUFFER_SIZE);
+      write_back_data(SOCKET_BUFFER_SIZE);
       break;
     case READ_NUMSIDS:
       usCFG("[CMD] READ_NUMSIDS: %u\n", (uint8_t)cfg.numsids);
@@ -339,12 +398,12 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       break;
     case APPLY_CONFIG:
       usCFG("[CMD] APPLY_CONFIG\n");
-      apply_config(false);
+      apply_config(false); /* Not at boot */
       break;
     case RELOAD_CONFIG:
       usCFG("[CMD] RELOAD_CONFIG\n");
       load_config(&usbsid_config);
-      apply_config(false);
+      apply_config(false); /* Not at boot */
       for (uint i = 0; i < count_of(clockrates); i++) {
         if (clockrates[i] == usbsid_config.clock_rate) {
           apply_clockrate(i, true);
@@ -553,7 +612,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         mcu_reset();
       } else {
         load_config(&usbsid_config);
-        apply_config(false);
+        apply_config(false); /* Not at boot */
       }
       break;
     case WRITE_CONFIG:  /* TODO: FINISH */
@@ -757,7 +816,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       break;
     case AUTO_DETECT:
       usCFG("[CMD] AUTO_DETECT\n");
-      err = sid_auto_detect(false);
+      err = sid_auto_detect(false); /* Not at boot */
       if (err != CFG_OK) {
         usERR("[CMD] Auto detection failed: %s\n", config_error_str(err));
       }
@@ -1102,7 +1161,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
   return;
 }
 
-void apply_led_config(void)
+void apply_rgbled_config()
 { /* if SID to use is higher then the number of sids, use first available SID */
   int sid = -1;
   int stou = (usbsid_config.RGBLED.sid_to_use - 1);
@@ -1144,6 +1203,34 @@ void apply_busclock_settings(void)
   start_dma_channels();
 }
 
+ConfigError apply_new_presetconfig(void)
+{
+  /* Start with validation */
+  err = validate_config();
+  if (err != CFG_OK) {
+    usERR("Preset config validation failed: %s\n", config_error_str(err));
+    socket_config_fallback();  /* Apply fallback configuration */
+    return err;
+  }
+
+  /* Apply values to Runtime Configuration */
+  RuntimeCFG new_cfg;
+  apply_runtime_config(&usbsid_config, &new_cfg);
+
+  /* Find configured FMOpl */
+  apply_fmopl_config();
+
+  /* Atomically swap runtime config IRQ safe */
+  uint32_t irq = save_and_disable_interrupts();
+  memcpy(&cfg, &new_cfg, sizeof(RuntimeCFG));
+  restore_interrupts(irq);
+
+  /* Apply to hardware (unless boot) */
+  apply_busclock_settings();
+
+  return CFG_OK;
+}
+
 ConfigError apply_config(bool at_boot)
 {
   usNFO("\n");
@@ -1159,7 +1246,6 @@ ConfigError apply_config(bool at_boot)
   /* Apply values to Runtime Configuration */
   RuntimeCFG new_cfg;
   apply_runtime_config(&usbsid_config, &new_cfg);
-  // apply_runtime_config(&usbsid_config, &cfg);
 
   /* Find configured FMOpl */
   apply_fmopl_config();
@@ -1179,7 +1265,7 @@ ConfigError apply_config(bool at_boot)
 
   if (RGB_ENABLED) {
     usCFG("  Applying RGBLED SID\n");
-    apply_led_config();
+    apply_rgbled_config();
   } else {
     usCFG("  RGBLED not available\n");
   }
@@ -1190,10 +1276,16 @@ ConfigError apply_config(bool at_boot)
   return CFG_OK;
 }
 
-void save_load_apply_config(bool at_boot)
+void save_load_config(void)
 {
   save_config(&usbsid_config);
   load_config(&usbsid_config);
+  return;
+}
+
+void save_load_apply_config(bool at_boot)
+{
+  save_load_config();
   apply_config(at_boot);
   return;
 }
@@ -1219,8 +1311,8 @@ void detect_default_config(void)
     usbsid_config.default_config = 0;
     usCFG("  Default configuration state set to %s\n", boolean_str(usbsid_config.default_config));
     first_boot = true;  /* Only at first boot the link popup will be sent */
-    // auto_detect_routine(); /* default auto detect routine based on default config */
-    sid_auto_detect(true); /* default auto detect routine based on default config */
+    /* default auto detect routine based on default config */
+    sid_auto_detect(true); /* At boot */
     save_config(&usbsid_config);
   }
   return;

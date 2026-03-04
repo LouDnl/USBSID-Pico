@@ -502,7 +502,7 @@ static DetectionResult detect_all(void)
 {
   DetectionResult result = { .success = false, .error = CFG_OK };
 
-  usCFG("Running CHIP & SID detection\n");
+  usCFG("Running Chip & SID detection\n");
 
   /* Create temporary probe config */
   Config probe = {
@@ -636,7 +636,7 @@ static DetectionResult detect_all(void)
   result.success = true;
 
   usNFO("\n");
-  usCFG("[DETECT] Complete: S1(%d,%d,%d) S2(%d,%d,%d)\n",
+  usCFG("Chip & SID detection complete: S1(%d,%d,%d) S2(%d,%d,%d)\n",
     result.socket[0].chiptype, result.socket[0].sid1_type, result.socket[0].sid2_type,
     result.socket[1].chiptype, result.socket[1].sid1_type, result.socket[1].sid2_type);
 
@@ -674,6 +674,31 @@ ConfigError sid_auto_detect(bool at_boot)
   /* Reset SID registers after detection */
   reset_sid_registers();
 
+  usNFO("\n");
   usCFG("Auto detection completed\n");
+  return CFG_OK;
+}
+
+/**
+ * @brief Handles chip and SID detection and configuration changes
+ * @note Special function used in config_socket:apply_preset()
+ *
+ * @return * ConfigError
+ */
+ConfigError sid_auto_detect_silent(void)
+{
+/* Run detection */
+  DetectionResult det = detect_all();
+
+  /* Apply results */
+  err = apply_detection_results(&det);
+  if (err != CFG_OK) {
+    usERR("Detection results invalid: %s\n", config_error_str(err));
+    return err;
+  }
+
+  /* Reset SID registers after detection */
+  reset_sid_registers();
+
   return CFG_OK;
 }

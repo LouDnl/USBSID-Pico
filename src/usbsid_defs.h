@@ -68,6 +68,30 @@
  */
 #define MAX_BUFFER_SIZE 64
 
+/* Socket config array
+ *  0 Initiator     = 0x37
+ *  1 Verification  = 0x7f
+ *  2 HiByte        = socketOne enabled
+ *  2 LoByte        = socketOne dualsid
+ *  3 LoByte        = socketOne chipType
+ *  4 HiByte        = socketOne sid1Type
+ *  4 LoByte        = socketOne sid2Type
+ *  5 HiByte        = socketTwo enabled
+ *  5 LoByte        = socketTwo dualsid
+ *  6 LoByte        = socketTwo chipType
+ *  7 HiByte        = socketTwo sid1Type
+ *  7 LoByte        = socketTwo sid2Type
+ *  8 HiByte        = socketOne SID1 id
+ *  8 LoByte        = socketOne SID2 id
+ *  9 HiByte        = socketOne SID1 id
+ *  9 LoByte        = socketOne SID2 id
+ * 10 LoByte 0b001  = socketTwo mirrors socketOne
+ * 10 LoByte 0b010  = sockets are flipped One is Two and vice versa
+ * 10 LoByte 0b100  = SID addresses are mixed (quad sid only)
+ * 11 Terminator    = 0xff
+ */
+#define SOCKET_BUFFER_SIZE 12
+
 /* Outgoing USB (CDC/WebUSB) data buffer
  *
  * 1 byte:

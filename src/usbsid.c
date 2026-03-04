@@ -833,7 +833,7 @@ int main()
   /* Load config before init of USBSID settings ~ NOTE: This cannot be run from Core 1! */
   load_config(&usbsid_config);
   /* Apply saved config to used vars */
-  err = apply_config(true);
+  err = apply_config(true); /* At boot */
   if (err != CFG_OK) {
     usERR("%s\n", config_error_str(err));
   };
@@ -907,7 +907,7 @@ int main()
     detect_default_config();
   }
   if (auto_config) {  /* NOTE: Does not work on rp2350 */
-    sid_auto_detect(true);  /* Double tap! */
+    sid_auto_detect(true); /* At boot */
     save_config_ext();
     auto_config = false;
     mcu_reset();

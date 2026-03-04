@@ -59,6 +59,10 @@ static const char __in_flash("us_statics") *preset_names[] = {
   [PRESET_QUAD]          = "Quad",
   [PRESET_MIRRORED]      = "Mirrored",
   [PRESET_MIRRORED_DUAL] = "Mirrored Dual",
+  [PRESET_DUAL_FLIPPED]  = "Dual flipped",
+  [PRESET_QUAD_FLIPPED]  = "Quad flipped",
+  [PRESET_QUAD_MIXED]    = "Quad mixed addresses",
+  [PRESET_QUAD_FLIPMIX]  = "Quad flipped and mixed",
 };
 
 /**

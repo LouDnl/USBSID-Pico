@@ -220,6 +220,7 @@ void apply_runtime_config(const Config *config, RuntimeCFG *rt)
   /* Apply bus control masks */
   apply_bus_masks(rt);
 
+  usNFO("\n");
   usCFG("Applied RuntimeCFG sids=%d (s1=%d s2=%d) mirrored=%d\n",
     rt->numsids, rt->sids_one, rt->sids_two, rt->mirrored);
 

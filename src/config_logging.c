@@ -128,10 +128,11 @@ void print_config_overview(void)
   usCFG("  Last applied preset is: %s\n",
     preset_name((int)usbsid_config.last_preset));
   usCFG("\n");
-  usCFG("  Socket One is %s as %s\n",
+  usCFG("  Socket One\n");
+  usCFG("      %s as %s\n",
     switch_str((int)usbsid_config.socketOne.enabled),
     dualsingle_str((int)usbsid_config.socketOne.dualsid));
-  usCFG("  Chip is %s\n",
+  usCFG("      Chip is %s\n",
     chip_type_name((int)usbsid_config.socketOne.chiptype));
   if (usbsid_config.socketOne.enabled)
     usCFG("      %s as SID1 @ addr $%02x with id %d\n",
@@ -143,10 +144,11 @@ void print_config_overview(void)
       sid_type_name((int)usbsid_config.socketOne.sid2.type),
       usbsid_config.socketOne.sid2.addr,
       usbsid_config.socketOne.sid2.id);
-  usCFG("  Socket Two is %s as %s\n",
+  usCFG("  Socket Two\n");
+  usCFG("      %s as %s\n",
     switch_str((int)usbsid_config.socketTwo.enabled),
     dualsingle_str((int)usbsid_config.socketTwo.dualsid));
-  usCFG("  Chip is %s\n",
+  usCFG("      Chip is %s\n",
     chip_type_name((int)usbsid_config.socketTwo.chiptype));
   if (usbsid_config.socketTwo.enabled)
     usCFG("      %s as SID1 @ addr $%02x with id %d\n",

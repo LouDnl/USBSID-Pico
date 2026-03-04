@@ -89,7 +89,7 @@ typedef enum SocketPreset {
   PRESET_QUAD,           /* Dual SID in both sockets (4 SIDs) */
   PRESET_MIRRORED,       /* S2 mirrors S1 (mono output on both) */
   PRESET_MIRRORED_DUAL,  /* S2 mirrors dual S1 */
-  PRESET_DUAL_FLIPPED,  /* One SID per socket (stereo), but flipped */
+  PRESET_DUAL_FLIPPED,   /* One SID per socket (stereo), but flipped */
   PRESET_QUAD_FLIPPED,   /* Dual SID in both sockets (4 SIDs), but flipped */
   PRESET_QUAD_MIXED,     /* Dual SID in both sockets (4 SIDs), mixed addresses */
   PRESET_QUAD_FLIPMIX,   /* Dual SID in both sockets (4 SIDs), but flipped and mixed addresses */

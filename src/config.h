@@ -390,10 +390,12 @@ void        load_config(Config *config);
 void        save_config_ext(void);
 void        handle_config_request(uint8_t *buffer, uint32_t size);
 void        print_config(void);
+ConfigError apply_new_presetconfig(void);
 ConfigError apply_config(bool at_boot);
 void        detect_default_config(void);
 int         return_clockrate(void);
 void        apply_clockrate(int n_clock, bool suspend_sids);
+void        save_load_config(void);
 void        save_load_apply_config(bool at_boot);
 void        verify_clockrate(void);
 

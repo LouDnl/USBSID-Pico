@@ -162,10 +162,11 @@ void apply_sid_addresses(void)
   if (addrs[2] == 0xFF) usbsid_config.socketTwo.sid1.type = SID_NA;
   if (addrs[3] == 0xFF) usbsid_config.socketTwo.sid2.type = SID_NA;
 
+  usNFO("\n");
   usCFG("SID addresses applied: S1.1=0x%02X S1.2=0x%02X S2.1=0x%02X S2.2=0x%02X (idx=%d)\n",
-  addrs[0], addrs[1], addrs[2], addrs[3], idx);
+    addrs[0], addrs[1], addrs[2], addrs[3], idx);
 
-    return;
+  return;
 }
 
 /**
@@ -352,7 +353,7 @@ void flip_sockets(void)
   usbsid_config.socketTwo.sid2.id = tmp_id;
   usbsid_config.socketTwo.sid2.addr = tmp_addr;
 
-  apply_runtime_config(&usbsid_config,&cfg);
+  apply_runtime_config(&usbsid_config, &cfg);
 
   /* Reset SID registers after fiddling with the socket configuration */
   reset_sid_registers();
@@ -366,10 +367,14 @@ void flip_sockets(void)
  * @param SocketPreset preset
  * @return ConfigError
  */
-static ConfigError apply_socket_preset(SocketPreset preset)
+static void apply_socket_preset(SocketPreset preset)
 {
-  if (preset < 0 || preset >= PRESET_COUNT) {
-    return CFG_ERR_INVALID_PRESET;
+  /* Applying a preset makes sure that the clockspeed
+     is set to PAL if still at the default 1MHz */
+  if (usbsid_config.clock_rate == CLOCK_DEFAULT) {
+    usbsid_config.clock_rate   = CLOCK_PAL;
+    usbsid_config.refresh_rate = HZ_50;
+    usbsid_config.raster_rate  = R_PAL;
   }
 
   const PresetDef *p = &socket_presets[preset];
@@ -396,16 +401,7 @@ static ConfigError apply_socket_preset(SocketPreset preset)
   /* Compute addresses for this preset */
   apply_sid_addresses();
 
-  /* Validate the result */
-  err = validate_config();
-  if (err != CFG_OK) {
-    usERR("Preset '%s' validation failed: %s\n", preset_name(preset), config_error_str(err));
-  } else {
-    usCFG("Preset applied: %s\n", preset_name(preset));
-  }
-
-  usbsid_config.last_preset = preset;
-  return err;
+  return;
 }
 
 /**
@@ -438,19 +434,32 @@ static SocketPreset detect_current_preset(void)
  * @param bool at_boot
  * @return ConfigError
  */
-static ConfigError apply_preset(SocketPreset preset, bool at_boot)
+static ConfigError apply_preset(SocketPreset preset)
 {
+  if (preset < 0 || preset >= PRESET_COUNT) {
+    return CFG_ERR_INVALID_PRESET;
+  }
+
   SocketPreset pre = detect_current_preset();
   if (pre == preset) {
     return CFG_ERR_EQUAL_PRESET;
   }
 
-  err = apply_socket_preset(preset);
+  /* Run autodetection before applying preset,
+     this will ensure supporting chips and sids, etc */
+  sid_auto_detect_silent();
+
+  apply_socket_preset(preset);
+
+  /* Validate the result */
+  err = apply_new_presetconfig();
   if (err != CFG_OK) {
-    return err;
+    usERR("Preset '%s' validation failed: %s\n", preset_name(preset), config_error_str(err));
+  } else {
+    usbsid_config.last_preset = preset;
   }
 
-  return apply_config(at_boot);
+  return err;
 }
 
 /**
@@ -466,16 +475,20 @@ void apply_preset_wrapper(SocketPreset preset)
   Config backup_cfg;
   memcpy(&backup_cfg, &usbsid_config, sizeof(Config));
   restore_interrupts(irq);
-  /* Run autodetection before applying preset,
-     this will ensure supporting chips and sids, etc */
-  sid_auto_detect(false);
 
   /* Now apply the preset */
-  err = apply_preset(preset, false);
+  err = apply_preset(preset);
   if (err != CFG_OK) {
     memcpy(&usbsid_config, &backup_cfg, sizeof(Config)); /* Reset the config back */
-    usERR("Applying preset error: %s\n", config_error_str(err));
+    usWRN("Did not apply requested preset: %s\n", config_error_str(err));
+    return;
   }
+
+  /* Save and load the config */
+  save_load_config();
+
+  usNFO("\n");
+  usCFG("Preset applied: %s\n", preset_name(preset));
   return;
 }
 
@@ -528,7 +541,6 @@ void socket_config_fallback(void)
   usbsid_config.mixed = false;
 
   RuntimeCFG new_cfg;
-  // apply_runtime_config(&usbsid_config,&cfg);
   apply_runtime_config(&usbsid_config, &new_cfg); /* Quietly apply the bus config */
   uint32_t irq = save_and_disable_interrupts();
   memcpy(&cfg, &new_cfg, sizeof(RuntimeCFG));
