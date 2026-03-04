@@ -23,6 +23,15 @@
  *
  */
 
+#ifndef _CFG_USBSID_H_
+#define _CFG_USBSID_H_
+#pragma once
+
+#ifdef __cplusplus
+  extern "C" {
+#endif
+
+
 /* Macros */
 #ifndef count_of
 #define count_of(a) (sizeof(a)/sizeof((a)[0]))
@@ -87,7 +96,11 @@ enum
   MIRRORED_SID     = 0x45,  /* Socket Two is linked to Socket One */
   DUAL_SOCKET1     = 0x46,  /* Two SID's in socket One, Socket Two disabled */
   DUAL_SOCKET2     = 0x47,  /* Two SID's in socket Two, Socket One disabled */
-  FLIP_SOCKETS     = 0x48,  /* Socket Two is Socket One and vice versa */
+  DUAL_FLIPPED     = 0x48,  /* Two SID's in 2 sockets, sockets flipped */
+  QUAD_FLIPPED     = 0x49,  /* Four SID's in 2 sockets, sockets flipped */
+  QUAD_MIXED       = 0x4A,  /* Four SID's in 2 sockets, mixed addresses */
+  QUAD_FLIPMIX     = 0x4B,  /* Four SID's in 2 sockets, sockets flipped and addresses flipped */
+  HOTFLIP_SOCKETS  = 0x4F,  /* Socket Two is Socket One and vice versa */
 
   SET_CLOCK        = 0x50,  /* Change SID clock frequency by array id */
   DETECT_SIDS      = 0x51,  /* Try to detect the SID types per socket ~ routines see sid_detection.c */
@@ -122,6 +135,13 @@ enum
   SKPICO           = 0xA1,  /* Config initiator byte for SIDKICK-pico */
   ARMSID           = 0xA2,  /* Config initiator byte for ARMSID */
   PDSID            = 0xA3,  /* Holds the reset line for 5 seconds to change SID type on a PDSID */
+};
+
+/* Config constants */
+enum {
+  FLASH_PAGE_SIZE    = 256,
+  MAX_BUFFER_SIZE    = 64,
+  SOCKET_BUFFER_SIZE = 12,
 };
 
 /* Clock cycles per second
@@ -172,6 +192,8 @@ const char * mono_stereo[] = { "Mono", "Stereo" };
 
 const char * chiptypes[]   = { "MOS", "Unknown", "SKPico", "ARMSID", "ARM2SID", "FPGASID", "RedipSID", "PDSID", "BackSID" };
 const char * sidtypes[]    = { "Unknown", "N/A", "8580", "6581", "FMOpl" };
+
+const uint8_t sid_addresses[4] = { 0x00, 0x20, 0x40, 0x60 };
 
 /* USBSID-Pico config struct */
 typedef struct SIDChip {
@@ -225,6 +247,8 @@ typedef struct Config {
   bool stereo_en : 1;           /* audio switch is off (mono) or on (stereo) ~ (PCB v1.3+ only) */
   bool lock_audio_sw : 1;       /* lock the audio switch into it's current stateand prevent it from being changed ~ (PCB v1.3+ only) */
   bool mirrored : 1;            /* act as socket 1 */
+  bool flipped : 1;             /* socket 1 is socket 2 and vice versa */
+  bool mixed : 1;               /* addresses are mixed up (quad SID only!) */
 } Config;
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
@@ -291,4 +315,13 @@ typedef struct Config {
   .stereo_en = false, \
   .lock_audio_sw = false, \
   .mirrored = false, \
+  .flipped = false, \
+  .mixed = false, \
 }
+
+
+#ifdef __cplusplus
+  }
+#endif
+
+#endif /* _CFG_USBSID_H_ */
