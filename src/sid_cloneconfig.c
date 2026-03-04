@@ -91,9 +91,8 @@ static void print_fpgasid_sidconfig(int slot, int sidno, uint8_t * configarray)
  */
 void read_fpgasid_configuration(uint8_t base_address)
 {
-  if (((/* base_address >= 0x0 &&  */base_address < 0x40) && (usbsid_config.socketOne.chiptype != CHIP_FPGASID))
-    || ((base_address >= 0x40 && base_address < 0x80) && (usbsid_config.socketTwo.chiptype != CHIP_FPGASID))) {
-      usERR("[SID] Incorrect address $%02x and Chip type %s (%d)\n",
+  if ((usbsid_config.socketOne.chiptype != CHIP_FPGASID) || (usbsid_config.socketTwo.chiptype != CHIP_FPGASID)) {
+      usERR("No FPGASID configured, chip type %s (%d)\n",
         base_address, chip_type_name((int)usbsid_config.socketOne.chiptype), usbsid_config.socketTwo.chiptype);
     return; /* Do nothing if no FPGASID configured */
   }

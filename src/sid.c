@@ -141,7 +141,6 @@ bool get_muted_state(void)
  */
 void unmute_sid(void)
 {
-  usDBG("[UNMUTE]\n");
   /* is_muted = false; */ /* Is globally handled from usbsid.c */
   for (int i = 0; i < cfg.numsids; i++) {
     uint8_t addr = ((0x20 * i) + 0x18);
@@ -158,7 +157,6 @@ void unmute_sid(void)
  */
 void mute_sid(void)
 {
-  usDBG("[MUTE]\n");
   for (int i = 0; i < cfg.numsids; i++) {
     uint8_t addr = ((0x20 * i) + 0x18);
     volume_state[i] = sid_memory[addr];

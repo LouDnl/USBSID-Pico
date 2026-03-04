@@ -286,56 +286,53 @@ void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volat
         cycled_delay_operation((sid_buffer[1] << 8 | sid_buffer[2]));
         return;
       case PAUSE:
-        usDBG("[PAUSE_SID]\n");
+        usDBG("PAUSE_SID\n");
         pause_sid();
         break;
       case MUTE:
-        usDBG("[MUTE_SID] %d\n",sid_buffer[1]);
+        usDBG("MUTE_SID %d\n",sid_buffer[1]);
         mute_sid();
         if (sid_buffer[1] == 1) set_muted_state(true);
         break;
       case UNMUTE:
-        usDBG("[UNMUTE_SID] %d\n",sid_buffer[1]);
+        usDBG("UNMUTE_SID %d\n",sid_buffer[1]);
         if (sid_buffer[1] == 1) set_muted_state(false);
         unmute_sid();
         break;
       case RESET_SID:
         if (sid_buffer[1] == 0) {
-          usDBG("[RESET_SID]\n");
+          usDBG("RESET_SID\n");
           reset_sid();
         }
         if (sid_buffer[1] == 1) {
-          usDBG("[RESET_SID_REGISTERS]\n");
+          usDBG("RESET_SID_REGISTERS\n");
           reset_sid_registers();
         }
         break;
       case DISABLE_SID:
-        usDBG("[DISABLE_SID]\n");
+        usDBG("DISABLE_SID\n");
         disable_sid();
         break;
       case ENABLE_SID:
-        usDBG("[ENABLE_SID]\n");
+        usDBG("ENABLE_SID\n");
         enable_sid(true);
         break;
       case CLEAR_BUS:
-        usDBG("[CLEAR_BUS]\n");
+        usDBG("CLEAR_BUS\n");
         clear_bus_all();
         break;
-      case CONFIG:
-        if (sid_buffer[1] < 0xD0) { /* Don't log incoming buffer to avoid spam above this region */
-          usDBG("[CONFIG]\n");
-        }
+      case CONFIG: /* Don't log message about config to avoid spam when uploading */
         /* Copy incoming buffer ignoring the command byte */
         memcpy(config_buffer, (sid_buffer + 1), (int)*n - 1);
         handle_config_request(config_buffer, *n - 1);
         memset(config_buffer, 0, count_of(config_buffer));
         break;
       case RESET_MCU:
-        usDBG("[RESET_MCU]\n");
+        usDBG("RESET_MCU\n");
         mcu_reset();
         break;
       case BOOTLOADER:
-        usDBG("[BOOTLOADER]\n");
+        usDBG("BOOTLOADER\n");
         mcu_jump_to_bootloader();
         break;
       default:

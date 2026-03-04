@@ -339,7 +339,6 @@ enum
 
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
   TEST_FN2         = 0x9A,  /* TODO: Remove before v1 release */
-  TEST_FN3         = 0x9B,  /* TODO: Remove before v1 release */
 
   /* Hardware SID clone configuration related */
   FPGASID          = 0xA0,  /* Config initiator byte for FPGASID */
