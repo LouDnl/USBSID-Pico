@@ -128,38 +128,40 @@ void print_config_overview(void)
   usCFG("  Last applied preset is: %s\n",
     preset_name((int)usbsid_config.last_preset));
   usCFG("\n");
-  usCFG("  Socket One\n");
-  usCFG("      %s as %s\n",
-    switch_str((int)usbsid_config.socketOne.enabled),
-    dualsingle_str((int)usbsid_config.socketOne.dualsid));
-  usCFG("      Chip is %s\n",
-    chip_type_name((int)usbsid_config.socketOne.chiptype));
-  if (usbsid_config.socketOne.enabled)
+  usCFG("  Socket One %s\n",
+    switch_str((int)usbsid_config.socketOne.enabled));
+  if (usbsid_config.socketOne.enabled) {
+    usCFG("      set as %s\n",
+      dualsingle_str((int)usbsid_config.socketOne.dualsid));
+    usCFG("      Chip is %s\n",
+      chip_type_name((int)usbsid_config.socketOne.chiptype));
     usCFG("      %s as SID1 @ addr $%02x with id %d\n",
       sid_type_name((int)usbsid_config.socketOne.sid1.type),
       usbsid_config.socketOne.sid1.addr,
       usbsid_config.socketOne.sid1.id);
-  if (usbsid_config.socketOne.enabled && usbsid_config.socketOne.dualsid)
+  if (usbsid_config.socketOne.dualsid)
     usCFG("      %s as SID2 @ addr $%02x with id %d\n",
       sid_type_name((int)usbsid_config.socketOne.sid2.type),
       usbsid_config.socketOne.sid2.addr,
       usbsid_config.socketOne.sid2.id);
-  usCFG("  Socket Two\n");
-  usCFG("      %s as %s\n",
-    switch_str((int)usbsid_config.socketTwo.enabled),
+  }
+  usCFG("  Socket Two %s\n",
+    switch_str((int)usbsid_config.socketTwo.enabled));
+  if (usbsid_config.socketTwo.enabled) {
+  usCFG("      set as %s\n",
     dualsingle_str((int)usbsid_config.socketTwo.dualsid));
   usCFG("      Chip is %s\n",
     chip_type_name((int)usbsid_config.socketTwo.chiptype));
-  if (usbsid_config.socketTwo.enabled)
     usCFG("      %s as SID1 @ addr $%02x with id %d\n",
       sid_type_name((int)usbsid_config.socketTwo.sid1.type),
       usbsid_config.socketTwo.sid1.addr,
       usbsid_config.socketTwo.sid1.id);
-  if (usbsid_config.socketTwo.enabled && usbsid_config.socketTwo.dualsid)
+  if (usbsid_config.socketTwo.dualsid)
     usCFG("      %s as SID2 @ addr $%02x with id %d\n",
       sid_type_name((int)usbsid_config.socketTwo.sid2.type),
       usbsid_config.socketTwo.sid2.addr,
       usbsid_config.socketTwo.sid2.id);
+  }
   usCFG("  Mirror Socket Two to Socket One = %s\n", switch_str(usbsid_config.mirrored));
   usCFG("  Flip Socket One and Socket One  = %s\n", switch_str(usbsid_config.flipped));
   usCFG("  Mix socket addresses (Quad SID) = %s\n", switch_str(usbsid_config.mixed));

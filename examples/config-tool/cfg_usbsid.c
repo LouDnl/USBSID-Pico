@@ -772,38 +772,40 @@ void print_config(void)
   printf("  Clock rate = %s\n",
     locked[(int)usbsid_config.lock_clockrate]);
   printf("\n");
-  printf("  Socket One\n");
-  printf("      %s as %s\n",
-    enabled[(int)usbsid_config.socketOne.enabled],
-    us_socket[(int)usbsid_config.socketOne.dualsid]);
-  printf("      Chip is %s\n",
-    chiptypes[(int)usbsid_config.socketOne.chiptype]);
-  if (usbsid_config.socketOne.enabled)
+  printf("  Socket One %s\n",
+    enabled[(int)usbsid_config.socketOne.enabled]);
+  if (usbsid_config.socketOne.enabled) {
+    printf("      set as %s\n",
+      us_socket[(int)usbsid_config.socketOne.dualsid]);
+    printf("      Chip is %s\n",
+      chiptypes[(int)usbsid_config.socketOne.chiptype]);
     printf("      %s as SID1 @ addr $%02x with id %d\n",
       sidtypes[(int)usbsid_config.socketOne.sid1.type],
       usbsid_config.socketOne.sid1.addr,
       usbsid_config.socketOne.sid1.id);
-  if (usbsid_config.socketOne.enabled && usbsid_config.socketOne.dualsid)
+  if (usbsid_config.socketOne.dualsid)
     printf("      %s as SID2 @ addr $%02x with id %d\n",
       sidtypes[(int)usbsid_config.socketOne.sid2.type],
       usbsid_config.socketOne.sid2.addr,
       usbsid_config.socketOne.sid2.id);
-  printf("  Socket Two\n");
-  printf("      %s as %s\n",
-    enabled[(int)usbsid_config.socketTwo.enabled],
-    us_socket[(int)usbsid_config.socketTwo.dualsid]);
-  printf("      Chip is %s\n",
-    chiptypes[(int)usbsid_config.socketTwo.chiptype]);
-  if (usbsid_config.socketTwo.enabled)
+  }
+  printf("  Socket Two %s\n",
+    enabled[(int)usbsid_config.socketTwo.enabled]);
+  if (usbsid_config.socketTwo.enabled) {
+    printf("      set as %s\n",
+      us_socket[(int)usbsid_config.socketTwo.dualsid]);
+    printf("      Chip is %s\n",
+      chiptypes[(int)usbsid_config.socketTwo.chiptype]);
     printf("      %s as SID1 @ addr $%02x with id %d\n",
       sidtypes[(int)usbsid_config.socketTwo.sid1.type],
       usbsid_config.socketTwo.sid1.addr,
       usbsid_config.socketTwo.sid1.id);
-  if (usbsid_config.socketTwo.enabled && usbsid_config.socketTwo.dualsid)
+  if (usbsid_config.socketTwo.dualsid)
     printf("      %s as SID2 @ addr $%02x with id %d\n",
       sidtypes[(int)usbsid_config.socketTwo.sid2.type],
       usbsid_config.socketTwo.sid2.addr,
       usbsid_config.socketTwo.sid2.id);
+  }
   printf("  Mirror Socket Two to Socket One = %s\n", enabled[usbsid_config.mirrored]);
   printf("  Flip Socket One and Socket One  = %s\n", enabled[usbsid_config.flipped]);
   printf("  Mix socket addresses (Quad SID) = %s\n", enabled[usbsid_config.mixed]);
