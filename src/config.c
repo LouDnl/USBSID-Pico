@@ -47,9 +47,9 @@
 #include <emudore_emulator.h>
 #endif /* ONBOARD_EMULATOR */
 
-
 /* SID player */
 #if defined(ONBOARD_SIDPLAYER)
+#include <usplayer.h>
 static int sidbytes_received = 0;
 static bool receiving_sidfile = 0;
 #endif /* ONBOARD_SIDPLAYER */
@@ -1101,6 +1101,10 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case SID_PLAYER_PREV:
     usCFG("SID_PLAYER_PREV\n");
       sidplayer_prev = true;
+      break;
+    case SID_PLAYER_TWO:
+    usCFG("SID_PLAYER_TWO\n");
+      force_socktwo();
       break;
     #endif
     default:

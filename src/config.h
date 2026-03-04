@@ -360,6 +360,7 @@ enum
   SID_PLAYER_PAUSE = 0xE3,  /* Pause/Unpause SID file play */
   SID_PLAYER_NEXT  = 0xE4,  /* Next SID subtune play */
   SID_PLAYER_PREV  = 0xE5,  /* Previous SID subtune play */
+  SID_PLAYER_TWO   = 0xE6,  /* Force play to play on socket two or sid two */
 
   /* Filetypes we can receive and process */
   SID_FILE         = 0x01,
