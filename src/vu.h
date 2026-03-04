@@ -3,7 +3,7 @@
  * for interfacing one or two MOS SID chips and/or hardware SID emulators over
  * (WEB)USB with your computer, phone or ASID supporting player
  *
- * sid_backsid.h
+ * vu.h
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
@@ -23,44 +23,41 @@
  *
  */
 
-#ifndef _USBSID_SID_BACKSID_H_
-#define _USBSID_SID_BACKSID_H_
+#ifndef _USBSID_VU_H_
+#define _USBSID_VU_H_
 #pragma once
 
 #ifdef __cplusplus
   extern "C" {
 #endif
 
+/* Default includes */
+#include <stdint.h>
 
-/* Registers */
-#define BACKSID_REG  0x1b /* Register select index */
-#define BACKSID_WR   0x1c /* Data write register */
-#define BACKSID_RD   0x1f /* Data read register */
-#define BACKSID_HS1  0x1d /* Handshake byte 1 */
-#define BACKSID_HS2  0x1e /* Handshake byte 2 */
-/* Handshake values */
-#define BACKSID_HV1  0xb5 /* Handshake value 1 */
-#define BACKSID_HV2  0x1d /* Handshake value 2 */
-/* $1b Read values */
-#define BACKSID_ID   0xba
-/* $1b Write values */
-#define BACKSID_MAG  0x00 /* Magic */
-#define BACKSID_OVD  0x02 /* Overdrive */
-#define BACKSID_FLT  0x03 /* Filters */
-#define BACKSID_SMT  0x04 /* Smoothing */
-#define BACKSID_POT  0x05 /* Pots */
-#define BACKSID_MAJ  0x40 /* Major */
-#define BACKSID_MIN  0x41 /* Minor */
-#define BACKSID_PAT  0x42 /* Patch */
-#define BACKSID_REV  0x45 /* Hardware revision */
 
-static const char * backsid_filters[] = {
-  "6581", "MIXED", "8580"
+/* LED breathe levels */
+enum
+{
+  ALWAYS_OFF   = 99999,   /* non zero is off */
+  ALWAYS_ON    = 0,       /* zero is on */
+  CHECK_INTV   = 100000,  /* 100ms == 100000us */
+  MAX_CHECKS   = 100,     /* 100 checks times 100ms == 10 seconds */
+  BREATHE_INTV = 1000,    /* 1ms == 1000us */
+  BREATHE_STEP = 100,     /* steps in brightness */
+  VU_MAX       = 65534,   /* max vu brightness */
+  HZ_MAX       = 40       /* No clue where I got this from 😅 but hey it works! */
 };
+
+/* VU meter value (written by Core 1 bus operations, read by LED runner) */
+extern volatile uint16_t vu;
+
+/* Functions from vu.c */
+void init_vu(void);
+void led_runner(void);
 
 
 #ifdef __cplusplus
   }
 #endif
 
-#endif /* _USBSID_SID_BACKSID_H_ */
+#endif /* _USBSID_VU_H_ */

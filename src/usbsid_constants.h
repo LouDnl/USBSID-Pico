@@ -3,7 +3,7 @@
  * for interfacing one or two MOS SID chips and/or hardware SID emulators over
  * (WEB)USB with your computer, phone or ASID supporting player
  *
- * config_constants.h
+ * usbsid_constants.h
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
@@ -31,11 +31,12 @@
 extern "C" {
 #endif
 
-
+/* Default includes */
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
+/* Pico libs */
 #include "pico/stdlib.h"
 #include "pico/types.h"
 #include "pico/platform.h"
@@ -88,6 +89,10 @@ typedef enum SocketPreset {
   PRESET_QUAD,           /* Dual SID in both sockets (4 SIDs) */
   PRESET_MIRRORED,       /* S2 mirrors S1 (mono output on both) */
   PRESET_MIRRORED_DUAL,  /* S2 mirrors dual S1 */
+  PRESET_DUAL_FLIPPED,  /* One SID per socket (stereo), but flipped */
+  PRESET_QUAD_FLIPPED,   /* Dual SID in both sockets (4 SIDs), but flipped */
+  PRESET_QUAD_MIXED,     /* Dual SID in both sockets (4 SIDs), mixed addresses */
+  PRESET_QUAD_FLIPMIX,   /* Dual SID in both sockets (4 SIDs), but flipped and mixed addresses */
   PRESET_COUNT,          /* Number of presets */
 } SocketPreset;
 
@@ -102,6 +107,8 @@ typedef struct {
   bool s2_enabled;
   bool s2_dual;
   bool mirrored;
+  bool flipped;
+  bool mixed;
 } PresetDef;
 
 

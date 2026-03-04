@@ -3,7 +3,7 @@
  * for interfacing one or two MOS SID chips and/or hardware SID emulators over
  * (WEB)USB with your computer, phone or ASID supporting player
  *
- * sid_backsid.h
+ * asid_buffer.h
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
@@ -23,44 +23,34 @@
  *
  */
 
-#ifndef _USBSID_SID_BACKSID_H_
-#define _USBSID_SID_BACKSID_H_
+#ifndef _USBSID_ASID_BUFFER_H_
+#define _USBSID_ASID_BUFFER_H_
 #pragma once
 
 #ifdef __cplusplus
   extern "C" {
 #endif
 
+/* Default includes */
+#include <stdint.h>
 
-/* Registers */
-#define BACKSID_REG  0x1b /* Register select index */
-#define BACKSID_WR   0x1c /* Data write register */
-#define BACKSID_RD   0x1f /* Data read register */
-#define BACKSID_HS1  0x1d /* Handshake byte 1 */
-#define BACKSID_HS2  0x1e /* Handshake byte 2 */
-/* Handshake values */
-#define BACKSID_HV1  0xb5 /* Handshake value 1 */
-#define BACKSID_HV2  0x1d /* Handshake value 2 */
-/* $1b Read values */
-#define BACKSID_ID   0xba
-/* $1b Write values */
-#define BACKSID_MAG  0x00 /* Magic */
-#define BACKSID_OVD  0x02 /* Overdrive */
-#define BACKSID_FLT  0x03 /* Filters */
-#define BACKSID_SMT  0x04 /* Smoothing */
-#define BACKSID_POT  0x05 /* Pots */
-#define BACKSID_MAJ  0x40 /* Major */
-#define BACKSID_MIN  0x41 /* Minor */
-#define BACKSID_PAT  0x42 /* Patch */
-#define BACKSID_REV  0x45 /* Hardware revision */
 
-static const char * backsid_filters[] = {
-  "6581", "MIXED", "8580"
-};
+/* Functions from asid_buffer.c */
+uint32_t track_asid_arrival(void);
+void     adjust_buffer_rate_dynamic(uint32_t target_rate);
+void     reset_arrival_tracking(void);
+void     ring_buffer_reset_size(void);
+void     set_buffer_rate(uint16_t rate);
+void     update_sid_count(uint8_t sid_num);
+void     init_buffer_pio(void);
+void     stop_buffer_pio(void);
+void     asid_ring_write(uint8_t reg, uint8_t val, uint16_t c);
+void     asid_ring_init(void);
+void     asid_ring_deinit(void);
 
 
 #ifdef __cplusplus
   }
 #endif
 
-#endif /* _USBSID_SID_BACKSID_H_ */
+#endif /* _USBSID_ASID_BUFFER_H_ */

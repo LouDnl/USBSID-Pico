@@ -39,7 +39,6 @@
   extern "C" {
 #endif
 
-
 /* Default includes */
 #include <stdint.h>
 #include <stdlib.h>
@@ -87,6 +86,11 @@ static const uint8_t asid_sid_registers[NO_SID_REGISTERS_ASID] =
   0x0b, // 11 - 26 <= secondary for reg 11
   0x12, // 18 - 27 <= secondary for reg 18
 };
+
+/* Functions from asid.c */
+void asid_init(void);
+void deinit_asid_buffer(void);
+void decode_asid_message(uint8_t *buffer, int size);
 
 
 #ifdef __cplusplus

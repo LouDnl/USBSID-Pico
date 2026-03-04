@@ -47,6 +47,7 @@ static const char __in_flash("fpgasid_vars") *filtermode[2] = { "6581", "8580" }
 static const char __in_flash("fpgasid_vars") *outputmode[2] = { "dual output over SID1 & SID2 channels -> stereo", "dual output over SID1 channel -> mono mix" };
 static const char __in_flash("fpgasid_vars") *sid2addr[5] = { "$d400 ", "$de00 ", "$d500 ", "$d420 ", "" };
 
+
 #ifdef __cplusplus
   }
 #endif

@@ -39,14 +39,13 @@
   extern "C" {
 #endif
 
-
 /* Default includes */
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 
-/* Pico libs */
-#include "pico/stdlib.h"
+/* MIDI CC values */
+#include <midi_cc.h>
 
 
 /* Midi bus states */
@@ -83,7 +82,7 @@ typedef struct {
   uint8_t streambuffer[64];   /* Normal speed max buffer size for TinyUSB */
 } midi_machine;
 
-/* Is init in usbsid.c */
+/* Global MIDI state machine (defined in midi.c) */
 extern midi_machine midimachine;
 
 /* Cynthcart~Emudore queue */
@@ -91,6 +90,15 @@ typedef struct {
   uint8_t data;
 } cynthcart_queue_entry_t;
 
+/* Global MIDI CC values defaults (defined in midi.c) */
+extern const midi_ccvalues midi_ccvalues_defaults;
+
+/* Functions from midi.c */
+void midi_init(void);
+void process_stream(uint8_t *buffer, size_t size);
+
+/* Functions from midi_handler.c */
+void midi_bus_operation(uint8_t a, uint8_t b);
 
 
 #ifdef __cplusplus

@@ -32,91 +32,60 @@
 #endif
 
 
-/* Default includes */
-#include <stdio.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <inttypes.h>
-#include <sys/time.h>
-#include <time.h>
+/* USB packet buffers from usbsid.c */
+extern uint8_t sid_buffer[];
+extern uint8_t uart_buffer[];
+extern uint8_t *write_buffer_p;
 
-/* Pico libs */
-#include "pico/stdlib.h"
-#include "pico/types.h"       /* absolute_time_t */
-#include "pico/multicore.h"   /* Multicore */
-#include "pico/sem.h"         /* Semaphores */
-#include "pico/util/queue.h"  /* Inter core queue */
-
-/* Hardware api's */
-#include "hardware/clocks.h"
-#include "hardware/flash.h"
-#include "hardware/uart.h"
-#include "hardware/timer.h"
-#include "hardware/structs/sio.h"  /* Pico SIO structs */
-
-/* Reboot type logging */
-#if PICO_RP2040
-#include "hardware/regs/vreg_and_chip_reset.h"
+/* SID register shadow memory from usbsid.c */
+#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
+extern uint8_t c64memory[];
+extern uint8_t *sid_memory;
 #else
-#include "hardware/regs/powman.h"
+extern uint8_t sid_memory[];
 #endif
-#include "hardware/vreg.h"
 
-/* TinyUSB libs */
-#include "bsp/board_api.h"   /* Tiny USB Board Porting API */
-#include "tusb.h"            /* Tiny USB stack */
-#include "tusb_config.h"     /* Tiny USB configuration */
+/* USB connection state */
+extern volatile int usb_connected, usbdata;
+extern volatile uint32_t cdcread, cdcwrite, webread, webwrite;
+extern volatile uint8_t *cdc_itf, *wusb_itf;
 
+/* CPU and SID timing */
+extern volatile double cpu_mhz, cpu_us, sid_hz, sid_mhz, sid_us;
 
-/* Maximum incoming and outgoing USB (CDC/WebUSB) buffer size
- * NOTE: 64 byte zero padded packets take longer to process
- *
- * Incoming Data buffer write example
- * 3 bytes minimum, 63 bytes maximum
- * Byte 0  ~ command byte (see globals.h)
- * Byte 1  ~ address byte
- * Byte 2  ~ data byte
- * Byte n+ ~ repetition of byte 1 and 2
- *
- * Incoming Data buffer with clock cycles write example
- * 5 bytes minimum, 61 bytes maximum
- * Byte 0  ~ command byte (see globals.h)
- * Byte 1  ~ address low byte
- * Byte 2  ~ data byte
- * Byte 3  ~ clock cycles high byte
- * Byte 4  ~ clock cycles low byte
- * Byte n+ ~ repetition of byte 1, 2, 3 and 4
- *
- * Incoming Command buffer example
- * 2 bytes, trailing bytes will be ignored
- * Byte 0 ~ command byte (see globals.h)
- * Byte 1 ~ optional command argument
- *
- * Incoming Config data buffer command example
- * 5 bytes, trailing bytes will be ignored
- * Byte 0 ~ command byte (see globals.h)
- * Byte 1 ~ config command
- * Byte 2 ~ struct setting e.g. socketOne or clock_rate
- * Byte 3 ~ setting entry e.g. dualsid
- * Byte 4 ~ new value
- * Byte 5 ~ reserved
- *
- */
-#define MAX_BUFFER_SIZE 64
+/* Emulator flags from usbsid.c */
+#if defined(ONBOARD_EMULATOR)
+extern volatile bool
+  emulator_running,
+  starting_emulator,
+  stopping_emulator;
+#endif /* ONBOARD_EMULATOR */
 
-/* Outgoing USB (CDC/WebUSB) data buffer
- *
- * 1 byte:
- * byte 0 : value to return
- *
- */
-#define BYTES_TO_SEND 1
+/* SID player flags from usbsid.c */
+#if defined(ONBOARD_SIDPLAYER)
+extern volatile bool
+  sidplayer_init,
+  sidplayer_start,
+  sidplayer_playing,
+  sidplayer_stop,
+  sidplayer_next,
+  sidplayer_prev;
+extern uint8_t * sidfile; /* Temporary buffer to store incoming data */
+extern volatile int sidfile_size;
+extern volatile char tuneno;
+extern volatile bool is_prg;
+#endif /* ONBOARD_SIDPLAYER */
 
-/* C64 memory storage sizes */
-#define C64_MEMORY_SIZE 0x10000 /* 64KB e.g. 65536 bytes */
-#define SID_MEMORY_SIZE 0x80    /* 4 * 0x20 = 4 * 32 e.g. 128 bytes */
+/* Runtime flags */
+extern volatile bool auto_config, offload_ledrunner;
+
+/* Inter-core queues */
+extern queue_t sidtest_queue;
+extern queue_t logging_queue;
+
+/* Functions from usbsid.c */
+void cdc_write(volatile uint8_t *itf, uint32_t n);
+void webserial_write(volatile uint8_t *itf, uint32_t n);
 
 
 #ifdef __cplusplus

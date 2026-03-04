@@ -3,7 +3,7 @@
  * for interfacing one or two MOS SID chips and/or hardware SID emulators over
  * (WEB)USB with your computer, phone or ASID supporting player
  *
- * sid_backsid.h
+ * dma.h
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
@@ -23,44 +23,46 @@
  *
  */
 
-#ifndef _USBSID_SID_BACKSID_H_
-#define _USBSID_SID_BACKSID_H_
+#ifndef _USBSID_DMA_H_
+#define _USBSID_DMA_H_
 #pragma once
 
 #ifdef __cplusplus
   extern "C" {
 #endif
 
+/* Default includes */
+#include <stdint.h>
 
-/* Registers */
-#define BACKSID_REG  0x1b /* Register select index */
-#define BACKSID_WR   0x1c /* Data write register */
-#define BACKSID_RD   0x1f /* Data read register */
-#define BACKSID_HS1  0x1d /* Handshake byte 1 */
-#define BACKSID_HS2  0x1e /* Handshake byte 2 */
-/* Handshake values */
-#define BACKSID_HV1  0xb5 /* Handshake value 1 */
-#define BACKSID_HV2  0x1d /* Handshake value 2 */
-/* $1b Read values */
-#define BACKSID_ID   0xba
-/* $1b Write values */
-#define BACKSID_MAG  0x00 /* Magic */
-#define BACKSID_OVD  0x02 /* Overdrive */
-#define BACKSID_FLT  0x03 /* Filters */
-#define BACKSID_SMT  0x04 /* Smoothing */
-#define BACKSID_POT  0x05 /* Pots */
-#define BACKSID_MAJ  0x40 /* Major */
-#define BACKSID_MIN  0x41 /* Minor */
-#define BACKSID_PAT  0x42 /* Patch */
-#define BACKSID_REV  0x45 /* Hardware revision */
 
-static const char * backsid_filters[] = {
-  "6581", "MIXED", "8580"
-};
+/* DMA channel indices from dma.c */
+extern int dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay;
+extern int dma_counter;
+#if PICO_RP2040
+extern int dma_counter_chain;
+#endif
+extern volatile uint32_t cycle_count_word;
+
+/* LED DMA channels (non-WiFi boards only) */
+#if defined(PICO_DEFAULT_LED_PIN)
+extern int dma_pwmled;
+extern volatile int pwm_value;
+#if defined(USE_RGB)
+extern int dma_rgbled;
+extern volatile uint32_t rgb_value;
+#endif
+#endif
+
+/* Functions from dma.c */
+void setup_dmachannels(void);
+void setup_vu_dma(void);
+void stop_dma_channels(void);
+void start_dma_channels(void);
+void unclaim_dma_channels(void);
 
 
 #ifdef __cplusplus
   }
 #endif
 
-#endif /* _USBSID_SID_BACKSID_H_ */
+#endif /* _USBSID_DMA_H_ */
