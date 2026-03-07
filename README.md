@@ -220,8 +220,20 @@ The firmware is still in development so features might change, be added or remov
 - Uses the [TinyUSB](https://github.com/hathach/tinyusb) stack
 
 ### Building
-You can build the firmware using the Pico SDK 2.1.1 and the included TinyUSB. Be sure to clone the SDK with `--recurse-submodules`.  
-After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py PICO_PLATFORM` where PICO_PLATFORM is either rp2040 or rp2350 depending on the board you are using.
+
+You'll need to clone the Raspberry Pico SDK, extras and Picotool repositories and ensure the latter is build for your OS. Assuming a Release build for the Raspberry Pico 2040-based device, the following instructions can be used:
+
+```sh
+> git clone --recurse-submodules https://github.com/raspberrypi/pico-sdk
+> git clone --recurse-submodules https://github.com/raspberrypi/pico-extras
+> export PICO_SDK_PATH=`pwd`/pico-sdk
+> export PICO_EXTRAS_PATH=`pwd`/pico-extras
+> git clone --recurse-submodules https://github.com/raspberrypi/picotool picotool-src
+> cmake -S picotool-src -B picotool-src/build -DCMAKE_INSTALL_PREFIX=`pwd`/picotool -DPICOTOOL_FLAT_INSTALL=1
+> (cd picotool-src/build && make -j `nproc` install)
+> cmake -B build -DCMAKE_BUILD_TYPE=Release -DPICO_PLATFORM=rp2040 -DPICO_BOARD=pico -Dpicotool_DIR=`pwd`/picotool/picotool -DONBOARD_EMULATOR=0
+> cmake --build build --config Release -j `nproc`
+```
 
 # Hardware
 ## Where to buy
