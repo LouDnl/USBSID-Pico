@@ -1118,6 +1118,7 @@ void apply_rgbled_config()
   int sid = -1;
   int stou = (usbsid_config.RGBLED.sid_to_use - 1);
   for (int s = 0; s < 4; s++) {
+    /* Find the first available SID that is either 2 or 3 */
     if (cfg.sidtype[s] == 2 || cfg.sidtype[s] == 3) {
       sid = (s + 1);
       break;
@@ -1126,10 +1127,11 @@ void apply_rgbled_config()
   usCFG("  RGBLED SID Requested: %d\n", usbsid_config.RGBLED.sid_to_use);
   /* check if requested sidno is actually configured  */
   usbsid_config.RGBLED.sid_to_use
-    = (stou > cfg.numsids)
-    || (cfg.sidtype[stou] != 2)
-    || (cfg.sidtype[stou] != 3)
-    ? (sid != -1)  /* If not still -1 */
+    = (stou > cfg.numsids) /* if sid_to_use is higher then numsids */
+    /* or */
+    || ((cfg.sidtype[stou] != 2) /* if sidtype of sid_to_use is not 2 */
+    && (cfg.sidtype[stou] != 3)) /* and if sidtype of sid_to_use is not 3 */
+    ? (sid != -1)  /* If any above are true then, if sid is not -1 */
     ? sid  /* use the first SID that is either 8580 or 6581 */
     : 1    /* else default to SID 1 */
     : usbsid_config.RGBLED.sid_to_use;  /* Else use the programmed SID to use */
