@@ -73,6 +73,10 @@
             <option value="">— no MIDI —</option>
           </select>
         </span>
+        <span id="sendsid-socket-row" style="display:none;align-items:center;gap:6px;margin-left:12px">
+          <input type="checkbox" id="chk-sendsid-socket2" style="cursor:pointer;accent-color:var(--c64-cyan)">
+          <label for="chk-sendsid-socket2" style="cursor:pointer;font-size:0.9rem;color:var(--c64-cyan);text-transform:uppercase;user-select:none">Force socket 2</label>
+        </span>
       </div>
     </div>
 
@@ -101,7 +105,7 @@
     <!-- SID library list -->
     <div class="c64-box" id="sid-list-box">
       <div class="c64-box-title">SID Library
-        <span id="sid-list-count" style="font-size:0.8rem;color:var(--c64-gray);margin-left:6px"></span>
+        <span id="sid-list-count" style="font-size:0.8rem;color:var(--c64-text);margin-left:6px"></span>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:6px">
         <button id="btn-prev-sid" class="c64-btn c64-btn-sm" disabled>&#171; PREV SID</button>
@@ -129,10 +133,15 @@
         </div>
       </div>
       <!-- WebUSB-only controls: shown when connected via WebUSB -->
-      <div id="webusb-player-btns" style="display:none;margin-top:6px">
+      <div id="webusb-player-btns" style="display:none;margin-top:6px;flex-wrap:wrap;gap:6px">
         <button id="btn-player-toggle-audio" class="c64-btn c64-btn-sm">TOGGLE AUDIO</button>
         <button id="btn-player-hotflip"      class="c64-btn c64-btn-sm">HOTFLIP</button>
         <button id="btn-player-mute"         class="c64-btn c64-btn-sm">MUTE SID</button>
+        <button id="btn-player-retrieve-numsids" class="c64-btn c64-btn-sm">RETRIEVE # SIDS</button>
+        <label for="sel-player-sid-addr" style="font-size:0.85rem;color:var(--c64-text);align-self:center">Play on SID:</label>
+        <select id="sel-player-sid-addr" class="c64-select" style="min-width:70px" disabled>
+          <option value="0">$00</option>
+        </select>
       </div>
       <!-- ASID-only controls: shown when ASID (MIDI sysex) mode is active -->
       <div id="asid-player-btns" style="display:none;margin-top:6px">
@@ -140,6 +149,7 @@
       </div>
       <!-- SendSID controls: shown when SendSID mode + connected to Pico2 firmware -->
       <div id="sendsid-player-btns" style="display:none;margin-top:6px;align-items:center;gap:6px">
+        <button id="btn-player-sendsid-toggle-audio" class="c64-btn c64-btn-sm">TOGGLE AUDIO</button>
         <button id="btn-upload-sid" class="c64-btn c64-btn-sm">UPLOAD TO DEVICE</button>
         <span id="sid-upload-status" style="font-size:0.85rem;color:var(--c64-cyan)"></span>
       </div>
@@ -170,19 +180,27 @@
        ╚══════════════════════════════════════════════════╝ -->
   <div id="panel-config" class="c64-panel">
 
+    <!-- First-open hint (cleared once config is loaded) -->
+    <div id="config-status" style="font-size:0.9rem;color:var(--c64-cyan);margin-bottom:4px;padding:2px 4px">
+      Click &ldquo;RETRIEVE CONFIG&rdquo; to load the current device configuration.
+    </div>
+
     <!-- Action buttons row -->
     <div class="c64-box">
       <div class="c64-box-title">Actions</div>
       <div class="preset-row">
-        <button id="btn-retrieve-config" class="c64-btn">RETRIEVE CONFIG</button>
-        <button id="btn-save-config"     class="c64-btn">SAVE (no reboot)</button>
-        <button id="btn-save-reboot"     class="c64-btn c64-btn-warn">SAVE + REBOOT</button>
-        <button id="btn-reset-config"    class="c64-btn c64-btn-danger">RESET DEFAULTS</button>
-        <button id="btn-reload-config"   class="c64-btn">RELOAD FLASH</button>
-        <button id="btn-toggle-audio"    class="c64-btn">TOGGLE AUDIO</button>
-        <button id="btn-hotflip-sockets" class="c64-btn">HOTFLIP</button>
-        <button id="btn-lock-clock"      class="c64-btn">LOCK CLOCK</button>
+        <button id="btn-retrieve-config" class="c64-btn" title="Click to retrieve the configuration from the board">RETRIEVE CONFIG</button>
+        <button id="btn-apply-config"    class="c64-btn" title="Apply the configuration set below to the board (doesn&#39;t save and is gone after rebooting the board)">APPLY CFG</button>
+        <button id="btn-save-config"     class="c64-btn" title="Save the configuration below to flash and apply it directly afterwards to the board">SAVE (no reboot)</button>
+        <button id="btn-save-reboot"     class="c64-btn c64-btn-warn"   title="Save the configuration below to flash and reboot the board (requires a reconnect)">SAVE + REBOOT</button>
+        <button id="btn-reset-config"    class="c64-btn c64-btn-danger" title="Reset the board&#39;s configuration to default settings (also reboots the board so will require a reconnect)">RESET DEFAULTS</button>
+        <button id="btn-reload-config"   class="c64-btn" title="Reload and apply the board configuration from flash">RELOAD FLASH</button>
       </div>
+     </div>
+
+    <!-- Retry notice (always visible) -->
+    <div style="font-size:0.85rem;color:var(--c64-cyan);background:rgba(0,180,255,0.05);border:1px solid var(--c64-cyan);border-radius:3px;padding:5px 8px;margin-bottom:4px">
+      &#8505; If the config is not loaded after clicking &ldquo;RETRIEVE CONFIG&rdquo;, try clicking again &mdash; but do not repeat-click too fast.
     </div>
 
     <!-- SID preset layouts -->
@@ -205,8 +223,14 @@
       </div>
     </div>
 
-    <!-- Status display -->
-    <div id="config-status" style="font-size:0.9rem;color:var(--c64-gray);margin-bottom:6px;padding:0 4px"></div>
+    <!-- Save notice (always visible) -->
+    <div style="font-size:0.85rem;color:var(--c64-yellow);background:rgba(255,200,0,0.07);border:1px solid var(--c64-yellow);border-radius:3px;padding:5px 8px;margin-bottom:6px">
+      &#9888; Presets are automatically applied but not saved to flash. To save click <strong>SAVE (no reboot)</strong> or <strong>SAVE + REBOOT</strong>.
+    </div>
+    <!-- Save notice (always visible) -->
+    <div style="font-size:0.85rem;color:var(--c64-orange);background:rgba(255,200,0,0.07);border:1px solid var(--c64-orange);border-radius:3px;padding:5px 8px;margin-bottom:6px">
+      &#9888; Any configuration change done below must be applied (You can do multiple changes first): click <strong>SAVE (NO REBOOT)</strong>, <strong>SAVE + REBOOT</strong> or <strong>APPLY CFG</strong>.
+    </div>
 
     <!-- Audio output (PCB v1.3+ only — shown after device connect) -->
     <div id="box-audio" class="c64-box c64-hidden">
@@ -378,32 +402,44 @@
       </div><!-- /right col -->
     </div><!-- /c64-cols -->
 
+    <!-- Detection panel -->
+    <div class="c64-box">
+      <div class="c64-box-title">Detection</div>
+      <div class="preset-row">
+        <button id="btn-debug-auto-detect"   class="c64-btn c64-btn-sm"
+                title="Run chip and SID autodetection routine. Saves and applies the detected items afterwards. Reload the config with the button at the top of the page.">START AUTO DETECT</button>
+        <button id="btn-debug-detect-sids"   class="c64-btn c64-btn-sm"
+                title="Detect present SID types. Does not change config or return anything. Logging is on the board uart console.">DETECT SIDS</button>
+        <button id="btn-debug-detect-clones" class="c64-btn c64-btn-sm"
+                title="Detect present clone chips. Does not change config or return anything. Logging is on the board uart console.">DETECT CLONES</button>
+      </div>
+    </div>
+
+    <!-- SID Tests panel -->
+    <div class="c64-box">
+      <div class="c64-box-title">SID Tests</div>
+      <div class="preset-row">
+        <button id="btn-debug-test-all"   class="c64-btn c64-btn-sm">TEST ALL</button>
+        <button id="btn-debug-test-sid1"  class="c64-btn c64-btn-sm">TEST SID1</button>
+        <button id="btn-debug-test-sid2"  class="c64-btn c64-btn-sm">TEST SID2</button>
+        <button id="btn-debug-test-sid3"  class="c64-btn c64-btn-sm">TEST SID3</button>
+        <button id="btn-debug-test-sid4"  class="c64-btn c64-btn-sm">TEST SID4</button>
+        <button id="btn-debug-stop-tests-sid" class="c64-btn c64-btn-sm c64-btn-warn">STOP TESTS</button>
+      </div>
+    </div>
+
     <!-- Config raw hex (debug) -->
-    <div class="c64-box" style="margin-top:8px">
+    <div class="c64-box">
       <div class="c64-box-title">Raw Config (hex)</div>
-      <div id="cfg-raw-hex" style="font-size:0.75rem;color:var(--c64-gray);word-break:break-all;line-height:1.4">
+      <div id="cfg-raw-hex" style="font-size:0.75rem;color:var(--c64-cyan);white-space:pre;line-height:1.4">
         —
       </div>
     </div>
 
     <!-- Debug panel -->
     <div id="debug-panel" class="c64-box">
-      <div class="c64-box-title">Debug &amp; Tests</div>
+      <div class="c64-box-title">Debug</div>
       <div class="preset-row" style="margin-bottom:6px">
-        <button id="btn-debug-detect-sids"   class="c64-btn c64-btn-sm">DETECT SIDS</button>
-        <button id="btn-debug-detect-clones" class="c64-btn c64-btn-sm">DETECT CLONES</button>
-        <button id="btn-debug-auto-detect"   class="c64-btn c64-btn-sm">AUTO DETECT</button>
-        <button id="btn-debug-stop-tests"    class="c64-btn c64-btn-sm c64-btn-warn">STOP TESTS</button>
-      </div>
-      <div class="preset-row" style="margin-bottom:6px">
-        <button id="btn-debug-test-all"   class="c64-btn c64-btn-sm">TEST ALL</button>
-        <button id="btn-debug-test-sid1"  class="c64-btn c64-btn-sm">TEST SID1</button>
-        <button id="btn-debug-test-sid2"  class="c64-btn c64-btn-sm">TEST SID2</button>
-        <button id="btn-debug-test-sid3"  class="c64-btn c64-btn-sm">TEST SID3</button>
-        <button id="btn-debug-test-sid4"  class="c64-btn c64-btn-sm">TEST SID4</button>
-      </div>
-      <div class="preset-row" style="margin-bottom:6px">
-        <button id="btn-debug-apply-config"  class="c64-btn c64-btn-sm">APPLY CFG</button>
         <button id="btn-debug-restart-bus"   class="c64-btn c64-btn-sm">RESTART BUS</button>
         <button id="btn-debug-restart-clk"   class="c64-btn c64-btn-sm">RESTART CLK</button>
         <button id="btn-debug-sync-pios"     class="c64-btn c64-btn-sm">SYNC PIOS</button>
@@ -437,15 +473,16 @@
         files directly from your browser without installing any software.
       </p>
       <hr class="c64-hr">
-      <p style="color:var(--c64-gray);font-size:0.9rem">
+      <p style="color:var(--c64-text);font-size:0.9rem">
         Firmware &amp; web config: <span class="c64-text-cyan">LouD</span><br>
         jsSID player: <span class="c64-text-cyan">Hermit / Mihaly Horvath</span><br>
+        WebUSB modifications: <span class="c64-text-cyan">LouD</span><br>
         DeepSID modifications: <span class="c64-text-cyan">JCH &amp; Thomas Jansson</span><br>
         WebSID: <span class="c64-text-cyan">Jürgen Wothke</span><br>
         License: GPLv2
       </p>
       <hr class="c64-hr">
-      <p style="color:var(--c64-gray);font-size:0.9rem">
+      <p style="color:var(--c64-text);font-size:0.9rem">
         <strong class="c64-text-yellow">Keyboard shortcuts (in player tab):</strong><br>
         Space — Play / Pause &nbsp;|&nbsp;
         S — Stop &nbsp;|&nbsp;
@@ -508,6 +545,60 @@ document.addEventListener('keydown', (e) => {
       break;
   }
 });
+
+/* ── Instant tooltips ────────────────────────────────
+ * Replace native title tooltips (delayed by ~1s in all browsers) with a
+ * custom div that appears immediately on mouseenter.
+ * Runs after all static HTML is parsed; dynamically-added elements can call
+ * initTooltip(el) individually if needed.
+ * ─────────────────────────────────────────────────── */
+(function () {
+  const tip = document.createElement('div');
+  tip.id = 'c64-tooltip';
+  tip.style.cssText = [
+    'position:fixed',
+    'z-index:9999',
+    'pointer-events:none',
+    'display:none',
+    'background:var(--c64-inset)',
+    'border:1px solid var(--c64-border)',
+    'color:var(--c64-text)',
+    'font-size:0.8rem',
+    'padding:4px 10px',
+    'border-radius:3px',
+    'max-width:320px',
+    'line-height:1.5',
+    'white-space:normal',
+    'box-shadow:0 2px 8px rgba(0,0,0,0.5)',
+  ].join(';');
+  document.body.appendChild(tip);
+
+  function position(e) {
+    const x = e.clientX + 14;
+    const y = e.clientY + 18;
+    /* Keep within viewport */
+    const right  = x + tip.offsetWidth;
+    const bottom = y + tip.offsetHeight;
+    tip.style.left = (right  > window.innerWidth  ? e.clientX - tip.offsetWidth  - 8 : x) + 'px';
+    tip.style.top  = (bottom > window.innerHeight ? e.clientY - tip.offsetHeight - 8 : y) + 'px';
+  }
+
+  function attach(el) {
+    const text = el.getAttribute('title');
+    if (!text) return;
+    el.removeAttribute('title');
+    el.dataset.tooltip = text;
+    el.addEventListener('mouseenter', e => {
+      tip.textContent = text;
+      tip.style.display = 'block';
+      position(e);
+    });
+    el.addEventListener('mousemove', position);
+    el.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+  }
+
+  document.querySelectorAll('[title]').forEach(attach);
+}());
 </script>
 
 </body>

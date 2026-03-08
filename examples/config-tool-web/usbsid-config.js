@@ -201,6 +201,10 @@ function presentConfig(cfgData) {
     return false;
   }
 
+  /* Clear first-open hint once config has loaded */
+  const cfgHint = document.getElementById('config-status');
+  if (cfgHint) cfgHint.textContent = '';
+
   /* Clock */
   const clockHz = convertClockRate(cfgData);
   const clockIdx = clkspeed_id[clockHz] !== undefined ? clkspeed_id[clockHz] : 0;
@@ -254,10 +258,6 @@ function presentConfig(cfgData) {
   /* Show raw hex in debug */
   const rawEl = document.getElementById('cfg-raw-hex');
   if (rawEl) {
-    // rawEl.textContent = Array.from(cfgData)
-    //   .map(b => b.toString(16).padStart(2, '0'))
-    //   .join(' ');
-    /* This adds a linebreak after each 16 bytes */
     rawEl.textContent = Array.from(cfgData)
       .map((b, i) => b.toString(16).padStart(2, '0') + ((i + 1) % 16 === 0 ? '\n' : ' '))
       .join('')
@@ -389,15 +389,7 @@ const configButtonMap = {
     usbsidSetStatus('Config reloaded from flash');
     setTimeout(() => doReadConfig(), 500);
   },
-  'btn-toggle-audio':      async () => {
-    await usbsidDevice.toggleAudio();
-    usbsidSetStatus('Audio switch toggled');
-  },
-  'btn-hotflip-sockets':    async () => { await usbsidDevice.hotFlipSockets();  usbsidSetStatus('Hot-flip sockets'); },
-  'btn-lock-clock':        async () => {
-    await usbsidDevice.lockClock();
-    usbsidSetStatus('Clock rate locked');
-  },
+  'btn-apply-config':      async () => { await usbsidDevice.applyConfig();   usbsidSetStatus('Config applied'); },
 };
 
 /* ─── Debug buttons ──────────────────────────────────── */
@@ -405,13 +397,12 @@ const debugButtonMap = {
   'btn-debug-detect-sids':   async () => { await usbsidDevice.detectSIDs();    usbsidSetStatus('Detecting SID types\u2026'); },
   'btn-debug-detect-clones': async () => { await usbsidDevice.detectClones();  usbsidSetStatus('Detecting clone SIDs\u2026'); },
   'btn-debug-auto-detect':   async () => { await usbsidDevice.autoDetect();    usbsidSetStatus('Auto-detection started\u2026'); },
-  'btn-debug-stop-tests':    async () => { await usbsidDevice.stopTests();     usbsidSetStatus('Tests stopped'); },
+  'btn-debug-stop-tests-sid': async () => { await usbsidDevice.stopTests();     usbsidSetStatus('Tests stopped'); },
   'btn-debug-test-all':      async () => { await usbsidDevice.configCmd(TEST_ALLSIDS); usbsidSetStatus('Testing all SIDs\u2026'); },
   'btn-debug-test-sid1':     async () => { await usbsidDevice.configCmd(TEST_SID1);    usbsidSetStatus('Testing SID 1\u2026'); },
   'btn-debug-test-sid2':     async () => { await usbsidDevice.configCmd(TEST_SID2);    usbsidSetStatus('Testing SID 2\u2026'); },
   'btn-debug-test-sid3':     async () => { await usbsidDevice.configCmd(TEST_SID3);    usbsidSetStatus('Testing SID 3\u2026'); },
   'btn-debug-test-sid4':     async () => { await usbsidDevice.configCmd(TEST_SID4);    usbsidSetStatus('Testing SID 4\u2026'); },
-  'btn-debug-apply-config':  async () => { await usbsidDevice.applyConfig();   usbsidSetStatus('Config applied'); },
   'btn-debug-restart-bus':   async () => { await usbsidDevice.restartBus();    usbsidSetStatus('Bus restarted'); },
   'btn-debug-restart-clk':   async () => { await usbsidDevice.restartBusClock(); usbsidSetStatus('Bus clock restarted'); },
   'btn-debug-sync-pios':     async () => { await usbsidDevice.syncPIOs();      usbsidSetStatus('PIOs synced'); },

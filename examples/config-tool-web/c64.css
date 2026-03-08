@@ -348,6 +348,7 @@ input[type=range].c64-range::-moz-range-thumb {
   cursor: default;
 }
 .sid-reg-cell .reg-addr { color: var(--c64-gray); font-size: 0.7rem; }
+.sid-reg-cell .reg-name { color: var(--c64-text); font-size: 0.65rem; min-height: 0.75rem; }
 .sid-reg-cell .reg-val  { color: var(--c64-cyan); }
 .sid-reg-cell.reg-written { background: var(--c64-darkgray); }
 .sid-reg-cell.reg-written .reg-val { color: var(--c64-yellow); }

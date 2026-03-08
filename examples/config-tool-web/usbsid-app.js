@@ -35,8 +35,9 @@ var _currentFile    = null;  /* { url, name } — url is blob: or http: */
 var _currentBlob    = null;  /* active Blob URL to revoke on next local load */
 var _currentSubtune = 0;
 var _maxSubtunes    = 1;
-var _sidFiles       = [];    /* entries from SID/sidfilelist.txt */
-var _sidFileIdx     = -1;    /* currently selected index in _sidFiles */
+var _sidFiles          = [];    /* entries from SID/sidfilelist.txt */
+var _sidFileIdx        = -1;    /* currently selected index in _sidFiles */
+var _webusbSidOffset   = 0;     /* SID address offset for WebUSB play-on-SID selector (0x00/0x20/0x40/0x60) */
 
 /* Path to SID library — same directory as this page, then SID/ */
 const SID_PATH = (function() {
@@ -134,6 +135,11 @@ async function onDeviceConnected() {
 
   /* Override webusb.writeReg so jsSID-webusb.js uses our driver */
   webusb.writeReg = function(array) {
+    /* Apply SID address offset if user selected a non-zero play-on-SID slot */
+    if (_webusbSidOffset > 0 && array && array.length >= 3) {
+      array = Array.from(array);
+      array[1] = (_webusbSidOffset + (array[1] & 0x1F)) & 0x7F;
+    }
     usbsidDevice.write(array);
     /* Update live register display */
     if (array && array.length >= 3) {
@@ -163,44 +169,36 @@ async function onDeviceConnected() {
   }
   usbsidSetStatus('Connected — reading device info\u2026', 'green');
 
-  /* Read version */
-  try {
-    const ver    = await usbsidDevice.readVersion();
-    const pcbver = await usbsidDevice.readPCBVersion();
-    usbsid.version = ver;
-    const verEl = document.getElementById('version-display');
-    if (verEl) verEl.textContent = 'FW: ' + (ver || '—') + '  PCB: ' + (pcbver || '—');
-    usbsidLog('FW version:', ver, '  PCB:', pcbver);
+  /* Parse FW and PCB version from USB device descriptor strings — no USB
+   * bulk transfers needed.  Both strings are part of the device descriptor
+   * and are fetched by the browser during enumeration.
+   *   productName:      "USBSID-Pico2 v1.3"           → PCB ver = last token
+   *   manufacturerName: "LouD (v0.7.0-20260308)"       → FW ver  = text in () */
+  const pname  = usbsidDevice.productName;
+  const mname  = usbsidDevice.manufacturerName;
+  const pcbver = pname.split(' ').pop();                          /* "v1.3" */
+  const fwMatch = mname.match(/\(([^)]+)\)/);
+  const ver    = fwMatch ? fwMatch[1] : '';                       /* "v0.7.0-20260308" */
+  usbsid.version = ver;
+  const verEl = document.getElementById('version-display');
+  if (verEl) verEl.textContent = 'FW: ' + (ver || '—') + '  PCB: ' + (pcbver || '—');
+  usbsidLog('FW version:', ver, '  PCB:', pcbver);
 
-    applyPCBVersionUI(pcbver);
+  applyPCBVersionUI(pcbver);
 
-    /* Read number of SIDs */
-    const n = await usbsidDevice.readNumSIDs();
-    if (n > 0) usbsid.nosids = n;
-
-    /* Read FMOpl SID */
-    const fm = await usbsidDevice.readFMOplSID();
-    usbsid.fmoplsid = fm;
-
-  } catch (e) {
-    usbsidLog('Version read error:', e);
-  }
+  /* Detect onboard SID player capability — Pico2 firmware builds only.
+   * readFMOplSID() is intentionally deferred to after config load so we only
+   * issue it when the config confirms FMOpl is enabled on a SID socket. */
+  _hasSIDPlayer = pname.includes('Pico2');
+  usbsidLog('USB productName:', JSON.stringify(pname));
+  usbsidLog('Onboard SID player:', _hasSIDPlayer ? 'available' : 'not available');
 
   /* Enable config panel */
   configavailable = true;
   const configPanel = document.getElementById('panel-config');
   if (configPanel) configPanel.classList.remove('c64-hidden');
 
-  /* Detect onboard SID player capability — only available on Pico2 firmware builds.
-   * Check USB productName descriptor (set from USBSID_PRODUCT in CMakeLists,
-   * e.g. "USBSID-Pico2 v1.3"). Fall back to checking the firmware version string
-   * returned by readVersion() if productName is empty (browser/platform dependent). */
-  const pname = usbsidDevice.productName;
-  usbsidLog('USB productName:', JSON.stringify(pname));
-  _hasSIDPlayer = pname.includes('Pico2') || usbsid.version.includes('Pico2');
-  usbsidLog('Onboard SID player:', _hasSIDPlayer ? 'available' : 'not available');
-
-  usbsidSetStatus('Connected — ' + (usbsid.version || 'USBSID-Pico'), 'green');
+  usbsidSetStatus('Connected — ' + (ver || pname || 'USBSID-Pico'), 'green');
 
   updateRegsTabVisibility();
   updateConfTabVisibility();
@@ -208,12 +206,16 @@ async function onDeviceConnected() {
 
   /* In SendSID mode, enable transport buttons immediately on connect */
   if (_emulator === 'sendsid') {
-    setPlayerButtons(true);
-    updateSendSIDPlayButton();
+    if (_hasSIDPlayer) {
+      setPlayerButtons(true);
+      updateSendSIDPlayButton();
+    } else {
+      usbsidSetStatus('Incompatible: SendSID requires Pico 2 firmware', 'red');
+    }
   }
 
   /* Auto-read config */
-  setTimeout(() => doReadConfig(), 300);
+  /* setTimeout(() => doReadConfig(), 300); */
 }
 
 function onDeviceDisconnected() {
@@ -233,8 +235,17 @@ function onDeviceDisconnected() {
   const verEl = document.getElementById('version-display');
   if (verEl) verEl.textContent = '';
 
+  const cfgHint = document.getElementById('config-status');
+  if (cfgHint) cfgHint.textContent = 'Click \u201cRETRIEVE CONFIG\u201d to load the current device configuration.';
+
   _hasSIDPlayer = false;
   _sendsidPlaying = false;
+  _webusbSidOffset = 0;
+  /* Reset SID address selector */
+  const selAddr = document.getElementById('sel-player-sid-addr');
+  if (selAddr) { selAddr.innerHTML = '<option value="0">$00</option>'; selAddr.disabled = true; }
+  const btnRet = document.getElementById('btn-player-retrieve-numsids');
+  if (btnRet) btnRet.disabled = false;
   usbsidSetStatus('Disconnected', 'red');
   usbsidLog('Device disconnected');
   if (_emulator === 'sendsid') {
@@ -263,9 +274,11 @@ function getPlayer() {
 
 /* Workaround to always subtract 1 from subtune as the player expects this */
 function _loadTune(subtune, timeout, file, callback) {
-  const p = getPlayer();
+  const p = _player;  /* use existing player only — do NOT call getPlayer() here, as that
+                        would create a new player for the current (possibly wrong) emulator */
   if (!p) return;
   subtune = (subtune != 0 ? (subtune - 1) : subtune);
+  /* usbsidLog(subtune, timeout, file, callback); */
   p.load(subtune, timeout, file, callback);
 }
 
@@ -273,6 +286,7 @@ function _loadTune(subtune, timeout, file, callback) {
 async function doLoadSID(url, displayName, subtune) {
   _currentFile    = { url, name: displayName };
   _currentSubtune = subtune != null ? subtune : 1;
+  updateRegGridSIDCount(detectSIDCountFromName(displayName));
 
   /* SendSID mode: fetch bytes and upload to onboard player */
   if (_emulator === 'sendsid') {
@@ -302,7 +316,8 @@ async function doLoadSID(url, displayName, subtune) {
   if (usbsidDevice.isOpen) await usbsidDevice.resetSID();
 
   p.setVolume(1);
-  p.load(_currentSubtune, 1000, url, null);
+  /* p.load(_currentSubtune, 1000, url, null); */
+  _loadTune(_currentSubtune, 1000, url, null);
   webusbplaying = true;
 
   /* Give hermit time to parse the file headers */
@@ -354,7 +369,8 @@ async function playPause() {
     } catch (e) { usbsidLog('sendsid playPause error:', e); }
     return;
   }
-  const p = getPlayer();
+  const p = _player;  /* use existing player only — do NOT call getPlayer() here, as that
+                      would create a new player for the current (possibly wrong) emulator */
   if (!p) return;
   try {
     if (!_currentFile) {
@@ -391,7 +407,8 @@ async function stopPlay() {
     usbsidSetStatus('Stopped');
     return;
   }
-  const p = getPlayer();
+  const p = _player;  /* use existing player only — do NOT call getPlayer() here, as that
+                         would create a new player for the current (possibly wrong) emulator */
   if (!p) return;
   try {
     p.setVolume(0);
@@ -414,7 +431,9 @@ async function prevSubtune() {
   }
   if (_currentSubtune > 1) {
     _currentSubtune--;
-    const p = getPlayer();
+    const p = _player;  /* use existing player only — do NOT call getPlayer() here, as that
+                         would create a new player for the current (possibly wrong) emulator */
+    if (!p) return;
     if (p && _currentFile) {
       // p.load(_currentSubtune, 1000, _currentFile.url, null);
       _loadTune(_currentSubtune, 1000, _currentFile.url, null);
@@ -433,7 +452,9 @@ async function nextSubtune() {
   }
   if (_currentSubtune < _maxSubtunes) {
     _currentSubtune++;
-    const p = getPlayer();
+    const p = _player;  /* use existing player only — do NOT call getPlayer() here, as that
+                         would create a new player for the current (possibly wrong) emulator */
+    if (!p) return;
     if (p && _currentFile) {
       // p.load(_currentSubtune, 1000, _currentFile.url, null);
       _loadTune(_currentSubtune, 1000, _currentFile.url, null);
@@ -580,16 +601,16 @@ function updatePlayerSideButtons() {
   const sendsidBtns = document.getElementById('sendsid-player-btns');
   if (webusbBtns)  webusbBtns.style.display  = (_emulator === 'webusb')  ? 'flex' : 'none';
   if (asidBtns)    asidBtns.style.display    = (_emulator === 'asid')   ? 'flex' : 'none';
-  if (sendsidBtns) sendsidBtns.style.display = (_emulator === 'sendsid' && usbsidDevice.isOpen) ? 'flex' : 'none';
+  if (sendsidBtns) sendsidBtns.style.display = (_emulator === 'sendsid' && usbsidDevice.isOpen && _hasSIDPlayer) ? 'flex' : 'none';
 }
 
 /* ── Emulator switching ────────────────────────────────── */
 function switchEmulator(em) {
-  stopPlay();
   /* Stop websid WASM worker before discarding the player to prevent memory leaks */
   if (_player && _player.emulator === 'websid' && _player.webusbsid) {
     _player.webusbsid.StopWorker();
   }
+  stopPlay();   /* uses _player directly now — safe to call before changing _emulator */
   _emulator = em;
   _player   = null;
   webusb_enabled = (em === 'webusb');
@@ -598,6 +619,9 @@ function switchEmulator(em) {
   /* Show MIDI selector only for ASID mode */
   const midiRow = document.getElementById('asid-midi-row');
   if (midiRow) midiRow.style.display = (em === 'asid') ? '' : 'none';
+  /* Show force-socket-2 checkbox only for SendSID mode */
+  const socketRow = document.getElementById('sendsid-socket-row');
+  if (socketRow) socketRow.style.display = (em === 'sendsid') ? 'inline-flex' : 'none';
   /* Re-evaluate button disabled state now that _emulator is set.
    * This ensures the stop button is active in sendsid mode regardless of
    * connection state (so the user can stop a still-playing device after refresh). */
@@ -608,8 +632,12 @@ function switchEmulator(em) {
   }
   /* Enable all transport buttons immediately in sendsid mode when already connected */
   if (em === 'sendsid' && usbsidDevice.isOpen) {
-    setPlayerButtons(true);
-    updateSendSIDPlayButton();
+    if (_hasSIDPlayer) {
+      setPlayerButtons(true);
+      updateSendSIDPlayButton();
+    } else {
+      usbsidSetStatus('Incompatible: SendSID requires Pico 2 firmware', 'red');
+    }
   }
   /* Enable WASM if websid */
   if (em === 'websid') {
@@ -624,7 +652,9 @@ function switchEmulator(em) {
 
 /* ── Volume control ────────────────────────────────────── */
 function setVolume(val) {
-  const p = getPlayer();
+  const p = _player;  /* use existing player only — do NOT call getPlayer() here, as that
+                      would create a new player for the current (possibly wrong) emulator */
+  if (!p) return;
   if (p && p.setVolume) p.setVolume(val / 100);
 }
 
@@ -641,11 +671,15 @@ function buildRegGrid() {
   if (!container) return;
   container.innerHTML = '';
 
-  for (let sid = 0; sid < 2; sid++) {
+  for (let sid = 0; sid < 4; sid++) {
+    const section = document.createElement('div');
+    section.id = 'sid-section-' + sid;
+    if (sid > 0) section.style.display = 'none';
+
     const title = document.createElement('div');
     title.className = 'c64-box-title';
     title.textContent = 'SID ' + (sid + 1);
-    container.appendChild(title);
+    section.appendChild(title);
 
     const grid = document.createElement('div');
     grid.className = 'sid-regs-grid';
@@ -658,15 +692,35 @@ function buildRegGrid() {
       const addr = document.createElement('div');
       addr.className = 'reg-addr';
       addr.textContent = '$' + ((sid * 0x20) + r).toString(16).padStart(2, '0');
+      const name = document.createElement('div');
+      name.className = 'reg-name';
+      name.textContent = SID_REG_NAMES[r] || '';
       const val = document.createElement('div');
       val.className = 'reg-val';
       val.textContent = '00';
       cell.appendChild(addr);
+      cell.appendChild(name);
       cell.appendChild(val);
       grid.appendChild(cell);
     }
-    container.appendChild(grid);
+    section.appendChild(grid);
+    container.appendChild(section);
   }
+}
+
+/* Show/hide SID register panels to match the number of SIDs a tune uses */
+function updateRegGridSIDCount(n) {
+  for (let sid = 0; sid < 4; sid++) {
+    const sec = document.getElementById('sid-section-' + sid);
+    if (sec) sec.style.display = sid < n ? '' : 'none';
+  }
+}
+
+/* Detect SID count from filename: 2sid→2, 3sid→3, 4sid→4, default 1 */
+function detectSIDCountFromName(name) {
+  if (!name) return 1;
+  const m = name.match(/([234])sid/i);
+  return m ? parseInt(m[1], 10) : 1;
 }
 
 function updateSIDReg(sid, reg, val) {
@@ -884,9 +938,11 @@ function initEmulatorSelect() {
     sel.value = saved;
     switchEmulator(saved);
   } else {
-    /* Apply initial MIDI row visibility based on default selection */
+    /* Apply initial row visibility based on default selection */
     const midiRow = document.getElementById('asid-midi-row');
     if (midiRow) midiRow.style.display = (sel.value === 'asid') ? '' : 'none';
+    const socketRow = document.getElementById('sendsid-socket-row');
+    if (socketRow) socketRow.style.display = (sel.value === 'sendsid') ? 'inline-flex' : 'none';
   }
   sel.addEventListener('change', () => {
     switchEmulator(sel.value);
@@ -939,6 +995,11 @@ async function uploadCurrentSID() {
   if (statusEl) statusEl.textContent = 'Uploading\u2026';
   usbsidSetStatus('Uploading SID to device\u2026', 'yellow');
   try {
+    /* Send SID_PLAYER_TWO before load if the user requested socket 2 playback */
+    const forceTwo = document.getElementById('chk-sendsid-socket2');
+    if (forceTwo && forceTwo.checked) {
+      await usbsidDevice.playerSocketTwo();
+    }
     await usbsidDevice.uploadSIDFile(_loadedBytes, _currentSubtune, 0x01, (sent, total) => {
       if (statusEl) statusEl.textContent = Math.round(sent / total * 100) + '%';
     });
@@ -980,6 +1041,10 @@ function initTransportButtons() {
       const btn = document.getElementById('btn-player-mute');
       if (btn) btn.textContent = Mute_SID ? 'UNMUTE SID' : 'MUTE SID';
     },
+    /* SendSID player-area buttons */
+    'btn-player-sendsid-toggle-audio': async () => {
+      if (usbsidDevice.isOpen) await usbsidDevice.toggleAudio().catch(e => usbsidLog('toggleAudio error:', e));
+    },
     /* ASID player-area buttons */
     'btn-player-sysex-audio': () => {
       if (typeof sysexCommand === 'function' && selectedMidiOutput) sysexCommand(1);
@@ -990,6 +1055,33 @@ function initTransportButtons() {
     const el = document.getElementById(id);
     if (el) el.addEventListener('click', fn);
   }
+
+  /* WebUSB: retrieve number of SIDs and populate address selector */
+  const btnRetrieve = document.getElementById('btn-player-retrieve-numsids');
+  const selAddr     = document.getElementById('sel-player-sid-addr');
+  if (btnRetrieve && selAddr) {
+    btnRetrieve.addEventListener('click', async () => {
+      if (!usbsidDevice.isOpen) return;
+      const n = await usbsidDevice.readNumSIDs().catch(() => 1);
+      usbsidLog('WebUSB: number of SIDs =', n);
+      selAddr.innerHTML = '';
+      const addrs = [0x00, 0x20, 0x40, 0x60];
+      const labels = ['$00 (SID 1)', '$20 (SID 2)', '$40 (SID 3)', '$60 (SID 4)'];
+      for (let i = 0; i < Math.max(n, 1) && i < 4; i++) {
+        const opt = document.createElement('option');
+        opt.value = addrs[i];
+        opt.textContent = labels[i];
+        selAddr.appendChild(opt);
+      }
+      selAddr.disabled = false;
+      btnRetrieve.disabled = true;
+    });
+    selAddr.addEventListener('change', () => {
+      _webusbSidOffset = parseInt(selAddr.value, 10) || 0;
+      usbsidLog('WebUSB: SID play address offset =', '0x' + _webusbSidOffset.toString(16));
+    });
+  }
+
   setPlayerButtons(false);
 }
 

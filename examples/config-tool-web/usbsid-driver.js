@@ -150,6 +150,29 @@ class USBSIDDevice {
     this._ifaceNum   = null;
     this._isOpen     = false;
     this._debug      = false;
+    /* Best-effort close on page hide/refresh.
+     * Chrome does not cancel HCI-queued bulk OUT transfers on same-origin
+     * page reload — old SID write packets from unawaited write() calls
+     * keep arriving at the device for seconds after reconnect.
+     * Calling device.close() from pagehide cancels Chrome's pending queue
+     * before the page unloads, so the new session starts with a clean pipe. */
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pagehide', () => this._syncClose());
+    }
+  }
+
+  /** Synchronous best-effort close called from pagehide (cannot await). */
+  _syncClose() {
+    if (!this._device) return;
+    try {
+      if (this._ifaceNum !== null) this._device.releaseInterface(this._ifaceNum).catch(() => {});
+      this._device.close().catch(() => {});
+    } catch (_) {}
+    this._isOpen   = false;
+    this._device   = null;
+    this._epOut    = null;
+    this._epIn     = null;
+    this._ifaceNum = null;
   }
 
   /* ── Connection ── */
@@ -166,6 +189,17 @@ class USBSIDDevice {
       this._log('connect failed:', e);
       return false;
     }
+  }
+
+  /** Close and immediately reopen — cancels all pending transfers, then
+   *  reopens with a fresh endpoint state. Used to recover from a leaked
+   *  transferIn after a configCmdRead timeout. */
+  async _reopen() {
+    const dev = this._device;    /* save ref before close() nulls it */
+    await this.close();
+    if (!dev) return false;
+    this._device = dev;          /* restore: device is closed but reusable */
+    return await this._open();
   }
 
   /** Re-open a previously-permitted device (no picker) */
@@ -219,6 +253,13 @@ class USBSIDDevice {
         value:       CTRL_ENABLE,
         index:       this._ifaceNum,
       });
+      /* Short settle delay: selectAlternateInterface sends SET_INTERFACE which
+       * causes TinyUSB to reset the bulk endpoints. On fast reconnects (page
+       * refresh, emulator switch) the first OUT packet can arrive while the
+       * device is still processing SET_INTERFACE and gets silently dropped.
+       * 100ms is imperceptible to the user but sufficient for the device to
+       * finish endpoint reset before the first bulk transfer. */
+      await us_delay(100);
       this._isOpen = true;
       this._log('opened, ifaceNum', this._ifaceNum, 'epOut', this._epOut, 'epIn', this._epIn);
       return true;
@@ -229,17 +270,24 @@ class USBSIDDevice {
   }
 
   async close() {
-    if (!this._isOpen) return;
-    try {
-      await this._device.releaseInterface(this._ifaceNum);
-      await this._device.close();
-    } catch (_) {}
-    this._isOpen = false;
+    /* Always attempt full teardown even if _isOpen is false (e.g. partial open) */
+    if (this._device) {
+      try {
+        if (this._ifaceNum !== null) await this._device.releaseInterface(this._ifaceNum);
+        await this._device.close();
+      } catch (_) {}
+    }
+    this._isOpen   = false;
+    this._device   = null;
+    this._epOut    = null;
+    this._epIn     = null;
+    this._ifaceNum = null;
     this._log('closed');
   }
 
-  get isOpen()       { return this._isOpen; }
-  get productName()  { return this._device ? (this._device.productName || '') : ''; }
+  get isOpen()          { return this._isOpen; }
+  get productName()     { return this._device ? (this._device.productName     || '') : ''; }
+  get manufacturerName(){ return this._device ? (this._device.manufacturerName || '') : ''; }
 
   /* ── Raw I/O ── */
 
@@ -280,6 +328,19 @@ class USBSIDDevice {
     }
   }
 
+  /** Clear endpoint halt/toggle state (e.g. after switching away and back) **/
+  async clearHaltEndpoints() {
+    if (!this._isOpen) return;
+    try { await this._device.clearHalt('out', this._epOut); } catch (_) {}
+    try { await this._device.clearHalt('in',  this._epIn);  } catch (_) {}
+  }
+
+  /** Send a ZLP to the OUT endpoint to flush any buffered data */
+  async clearEndpoints() {
+    if (!this._isOpen) return;
+    try { await this._device.transferOut(this._epOut, new Uint8Array(0)); } catch (_) {}
+  }
+
   /* ── High-level helpers ── */
 
   /** Build command byte: type (2-bit) | payload (6-bit) */
@@ -292,33 +353,62 @@ class USBSIDDevice {
     await this.write([this.cmd(COMMAND, CONFIG), sub, b2, b3, b4, b5]);
   }
 
-  /** Send config command and read response packets */
-  // async configCmdRead(sub, b2 = 0, b3 = 0, b4 = 0, b5 = 0, numPackets = 1) {
+  /** Send config command and read response packets.
+   *  On timeout a transferIn is leaked (WebUSB has no cancel API). We recover
+   *  by closing and reopening the device (which aborts all pending transfers),
+   *  then retrying the command once on a clean connection. */
   async configCmdRead(sub, b2 = 0, b3 = 0, b4 = 0, b5 = 0, numBytes = 1) {
+    if (!this._isOpen) return [];
+    usbsidLog('configCmdRead: start ', sub);
     const cmdBuf = new Uint8Array([this.cmd(COMMAND, CONFIG), sub, b2, b3, b4, b5]);
     const packets = [];
+    let timedOut = false;
     try {
       usbsidLog("configCmdRead ==> Write: ", cmdBuf);
       await this._device.transferOut(this._epOut, cmdBuf);
-      usbsidLog("configCmdRead <== Read start");
-      const r = await this._device.transferIn(this._epIn, numBytes);
+      usbsidLog("configCmdRead <== Read start: ", numBytes);
+      const r = await Promise.race([
+        this._device.transferIn(this._epIn, numBytes),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('configCmdRead timeout')), 1500)
+        ),
+      ]);
       usbsidLog("configCmdRead <== Read done");
       packets.push(new Uint8Array(r.data.buffer));
       usbsidLog("configCmdRead <== data pushed");
-      /* .then(r => { */
-        // this.onReceive(r.data);
-      /* }, error => {
-        this.onReceiveError(error);
-        console.error("error: " + error);
-      }); */
-      // await this._device.transferOut(this._epOut, cmdBuf);
-      // for (let i = 0; i < numPackets; i++) {
-      //   const r = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE);
-      //   packets.push(new Uint8Array(r.data.buffer));
-      // }
     } catch (e) {
-      this._log('configCmdRead error:', e);
+      usbsidLog('configCmdRead error:', e.message || e);
+      timedOut = (e.message === 'configCmdRead timeout');
     }
+    if (timedOut && this._isOpen) {
+      /* A transferIn is now leaked in Chrome's queue — the only way to cancel
+       * it is to close the device (aborts all pending transfers) and reopen.
+       * This also resets the endpoint state, so the retry starts clean. */
+      usbsidLog('configCmdRead: recovering — close/reopen to cancel leaked transfer');
+      const ok = await this._reopen();
+      if (ok) {
+        usbsidLog('configCmdRead: retrying sub=', sub);
+        try {
+          await this._device.transferOut(this._epOut, cmdBuf);
+          /* Use a long timeout here: the device may still be draining a queue of
+           * old SID write packets (from unawaited write() calls) that Chrome's
+           * HCI submitted before the pagehide/close could cancel them.  At
+           * ~1000 SID writes/sec and several seconds of playback, draining can
+           * take 3-5 s.  5000 ms covers all realistic playback durations. */
+          const r = await Promise.race([
+            this._device.transferIn(this._epIn, numBytes),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('configCmdRead retry timeout')), 5000)
+            ),
+          ]);
+          packets.push(new Uint8Array(r.data.buffer));
+          usbsidLog('configCmdRead: retry succeeded');
+        } catch (e) {
+          usbsidLog('configCmdRead: retry failed:', e.message || e);
+        }
+      }
+    }
+    usbsidLog('configCmdRead: end');
     return packets;
   }
 
@@ -330,6 +420,7 @@ class USBSIDDevice {
    * without using Promise.race — that approach leaks pending transferIn calls
    * which then consume the real response on the next read, yielding 0 bytes. */
   async readConfig() {
+    usbsidLog('readConfig: start');
     const CONFIG_SIZE = 64;
     const CC = this.cmd(COMMAND, CONFIG);
     const cmdBuf = new Uint8Array([CC, READ_CONFIG, 0, 0, 0, 0]);
@@ -367,7 +458,7 @@ class USBSIDDevice {
         if (all.length >= CONFIG_SIZE) break;
         // await this._device.transferIn(this._epIn, MAX_PACKET_SIZE).then(r => {
         // const chunk = new Uint8Array(r.data.buffer);
-        console.log(i + ": " + chunk);
+        usbsidLog(i + ": " + chunk);
         // if (all.length === 0) {
         //   // if (chunk.length === 0) { this._log('readConfig: skipping zero-length packet'); continue; }
         //   // if (chunk.every(b => b === 0)) { this._log('readConfig: skipping stale zero packet'); continue; }
@@ -382,8 +473,9 @@ class USBSIDDevice {
         // })
       }
     } catch (e) {
-      this._log('readConfig error:', e.message || e);
+      usbsidLog('readConfig error:', e.message || e);
     }
+    usbsidLog('readConfig: end');
     return new Uint8Array(all.slice(0, CONFIG_SIZE));
   }
 
