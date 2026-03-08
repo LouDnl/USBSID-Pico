@@ -947,13 +947,16 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         read_skpico_configuration(buffer[2], buffer[3]);
       }
       if (buffer[1] == 5)  {
+        read_armsid_configuration(buffer[2]);
+      }
+      if (buffer[1] == 6)  {
         print_backsid_filter_type(buffer[2]);
         print_backsid_version(buffer[2]);
       }
-      if (buffer[1] == 6) {
+      if (buffer[1] == 7) {
         set_backsid_filter_type(buffer[2],buffer[3]);
       }
-      if (buffer[1] == 7) {
+      if (buffer[1] == 8) {
         cycled_write_operation(0x1d,0x50,6);
         cycled_delay_operation(100);
         cycled_write_operation(0x1e,0x44,6);
@@ -961,7 +964,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         uint8_t result = cycled_read_operation(0x1e,6);
         usNFO("PDSID: $%02x\n",result);
       }
-      if (buffer[1] == 8) {
+      if (buffer[1] == 9) {
         if (buffer[2] == 0) {
           print_config_overview();
         } else if (buffer[2] == 1){
@@ -971,7 +974,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
           print_cfg_addr();
         }
       }
-      if (buffer[1] == 9) {
+      if (buffer[1] == 10) {
         uint16_t dcyc = 1000;
         if (buffer[2] != 0 || buffer[3] != 0)
           dcyc = (buffer[2] << 8) | buffer[3];
