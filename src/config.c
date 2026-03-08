@@ -369,9 +369,10 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       read_config(&usbsid_config);
       print_cfg(config_array, count_of(config_array), false);
       /* TODO: Add check for terminator byte (end) or continue byte (moar packets coming in!) */
-      int writes = count_of(config_array) / 64;
+      /* int writes = count_of(config_array) / 64; */
       memset(write_buffer_p, 0, 64);
-      for (int i = 0; i < writes; i++) {
+      /* NOTICE: Temporarily fixed the writes to 1 only, config isn't bigger anyway */
+      for (int i = 0; i < 1/* writes */; i++) {
         memcpy(write_buffer_p, config_array + (i * 64), 64);
         write_back_data(64);
       }
