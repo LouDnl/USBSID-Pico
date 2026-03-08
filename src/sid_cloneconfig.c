@@ -272,7 +272,7 @@ bool read_skpico_version(uint8_t base_address)
 }
 
 /**
- * @brief Read configuration from an SIDKick-pico at supplied address
+ * @brief Read configuration from a SIDKick-pico at supplied address
  *
  * @param uint8_t base_address
  */
@@ -472,6 +472,12 @@ void set_backsid_filter_type(uint8_t base_address, uint8_t type)
   return;
 }
 
+/**
+ * @brief Read configuration from am ARM(2)SID at supplied address
+ * @note Routine from 1541Ultimate-II
+ *
+ * @param uint8_t base_address
+ */
 void read_armsid_configuration(uint8_t base_address)
 {
   usCFG("Read ARM(2)SID configuration @ $%02x\n", base_address);
