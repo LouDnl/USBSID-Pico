@@ -183,8 +183,10 @@ void cdc_write(volatile uint8_t * itf, uint32_t n)
 void webserial_write(volatile uint8_t * itf, uint32_t n)
 { /* No need to check if write available with current driver code */
   usIO("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
-  tud_vendor_write(write_buffer, n);
-  tud_vendor_flush();
+  tud_vendor_n_write(*itf, write_buffer, n);
+  tud_vendor_n_write_flush(*itf);
+  // tud_vendor_write(write_buffer, n);
+  // tud_vendor_flush();
   return;
 }
 
