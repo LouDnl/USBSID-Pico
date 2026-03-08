@@ -340,36 +340,48 @@ bool detect_fpgasid(uint8_t base_address)
  */
 uint8_t detect_armsid(uint8_t base_address)
 {
+  /* Clear / reset ARM(2)SID with 3 writes */
+  cycled_write_operation((ARMSID_W1 + base_address),0x00,6); /* $1d -> 0x00 */
+  cycled_write_operation((ARMSID_W1 + base_address),0x00,6); /* $1d -> 0x00 */
+  cycled_write_operation((ARMSID_W1 + base_address),0x00,6); /* $1d -> 0x00 */
+  sleep_us(10);
   usCFG("  Check for ARMSID @ $%02x\n", base_address);
-  cycled_write_operation((ARMSID_A + base_address),ARMSID_D1,6); /* 0x53 'S' */
+  cycled_write_operation((ARMSID_W1 + base_address),ARMSID_S,6); /* $1d -> 0x53 'S' */
   sleep_us(10);
-  cycled_write_operation((ARMSID_B + base_address),ARMSID_D2,6); /* 0x49 'I' */
+  cycled_write_operation((ARMSID_W2 + base_address),ARMSID_I,6); /* $1e -> 0x49 'I' */
   sleep_us(10);
-  cycled_write_operation((ARMSID_C + base_address),ARMSID_D3,6); /* 0x44 'D' */
+  cycled_write_operation((ARMSID_W3 + base_address),ARMSID_D,6); /* $1f -> 0x44 'D' */
   sleep_us(10);
   sleep_ms(10);
 
-  uint8_t id1 = cycled_read_operation((ARMSID_R1 + base_address), 4); /* expect 'N' */
+  /* Read OSC3 */
+  uint8_t id1 = cycled_read_operation((ARMSID_R1 + base_address), 4); /* $1b <- expect 'N' */
   sleep_us(10);
-  uint8_t id2 = cycled_read_operation((ARMSID_R2 + base_address), 4); /* expect 'O' */
+  /* Read ENV3 */
+  uint8_t id2 = cycled_read_operation((ARMSID_R2 + base_address), 4); /* $1c <- expect 'O' */
   sleep_us(10);
 
-  /* usCFG("ARMSID Detect: 0b%08b 0b%08b $%02x $%02x\n", id1, id2, id1, id2); */
-  if ((id1 == ARMSID_ID1) && (id2 == ARMSID_ID2)) { /* 0x4e 'N' && 0x4f 'O' */
+  usCFG("  ARMSID Detect: 0b%08b 0b%08b $%02x $%02x\n", id1, id2, id1, id2);
+  if ((id1 == ARMSID_ID1) && (id2 == ARMSID_ID2)) { /* expect 0x4e 'N' && 0x4f 'O' */
 
     /* Try detect if ARM2SID */
-    cycled_write_operation((ARMSID_C + base_address),ARMSID_D2,6); /* 0x49 'I' */
+    cycled_write_operation((ARMSID_W3 + base_address),ARMSID_I,6); /* $1f -> 0x49 'I' */
     sleep_us(10);
-    cycled_write_operation((ARMSID_B + base_address),ARMSID_D2,6); /* 0x49 'I' */
+    cycled_write_operation((ARMSID_W2 + base_address),ARMSID_I,6); /* $1e -> 0x49 'I' */
     sleep_us(10);
     sleep_ms(10);
-    id1 = cycled_read_operation((ARMSID_R1 + base_address), 4); /* expect 'L' or 'R' */
+    uint8_t id1 = cycled_read_operation((ARMSID_R1 + base_address), 4); /* $1b <- expect 'L' */
+    uint8_t id2 = cycled_read_operation((ARMSID_R2 + base_address), 4); /* $1c <- expect 'L' */
     sleep_us(10);
-    cycled_write_operation((ARMSID_A + base_address),0,6); /* 0 */
+    /* Clear / reset ARM(2)SID with 3 writes */
+    cycled_write_operation((ARMSID_W1 + base_address),0x00,6); /* $1d -> 0x00 */
+    cycled_write_operation((ARMSID_W1 + base_address),0x00,6); /* $1d -> 0x00 */
+    cycled_write_operation((ARMSID_W1 + base_address),0x00,6); /* $1d -> 0x00 */
     sleep_us(10);
 
-    /* usCFG("ARM2SID Detect: 0b%08b 0b%08b $%02x $%02x\n", id1, id2, id1, id2); */
-    if ((id1 == ARMSID_ID1) && (id2 == ARMSID_ID2)) {
+    usCFG("  ARM2SID Detect: 0b%08b 0b%08b $%02x $%02x\n", id1, id2, id1, id2);
+    if ((id1 == ARM2SID_ID1) /* expect #$02 */
+      && ((id2 == ARM2SID_ID2) || (id2 == ARM2SID_ID3))) { /* expect 'L' or 'R' */
       usCFG("  Found ARM2SID @ $%02x\n", base_address);
       return 2;
     }
