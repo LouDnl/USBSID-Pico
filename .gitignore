@@ -67,18 +67,33 @@
 !examples/config-tool
 !examples/config-tool/ini-examples
 !examples/config-tool/inih
+!examples/config-tool-web
+!examples/config-tool-web/images
+!examples/config-tool-web/lib
+!examples/config-tool-web/SID
+!examples/config-tool-web/websid
+!examples/config-tool-web_old
 !examples/send_sid
 !examples/hardsid-sidblaster
 !examples/udev-rules
 !examples/vmpk
-!examples/webconfig-tool
 !resources
 
 # recursive directory contents
 !lib/emudore-embedded/**
 !examples/cloje64/**
 !examples/config-tool/inih/**
+!examples/config-tool-web_old/**
 !examples/hardsid-sidblaster/**
 !examples/udev-rules/**
 !examples/vmpk/**
-!examples/webconfig-tool/**
+
+# specific files in specified directories
+examples/config-tool-web/*.md
+!examples/config-tool-web/*.js
+!examples/config-tool-web/*.css
+!examples/config-tool-web/lib/*.js
+!examples/config-tool-web/lib/*.wasm
+!examples/config-tool-web/SID/genlist.bb
+!examples/config-tool-web/websid/*.js
+!examples/config-tool-web/websid/*.wasm
