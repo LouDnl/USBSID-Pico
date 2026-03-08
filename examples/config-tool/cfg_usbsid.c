@@ -916,7 +916,7 @@ void run_autodetection(bool reboot)
 }
 
 void read_config(void)
-{
+{ /* NOTICE: When the config grows outside of 64 bytes, this requires an update */
   memset(config, 0, count_of(config));
   config_buffer[1] = 0x30;
   write_chars(config_buffer, count_of(config_buffer));
