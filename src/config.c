@@ -1150,7 +1150,7 @@ void print_config(void)
 
 void apply_busclock_settings(void)
 {
-  usCFG("Applying bus clock settings\n");
+  usCFG("  Applying bus clock settings\n");
   stop_dma_channels();
   restart_bus_clocks();
   sync_pios(false);
@@ -1218,7 +1218,7 @@ ConfigError apply_config(bool at_boot)
   usCFG("  Success: %d SIDs active\n", cfg.numsids);
 
   if (RGB_ENABLED) {
-    usCFG("  Applying RGBLED SID\n");
+    usCFG("Applying RGBLED SID\n");
     apply_rgbled_config();
   } else {
     usCFG("  RGBLED not available\n");
