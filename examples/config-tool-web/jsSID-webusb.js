@@ -223,6 +223,7 @@ function asidSendEnv() {
   let sidspeed = (filedata[18] << 24) | (filedata[18 + 1] << 16) | (filedata[18 + 2] << 8) | filedata[18 + 3];
   let curr_sidspeed = sidspeed & (1 << subtune);  // Not 0? CIA speed
   let custom_speed = (timermode[subtune] || memory[0xDC05]);
+  const SID = getPlayer();
   let clock_type = SID.hermit.getclockspeed();  // 0 = 1MHz, 1 = PAL, 2 = NTSC, 3 = PAL&NTSC
   let cia_speed = SID.hermit.getcia();  // Must be non zero if curr_sidspeed == 1
   let isPAL = (clock_type == 2 ? false : true);
@@ -359,7 +360,7 @@ function sysexCommand(command, a = 0, b = 0, c = 0, d = 0) {
   selectedMidiOutput.send(sysexOutBuffer.slice(0, SYSEX_BUFFER_SIZE));
 }
 
-/* WebUSB */
+/* WebUSB -> overriden via usbsid-app.js */
 
 let port,
     savedport;
@@ -367,399 +368,6 @@ let webusbconnected = false,
     webusbplaying = false
 let configavailable = false;
 var webusb = {};
-var version_regex = "";
-var usbsid = {};
-const webusb_min_version = "0.2.3";
-
-/* (function () {
-  document.addEventListener('DOMContentLoaded', event => {
-
-  })
-}); */
-
-(function () {
-
-  document.addEventListener('DOMContentLoaded', event => {
-
-    savedport = localStorage.getItem("webusbport");
-    let statusDisplay = document.querySelector('#status-text');
-
-    webusb.getPorts = function () {
-      return navigator.usb.getDevices().then(devices => {
-        return devices.map(device => new webusb.Port(device));
-      });
-    };
-
-    webusb.requestPort = function () {
-      const filters = [
-        { 'vendorId': 0xcafe, 'productId': 0x4011 },  // USBSID-Pico
-      ];
-      return navigator.usb.requestDevice({ 'filters': filters }).then(
-        device => new webusb.Port(device)
-      );
-    }
-
-    webusb.Port = function (device) {
-      this.device_ = device;
-      this.interfaceNumber = 0;
-      this.endpointIn = 0;
-      this.endpointOut = 0;
-      this.name = webusb.name = device.productName;
-    };
-
-    webusb.readsingle = 0;
-    webusb.datareadresult = null;
-    webusb.datainsize = 64;
-
-    webusb.Port.prototype.connect = function () {
-      let readLoop = async () => {
-        if (webusbconnected) { // ISSUE: NEED TO TEST IF THIS INTERFERES WITH AUTO CONFIG LOAD
-          await this.device_.transferIn(this.endpointIn, webusb.datainsize).then(result => {
-            this.onReceive(result.data);
-            // console.log(result.data);
-            readLoop();  /* Recursion */
-          }, error => {
-            if (webusbconnected) {
-              this.onReceiveError(error);
-            }
-          });
-        } else {
-          console.log("Not connected to WebUSB");
-        };
-      };
-
-      return this.device_.open()
-        .then(() => {
-          if (this.device_.configuration === null) {
-            return this.device_.selectConfiguration(1);
-          }
-        })
-        .then(() => {
-          var interfaces = this.device_.configuration.interfaces;
-          interfaces.forEach(element => {
-            element.alternates.forEach(elementalt => {
-              if (elementalt.interfaceClass == 0xFF) {
-                this.interfaceNumber = element.interfaceNumber;
-                elementalt.endpoints.forEach(elementendpoint => {
-                  if (elementendpoint.direction == "out") {
-                    this.endpointOut = elementendpoint.endpointNumber;
-                  }
-                  if (elementendpoint.direction == "in") {
-                    this.endpointIn = elementendpoint.endpointNumber;
-                  }
-                })
-              }
-            })
-          })
-        })
-        .then(() => this.device_.claimInterface(this.interfaceNumber))
-        .then(() => this.device_.selectAlternateInterface(this.interfaceNumber, 0))
-        .then(() => this.device_.controlTransferOut({
-          'requestType': 'class',
-          'recipient': 'interface',
-          'request': 0x22,
-          'value': 0x01,
-          'index': this.interfaceNumber
-        }))
-        .then(() => {
-          statusDisplay.textContent = '';
-          usbsid.productName = this.device_.productName;
-          usbsid.manufacturerName = this.device_.manufacturerName;
-          usbsid.serialNumber = this.device_.serialNumber;
-          usbsid.fullversion = usbsid.manufacturerName.match(/v[0-9\.]+-[A-Z0-9\.]+/g)[0];
-          usbsid.version = usbsid.fullversion.match(/\d+\.\d+\.\d+/g)[0];
-          if (usbsid.version < webusb_min_version) {
-            var message = `Warning, your firmware version ${usbsid.version} is lower then ${webusb_min_version}, playing results may vary! Please update your firmware!`;
-            console.log(message);
-            alert(message);
-          } else {
-            console.log(`Device firmware version ${usbsid.version} verified against minimal play version ${webusb_min_version}`);
-          }
-          webusbconnected = true;
-          mute_SIDS();
-          clear_BUS();
-          unmute_SIDS();
-          readLoop();
-        });
-    };
-
-    webusb.Port.prototype.disconnect = function () {
-      return this.device_.controlTransferOut({
-        'requestType': 'class',
-        'recipient': 'interface',
-        'request': 0x22,
-        'value': 0x00,
-        'index': this.interfaceNumber
-      }).then(() => {
-        this.device_.reset();
-      }).then(() => this.device_.close());
-    };
-
-    webusb.Port.prototype.send = function (data) {
-      return this.device_.transferOut(this.endpointOut, data);
-    };
-
-    webusb.writeReg = function (array) {
-      if (Mute_SID == 1) {
-        array = 0;
-      }
-      port.send(
-        new Uint8Array(array)
-      );
-      fillsidmemory(array);
-      // if (array[1] >= 0x0 && array[1] < 0x20) {
-      //   document.querySelector('#SID0col'+array[1]).textContent = '$' + dec2Hex(array[1]) + ':' + dec2Hex(array[2]);
-      //   // document.querySelector('#SID0col'+array[1]).textContent = '$' + dec2Hex(array[1]) + ':' + dec2Hex(memory[0xD400 + array[1]]);
-      // } else if (array[1] >= 0x20 && array[1] < 0x40) {
-      //   document.querySelector('#SID1col'+(array[1] - 0x20)).textContent = '$' + dec2Hex(array[1]) + ':' + dec2Hex(array[2]);
-      // } if (array[1] >= 0x40 && array[1] < 0x60) {
-      //   document.querySelector('#SID2col'+(array[1] - 0x40)).textContent = '$' + dec2Hex(array[1]) + ':' + dec2Hex(array[2]);
-      // } if (array[1] >= 0x60 && array[1] < 0x80) {
-      //   document.querySelector('#SID3col'+(array[1] - 0x60)).textContent = '$' + dec2Hex(array[1]) + ':' + dec2Hex(array[2]);
-      // }
-    }
-
-    webusb.readReg = function (array) {
-      port.send(
-        new Uint8Array(array)
-      );
-    }
-  });
-
-})();
-
-async function mute_SIDS() {
-  webusb.writeReg([((3 << 6) | 12), 0, 0]);
-}
-
-async function unmute_SIDS() {
-  webusb.writeReg([((3 << 6) | 13), 0, 0]);
-}
-
-async function clear_BUS() {
-  webusb.writeReg([((3 << 6) | 17), 0, 0]);
-}
-
-async function reset_SIDS() {
-  webusb.writeReg([((3 << 6) | 14), 0, 0]);
-}
-
-async function set_ClockSpeed(clk_speed) {
-  webusb.writeReg([((3 << 6) | 18), 0x50, clk_speed, 0, 0, 0]);
-}
-
-async function get_NoSIDs() {
-  webusb.datainsize = 1;
-  readnosids = true;
-  await webusb.writeReg([((3 << 6) | 18), 0x39, 0, 0, 0, 0]);
-}
-
-async function get_FmOplSIDno() {
-  webusb.datainsize = 1;
-  readfmoplsid = true;
-  await webusb.writeReg([((3 << 6) | 18), 0x3A, 0, 0, 0, 0]);
-}
-
-async function readVersion() {
-  // appender.empty();
-  readver = true;
-  await webusb.readReg([((3 << 6) | 18), 0x80, 0, 0, 0, 0]);
-}
-
-async function readPCBVersion() {
-  // appender.empty();
-  readpcbver = true;
-  await webusb.readReg([((3 << 6) | 18), 0x81, 0, 0, 0, 0]);
-}
-
-async function readConfig() {
-  appender.empty();
-  readcfg = true;
-  await webusb.readReg([((3 << 6) | 18), 0x30, 0, 0, 0, 0]);
-}
-
-(function () {
-  'use strict';
-
-  document.addEventListener('DOMContentLoaded', event => {
-
-    let connectButton = document.querySelector("#device-connect");
-    let statusDisplay = document.querySelector('#status-text');
-    let configButton = document.querySelector("#toggle-config");
-
-    let cfgreads = 0;
-
-    webusb.connect = function () {
-      port.connect().then(() => {
-        connectButton.textContent = 'Disconnect';
-        statusDisplay.textContent = 'from USB device';
-        configButton.classList.remove("d-none");
-
-        if (checkPCBVersion(webusb.name)) {
-          $('#webusb-audio-buttons').removeClass('d-none');
-        } else {
-          $('#webusb-audio-buttons').addClass('d-none');
-        }
-
-        if(version == null || version === 'undefined')
-          setTimeout(function() { readVersion(); }, 100);
-        if(pcbversion == null || pcbversion === 'undefined')
-          setTimeout(function() { readPCBVersion(); }, 100);
-
-        port.onReceive = data => {
-          if (readcfg) {
-            if (data.byteLength != 0) {
-              appender.append(data.buffer);
-              cfgreads++;
-              if (appender.length() >= 64) {  /* BUG: TinyUSB is refusing to send more then 2x 64KB packets */
-                presentConfig();
-              }
-            } else if (cfgreads > 2) {
-              presentConfig(false);
-              console.log("Received empty config buffer: " + data.byteLength);
-            }
-          } else if (readver) {
-            if (data.byteLength != 0) {
-              version = new Uint8Array(data.buffer);
-              if (version[0] == 0x80) {
-                presentVersion(version);
-              }
-            } else {
-              presentVersion(false);
-              console.log("Received empty version buffer: " + data.byteLength);
-            }
-          } else if (readpcbver) {
-            if (data.byteLength != 0) {
-              version = new Uint8Array(data.buffer);
-              if (version[0] == 0x81) {
-                let pcbversionLength = version[1];
-                let versionText = version.slice(2, (2 + pcbversionLength));
-                pcbversion = textDecoder.decode(versionText);
-                readpcbver = false;
-              }
-            } else {
-              console.log("Received empty PCB version buffer: " + data.byteLength);
-            }
-          } else if (readfmoplsid) {
-            webusb.datareadresult = new Uint8Array(data.buffer);
-            readfmoplsid = false;
-            webusb.datainsize = 64;
-            usbsid.fmoplsid = webusb.datareadresult[0];
-          } else if (readnosids) {
-            webusb.datareadresult = new Uint8Array(data.buffer);
-            readnosids = false;
-            webusb.datainsize = 64;
-            usbsid.nosids = webusb.datareadresult[0];
-          } else {
-            webusb.datareadresult = new Uint8Array(data.buffer);
-            webusb.datainsize = 64;
-          }
-        };
-        port.onReceiveError = error => {
-          statusDisplay.textContent = error;
-          console.error(error);
-        };
-      }, error => {
-        statusDisplay.textContent = error;
-      }).then(_ => {
-
-        get_NoSIDs();
-        if (usbsid.nosids === undefined) {
-          get_NoSIDs();
-        }
-
-        get_FmOplSIDno();
-        if (usbsid.fmoplsid === undefined) {
-          get_FmOplSIDno();
-        }
-
-        /* Empty buffer */
-        port.send(new Uint8Array([0]));
-
-        // port.device_.transferOut(port.endpointOut, new Uint8Array([0]));
-        // port.device_.transferIn(port.endpointIn, new Uint8Array([0]));
-      // }).then(_ => {
-      //   if (enableConfigThings()) {
-      //     setTimeout(readConfig, 200);
-      //     setTimeout(readVersion, 400);
-      //   };
-      });
-    }
-
-    webusb.connectNow = function () {
-      if (!webusbplaying) {
-        if (port) {
-          if (webusbconnected) {
-            webusbconnected = false;
-            port.disconnect();
-            connectButton.textContent = 'Connect';
-            statusDisplay.textContent = '';
-            disableConfigThings();
-            port = null;
-          } else {
-            statusDisplay.textContent = 'Not connected';
-          }
-        } else {
-          webusb.getPorts().then(ports => {
-            webusb.requestPort().then(selectedPort => {
-              port = selectedPort;
-              if (savedport != port) {
-                localStorage.setItem("webusbport", port);
-                savedport = localStorage.getItem("webusbport");
-              }
-              webusb.connect(port);
-            }).catch(error => {
-              statusDisplay.textContent = error;
-            });
-          })
-        }
-      } else {
-        statusDisplay.textContent = 'Press stop playing first';
-      }
-    }
-
-    /* Autoconnect sometimes fails on load: */
-    /* SecurityError: Failed to execute 'claimInterface' on 'USBDevice': The requested interface implements a protected class. */
-    webusb.autoConnect = function () {
-      webusb.getPorts().then(ports => {
-        if (ports.length === 0) {
-          statusDisplay.textContent = 'No previous device to connect to';
-        } else {
-          statusDisplay.textContent = 'Connecting...';
-          port = ports[0];
-          webusb.connect();
-        }
-      });
-    };
-
-    connectButton.addEventListener('click', function () {
-      webusb.connectNow();
-    });
-
-    // versionButton.addEventListener('click', function () {
-    //   if (connectButton.textContent == 'Disconnect') {
-    //     if (!webusbplaying) {
-    //       readVersion();
-    //     } else {
-    //       statusDisplay.textContent = 'Press stop playing first';
-    //     }
-    //   };
-    // })
-
-    // configButton.addEventListener('click', function () {
-    //   if (connectButton.textContent == 'Disconnect') {
-    //     if (!webusbplaying) {
-    //       setTimeout(readConfig, 100);
-    //       setTimeout(readVersion, 300)
-    //     } else {
-    //       statusDisplay.textContent = 'Press stop playing first';
-    //     }
-    //   };
-    // })
-
-  });
-
-})();
 
 function playSID(sidurl, subtune) { //convenience function to create default-named jsSID object and play in one call, easily includable as inline JS function call in HTML
   if (typeof SIDplayer === 'undefined') SIDplayer = new jsSID(16384, 0.0005); //create the object if doesn't exist yet
@@ -780,7 +388,7 @@ function jsSID(bufferlen, background_noise, asid_enable = false, webusb_enable =
     if (savedport != null) {
       webusb.autoConnect();
     } else {
-      alert("Autoconnect not actived yet, please connect to a WebUSB device first.");
+      console.warn("[jsSID] No saved port — use usbsidDevice.connect() to connect first");
     }
     maxsid = 4;
   }
@@ -869,7 +477,7 @@ function jsSID(bufferlen, background_noise, asid_enable = false, webusb_enable =
       preferred_SID_model[2] = (filedata[0x76] & 3) >= 3 ? 8580 : 6581;
       clockSpeed = ((((filedata[0x76]<<8|filedata[0x77]) & 0xC) >> 2) & 3);
       if (webusb_enabled) {
-        set_ClockSpeed(clockSpeed);
+        setClock(clockSpeed);
       }
       // SID_address[1] = filedata[0x7A] >= 0x42 && (filedata[0x7A] < 0x80 || filedata[0x7A] >= 0xE0) ? 0xD000 + filedata[0x7A] * 16 : 0;
       // SID_address[2] = filedata[0x7B] >= 0x42 && (filedata[0x7B] < 0x80 || filedata[0x7B] >= 0xE0) ? 0xD000 + filedata[0x7B] * 16 : 0;
@@ -930,9 +538,9 @@ function jsSID(bufferlen, background_noise, asid_enable = false, webusb_enable =
       multi = 1; // Added by JCH
       if(webusb_enabled) {
         // nosidsintune = 1 + (SID_address[1] > 0 ? 1 : 0) + (SID_address[2] > 0 ? 1 : 0) + (SID_address[3] > 0 ? 1 : 0);
-        for (var s = 0; s < 4; s++) {
-          enablesidmemory(s, SIDamount);
-        }
+        // for (var s = 0; s < 4; s++) {
+        //   enablesidmemory(s, SIDamount);
+        // }
       }
     };   // ';' is needed here (and similar places) so that minimized/compacted jsSID.js generated by Makefile will work in the browser
 
@@ -1066,7 +674,7 @@ function jsSID(bufferlen, background_noise, asid_enable = false, webusb_enable =
 
     if (webusb_enabled) {
       if (!webusbconnected) {
-        alert("WebUSB not connected!");
+        console.warn("[jsSID] WebUSB not connected");
       }
       // for (var chip = 0; chip < maxsid; chip++) {
       //   for (var addr = 0; addr <= 0x18; addr++) {

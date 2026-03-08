@@ -2,6 +2,7 @@
  * DeepSID / SIDPlayer
  */
 
+// var $ = jQuery.noConflict();
 
 function SIDPlayer(emulator) {
 
@@ -72,7 +73,7 @@ function SIDPlayer(emulator) {
 
 			/**
 			 * WebSid by Jürgen Wothke (Tiny'R'Sid)
-			 * 
+			 *
 			 * + Can play almost all digi tunes
 			 * + SID model and encoding
 			 * + Can play 2SID and 3SID tunes
@@ -105,6 +106,9 @@ function SIDPlayer(emulator) {
 			// This is used by the scopes in the dedicated sundry tab
 			// if (typeof Tracer === "undefined") Tracer = new ChannelStreamer();
 
+      this.webusbsid = new USPlayer();
+      /* this.websid.StartWorker(); */
+
 			this.emulatorFlags.supportFaster	= true;
 			this.emulatorFlags.supportEncoding	= true;
 			this.emulatorFlags.supportSeeking	= false;
@@ -117,7 +121,6 @@ function SIDPlayer(emulator) {
 			this.emulatorFlags.offline			= false;
 			break;
 
-    
     case "hermit":
 
       /**
@@ -131,7 +134,7 @@ function SIDPlayer(emulator) {
        * - Cannot play BASIC and digi tunes (RSID)
        * - Some CIA tunes doesn't work either
        */
-      this.hermit = new jsSID(($("body").attr("data-mobile") !== "0" ? 16384 : this.bufferSize[this.emulator]), 0.0005);
+      this.hermit = new jsSID((document.body.getAttribute("data-mobile") !== "0" ? 16384 : this.bufferSize[this.emulator]), 0.0005, false, false);
 
       this.emulatorFlags.supportFaster = true;
       this.emulatorFlags.supportEncoding = false;
@@ -237,7 +240,7 @@ SIDPlayer.prototype = {
 
     // Show the raw SID filename in the title
     this.rawFilename = file.split("/").slice(-1)[0];
-    $(document).attr("title", "LouDSID | " + this.rawFilename + " | Quick RIP from DeepSID");
+    document.title = "LouDSID | " + this.rawFilename + " | Quick RIP from DeepSID";
 
     // viz.clearStats();
 
@@ -251,6 +254,16 @@ SIDPlayer.prototype = {
 				options.track = subtune;
 				options.timeout = timeout;
 				options.traceSID = true;	// Needed for the oscilloscope sundry box view
+        // Set the sidpath for loading with websid
+        this.sidpath = file.replace(this.rawFilename, "");
+        console.log(file);
+        // this.sidpath = PATH + (sidfilepath != null ? sidfilepath + "/" : "");
+        this.webusbsid.Cmd('usb');
+        this.webusbsid.setPathFilename(this.sidpath,this.rawFilename);
+        this.webusbsid.setTrack(subtune);
+        setTimeout(() => {this.webusbsid.Cmd('init');},  100);
+        setTimeout(() => {this.webusbsid.Cmd('start');}, 300);
+        setTimeout(() => {this.webusbsid.Cmd('play');},  500);
 
 				// WebSid HQ: Preset filter for 6581 and stereo default
 				// if (this.emulator != "legacy") {
@@ -388,13 +401,14 @@ SIDPlayer.prototype = {
     }
     switch (this.emulator) {
       case "websid":
-				if (this.WebSid) {
-					if (typeof forcePlay !== "undefined")
-						this.WebSid.play();
-					else
-						this.WebSid.isPaused() ? this.WebSid.resume() : this.WebSid.play();
-				}
-				this.speed($("#piano-slow").hasClass("button-on") ? viz.slowSpeed : 1);
+        this.webusbsid.Cmd('resume');
+				// if (this.WebSid) {
+				// 	if (typeof forcePlay !== "undefined")
+				// 		this.WebSid.play();
+				// 	else
+				// 		this.WebSid.isPaused() ? this.WebSid.resume() : this.WebSid.play();
+				// }
+				// this.speed($("#piano-slow").hasClass("button-on") ? viz.slowSpeed : 1);
 				break;
       case "hermit":
       case "webusb":
@@ -410,10 +424,9 @@ SIDPlayer.prototype = {
     // UpdateRedirectPlayIcons();
     // viz.clearStats();
     // Stop all the <AUDIO> elements in the 'Remix' tab
-    $("#topic-remix audio").each(function () {
-      var $sound = $(this)[0];
-      $sound.pause();
-      $sound.currentTime = 0;
+    document.querySelectorAll("#topic-remix audio").forEach(function (sound) {
+      sound.pause();
+      sound.currentTime = 0;
     });
   },
 
@@ -428,8 +441,10 @@ SIDPlayer.prototype = {
     var playing;
     switch (this.emulator) {
       case "websid":
-				if (this.WebSid)
-					playing = !this.WebSid.isPaused();
+				// if (this.WebSid)
+				// 	playing = !this.WebSid.isPaused();
+				if (this.webusbsid)
+					playing = this.webusbsid.Cmd('running');
 				break;
       case "hermit":
       case "webusb":
@@ -451,7 +466,9 @@ SIDPlayer.prototype = {
     var suspended;
     switch (this.emulator) {
       case "websid":
-				suspended = ScriptNodePlayer.getWebAudioContext().state == "suspended";
+				// suspended = ScriptNodePlayer.getWebAudioContext().state == "suspended";
+        if (this.webusbsid)
+					suspended = this.webusbsid.Cmd('running');
 				break;
       case "hermit":
       case "webusb":
@@ -471,8 +488,10 @@ SIDPlayer.prototype = {
     this.paused = true;
     switch (this.emulator) {
       case "websid":
-				if (this.WebSid)
-					this.WebSid.pause();
+				// if (this.WebSid)
+				// 	this.WebSid.pause();
+				if (this.webusbsid)
+					this.webusbsid.Cmd('pause');
 				break;
       case "hermit":
       case "webusb":
@@ -492,9 +511,10 @@ SIDPlayer.prototype = {
     // viz.stopBufferEndedEffects();
     switch (this.emulator) {
       case "websid":
-				if (this.WebSid) {
-					this.load(); // Dirty hack to make sure the tune is restarted next time it is played
-					this.WebSid.pause();
+				if (this.webusbsid) {
+					// this.load(); // Dirty hack to make sure the tune is restarted next time it is played
+					// this.WebSid.pause();
+          this.webusbsid.Cmd('stop');
 				}
 				break;
       case "hermit":
@@ -799,7 +819,7 @@ SIDPlayer.prototype = {
     this.voiceMask[chip] ^= 1 << (voice - 1); // Toggle a bit in the '1111' mask
     switch (this.emulator) {
       case "websid":
-				if ($("body").attr("data-mobile") === "0")
+				if (document.body.getAttribute("data-mobile") === "0")
 					this.websidem.enableVoice(chip, voice - 1, this.voiceMask[chip] & 1 << (voice - 1));
 				break;
       case "webusb":
@@ -829,7 +849,7 @@ SIDPlayer.prototype = {
     this.voiceMask = [0xF, 0xF, 0xF];
     switch (this.emulator) {
       case "websid":
-				if ($("body").attr("data-mobile") === "0") {
+				if (document.body.getAttribute("data-mobile") === "0") {
 					for (var chip = 0; chip < 3; chip++) {
 						for (var voice = 0; voice < 4; voice++)
 							this.websidem.enableVoice(chip, voice, true);

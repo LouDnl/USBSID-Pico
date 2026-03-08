@@ -28,7 +28,8 @@
 ; from sidfiles in this directory and recursive directories
 
 (require '[babashka.fs :as fs]
-         '[clojure.java.io :as io])
+         '[clojure.java.io :as io]
+         '[clojure.string :as string])
 
 (def all-files (mapv str (fs/glob "." "**{.sid}")))
 (def psid (sort (filter #(.contains % "psid/") all-files)))
@@ -54,7 +55,7 @@
   (.write wr (with-out-str (println "<-- DEMO's -->")))
   (doseq [file indirs] (when (.contains file "demos") (.write wr (with-out-str (println file)))))
   (.write wr (with-out-str (println "<-- Digitunes -->")))
-  (doseq [file indirs] (when (.contains file "rsid") (.write wr (with-out-str (println file)))))
+  (doseq [file indirs] (when (string/starts-with? file "rsid") (.write wr (with-out-str (println file)))))
   (.write wr (with-out-str (println "<-- FMOpl -->")))
   (doseq [file indirs] (when (.contains file "fmopl") (.write wr (with-out-str (println file)))))
   (.write wr (with-out-str (println "<-- TEST -->")))

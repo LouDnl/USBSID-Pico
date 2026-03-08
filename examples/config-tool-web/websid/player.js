@@ -50,7 +50,7 @@ class USPlayer
 
   #listenFor()
   {
-    const el = document.querySelector("#websiddevice-connect");
+    const el = document.querySelector("#btn-connect");
     el.addEventListener('click', this.Connect.bind(this), false);
   }
 
