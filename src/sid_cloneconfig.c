@@ -32,10 +32,11 @@
 #include <sid_detection.h>
 #include <config_logging.h>
 #include <logging.h>
-#include <sid_fpgasid.h>
-#include <sid_skpico.h>
-#include <sid_pdsid.h>
+#include <sid_armsid.h>
 #include <sid_backsid.h>
+#include <sid_fpgasid.h>
+#include <sid_pdsid.h>
+#include <sid_skpico.h>
 
 
 /* Init local variables */
@@ -468,5 +469,67 @@ void set_backsid_filter_type(uint8_t base_address, uint8_t type)
   cycled_write_operation((base_address + BACKSID_HS2), BACKSID_HV2,6); /* Write handshake 2 */
   sleep_ms(1327); /* 79 Jiffies of 16,8ms each */
   print_backsid_filter_type(base_address);
+  return;
+}
+
+void read_armsid_configuration(uint8_t base_address)
+{
+  usCFG("Read ARM(2)SID configuration @ $%02x\n", base_address);
+  cycled_write_operation((ARMSID_W1 + base_address),ARMSID_S,6); /* $1d -> 0x53 'S' */
+  // sleep_us(10);
+  cycled_write_operation((ARMSID_W2 + base_address),ARMSID_I,6); /* $1e -> 0x49 'I' */
+  // sleep_us(10);
+  cycled_write_operation((ARMSID_W3 + base_address),ARMSID_D,6); /* $1f -> 0x44 'D' */
+
+  sleep_ms(2);
+
+  cycled_write_operation((ARMSID_W3 + base_address),ARMSID_V,6); /* $1f -> 0x56 'V' */
+  // sleep_us(10);
+  cycled_write_operation((ARMSID_W2 + base_address),ARMSID_I,6); /* $1e -> 0x49 'I' */
+  // sleep_us(10);
+
+  sleep_ms(2);
+
+  uint8_t vh = cycled_read_operation((ARMSID_R1 + base_address), 4); /* $1b */
+  // sleep_us(10);
+  uint8_t vl = cycled_read_operation((ARMSID_R2 + base_address), 4); /* $1c */
+  // sleep_us(10);
+
+  cycled_write_operation((ARMSID_W3 + base_address),ARMSID_F,6); /* $1f -> 0x46 'F' */
+  // sleep_us(10);
+  cycled_write_operation((ARMSID_W2 + base_address),ARMSID_F,6); /* $1e -> 0x49 'I' */
+  // sleep_us(10);
+  sleep_ms(2);
+
+  uint8_t chip = cycled_read_operation((ARMSID_R1 + base_address), 4); /* $1b */
+  // sleep_us(10);
+
+  cycled_write_operation((ARMSID_W3 + base_address),ARMSID_U,6); /* $1f -> 0x55 'U' */
+  // sleep_us(10);
+  cycled_write_operation((ARMSID_W2 + base_address),ARMSID_F,6); /* $1e -> 0x49 'I' */
+  // sleep_us(10);
+
+  sleep_ms(10);
+
+  uint8_t v1 = cycled_read_operation((ARMSID_R1 + base_address), 4); /* $1b */
+  // sleep_us(10);
+  uint8_t v2 = cycled_read_operation((ARMSID_R2 + base_address), 4); /* $1c */
+  int v = v1 * 256 + v2;
+
+  cycled_write_operation((ARMSID_W3 + base_address),ARMSID_H,6); /* $1f -> 0x48 'H' */
+  // sleep_us(10);
+  cycled_write_operation((ARMSID_W2 + base_address),ARMSID_F,6); /* $1e -> 0x49 'I' */
+  // sleep_us(10);
+
+  sleep_ms(10);
+
+  uint8_t p = cycled_read_operation((ARMSID_R1 + base_address), 4); /* $1b */
+  // sleep_us(10);
+  uint8_t q = cycled_read_operation((ARMSID_R2 + base_address), 4); /* $1c */
+
+  usCFG("Current ARMSID settings\n");
+  usCFG("  Chip: %c5xx FW: %d.%d Filt: %b %b  (Voltage = %d mV (%d %d))\n",
+    chip, vh, vl, p, q, v, v1, v2);
+
   return;
 }

@@ -46,6 +46,7 @@ void    print_backsid_filter_type(uint8_t base_address);
 void    print_backsid_version(uint8_t base_address);
 void    set_backsid_filter_type(uint8_t base_address, uint8_t type);
 bool    detect_armsid(uint8_t base_address);
+void    read_armsid_configuration(uint8_t base_address);
 
 
 #ifdef __cplusplus
