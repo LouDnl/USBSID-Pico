@@ -208,8 +208,11 @@ async function onDeviceConnected() {
   if (_emulator === 'sendsid') {
     if (_hasSIDPlayer) {
       setPlayerButtons(true);
+      setLoadButtons(true);
       updateSendSIDPlayButton();
     } else {
+      setPlayerButtons(false);
+      setLoadButtons(false);
       usbsidSetStatus('Incompatible: SendSID requires Pico 2 firmware', 'red');
     }
   }
@@ -252,6 +255,7 @@ function onDeviceDisconnected() {
     setPlayerButtons(false);
     updateSendSIDPlayButton();
   }
+  setLoadButtons(true);
   updateRegsTabVisibility();
   updateConfTabVisibility();
   updatePlayerSideButtons();
@@ -553,6 +557,19 @@ function setPlayerButtons(enabled) {
   });
 }
 
+/* Enable/disable file browse + URL load buttons (shared across emulator modes) */
+function setLoadButtons(enabled) {
+  const fileInput = document.getElementById('sid-file-input');
+  const urlInput  = document.getElementById('sid-url-input');
+  const urlBtn    = document.getElementById('btn-load-url');
+  const browseLabel = fileInput && fileInput.closest('label');
+  if (fileInput)   fileInput.disabled = !enabled;
+  if (urlInput)    urlInput.disabled  = !enabled;
+  if (urlBtn)      urlBtn.disabled    = !enabled;
+  if (browseLabel) browseLabel.style.opacity = enabled ? '' : '0.4';
+  if (browseLabel) browseLabel.style.pointerEvents = enabled ? '' : 'none';
+}
+
 /* ── Visibility helpers for emulator-dependent UI ──────── */
 function updateConnectButtonVisibility() {
   const btn = document.getElementById('btn-connect');
@@ -626,6 +643,7 @@ function switchEmulator(em) {
    * This ensures the stop button is active in sendsid mode regardless of
    * connection state (so the user can stop a still-playing device after refresh). */
   setPlayerButtons(false);
+  setLoadButtons(true);  /* always restore load buttons on emulator switch; incompatible path re-disables if needed */
   /* Mode-specific prompts and button state */
   if ((em === 'webusb' || em === 'sendsid') && !usbsidDevice.isOpen) {
     usbsidSetStatus('Connect device for ' + (em === 'sendsid' ? 'SendSID' : 'WebUSB') + ' playback', 'yellow');
@@ -634,9 +652,12 @@ function switchEmulator(em) {
   if (em === 'sendsid' && usbsidDevice.isOpen) {
     if (_hasSIDPlayer) {
       setPlayerButtons(true);
+      setLoadButtons(true);
       updateSendSIDPlayButton();
     } else {
-      usbsidSetStatus('Incompatible: SendSID requires Pico 2 firmware', 'red');
+      setPlayerButtons(false);
+      setLoadButtons(false);
+      usbsidSetStatus('Incompatible: SendSID requires a Pico2 with onboard sidplayer firmware', 'red');
     }
   }
   /* Enable WASM if websid */
@@ -758,6 +779,7 @@ async function initSIDList() {
     _sidFiles = text.trim().split(/\r?\n/).filter(l => l.trim());
     sel.innerHTML = '';
     let count = 0;
+    const sections = [];  /* { name, headingOptIdx } — populated below */
     _sidFiles.forEach((entry, i) => {
       const opt = document.createElement('option');
       if (entry.toLowerCase().endsWith('.sid')) {
@@ -770,11 +792,39 @@ async function initSIDList() {
         opt.textContent = '\u2500 ' + entry + ' \u2500';
         opt.disabled    = true;
         opt.style.color = 'var(--c64-yellow)';
+        sections.push({ name: entry, headingOptIdx: i });
       }
       sel.appendChild(opt);
     });
+
     const countEl = document.getElementById('sid-list-count');
     if (countEl) countEl.textContent = '(' + count + ' files)';
+
+    /* Section jump buttons — recreate on every list load */
+    let sectionBar = document.getElementById('sid-section-buttons');
+    if (!sectionBar) {
+      sectionBar = document.createElement('div');
+      sectionBar.id = 'sid-section-buttons';
+      sectionBar.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-top:6px';
+      sel.insertAdjacentElement('afterend', sectionBar);
+    }
+    sectionBar.innerHTML = '';
+    sections.forEach(({ name, headingOptIdx }) => {
+      const btn = document.createElement('button');
+      btn.className = 'c64-btn c64-btn-sm';
+      btn.textContent = name;
+      btn.style.fontSize = '0.75rem';
+      btn.addEventListener('click', () => {
+        /* Scroll so the section heading sits at the top of the visible list.
+         * scrollHeight / options.length gives the per-option row height.
+         * We do NOT set selectedIndex — no change event, no auto-play. */
+        if (sel.options.length === 0) return;
+        const rowH = sel.scrollHeight / sel.options.length;
+        sel.scrollTop = Math.round(rowH * headingOptIdx);
+      });
+      sectionBar.appendChild(btn);
+    });
+
     sel.addEventListener('change', async () => {
       const idx = parseInt(sel.value, 10);
       if (!isNaN(idx)) await selectSIDByIndex(idx);
@@ -988,6 +1038,7 @@ function initConnectButton() {
 /* ── Onboard SID player upload ─────────────────────────── */
 async function uploadCurrentSID() {
   if (!usbsidDevice.isOpen) { usbsidSetStatus('Not connected', 'red'); return; }
+  if (!_hasSIDPlayer) { usbsidSetStatus('Incompatible: SendSID requires Pico 2 firmware', 'red'); return; }
   if (!_loadedBytes) { usbsidSetStatus('No SID file loaded', 'yellow'); return; }
   const statusEl = document.getElementById('sid-upload-status');
   const btn      = document.getElementById('btn-upload-sid');

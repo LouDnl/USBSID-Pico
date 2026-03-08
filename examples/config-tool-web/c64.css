@@ -90,7 +90,7 @@ body::before {
   font-family: var(--font-main);
   font-size: 2.4rem;
   color: var(--c64-white);
-  text-transform: uppercase;
+  /* text-transform: uppercase; */
   letter-spacing: 0.12em;
   text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
 }
@@ -156,6 +156,24 @@ body::before {
   color: var(--c64-white);
   border-bottom-color: var(--c64-btn-bg);
 }
+/* External link buttons in the tab bar — same shape, cyan accent, pushed to right */
+.c64-tab-link {
+  font-family: var(--font-main);
+  font-size: 1rem;
+  text-transform: uppercase;
+  background: var(--c64-darkgray);
+  color: var(--c64-cyan);
+  border: 2px solid var(--c64-cyan);
+  padding: 3px 14px;
+  cursor: pointer;
+  letter-spacing: 0.1em;
+  border-radius: 2px 2px 0 0;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+  margin-left: auto;
+}
+.c64-tab-link + .c64-tab-link { margin-left: 4px; }
+.c64-tab-link:hover { background: var(--c64-cyan); color: var(--c64-bg); }
 @media (max-width: 400px) {
   .c64-tab {
     font-size: 0.75rem;

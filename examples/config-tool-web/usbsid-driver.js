@@ -359,23 +359,23 @@ class USBSIDDevice {
    *  then retrying the command once on a clean connection. */
   async configCmdRead(sub, b2 = 0, b3 = 0, b4 = 0, b5 = 0, numBytes = 1) {
     if (!this._isOpen) return [];
-    usbsidLog('configCmdRead: start ', sub);
+    /* usbsidLog('configCmdRead: start ', sub); */
     const cmdBuf = new Uint8Array([this.cmd(COMMAND, CONFIG), sub, b2, b3, b4, b5]);
     const packets = [];
     let timedOut = false;
     try {
-      usbsidLog("configCmdRead ==> Write: ", cmdBuf);
+      /* usbsidLog("configCmdRead ==> Write: ", cmdBuf); */
       await this._device.transferOut(this._epOut, cmdBuf);
-      usbsidLog("configCmdRead <== Read start: ", numBytes);
+      /* usbsidLog("configCmdRead <== Read start: ", numBytes); */
       const r = await Promise.race([
         this._device.transferIn(this._epIn, numBytes),
         new Promise((_, reject) =>
           setTimeout(() => reject(new Error('configCmdRead timeout')), 1500)
         ),
       ]);
-      usbsidLog("configCmdRead <== Read done");
+      /* usbsidLog("configCmdRead <== Read done"); */
       packets.push(new Uint8Array(r.data.buffer));
-      usbsidLog("configCmdRead <== data pushed");
+      /* usbsidLog("configCmdRead <== data pushed"); */
     } catch (e) {
       usbsidLog('configCmdRead error:', e.message || e);
       timedOut = (e.message === 'configCmdRead timeout');
@@ -408,7 +408,7 @@ class USBSIDDevice {
         }
       }
     }
-    usbsidLog('configCmdRead: end');
+    /* usbsidLog('configCmdRead: end'); */
     return packets;
   }
 
@@ -420,7 +420,7 @@ class USBSIDDevice {
    * without using Promise.race — that approach leaks pending transferIn calls
    * which then consume the real response on the next read, yielding 0 bytes. */
   async readConfig() {
-    usbsidLog('readConfig: start');
+    /* usbsidLog('readConfig: start'); */
     const CONFIG_SIZE = 64;
     const CC = this.cmd(COMMAND, CONFIG);
     const cmdBuf = new Uint8Array([CC, READ_CONFIG, 0, 0, 0, 0]);
@@ -458,7 +458,7 @@ class USBSIDDevice {
         if (all.length >= CONFIG_SIZE) break;
         // await this._device.transferIn(this._epIn, MAX_PACKET_SIZE).then(r => {
         // const chunk = new Uint8Array(r.data.buffer);
-        usbsidLog(i + ": " + chunk);
+        /* usbsidLog(i + ": " + chunk); */
         // if (all.length === 0) {
         //   // if (chunk.length === 0) { this._log('readConfig: skipping zero-length packet'); continue; }
         //   // if (chunk.every(b => b === 0)) { this._log('readConfig: skipping stale zero packet'); continue; }
@@ -475,7 +475,7 @@ class USBSIDDevice {
     } catch (e) {
       usbsidLog('readConfig error:', e.message || e);
     }
-    usbsidLog('readConfig: end');
+    /* usbsidLog('readConfig: end'); */
     return new Uint8Array(all.slice(0, CONFIG_SIZE));
   }
 
