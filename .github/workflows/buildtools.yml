@@ -50,10 +50,10 @@ jobs:
               directory: config-tool, buildname: cfg_usbsid_macos14 }
           - { os: macos-14, shell: 'bash',
               directory: send_sid, buildname: send_sid_macos14 }
-          - { os: macos-14-large, shell: 'bash',
-              directory: config-tool, buildname: cfg_usbsid_macos14large }
-          - { os: macos-14-large, shell: 'bash',
-              directory: send_sid, buildname: send_sid_macos14large }
+          # - { os: macos-14-large, shell: 'bash',
+          #     directory: config-tool, buildname: cfg_usbsid_macos14large }
+          # - { os: macos-14-large, shell: 'bash',
+          #     directory: send_sid, buildname: send_sid_macos14large }
           - { os: macos-15-intel, shell: 'bash',
               directory: config-tool, buildname: cfg_usbsid_macos15intel }
           - { os: macos-15-intel, shell: 'bash',
