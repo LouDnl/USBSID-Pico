@@ -77,6 +77,7 @@
 !examples/hardsid-sidblaster
 !examples/udev-rules
 !examples/vmpk
+!examples/Cynthcart-Ninja_VST
 !resources
 
 # recursive directory contents
@@ -87,6 +88,7 @@
 !examples/hardsid-sidblaster/**
 !examples/udev-rules/**
 !examples/vmpk/**
+!examples/Cynthcart-Ninja_VST/**
 
 # specific files in specified directories
 examples/config-tool-web/*.md
