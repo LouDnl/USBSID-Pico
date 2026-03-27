@@ -31,30 +31,22 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "logging.h"
-#include "config.h"
-#include "globals.h"
+#include <logging.h>
+#include <config.h>
+#include <globals.h>
 
-#ifdef ONBOARD_EMULATOR
+#include <emudore_emulator.h>
 #include <kernal.h>
 #include <chargen.h>
 #include <basic.h>
 #include <cynthcart.h>
-#endif
 
-/* config.c */
-extern RuntimeCFG cfg;
-extern void apply_clockrate(int n_clock, bool suspend_sids);
+#include <config.h>
+#include <gpio.h>
+#include <sid.h>
 
-/* gpio.c */
-extern void mute_sid(void);
-extern void unmute_sid(void);
 
-/* sid.c */
-void reset_sid_registers(void);
-
-#ifdef ONBOARD_EMULATOR
-/* interface.h */
+/* interface.cpp */
 extern void start_emudore_cynthcart(
   uint8_t * basic_, uint8_t * chargen_,
   uint8_t * kernal_, uint8_t * binary_,
@@ -68,6 +60,7 @@ extern unsigned int run_specified_cycle(
 extern void _set_logging(void);
 extern void logging_enable(int logid);
 extern void logging_disable(int logid);
+
 
 void set_logging(int logid)
 {
@@ -115,5 +108,3 @@ unsigned int run_cynthcart(void)
     true   // cart
   );
 }
-
-#endif /* ONBOARD_EMULATOR */

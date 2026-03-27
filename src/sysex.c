@@ -33,20 +33,15 @@
  *
  */
 
- #include "stdbool.h"
- #include "config.h"
- #include "globals.h"
- #include "logging.h"
+ #include <stdbool.h>
 
+ #include <config.h>
+ #include <globals.h>
+ #include <vu.h>
+ #include <asid.h>
+ #include <sysex.h>
+ #include <logging.h>
 
-/* vu.c */
-extern uint16_t vu;
-
-/* sid.c */
-extern void decode_asid_message(uint8_t* buffer, int size);
-
-/* config.c */
-extern void handle_config_request(uint8_t * buffer, uint32_t size);
 
 /* Custom commands */
 enum {
@@ -54,8 +49,13 @@ enum {
 };
 
 
-/* Spy vs Spy ? */
-void decode_sysex_command(uint8_t* buffer, int size)
+/**
+ * @brief Spy vs Spy ?
+ *
+ * @param uint8_t * buffer
+ * @param int size
+ */
+void decode_sysex_command(uint8_t * buffer, int size)
 {
   uint8_t config_buffer[5] = {0};
 
@@ -70,7 +70,12 @@ void decode_sysex_command(uint8_t* buffer, int size)
   return;
 }
 
-/* Is it ? */
+/**
+ * @brief Is it ?
+ *
+ * @param uint8_t * buffer
+ * @param int size
+ */
 void process_sysex(uint8_t* buffer, int size)
 {
   switch(buffer[1]) {

@@ -31,9 +31,9 @@
   extern "C" {
 #endif
 
+
 #ifdef USE_PIO_UART
 #if PICO_RP2350
-
 
 /* Default includes */
 #include <stdio.h>
@@ -58,9 +58,12 @@
 /* What am I doing here? */
 #define UART_FIFO_SIZE 65535 /* TODO: Verify size */
 
+/* Functions from uart.c */
+void init_uart(void);
 
 #endif /* PICO_RP2350 */
 #endif /* USE_PIO_UART */
+
 
 #ifdef __cplusplus
   }

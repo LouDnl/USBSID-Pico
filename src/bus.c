@@ -23,54 +23,24 @@
  *
  */
 
+#include <globals.h>
+#include <usbsid.h>
+#include <logging.h>
+#include <config.h>
+#include <gpio_defs.h>
+#include <pio.h>
+#include <dma.h>
+#include <vu.h>
+#include <sid.h>
 
-#include "hardware/irq.h"    /* Hardware interrupt handling */
-
-#include "globals.h"
-
-#include "logging.h"
-#include "config.h"
-#include "pio.h"
-#include "sid.h"
-
-
-/* usbsid.c */
-#ifdef ONBOARD_EMULATOR
-extern uint8_t *sid_memory;
-#else
-extern uint8_t sid_memory[(0x20 * 4)];
-#endif
-
-/* config.c */
-extern RuntimeCFG cfg;
-
-extern PIO bus_pio;
-extern uint sm_control, sm_data, sm_clock, sm_delay;
-extern int dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay;
-
-/* vu.c */
-extern uint16_t vu;
-
-/* dma.c */
-extern void setup_dmachannels(void);
-extern void unclaim_dma_channels(void);
-extern volatile uint32_t cycle_count_word;
-
-/* pio.c */
-extern void setup_piobus(void);
-extern void sync_pios(bool at_boot);
-extern void stop_pios(void);
-
-/* globals */
-volatile bool is_muted; /* Global muting state */
 
 /* Direct Pio IRQ access */
 #define IRQState (pio0_hw->irq)
 
 /* DMA bus data variables */
-volatile uint8_t control_word, read_data;
-volatile uint16_t delay_word;
-volatile uint32_t data_word, dir_mask;
+volatile static uint8_t control_word, read_data;
+volatile static uint16_t delay_word;
+volatile static uint32_t data_word, dir_mask;
 
 
 /**
@@ -93,7 +63,7 @@ inline static int __not_in_flash_func(set_bus_bits)(uint8_t address, bool write)
   }
   address = (address & 0x7F);
   uint8_t data = (write ? sid_memory[(address & 0x7F)] : 0x0);
-  if (is_muted && ((address & 0x1F) == 0x18)) data &= 0xF0; /* Mask volume register to 0 if muted */
+  if (get_muted_state() && ((address & 0x1F) == 0x18)) data &= 0xF0; /* Mask volume register to 0 if muted */
   switch (address) {
     case 0x00 ... 0x1F:
       if __us_unlikely(cfg.one == 0b110 || cfg.one == 0b111) return 0;
@@ -118,8 +88,8 @@ inline static int __not_in_flash_func(set_bus_bits)(uint8_t address, bool write)
       break;
   }
   data_word = (dir_mask << 16) | data_word;
-  // usCFG("$%02X:%02X $%04X 0b"PRINTF_BINARY_PATTERN_INT32" $%04X 0b"PRINTF_BINARY_PATTERN_INT16"\n",
-  //   address, data, data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word));
+  /* usCFG("$%02X:%02X $%04X 0b%032b $%04X 0b%016b\n",
+    address, data, data_word, data_word, control_word, control_word); */
   return 1;
 }
 
@@ -171,16 +141,16 @@ uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t ad
       read_data = 0x0;
       dma_channel_set_write_addr(dma_rx_data, &read_data, true);
       dma_channel_wait_for_finish_blocking(dma_rx_data);
-      usGPIO("[W]$%08x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\n[R]$%08x 0b"PRINTF_BINARY_PATTERN_INT32"\n",
-        data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word),
-        control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word),
-        read_data, PRINTF_BYTE_TO_BINARY_INT32(read_data));
+      usGPIO("[W]$%08x 0b%032b $%04x 0b%016b\n[R]$%08x 0b%032b\n",
+        data_word, data_word,
+        control_word, control_word,
+        read_data, read_data);
       sid_memory[(address & 0x7F)] = read_data & 0xFF;
       return read_data & 0xFF;
   }
   /* WRITE, G_PAUSE & G_CLEAR_BUS*/
   dma_channel_wait_for_finish_blocking(dma_tx_control);
-  usGPIO("[W]$%08x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16"\n", data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word));
+  usGPIO("[W]$%08x 0b%032b $%04x 0b%016b\n", data_word, data_word, control_word, control_word);
   return 0;
 }
 
@@ -259,8 +229,8 @@ void __no_inline_not_in_flash_func(cycled_write_operation_nondma)(uint8_t addres
   pio_sm_put_blocking(bus_pio, sm_data, data_word);
   pio_sm_put_blocking(bus_pio, sm_delay, delay_word);
 
-  usGPIO("[WC]$%04x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16" $%02X:%02X(%u %u)\n",
-    data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word),
+  usGPIO("[WC]$%04x 0b%032b $%04x 0b%016b $%02X:%02X(%u %u)\n",
+    data_word, data_word, control_word, control_word,
     address, data, cycles, delay_word);
   return;
 }
@@ -337,8 +307,8 @@ void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint
    */
   dma_channel_wait_for_finish_blocking(dma_tx_control);
 
-  usGPIO("[WC]$%04x 0b"PRINTF_BINARY_PATTERN_INT32" $%04x 0b"PRINTF_BINARY_PATTERN_INT16" $%02X:%02X(%u %u)\n",
-    data_word, PRINTF_BYTE_TO_BINARY_INT32(data_word), control_word, PRINTF_BYTE_TO_BINARY_INT16(control_word),
+  usGPIO("[WC]$%04x 0b%032b $%04x 0b%016b $%02X:%02X(%u %u)\n",
+    data_word, data_word, control_word, control_word,
     address, data, cycles, delay_word);
   return;
 }
@@ -386,7 +356,7 @@ uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, ui
  */
 void restart_bus(void)
 {
-  usCFG("[RESTART BUS START]\n");
+  usDBG("Restarting BUS\n");
   /* unclaim dma channels */
   unclaim_dma_channels();
   /* stop all pio's */
@@ -397,7 +367,7 @@ void restart_bus(void)
   setup_dmachannels();
   /* sync pios */
   sync_pios(false);
-  usCFG("[RESTART BUS END]\n");
+  usDBG("Finished restarting BUS\n");
   return;
 }
 

@@ -23,34 +23,20 @@
  *
  */
 
-#include "globals.h"
-#include "config.h"
-#include "usbsid.h"
-#include "sid.h"
-#include "logging.h"
+#include "pico/util/queue.h"
 
+#include <globals.h>
+#include <usbsid.h>
+#include <config.h>
+#include <gpio_defs.h>
+#include <bus.h>
+#include <vu.h>
+#include <sid.h>
+#include <logging.h>
 
-/* usbsid.c */
-#ifdef ONBOARD_EMULATOR
-extern uint8_t *sid_memory;
-#else
-extern uint8_t sid_memory[(0x20 * 4)];
-#endif
-extern volatile int usbdata;
-
-/* config.c */
-extern Config usbsid_config;
-extern RuntimeCFG cfg;
-
-/* vu.c */
-extern uint16_t vu;
-
-/* bus.c */
-extern void clockcycle_delay(uint32_t n_cycles);
-extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
 
 /* (hot) locals */
-static bool paused_state, reset_state;
+static volatile bool paused_state, reset_state, muted_state;
 static uint8_t volume_state[4] = {0};
 
 
@@ -77,7 +63,7 @@ void init_sid_chips(void)
  */
 void clear_sid_memory(void)
 {
-  memset(sid_memory, 0, count_of(sid_memory));
+  memset(sid_memory, 0, SID_MEMORY_SIZE);
   return;
 }
 
@@ -131,11 +117,30 @@ bool get_paused_state(void)
 }
 
 /**
+ * @brief Set the muted state to true or false
+ *
+ * @param state Boolean
+ */
+void set_muted_state(bool state)
+{
+  muted_state = state;
+  return;
+}
+
+/**
+ * @brief Get the muted state value
+ *
+ */
+bool get_muted_state(void)
+{
+  return muted_state;
+}
+
+/**
  * @brief unmute all sid's
  */
 void unmute_sid(void)
 {
-  usDBG("[UNMUTE]\n");
   /* is_muted = false; */ /* Is globally handled from usbsid.c */
   for (int i = 0; i < cfg.numsids; i++) {
     uint8_t addr = ((0x20 * i) + 0x18);
@@ -152,7 +157,6 @@ void unmute_sid(void)
  */
 void mute_sid(void)
 {
-  usDBG("[MUTE]\n");
   for (int i = 0; i < cfg.numsids; i++) {
     uint8_t addr = ((0x20 * i) + 0x18);
     volume_state[i] = sid_memory[addr];
@@ -226,7 +230,7 @@ void reset_sid(void)
   set_reset_state(true);
   set_paused_state(false);
   memset(volume_state, 0, 4);
-  memset(sid_memory, 0, count_of(sid_memory));
+  memset(sid_memory, 0, SID_MEMORY_SIZE);
   cPIN(RES);
   if (cfg.chip_one == 0 || cfg.chip_two == 0) {
     /* 10x PHI1(02) cycles as per datasheet for REAL SIDs only */
@@ -255,7 +259,7 @@ void clear_sid_registers(int sidno)
   for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
     cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0x0, 6);
   }
-  memset(sid_memory, 0, (4 * 0x20));
+  memset(sid_memory, 0, SID_MEMORY_SIZE);
   return;
 }
 

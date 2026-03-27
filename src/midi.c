@@ -31,49 +31,34 @@
  *
  */
 
-#include "pico/multicore.h"
-#include "pico/util/queue.h"
+#include <midi.h>
+#include <globals.h>
+#include <config.h>
+#include <sid.h>
+#include <logging.h>
+#include <midi_handler.h>
+#include <midi_cc.h>
+#include <sysex.h>
 
-#include "midi.h"
-#include "globals.h"
-#include "config.h"
-#include "sid.h"
-#include "logging.h"
-
-#include "midi_cc.h"
-
-
-/* sid.c */
-extern void reset_sid(void);
-extern void reset_sid_registers(void);
-
-/* midi_handler.c */
-extern void midi_processor_init(void);
-extern void process_midi(uint8_t *buffer, int size);
-
-/* sysex.c */
-extern void process_sysex(uint8_t *buffer, int size);
-
-#ifdef ONBOARD_EMULATOR
-/* Cynthcart ~ Emudore */
-#include "pico/util/queue.h"  /* Intercore queue */
-extern bool emulator_running,
-  starting_emulator,
-  stopping_emulator,
-  offload_ledrunner;
-extern bool stop_cynthcart(void);
+#if defined(ONBOARD_EMULATOR)
+#include <usbsid.h> /* emulator variables */
+#include <emudore_emulator.h> /* Cynthcart ~ Emudore */
 queue_t cynthcart_queue;
-#endif
+#endif /* ONBOARD_EMULATOR */
+
+
+/* MIDI state machine (declared extern in midi.h) */
+midi_machine midimachine;
 
 /* Always boot with default CC values ~ TODO: Load from flash!? */
 const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT;
 
 
-/* Initialize the midi handlers */
+/* Initialise the midi handlers */
 void midi_init(void)
 {
   usNFO("\n");
-  usNFO("[MIDI] Init start\n");
+  usNFO("[MIDI] Init\n");
 
   /* Set initial stream state and index */
   midimachine.bus = FREE;
@@ -88,7 +73,7 @@ void midi_init(void)
   /* Start the processor of midi buffers */
   midi_processor_init();
 
-  usNFO("[MIDI] Init finished\n");
+  return;
 }
 
 #ifdef ONBOARD_EMULATOR
@@ -167,7 +152,7 @@ inline void handle_emulator_cc(void)
 
 /* Processes a 1 byte incoming midi buffer
  * Figures out if we're receiving midi or sysex */
-inline void midi_buffer_task(uint8_t buffer)
+static inline void midi_buffer_task(uint8_t buffer)
 {
   if (midimachine.index != 0) {
     if (midimachine.type != SYSEX) usMCMD(" [B%d]$%02x#%03d", midimachine.index, buffer, buffer);

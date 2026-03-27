@@ -31,13 +31,11 @@
   extern "C" {
 #endif
 
-
 /* Pico W devices use a GPIO on the WIFI chip for the LED,
  * so when building for Pico W, CYW43_WL_GPIO_LED_PIN will be defined */
 #ifdef CYW43_WL_GPIO_LED_PIN
 #include "pico/cyw43_arch.h"
 #endif
-
 
 /* PIO */
 #include "bus_control.pio.h"   /* Busje komt zo! */
@@ -88,10 +86,34 @@
   * SM3:
   */
 
-
 /* IRQ's */
 #define PIO_IRQ0 0
 #define PIO_IRQ1 1
+
+/* PIO state machine variables from pio.c */
+extern const PIO bus_pio;
+extern const PIO clkcnt_pio;
+extern volatile uint sm_control, sm_data, sm_clock, sm_delay, sm_clkcnt;
+extern volatile float sidclock_frequency, busclock_frequency;
+
+/* LED PIO (non-WiFi boards only) */
+#if defined(PICO_DEFAULT_LED_PIN)
+extern PIO led_pio;
+extern uint sm_pwmled;
+#if defined(USE_RGB)
+extern uint sm_rgbled;
+#endif
+#endif
+
+/* Functions from pio.c */
+void setup_vu(void);
+void setup_sidclock(void);
+void init_sidclock(void);
+void deinit_sidclock(void);
+void setup_piobus(void);
+void sync_pios(bool at_boot);
+void stop_pios(void);
+void restart_bus_clocks(void);
 
 
 #ifdef __cplusplus

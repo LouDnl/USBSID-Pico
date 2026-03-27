@@ -24,48 +24,21 @@
  */
 
 #include <math.h>
-#include "globals.h"
-#include "config.h"
-#include "logging.h"
-#include "sid.h"
+
+#include <globals.h>
+#include <usbsid.h>
+#include <config.h>
+#include <pio.h>
+#include <dma.h>
+#include <logging.h>
+#include <sid.h>
+#include <vu.h>
+
 #include "vu.pio.h"      /* Vu LED handler */
 #if defined(USE_RGB)
 #include "vu_rgb.pio.h"  /* Vu RGB led handler */
 #endif
 
-
-/* config.c */
-extern Config usbsid_config;
-
-/* usbsid.c */
-#ifdef ONBOARD_EMULATOR
-extern uint8_t *sid_memory;
-#else
-extern uint8_t sid_memory[(0x20 * 4)];
-#endif
-extern volatile int usbdata;
-extern volatile bool offload_ledrunner;
-
-/* pio.c */
-extern void setup_vu(void);
-
-/* dma.c */
-extern int dma_pwmled, dma_rgbled;
-volatile extern int pwm_value;
-volatile extern uint32_t rgb_value;
-
-/* LED breathe levels */
-enum
-{
-  ALWAYS_OFF   = 99999,   /* non zero is off */
-  ALWAYS_ON    = 0,       /* zero is on */
-  CHECK_INTV   = 100000,  /* 100ms == 100000us */
-  MAX_CHECKS   = 100,     /* 100 checks times 100ms == 10 seconds */
-  BREATHE_INTV = 1000,    /* 1ms == 1000us */
-  BREATHE_STEP = 100,     /* steps in brightness */
-  VU_MAX       = 65534,   /* max vu brightness */
-  HZ_MAX       = 40       /* No clue where I got this from 😅 but hey it works! */
-};
 
 /* (RGB)LED variables */
 volatile int n_checks = 0, updown = 1;
@@ -80,7 +53,10 @@ volatile static int _rgb = 0;
 #endif
 
 
-/* Init the RGB LED */
+/**
+ * @brief Init the RGB LED
+ *
+ */
 void init_rgb(void)
 {
   #if defined(USE_RGB)
@@ -92,7 +68,10 @@ void init_rgb(void)
   return;
 }
 
-/* Init the Vu */
+/**
+ * @brief Init the Vu
+ *
+ */
 void init_vu(void)
 {
   /* Start the Vu statemachines */
@@ -108,7 +87,10 @@ void init_vu(void)
 
 /* LED SORCERERS */
 
-/* It goes up and it goes down */
+/**
+ * @brief It goes up and it goes down
+ *
+ */
 void led_vumeter_task(void)
 { /* Only the lower 8 bits of each oscillator frequency is used
      Adding the higher 8 bits only makes de LED brighter and the Vu uglier */
@@ -156,7 +138,10 @@ void led_vumeter_task(void)
   #endif
 }
 
-/* Mouth breather! */
+/**
+ * @brief Mouth breather!
+ *
+ */
 void led_breathe_task(void)
 {
   #if LED_PWM
@@ -207,6 +192,10 @@ void led_breathe_task(void)
   #endif
 }
 
+/**
+ * @brief It just runs and runs and runs and...
+ *
+ */
 void led_runner(void)
 { /* Called from Core 1 */
   usbdata == 1 ? led_vumeter_task() : led_breathe_task();

@@ -131,8 +131,7 @@ do {                                 \
 #endif
 
 
-/* Global logging queues */
-
+/* Global logging queue */
 #ifdef WRITE_DEBUG
 #include "pico/util/queue.h"  /* Inter core queue */
 extern queue_t logging_queue;

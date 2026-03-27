@@ -31,18 +31,24 @@
   extern "C" {
 #endif
 
-
 /* Default includes */
-#include <stdint.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <inttypes.h>
+#include <sys/time.h>
+#include <time.h>
 
-/* Default Pico includes */
+/* Pico libs */
+#include "pico/flash.h"
 #include "pico/stdlib.h"
-#include "pico/types.h"
-#if PICO_RP2350
-#include "hardware/structs/powman.h"
-#endif
+#include "pico/types.h"       /* absolute_time_t */
+#include "pico/multicore.h"   /* Multicore */
+#include "pico/sem.h"         /* Semaphores */
+#include "pico/util/queue.h"  /* Inter core queue */
 
 /* Hardware api's */
 #include "hardware/gpio.h"   /* General Purpose Input/Output (GPIO) API */
@@ -50,11 +56,34 @@
 #include "hardware/dma.h"    /* DMA Controller API */
 #include "hardware/pwm.h"    /* Hardware Pulse Width Modulation (PWM) API */
 #include "hardware/irq.h"    /* Hardware interrupt handling */
+#include "hardware/clocks.h"
+#include "hardware/flash.h"
+#include "hardware/sync.h"
+#include "hardware/uart.h"
+#include "hardware/timer.h"
 #include "hardware/structs/iobank0.h"
+#include "hardware/structs/sio.h"  /* Pico SIO structs */
+/* Reboot type logging */
+#if PICO_RP2350
+#include "hardware/structs/powman.h"
+#endif
+/* Reboot type logging */
+#if PICO_RP2040
+#include "hardware/regs/vreg_and_chip_reset.h"
+#else
+#include "hardware/regs/powman.h"
+#endif
+#include "hardware/vreg.h"
 
-/* project headers to always include */
-#include "macros.h"
-#include "gpio.h"
+/* TinyUSB libs */
+#include "bsp/board_api.h"   /* Tiny USB Board Porting API */
+#include "tusb.h"            /* Tiny USB stack */
+#include "tusb_config.h"     /* Tiny USB configuration */
+
+/* Project headers to always include */
+#include <macros.h>
+#include <sid_defs.h>
+#include <usbsid_defs.h>
 
 
 /* Compile time variable settings */
@@ -87,8 +116,8 @@
 #define MIDI_CABLE 0
 
 /* USB data type */
-extern volatile char dtype, ntype;
-extern const char cdc, asid, midi, sysex, wusb;
+extern volatile char dtype, ntype, rtype;
+extern const char cdc, asid, midi, sysex, wusb, uart;
 
 /* WebUSB globals */
 #define URL  "/usbsid.loudai.nl"

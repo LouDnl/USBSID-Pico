@@ -23,19 +23,12 @@
  *
  */
 
-#include "globals.h"
-#include "config.h"
-#include "usbsid.h"
-#include "sid.h"
-#include "logging.h"
+#include <globals.h>
+#include <config.h>
+#include <bus.h>
+#include <sid.h>
+#include <logging.h>
 
-
-/* bus.c */
-extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
-
-/* sid.c */
-extern void clear_sid_registers(int sidno);
-extern void reset_sid_registers(void);
 
 /* Declare variables */
 volatile bool running_tests = false;

@@ -30,7 +30,7 @@ set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
 string(TIMESTAMP MAGIC_SMOKE "%Y%m%d")  # Auto generate dated version
-set(PROJECT_VERSION "0.6.4-BETA.${MAGIC_SMOKE}")  # Generate compile version
+set(PROJECT_VERSION "0.7.0-${MAGIC_SMOKE}")  # Generate compile version
 
 ### Want a cookie?
 # NOTICE: ENABLING THESE DEBUGGING DEFINITIONS WILL HAVE SIGNIFICANT IMPACT AND WILL DELAY PLAYING!
@@ -122,7 +122,7 @@ if(DEFINED PICO_PLATFORM)
 else()
   if(DEFINED PICO_BOARD)
     if(PICO_BOARD STREQUAL "pico2")
-      set(PICO_PLATFORM rp2350)
+      set(PICO_PLATFORM rp2350-arm-s)
       message(STATUS "PICO_PLATFORM not defined, board is ${PICO_BOARD} setting PICO_PLATFORM to ${PICO_PLATFORM}")
     endif()
   else()
@@ -327,8 +327,9 @@ endif()
 
 ### Source files to compile
 set(SOURCEFILES
-  ${CMAKE_CURRENT_LIST_DIR}/src/usbsid_doubletap.c
   ${CMAKE_CURRENT_LIST_DIR}/src/usbsid.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/usbsid_doubletap.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/usbsid_constants.c
   ${CMAKE_CURRENT_LIST_DIR}/src/config.c
   ${CMAKE_CURRENT_LIST_DIR}/src/config_bus.c
   ${CMAKE_CURRENT_LIST_DIR}/src/config_socket.c
@@ -362,7 +363,8 @@ set(TARGET_INCLUDE_DIRS PRIVATE
 ### Embedded player stuffs
 if(ONBOARD_SIDPLAYER EQUAL 1)
   # NOTICE: SIDPLAYER REQUIRES FULL OPTIMIZATIONS!!
-  set(COMPILE_OPTS ${COMPILE_OPTS} -O3)
+  # NOTE TO SELF: -O3 is already set in COMPILE_OPTS and applied via target_compile_options()
+  # NOTE TO SELF: Do NOT use set(CMAKE_CXX_FLAGS ...) here as it strips Pico SDK architecture flags!
   ## Set sidplayer list directory
   if(NOT ${EMUDIR} STREQUAL "")
     set(USPLAYER_LIST_DIR ${EMUDIR})
@@ -379,13 +381,16 @@ if(ONBOARD_SIDPLAYER EQUAL 1)
 
   ### Build psiddrv header
   add_custom_command(
-    OUTPUT psiddrv.h
+    # Use absolute paths
+    OUTPUT ${USPLAYER_LIST_DIR}/src/psiddrv/psiddrv.h
     COMMAND $(MAKE) all
+    # Remove built .o65 to ensure the linker does not accidentally pick it up
+    COMMAND ${CMAKE_COMMAND} -E rm -f ${USPLAYER_LIST_DIR}/src/psiddrv/psiddrv.o65
     WORKING_DIRECTORY ${USPLAYER_LIST_DIR}/src/psiddrv/
   )
   add_custom_target(
     RSIDDriver ALL
-    DEPENDS psiddrv.h
+    DEPENDS ${USPLAYER_LIST_DIR}/src/psiddrv/psiddrv.h
   )
 
   ### Add some fancy shmancy necromancy
@@ -492,6 +497,7 @@ set(TARGET_LL
   hardware_pio
   hardware_pwm
   hardware_resets
+  hardware_structs
   hardware_sync
   hardware_timer
   hardware_uart
@@ -531,6 +537,11 @@ project(${PROJECT_NAME} C CXX ASM)
 
 ### init sdk
 pico_sdk_init()
+
+# Explicitely force pioasm to complete before any firmware targets on clean builds
+if(TARGET pioasmBuild)
+  set(PIOASM_DEPENDENCY pioasmBuild)
+endif()
 
 ### Include
 include_directories(".")
@@ -638,6 +649,14 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   pico_generate_pio_header(${BUILD} ${PIO_COUNTER})
   if(PICOTYPE STREQUAL "RGB")
     pico_generate_pio_header(${BUILD} ${PIO_RGB})
+  endif()
+  # rsiddrv dependency for sidplayer
+  if(ONBOARD_SIDPLAYER EQUAL 1)
+    add_dependencies(${BUILD} RSIDDriver)
+  endif()
+  # force pioasm to build first on clean builds
+  if(DEFINED PIOASM_DEPENDENCY)
+    add_dependencies(${BUILD} ${PIOASM_DEPENDENCY})
   endif()
   # source files to compile
   target_sources(${BUILD} PUBLIC ${SOURCEFILES})

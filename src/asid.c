@@ -33,42 +33,25 @@
  *
  */
 
-#include "stdbool.h"
+#include <stdbool.h>
 
-#include "sid.h"
-#include "midi.h"
-#include "asid.h"
-#include "globals.h"
-#include "config.h"
-#include "logging.h"
+#include <sid.h>
+#include <midi.h>
+#include <asid.h>
+#include <globals.h>
+#include <usbsid_constants.h>
+#include <config.h>
+#include <bus.h>
+#include <vu.h>
+#include <asid_buffer.h>
+#include <logging.h>
 
-
-/* config.c */
-extern Config usbsid_config;
-extern RuntimeCFG cfg;
-extern char *sidtypes[5];
-
-/* gpio.c */
-extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
-extern void pause_sid(void);
-extern void reset_sid(void);
-extern void reset_sid_registers(void);
-
-/* vu.c */
-extern uint16_t vu;
-
-/* asid_buffer.c */
-extern uint32_t track_asid_arrival(void);
-extern void adjust_buffer_rate_dynamic(uint32_t target_rate);
-extern void reset_arrival_tracking(void);
-extern void ring_buffer_reset_size(void);
-extern void set_buffer_rate(uint16_t rate);
 
 /* Some locals, rural and such */
 static bool buffer_started = false;
 static bool default_order = false;
 static bool default_order_on_start = false;
-bool write_ordered = false;
+static bool write_ordered = false;
 /* thanks to thomasj */
 struct asid_regpair_t {
   uint8_t index;
@@ -96,7 +79,7 @@ void reset_asid_to_writeorder(void)
 }
 
 /**
- * @brief Initialize the asid buffer
+ * @brief Initialise the asid buffer
  *
  * @param uint16_t framedelta_us ~ the rate to set the buffer to
  */
@@ -104,8 +87,6 @@ void init_asid_buffer(uint16_t framedelta_us)
 {
   if (!buffer_started) {
     usASID("Init buffer queue, timer and irq\n");
-    extern void init_buffer_pio(void);
-    extern void asid_ring_init(void);
 
     asid_ring_init();
     init_buffer_pio();
@@ -121,29 +102,29 @@ void init_asid_buffer(uint16_t framedelta_us)
 }
 
 /**
- * @brief De-initialize the asid buffer
+ * @brief De-initialise the asid buffer
  */
 void deinit_asid_buffer(void)
 {
   if (buffer_started) {
     usASID("De-init buffer queue, timer and irq\n");
     reset_asid_to_writeorder();
-    extern void stop_buffer_pio(void);
-    extern void asid_ring_deinit(void);
     asid_ring_deinit();
     stop_buffer_pio();
     buffer_started = false;
   }
+  return;
 }
 
 /**
- * @brief Initialize ASID on boot
+ * @brief Initialise ASID on boot
  */
 void asid_init(void)
 {
+  usNFO("[ASID] Init\n");
   if (!default_order_on_start) reset_asid_to_writeorder();  /* Set defaults once on boot */
   else { ring_buffer_reset_size(); reset_arrival_tracking(); }
-  usNFO("[ASID] Initialized\n");
+  return;
 }
 
 /* Pling, plong, ploink!? */
@@ -293,8 +274,6 @@ void handle_writeordered_asid_message(uint8_t sid, uint8_t* buffer)
       }
     }
   }
-  /* inline extern as only used here */
-  extern void asid_ring_write(uint8_t reg, uint8_t val, uint16_t c);
   for (size_t pos = 0; pos < NO_SID_REGISTERS_ASID; pos++) {
     if (writeOrder[chip][pos].wait_us != 0xff) {
       /* Push data to ASID ringbuffer */
@@ -347,14 +326,13 @@ void handle_asid_writeorder_config(uint8_t* buffer)
  * @param int buffering
  * @param uint16_t framedelta_us
  */
-inline void set_asid_env(int refresh_rate, int speed_multiplier, int custom_speed, int buffering, uint16_t framedelta_us)
+static inline void set_asid_env(int refresh_rate, int speed_multiplier, int custom_speed, int buffering, uint16_t framedelta_us)
 {
   (void)speed_multiplier; /* Not used */
   (void)custom_speed;     /* Not used */
   (void)buffering;        /* Not used */
 
   { /* apply the new clock_rate based on the refresh_rate if applicable */
-    extern void apply_clockrate(int n_clock, bool suspend_sids);
     apply_clockrate(
       ((refresh_rate == 0)
       ? 1   /* PAL */
@@ -423,7 +401,7 @@ void handle_asid_typemessage(uint8_t* buffer)
      0xF0, 0x2D, 0x32, SIDNO, SIDTYPE, 0x7F
   */
   int sidtype = ((buffer[1] == 0) ? 3 : (buffer[1] == 1) ? 2 : 0);
-  usASID("Tune SID %d type: %s\n", buffer[0], sidtypes[sidtype]);
+  usASID("Tune SID %d type: %s\n", buffer[0], sid_type_name(sidtype));
   return;
 }
 
@@ -472,7 +450,6 @@ void decode_asid_message(uint8_t* buffer, int size)
       break;
     case 0x50:  /* SID 2 */
       /* Update SID count and adjust rate - tracking only on SID1 for timing */
-      extern void update_sid_count(uint8_t sid_num);
       update_sid_count(2);
       adjust_buffer_rate_dynamic(0);
       handle_writeordered_asid_message(32, &buffer[3]);

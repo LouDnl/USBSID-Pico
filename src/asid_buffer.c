@@ -38,20 +38,15 @@
 #include <pico/stdlib.h>
 #include <pico/malloc.h>
 
-#include "globals.h"
-#include "config.h"
-#include "pio.h"
-#include "gpio.h"
-#include "logging.h"
-#include "asid.h"
-#include "sid.h"
+#include <globals.h>
+#include <config.h>
+#include <bus.h>
+#include <pio.h>
+#include <gpio.h>
+#include <logging.h>
+#include <asid.h>
+#include <sid.h>
 
-
-/* config.c */
-extern Config usbsid_config;
-
-/* bus.c */
-extern uint32_t clockcycles(void);
 
 /* PIO */
 const PIO raster_pio = pio1;
@@ -98,12 +93,12 @@ typedef struct {
 static ring_buffer_t __not_in_flash("asid_buffer") asid_ringbuffer;
 
 /* Dynamic ring buffer sizing */
-static const uint16_t RING_SIZE_MIN = (10 * 224);     /* 2240 bytes - minimum size */
-static const uint16_t RING_SIZE_DEFAULT = (20 * 224); /* 4480 bytes - default/starting size */
-static const uint16_t RING_SIZE_MAX = (150 * 224);    /* 33600 bytes - maximum size (~150 frames, ~33KB) */
-static const uint16_t RING_SIZE_STEP = (20 * 224);    /* 4480 bytes - grow/shrink increment */
-volatile uint16_t ring_size = RING_SIZE_DEFAULT;      /* Current effective size */
-static uint16_t ring_size_allocated = 0;              /* Actual allocated size */
+static const uint16_t RING_SIZE_MIN = (10 * 224);       /* 2240 bytes - minimum size */
+static const uint16_t RING_SIZE_DEFAULT = (20 * 224);   /* 4480 bytes - default/starting size */
+static const uint16_t RING_SIZE_MAX = (150 * 224);      /* 33600 bytes - maximum size (~150 frames, ~33KB) */
+static const uint16_t RING_SIZE_STEP = (20 * 224);      /* 4480 bytes - grow/shrink increment */
+volatile static uint16_t ring_size = RING_SIZE_DEFAULT; /* Current effective size */
+static uint16_t ring_size_allocated = 0;                /* Actual allocated size */
 
 
 /**
@@ -431,9 +426,6 @@ void __not_in_flash_func(buffer_irq_handler)(void)
   irq_prev_at = irq_now_at;
   irq_now_at = clockcycles();
 
-  /* inline extern as only used here */
-  extern void cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
-
   /* Retrieve the current diff */
   int current_diff = ring_diff();
   /* Only start if head and tail are not the same */
@@ -486,7 +478,7 @@ void __not_in_flash_func(buffer_irq_handler)(void)
 }
 
 /**
- * @brief initialize the buffer irq
+ * @brief initialise the buffer irq
  * @note sets the interrupt number and handler
  * @note sets the irq source and enables the irq
  */
@@ -505,7 +497,7 @@ void init_buffer_irq(void)
 }
 
 /**
- * @brief initializes the raster_pio
+ * @brief initialises the raster_pio
  * @note also claims the pio statemachine
  */
 void init_buffer_pio(void)
@@ -659,7 +651,7 @@ static uint8_t __not_in_flash_func(ring_get)(void)
 }
 
 /**
- * @brief intialize the ring buffer
+ * @brief intialise the ring buffer
  * @note Allocates maximum size upfront to allow dynamic growth
  */
 void asid_ring_init(void)
@@ -675,14 +667,14 @@ void asid_ring_init(void)
     ring_size = RING_SIZE_DEFAULT;  /* Start with default logical size */
     asid_ringbuffer.is_allocated = true;
     ring_buffer_reset();
-    usASID("Ringbuffer initialized (allocated=%u, effective=%u)\n",
+    usASID("Ringbuffer initialised (allocated=%u, effective=%u)\n",
       ring_size_allocated, ring_size);
   }
   return;
 }
 
 /**
- * @brief de-intialize the ring buffer
+ * @brief de-intialise the ring buffer
  */
 void asid_ring_deinit(void)
 {

@@ -1,0 +1,952 @@
+<!--
+/*
+ * USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board
+ * for interfacing one or two MOS SID chips and/or hardware SID emulators over
+ * (WEB)USB with your computer, phone or ASID supporting player
+ *
+ * index.html
+ * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
+ * File author: LouD
+ *
+ * Copyright (c) 2024-2026 LouD
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 2.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+-->
+
+<!DOCTYPE html>
+<html lang="en-US" style="overflow:scroll-x;">
+  <head>
+    <!-- Must load first -->
+    <script src="js/color-modes.js"></script>
+
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="LouD">
+    <title>LouDSID</title>
+
+    <link rel="canonical" href="https://usbsid.loudai.nl/">
+
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script type="text/javascript" defer src="config.js"></script>
+    <script type="text/javascript" defer src="jsSID-webusb.js"></script>
+    <script type="text/javascript" defer src="main.js"></script>
+    <script type="text/javascript" src="player.js"></script>
+    <script type="text/javascript" src="lib/opl.js"></script>
+    <script type="text/javascript" src="opljs-if.js"></script>
+
+    <script type="text/javascript" src="websid/player.js"></script>
+    <script type="text/javascript" src="websid/usbsid_adapter.js"></script>
+    <!-- <script type="text/javascript" src="websid/backend_websid.js"></script> -->
+    <!-- <script type="text/javascript" src="websid/websid_adapter.js"></script> -->
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@docsearch/css@3">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+
+    <!-- Custom styles for this template -->
+    <link href="css/header.css" rel="stylesheet">
+    <link href="css/body.css" rel="stylesheet">
+  </head>
+
+  <body style="font-family: sans-serif;">
+
+    <!-- Inline SVG's -->
+    <svg xmlns="http://www.w3.org/2000/svg" class="d-none">
+      <symbol id="bluesky" viewBox="0 0 511.999 452.266">
+        <path fill-rule="nonzero" d="M110.985 30.442c58.695 44.217 121.837 133.856 145.013 181.961 23.176-48.105 86.322-137.744 145.016-181.961 42.361-31.897 110.985-56.584 110.985 21.96 0 15.681-8.962 131.776-14.223 150.628-18.272 65.516-84.873 82.228-144.112 72.116 103.55 17.68 129.889 76.238 73 134.8-108.04 111.223-155.288-27.905-167.385-63.554-3.489-10.262-2.991-10.498-6.561 0-12.098 35.649-59.342 174.777-167.382 63.554-56.89-58.562-30.551-117.12 72.999-134.8-59.239 10.112-125.84-6.6-144.112-72.116C8.962 184.178 0 68.083 0 52.402c0-78.544 68.633-53.857 110.985-21.96z"/>
+      </symbol>
+      <symbol id="youtube" viewBox="0 0 461.001 461.001">
+        <path d="M365.257,67.393H95.744C42.866,67.393,0,110.259,0,163.137v134.728 c0,52.878,42.866,95.744,95.744,95.744h269.513c52.878,0,95.744-42.866,95.744-95.744V163.137 C461.001,110.259,418.135,67.393,365.257,67.393z M300.506,237.056l-126.06,60.123c-3.359,1.602-7.239-0.847-7.239-4.568V168.607 c0-3.774,3.982-6.22,7.348-4.514l126.06,63.881C304.363,229.873,304.298,235.248,300.506,237.056z"></path>
+      </symbol>
+      <symbol id="facebook" viewBox="0 0 16 16">
+        <path d="M16 8.049c0-4.446-3.582-8.05-8-8.05C3.58 0-.002 3.603-.002 8.05c0 4.017 2.926 7.347 6.75 7.951v-5.625h-2.03V8.05H6.75V6.275c0-2.017 1.195-3.131 3.022-3.131.876 0 1.791.157 1.791.157v1.98h-1.009c-.993 0-1.303.621-1.303 1.258v1.51h2.218l-.354 2.326H9.25V16c3.824-.604 6.75-3.934 6.75-7.951z"/>
+      </symbol>
+      <symbol id="instagram" viewBox="0 0 16 16">
+          <path d="M8 0C5.829 0 5.556.01 4.703.048 3.85.088 3.269.222 2.76.42a3.917 3.917 0 0 0-1.417.923A3.927 3.927 0 0 0 .42 2.76C.222 3.268.087 3.85.048 4.7.01 5.555 0 5.827 0 8.001c0 2.172.01 2.444.048 3.297.04.852.174 1.433.372 1.942.205.526.478.972.923 1.417.444.445.89.719 1.416.923.51.198 1.09.333 1.942.372C5.555 15.99 5.827 16 8 16s2.444-.01 3.298-.048c.851-.04 1.434-.174 1.943-.372a3.916 3.916 0 0 0 1.416-.923c.445-.445.718-.891.923-1.417.197-.509.332-1.09.372-1.942C15.99 10.445 16 10.173 16 8s-.01-2.445-.048-3.299c-.04-.851-.175-1.433-.372-1.941a3.926 3.926 0 0 0-.923-1.417A3.911 3.911 0 0 0 13.24.42c-.51-.198-1.092-.333-1.943-.372C10.443.01 10.172 0 7.998 0h.003zm-.717 1.442h.718c2.136 0 2.389.007 3.232.046.78.035 1.204.166 1.486.275.373.145.64.319.92.599.28.28.453.546.598.92.11.281.24.705.275 1.485.039.843.047 1.096.047 3.231s-.008 2.389-.047 3.232c-.035.78-.166 1.203-.275 1.485a2.47 2.47 0 0 1-.599.919c-.28.28-.546.453-.92.598-.28.11-.704.24-1.485.276-.843.038-1.096.047-3.232.047s-2.39-.009-3.233-.047c-.78-.036-1.203-.166-1.485-.276a2.478 2.478 0 0 1-.92-.598 2.48 2.48 0 0 1-.6-.92c-.109-.281-.24-.705-.275-1.485-.038-.843-.046-1.096-.046-3.233 0-2.136.008-2.388.046-3.231.036-.78.166-1.204.276-1.486.145-.373.319-.64.599-.92.28-.28.546-.453.92-.598.282-.11.705-.24 1.485-.276.738-.034 1.024-.044 2.515-.045v.002zm4.988 1.328a.96.96 0 1 0 0 1.92.96.96 0 0 0 0-1.92zm-4.27 1.122a4.109 4.109 0 1 0 0 8.217 4.109 4.109 0 0 0 0-8.217zm0 1.441a2.667 2.667 0 1 1 0 5.334 2.667 2.667 0 0 1 0-5.334z"/>
+      </symbol>
+      <symbol id="twitter" viewBox="0 0 16 16">
+        <path d="M5.026 15c6.038 0 9.341-5.003 9.341-9.334 0-.14 0-.282-.006-.422A6.685 6.685 0 0 0 16 3.542a6.658 6.658 0 0 1-1.889.518 3.301 3.301 0 0 0 1.447-1.817 6.533 6.533 0 0 1-2.087.793A3.286 3.286 0 0 0 7.875 6.03a9.325 9.325 0 0 1-6.767-3.429 3.289 3.289 0 0 0 1.018 4.382A3.323 3.323 0 0 1 .64 6.575v.045a3.288 3.288 0 0 0 2.632 3.218 3.203 3.203 0 0 1-.865.115 3.23 3.23 0 0 1-.614-.057 3.283 3.283 0 0 0 3.067 2.277A6.588 6.588 0 0 1 .78 13.58a6.32 6.32 0 0 1-.78-.045A9.344 9.344 0 0 0 5.026 15z"/>
+      </symbol>
+      <symbol id="mastodon" viewBox="0 0 24 24">
+        <path d="M21.327 8.566c0-4.339-2.843-5.61-2.843-5.61-1.433-.658-3.894-.935-6.451-.956h-.063c-2.557.021-5.016.298-6.45.956 0 0-2.843 1.272-2.843 5.61 0 .993-.019 2.181.012 3.441.103 4.243.778 8.425 4.701 9.463 1.809.479 3.362.579 4.612.51 2.268-.126 3.541-.809 3.541-.809l-.075-1.646s-1.621.511-3.441.449c-1.804-.062-3.707-.194-3.999-2.409a4.523 4.523 0 0 1-.04-.621s1.77.433 4.014.536c1.372.063 2.658-.08 3.965-.236 2.506-.299 4.688-1.843 4.962-3.254.434-2.223.398-5.424.398-5.424zm-3.353 5.59h-2.081V9.057c0-1.075-.452-1.62-1.357-1.62-1 0-1.501.647-1.501 1.927v2.791h-2.069V9.364c0-1.28-.501-1.927-1.502-1.927-.905 0-1.357.546-1.357 1.62v5.099H6.026V8.903c0-1.074.273-1.927.823-2.558.566-.631 1.307-.955 2.228-.955 1.065 0 1.872.409 2.405 1.228l.518.869.519-.869c.533-.819 1.34-1.228 2.405-1.228.92 0 1.662.324 2.228.955.549.631.822 1.484.822 2.558v5.253z"></path>
+      </symbol>
+      <symbol id="discord" viewBox="0 -28.5 256 256">
+        <path d="M216.856339,16.5966031 C200.285002,8.84328665 182.566144,3.2084988 164.041564,0 C161.766523,4.11318106 159.108624,9.64549908 157.276099,14.0464379 C137.583995,11.0849896 118.072967,11.0849896 98.7430163,14.0464379 C96.9108417,9.64549908 94.1925838,4.11318106 91.8971895,0 C73.3526068,3.2084988 55.6133949,8.86399117 39.0420583,16.6376612 C5.61752293,67.146514 -3.4433191,116.400813 1.08711069,164.955721 C23.2560196,181.510915 44.7403634,191.567697 65.8621325,198.148576 C71.0772151,190.971126 75.7283628,183.341335 79.7352139,175.300261 C72.104019,172.400575 64.7949724,168.822202 57.8887866,164.667963 C59.7209612,163.310589 61.5131304,161.891452 63.2445898,160.431257 C105.36741,180.133187 151.134928,180.133187 192.754523,160.431257 C194.506336,161.891452 196.298154,163.310589 198.110326,164.667963 C191.183787,168.842556 183.854737,172.420929 176.223542,175.320965 C180.230393,183.341335 184.861538,190.991831 190.096624,198.16893 C211.238746,191.588051 232.743023,181.531619 254.911949,164.955721 C260.227747,108.668201 245.831087,59.8662432 216.856339,16.5966031 Z M85.4738752,135.09489 C72.8290281,135.09489 62.4592217,123.290155 62.4592217,108.914901 C62.4592217,94.5396472 72.607595,82.7145587 85.4738752,82.7145587 C98.3405064,82.7145587 108.709962,94.5189427 108.488529,108.914901 C108.508531,123.290155 98.3405064,135.09489 85.4738752,135.09489 Z M170.525237,135.09489 C157.88039,135.09489 147.510584,123.290155 147.510584,108.914901 C147.510584,94.5396472 157.658606,82.7145587 170.525237,82.7145587 C183.391518,82.7145587 193.761324,94.5189427 193.539891,108.914901 C193.539891,123.290155 183.391518,135.09489 170.525237,135.09489 Z" fill-rule="nonzero"></path>
+      </symbol>
+      <symbol id="github" viewBox="0 -3.5 256 256">
+        <path d="M127.505 0C57.095 0 0 57.085 0 127.505c0 56.336 36.534 104.13 87.196 120.99 6.372 1.18 8.712-2.766 8.712-6.134 0-3.04-.119-13.085-.173-23.739-35.473 7.713-42.958-15.044-42.958-15.044-5.8-14.738-14.157-18.656-14.157-18.656-11.568-7.914.872-7.752.872-7.752 12.804.9 19.546 13.14 19.546 13.14 11.372 19.493 29.828 13.857 37.104 10.6 1.144-8.242 4.449-13.866 8.095-17.05-28.32-3.225-58.092-14.158-58.092-63.014 0-13.92 4.981-25.295 13.138-34.224-1.324-3.212-5.688-16.18 1.235-33.743 0 0 10.707-3.427 35.073 13.07 10.17-2.826 21.078-4.242 31.914-4.29 10.836.048 21.752 1.464 31.942 4.29 24.337-16.497 35.029-13.07 35.029-13.07 6.94 17.563 2.574 30.531 1.25 33.743 8.175 8.929 13.122 20.303 13.122 34.224 0 48.972-29.828 59.756-58.22 62.912 4.573 3.957 8.648 11.717 8.648 23.612 0 17.06-.148 30.791-.148 34.991 0 3.393 2.295 7.369 8.759 6.117 50.634-16.879 87.122-64.656 87.122-120.973C255.009 57.085 197.922 0 127.505 0"></path> <path d="M47.755 181.634c-.28.633-1.278.823-2.185.389-.925-.416-1.445-1.28-1.145-1.916.275-.652 1.273-.834 2.196-.396.927.415 1.455 1.287 1.134 1.923M54.027 187.23c-.608.564-1.797.302-2.604-.589-.834-.889-.99-2.077-.373-2.65.627-.563 1.78-.3 2.616.59.834.899.996 2.08.36 2.65M58.33 194.39c-.782.543-2.06.034-2.849-1.1-.781-1.133-.781-2.493.017-3.038.792-.545 2.05-.055 2.85 1.07.78 1.153.78 2.513-.019 3.069M65.606 202.683c-.699.77-2.187.564-3.277-.488-1.114-1.028-1.425-2.487-.724-3.258.707-.772 2.204-.555 3.302.488 1.107 1.026 1.445 2.496.7 3.258M75.01 205.483c-.307.998-1.741 1.452-3.185 1.028-1.442-.437-2.386-1.607-2.095-2.616.3-1.005 1.74-1.478 3.195-1.024 1.44.435 2.386 1.596 2.086 2.612M85.714 206.67c.036 1.052-1.189 1.924-2.705 1.943-1.525.033-2.758-.818-2.774-1.852 0-1.062 1.197-1.926 2.721-1.951 1.516-.03 2.758.815 2.758 1.86M96.228 206.267c.182 1.026-.872 2.08-2.377 2.36-1.48.27-2.85-.363-3.039-1.38-.184-1.052.89-2.105 2.367-2.378 1.508-.262 2.857.355 3.049 1.398"></path>
+      </symbol>
+      <symbol id="check2" viewBox="0 0 16 16">
+        <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+      </symbol>
+      <symbol id="circle-half" viewBox="0 0 16 16">
+        <path d="M8 15A7 7 0 1 0 8 1v14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z"/>
+      </symbol>
+      <symbol id="moon-stars-fill" viewBox="0 0 16 16">
+        <path d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z"/>
+        <path d="M10.794 3.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387a1.734 1.734 0 0 0-1.097 1.097l-.387 1.162a.217.217 0 0 1-.412 0l-.387-1.162A1.734 1.734 0 0 0 9.31 6.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387a1.734 1.734 0 0 0 1.097-1.097l.387-1.162zM13.863.099a.145.145 0 0 1 .274 0l.258.774c.115.346.386.617.732.732l.774.258a.145.145 0 0 1 0 .274l-.774.258a1.156 1.156 0 0 0-.732.732l-.258.774a.145.145 0 0 1-.274 0l-.258-.774a1.156 1.156 0 0 0-.732-.732l-.774-.258a.145.145 0 0 1 0-.274l.774-.258c.346-.115.617-.386.732-.732L13.863.1z"/>
+      </symbol>
+      <symbol id="sun-fill" viewBox="0 0 16 16">
+        <path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/>
+      </symbol>
+      <symbol id="cpu-fill" viewBox="0 0 16 16">
+        <path d="M6.5 6a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3z"/>
+        <path d="M5.5.5a.5.5 0 0 0-1 0V2A2.5 2.5 0 0 0 2 4.5H.5a.5.5 0 0 0 0 1H2v1H.5a.5.5 0 0 0 0 1H2v1H.5a.5.5 0 0 0 0 1H2v1H.5a.5.5 0 0 0 0 1H2A2.5 2.5 0 0 0 4.5 14v1.5a.5.5 0 0 0 1 0V14h1v1.5a.5.5 0 0 0 1 0V14h1v1.5a.5.5 0 0 0 1 0V14h1v1.5a.5.5 0 0 0 1 0V14a2.5 2.5 0 0 0 2.5-2.5h1.5a.5.5 0 0 0 0-1H14v-1h1.5a.5.5 0 0 0 0-1H14v-1h1.5a.5.5 0 0 0 0-1H14v-1h1.5a.5.5 0 0 0 0-1H14A2.5 2.5 0 0 0 11.5 2V.5a.5.5 0 0 0-1 0V2h-1V.5a.5.5 0 0 0-1 0V2h-1V.5a.5.5 0 0 0-1 0V2h-1V.5zm1 4.5h3A1.5 1.5 0 0 1 11 6.5v3A1.5 1.5 0 0 1 9.5 11h-3A1.5 1.5 0 0 1 5 9.5v-3A1.5 1.5 0 0 1 6.5 5z"/>
+      </symbol>
+    </svg>
+
+    <!-- Light/Dark switcher -->
+    <div class="dropdown position-fixed bottom-0 end-0 mb-3 me-3 bd-mode-toggle">
+      <button class="btn btn-bd-primary py-2 dropdown-toggle d-flex align-items-center"
+              id="bd-theme"
+              type="button"
+              aria-expanded="false"
+              data-bs-toggle="dropdown"
+              aria-label="Toggle theme (auto)">
+        <svg class="bi my-1 theme-icon-active" width="1em" height="1em"><use href="#circle-half"></use></svg>
+        <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
+        <li>
+          <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
+            <svg class="bi me-2 opacity-50" width="1em" height="1em"><use href="#sun-fill"></use></svg>
+            Light
+            <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
+            <svg class="bi me-2 opacity-50" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>
+            Dark
+            <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
+            <svg class="bi me-2 opacity-50" width="1em" height="1em"><use href="#circle-half"></use></svg>
+            Auto
+            <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+          </button>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Primary container -->
+    <main>
+      <h1 class="visually-hidden">USBSID-Pico config tool</h1>
+
+      <!-- Header and Navbar -->
+      <div class="container" id="header">
+        <header class="d-flex flex-wrap justify-content-center py-3 mb-4 border-bottom">
+          <a href="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto link-body-emphasis text-decoration-none">
+            <img class="svg" id="usbsid-logo" src="img/usbsid-black.svg" width="100px">
+            <span class="ms-3 fs-4">USBSID-Pico</span>
+          </a>
+
+          <ul class="nav nav-pills">
+            <li class="nav-item"><a href="/" class="nav-link active" aria-current="page">Home</a></li>
+            <li class="nav-item"><a href="https://github.com/LouDnl/USBSID-Pico" target="_blank" class="nav-link">Github</a></li>
+            <li class="nav-item"><a href="https://github.com/LouDnl/USBSID-Pico/wiki" target="_blank" class="nav-link">Wiki</a></li>
+          </ul>
+        </header>
+      </div>
+
+      <!-- SID registers -->
+      <div class="container px-4 overflow-hidden d-none" id="sid-memory">
+        <h2 class="pb-2 border-bottom">SID registers</h2>
+        <!-- SID registers row -->
+        <div class="row row-cols-1 row-cols-lg-3 align-items-stretch justify-content-center py-2">
+            <div class="card card-cover px-1 mx-1 h-auto w-auto v-auto overflow-hidden text-bg-auto rounded-4 shadow-lg">
+              <div id="SIDMEMORY" class="d-flex flex-column h-auto w-auto align-items-center justify-content-center p-2 text-auto text-shadow-1">
+              </div>
+          </div>
+        </div>
+      </div>
+      <!-- SID file Player menu -->
+      <div class="container px-4 overflow-hidden" id="sid-file-player">
+        <h2 class="pb-2 border-bottom">SID file player</h2>
+        <div class="row row-cols-1 row-cols-lg-3 align-items-stretch justify-content-center py-5">
+          <!-- Connect card -->
+          <div class="card card-cover px-1 mx-1 h-auto w-auto v-auto overflow-hidden text-bg-auto rounded-4 shadow-lg">
+            <div class="d-flex flex-column h-auto w-auto p-5 text-auto text-shadow-1">
+              <h3 class="display-6 lh-1 fw-bold">Select emulator</h3>
+              <div class="dropdown">
+                <button class="btn btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" id="emulatorButton" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                  Emulator
+                </button>
+                <ul class="dropdown-menu" id="emulators">
+                  <li><a class="dropdown-item" href="" name="webusb">WebUSB (Hermit)</a></li>
+                  <li><a class="dropdown-item" href="" name="asid">ASID (MIDI)</a></li>
+                  <li><a class="dropdown-item" href="" name="hermit">Hermit's (+FM)</a></li>
+                  <li><a class="dropdown-item" href="" name="websid">WebSID + USBSID (alpha test)</a></li>
+                </ul>
+              </div>
+              <div id="webusb-connect" style="display:none;">
+                <button class="btn btn-secondary mt-1" id="device-connect">Connect</button>
+                <span id="status-text"></span><br>
+                <button class="btn btn-secondary mt-1 d-none" id="toggle-config">Open config</button>
+                <span id="toggle-status-text"></span>
+                <div id="devices" style="position:relative; width:100%; height:100%"></div>
+              </div>
+              <div id="websidusb-connect" style="display:none;">
+                <button class="btn btn-secondary mt-1" id="websiddevice-connect">Connect</button>
+                <span id="status-text"></span><br>
+                <!-- <button class="btn btn-secondary mt-1 d-none" id="toggle-config">Open config</button> -->
+                <span id="toggle-status-text"></span>
+                <!-- <div id="devices" style="position:relative; width:100%; height:100%"></div> -->
+              </div>
+              <div id="asid-midi" style="display:none;">
+                <label for="select-midi-outputs">Select MIDI port</label><br>
+                <select class="asid-midi-outputs" id="asid-midi-outputs" name="select-midi-outputs"></select>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Select SID card -->
+          <div class="card card-cover mx-1 h-auto w-auto v-auto overflow-hidden text-bg-auto rounded-4 shadow-lg">
+            <div class="d-flex flex-column h-75 p-5 text-auto text-shadow-1">
+              <h3 class="display-6 lh-1 fw-bold">Select SID file</h3>
+              <div class="d-flex flex-row justify-content-center mb-0 pt-0 pb-0 text-auto text-shadow-1">
+                <div class="dropdown">
+
+                  <button class="btn btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" id="SIDfileButton" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                   -- SELECT SID --
+                  </button>
+                  <ul class="dropdown-menu" id="sidfiles" style="overflow-y: scroll; height: 250px;"></ul>
+
+                </div>
+              </div>
+              <!-- Tune manipulators -->
+              <div id="tune-buttons" class="d-flex flex-row justify-content-center mb-0 pt-0 pb-0 text-auto text-shadow-1">
+                <div class="d-flex flex-column h-100 p-1 pb-0 text-auto text-shadow-1">
+                  <div class="col">
+                    <button id="toggle-previous-sid" title="Previous SID" class="btn btn-secondary mt-1 browser-ctrls" type="button">
+                      <b><<</b>
+                    </button>
+                    <button id="toggle-previous-tune" title="Previous Subtune" class="btn btn-secondary mt-1 browser-ctrls" type="button">
+                      <b><</b>
+                    </button>
+                    <button id="toggle-next-tune" title="Next Subtune" class="btn btn-secondary mt-1 browser-ctrls" type="button">
+                      <b>></b>
+                    </button>
+                    <button id="toggle-next-sid" title="Next SID" class="btn btn-secondary mt-1 browser-ctrls" type="button">
+                      <b>>></b>
+                    </button>
+                </div>
+                </div>
+              </div>
+              <div class="d-flex flex-row justify-content-center mb-0 pt-0 pb-0 text-auto text-shadow-1">
+                <div class="d-flex flex-column h-100 p-1 pb-0 text-left text-shadow-1">
+                  <div class="justify-content-center">Subtune <span id="current-subtune">0</span> of <span id="max-subtunes">0</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Load, Play, Pause and Stop buttons -->
+          <div class="card card-cover mx-1 h-auto w-auto v-auto overflow-hidden text-bg-auto rounded-4 shadow-lg">
+            <div class="d-flex flex-row justify-content-center mb-0 pt-0 pb-0 text-auto text-shadow-1">
+              <div class="d-flex flex-column h-100 p-5 pb-0 text-auto text-shadow-1">
+                <h3 class="display-6 lh-1 fw-bold">Actions</h3>
+                <div class="col">
+                  <button id="load-file" class="btn btn-light browser-ctrls" type="button">
+                    <b style="font-size:18px;position:relative;top:-6px;">..</b>
+                  </button>
+
+                  <button id="play-pause" class="btn btn-light button-ctrls button-big button-idle disabled" type="button">
+                    <svg id="play" height="40" viewBox="0 0 48 48">
+                      <path d="M-838-2232H562v3600H-838z" fill="none" />
+                      <path d="M16 10v28l22-14z" />
+                      <path d="M0 0h48v48H0z" fill="none" />
+                    </svg>
+                    <svg id="pause" height="40" viewBox="0 0 48 48" style="display:none;">
+                      <path d="M12 38h8V10h-8v28zm16-28v28h8V10h-8z" />
+                      <path d="M0 0h48v48H0z" fill="none" />
+                    </svg>
+                  </button>
+
+                  <button id="stop" class="btn btn-light button-ctrls button-big button-selected disabled" type="button">
+                    <svg height="40" viewBox="0 0 48 48">
+                      <path d="M0 0h48v48H0z" fill="none" />
+                      <path d="M12 12h24v24H12z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <!-- WebUSB manipulators -->
+            <div id="webusb-audio-buttons" class="d-flex flex-row justify-content-center mb-0 pt-0 pb-0 text-auto text-shadow-1 d-none">
+              <div class="d-flex flex-column h-100 pt-1 pb-0 text-auto text-shadow-1">
+                <div class="d-flex flex-row justify-content-center mb-0 pt-0 pb-0 text-auto text-shadow-1">
+                  <button class="btn btn-secondary mt-1" id="toggle-audio">
+                    <b>Toggle Mono/Stereo</b>
+                  </button>
+                </div>
+              </div>
+              <div class="d-flex flex-column h-100 ps-1 pt-1 pb-0 text-auto text-shadow-1">
+                <div class="d-flex flex-row justify-content-center mb-0 pt-0 pb-0 text-auto text-shadow-1">
+                  <button class="btn btn-secondary mt-1" id="flip-sockets">
+                    <b>Flip Sockets</b>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <!-- SysEx/ASID manipulators -->
+            <div id="asid-audio-buttons" class="d-flex flex-row justify-content-center mb-0 pt-0 pb-0 text-auto text-shadow-1 d-none">
+              <div class="d-flex flex-column h-100 p-1 pb-0 text-auto text-shadow-1">
+                <button id="sysex-toggle-audio" class="btn btn-secondary mt-1 browser-ctrls" type="button">
+                  <b>Toggle Mono/Stereo</b>
+                </button>
+              </div>
+            </div>
+
+            <div id="mute-buttons" class="d-flex flex-row justify-content-center mb-0 pt-0 pb-0 text-auto text-shadow-1 d-none">
+              <div class="d-flex flex-column h-100 pt-1 text-auto text-shadow-1">
+                <button id="mute-sid" class="btn w-auto btn-light browser-ctrls" type="button">
+                  <b>Mute emulator</b>
+                </button>
+              </div>
+               <!-- TODO: FINISH -->
+              <!-- <div class="col d-flex flex-column h-100 pt-1 text-auto text-shadow-1">
+                <button id="mute-voice-one" class="btn btn-light browser-ctrls" type="button">
+                  <b>V1</b>
+                </button>
+              </div>
+              <div class="col d-flex flex-column h-100 pt-1 text-auto text-shadow-1">
+                <button id="mute-voice-two" class="btn btn-light browser-ctrls" type="button">
+                  <b>V2</b>
+                </button>
+              </div>
+              <div class="col d-flex flex-column h-100 pt-1 text-auto text-shadow-1">
+                <button id="mute-voice-three" class="btn btn-light browser-ctrls" type="button">
+                  <b>V3</b>
+                </button>
+              </div> -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- USBSID WebUSB config menu -->
+      <div class="container px-4 pt-5 d-none" id="usbsid-config">
+        <h2 class="pb-2 border-bottom">USBSID-Pico configuration</h2>
+        <!-- Current configuration card -->
+        <div class="row row-cols-1 row-cols-lg-3 align-items-stretch justify-content-center g-5 py-4">
+          <div id="current-config" class="card card-cover mx-1 pb-0 h-auto w-auto v-auto overflow-hidden text-bg-auto rounded-4 shadow-lg d-none">
+            <div class="d-flex flex-row mb-0 pt-3 pb-0 text-auto text-shadow-1">
+              <div class="d-flex col justify-content-center">
+                <h3 class="display-6 lh-1 fw-bold">Your board config:</h3>
+              </div>
+              <div class="d-flex justify-content-end">
+                <button id="config-cards-button" class="btn btn-sm btn-outline-secondary">Hide</button>
+              </div>
+            </div>
+            <div id="config-cards" class="d-flex flex-row h-auto p-5 pt-0 mt-0 text-auto text-shadow-1">
+              <div class="d-flex flex-column h-auto p-2 text-auto text-shadow-1">
+                <div class="card card-cover mx-1 h-auto w-auto v-auto overflow-hidden text-bg-auto rounded-4 shadow-lg text-center">
+                  <h3 class="display-8 lh-1 m-2 fw-bold">General</h3>
+                    <ul class="list-group list-group-horizontal">
+                      <li class="list-group-item list-group-item-light flex-grow-1 text-start">SID Clockrate</li>
+                      <li class="list-group-item list-group-item-dark w-65" id="us_clockrate">1000000</li>
+                    </ul>
+                    <ul class="list-group list-group-horizontal">
+                      <li class="list-group-item list-group-item-light flex-grow-1 text-start">Clockrate locked</li>
+                      <li class="list-group-item list-group-item-dark w-65" id="us_clocklock">False</li>
+                    </ul>
+                    <ul class="list-group list-group-horizontal">
+                      <li class="list-group-item list-group-item-light flex-grow-1 text-start">Onboard LED</li>
+                      <li class="list-group-item list-group-item-dark" id="us_picoled">Disabled</li>
+                    </ul>
+                    <ul class="list-group list-group-horizontal">
+                      <li class="list-group-item list-group-item-light flex-grow-1 text-start">Onboard LED Breathing</li>
+                      <li class="list-group-item list-group-item-dark" id="us_picoledbreathe">Disabled</li>
+                    </ul>
+                    <ul class="list-group list-group-horizontal">
+                      <li class="list-group-item list-group-item-light flex-grow-1 text-start">RGB LED</li>
+                      <li class="list-group-item list-group-item-dark" id="us_rgbled">Disabled</li>
+                    </ul>
+                    <ul class="list-group list-group-horizontal">
+                      <li class="list-group-item list-group-item-light flex-grow-1 text-start">RGB LED Breathing</li>
+                      <li class="list-group-item list-group-item-dark" id="us_rgbledbreathe">Disabled</li>
+                    </ul>
+                    <ul class="list-group list-group-horizontal">
+                      <li class="list-group-item list-group-item-light flex-grow-1 text-start">RGB LED Brightness</li>
+                      <li class="list-group-item list-group-item-dark" id="us_rgbledbrightness">255</li>
+                    </ul>
+                    <ul class="list-group list-group-horizontal">
+                      <li class="list-group-item list-group-item-light flex-grow-1 text-start">RGB LED SID to use</li>
+                      <li class="list-group-item list-group-item-dark" id="us_rgbledsidno">1</li>
+                    </ul>
+                </div>
+              </div>
+              <div class="d-flex flex-column h-auto p-2 text-auto text-shadow-1">
+                <div class="card card-cover mx-1 h-auto w-auto v-auto overflow-hidden text-bg-auto rounded-4 shadow-lg text-center">
+                  <h3 class="display-8 lh-1 m-2 fw-bold">Socket One</h3>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">Enabled</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_socketone">False</li>
+                  </ul>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">Chip type</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_socketonechip">Real</li>
+                  </ul>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">Clone type</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_socketoneclone">None</li>
+                  </ul>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">Dual SID</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_socketonedual">False</li>
+                  </ul>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">SID One</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_socketonesidone">None</li>
+                  </ul>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">SID Two</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_socketonesidtwo">None</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="d-flex flex-column h-auto p-2 text-auto text-shadow-1">
+                <div class="card card-cover mx-1 h-auto w-auto v-auto overflow-hidden text-bg-auto rounded-4 shadow-lg text-center">
+                  <h3 class="display-8 lh-1 m-2 fw-bold">Socket Two</h3>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">Enabled</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_sockettwo">False</li>
+                  </ul>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">Chip type</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_sockettwochip">Real</li>
+                  </ul>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">Clone type</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_sockettwoclone">None</li>
+                  </ul>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">Dual SID</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_sockettwodual">False</li>
+                  </ul>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">SID One</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_sockettwosidone">None</li>
+                  </ul>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">SID Two</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_sockettwosidtwo">None</li>
+                  </ul>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">Act as One</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_sockettwoactasone">False</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="d-flex flex-column h-auto p-2 text-auto text-shadow-1">
+                <div class="card card-cover mt-1 mx-1 h-auto w-auto v-auto overflow-hidden text-bg-auto rounded-4 shadow-lg text-center">
+                  <h3 class="display-8 lh-1 m-2 fw-bold">Protocols</h3>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">CDC</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_cdc">Disabled</li>
+                  </ul>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">WebUSB</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_webusb">Disabled</li>
+                  </ul>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">ASID</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_asid">Disabled</li>
+                  </ul>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">Midi</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_midi">Disabled</li>
+                  </ul>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">FMOpl</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_fmopl">Disabled</li>
+                  </ul>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">FMOpl SID</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_fmoplsidno">-1</li>
+                  </ul>
+                  <ul class="list-group list-group-horizontal">
+                    <li class="list-group-item list-group-item-light flex-grow-1 text-start">Audio</li>
+                    <li class="list-group-item list-group-item-dark w-65" id="us_audioswitch">N/A</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Configuration row -->
+        <div class="row row-cols-1 row-cols-lg-3 align-items-stretch justify-content-center g-2 py-0">
+          <!-- Config options -->
+          <div class="card card-cover mx-1 pb-0 h-auto w-auto v-auto text-bg-auto rounded-4 shadow-lg">
+            <!-- Title -->
+            <div class="d-flex flex-row mb-0 pt-3 pb-0 text-auto text-shadow-1 justify-content-center">
+              <h3 class="d-block display-6 lh-1 fw-bold">Config options</h3>
+            </div>
+            <!-- Warning -->
+            <div class="d-flex flex-row mb-0 p-0 pb-0 text-auto text-shadow-1 justify-content-center">
+              <small class="d-block text-danger">After changing your config, do not forget to click <strong>`Save config`</strong> and then <strong>`Retrieve config`</strong></small>
+            </div>
+            <!-- Configuration cards -->
+            <div class="d-flex flex-row mb-2 pt-3 pb-0 text-auto text-shadow-1">
+              <!-- Retrieve and Save -->
+              <div class="card card-cover mt-1 mx-1 h-auto w-auto v-auto text-bg-auto rounded-4 shadow-lg text-center">
+                <div class="d-flex flex-row justify-content-center mb-0 pt-3 pb-0 text-auto text-shadow-1">
+                  <!-- Buttons -->
+                  <div class="justify-content-center text-center mx-1">
+                    <button id="retrieve-config" class="btn btn-secondary mt-1" disabled>Retrieve config</button>
+                    <br>
+                    <button id="save-config" class="btn btn-secondary mt-1" disabled>Save config</button>
+                  </div>
+                </div>
+                <!-- Status boxes -->
+                <div class="d-flex flex-row justify-content-center mb-0 pt-3 pb-0 text-auto text-shadow-1">
+                  <ul class="list-group list-group-vertical" style="width: 8rem !important;">
+                    <li id="config-status" class="badge d-block list-group-item list-group-item-dark text-wrap text-break"></span>
+                    <li id="version" class="badge d-block list-group-item list-group-item-dark text-wrap text-break"></span>
+                  </ul>
+                </div>
+                <div class="d-flex flex-row justify-content-center mb-0 pt-3 pb-0 text-auto text-shadow-1">
+                  <!-- Moar buttons -->
+                  <div class="justify-content-center text-center mx-1">
+                    <button id="default-config" class="btn btn-secondary mt-1" disabled>Default config</button>
+                  </div>
+                </div>
+              </div>
+              <!-- General -->
+              <div class="card card-cover mt-1 mx-1 h-auto w-auto v-auto text-bg-auto rounded-4 shadow-lg text-center">
+                <!-- SID Clockrate -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="0">SID Clockrate</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_clockrate" value="0" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_clockrate">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- Locked Clockrate -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="0">Lock Clockrate</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_clocklock" value="0" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_clocklock">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- Onboard LED -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="3">Onboard LED</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_led" value="0" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_led">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- Onboard LED breathing -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="3">LED breathing</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_ledbreathe" value="1" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_ledbreathe">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- Onboard RGB LED -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="4">Onboard RGB LED</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_rgbled" value="0" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_rgbled">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- Onboard RGB LED breathing -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="4">RGB LED breathing</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_rgbledbreathe" value="1" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_rgbledbreathe">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- Onboard RGB LED Brightness -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="4">RGB LED brightness</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_rgbledbrightness" value="2" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu dropdown-menu-scroll" id="us_set_rgbledbrightness">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- Onboard RGB LED SID to Use -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="4">RGB LED SID to use</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_rgbledsidtouse" value="3" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_rgbledsidtouse">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- FMOpl -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="9">FMOpl enabled</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_fmopl" value="1" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_fmopl">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- Audio switch -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="10">Audio switch</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_auswitch" value="1" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_auswitch">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+              <!-- Socket One -->
+              <div class="card card-cover mt-1 mx-1 h-auto w-auto v-auto text-bg-auto rounded-4 shadow-lg text-center">
+                <!-- Enable -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="1">SocketOne enabled</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_one_enabled" value="0" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_one_enabled">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- Chip type -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="1">SocketOne chip type</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_one_chiptype" value="2" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_one_chiptype">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- Clone type -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="1">SocketOne clone type</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_one_clonetype" value="3" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_one_clonetype">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- Dual SID -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="1">SocketOne dual SID</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_one_dualsid" value="1" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_one_dualsid">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- SID One -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="1">SocketOne SID One</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_one_sidone" value="4" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_one_sidone">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- SID Two -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="1">SocketOne SID Two</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_one_sidtwo" value="5" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_one_sidtwo">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+              <!-- Socket Two -->
+              <div class="card card-cover mt-1 mx-1 h-auto w-auto v-auto text-bg-auto rounded-4 shadow-lg text-center">
+                <!-- Enable -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="2">SocketTwo enabled</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_two_enabled" value="0" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_two_enabled">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- Chip type -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="2">SocketTwo chip type</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_two_chiptype" value="2" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_two_chiptype">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- Clone type -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="2">SocketTwo clone type</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_two_clonetype" value="3" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_two_clonetype">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- Dual SID -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="2">SocketTwo dual SID</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_two_dualsid" value="1" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_two_dualsid">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- SID One -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="2">SocketTwo SID One</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_two_sidone" value="4" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_two_sidone">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- SID Two -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="2">SocketTwo SID Two</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_two_sidtwo" value="5" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_two_sidtwo">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+                <!-- Act as One -->
+                <ul class="d-flex list-group list-group-horizontal align-items-stretch">
+                  <li class="list-group-item text-start align-self-center p-2 w-100" id="config-name" value="2">SocketTwo Act an One</li>
+                  <li class="list-group-item p-1">
+                    <div class="dropdown">
+                      <button id="us_B_two_actasone" value="6" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-popper-config='{"strategy":"fixed"}' type="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Choose
+                      </button>
+                      <ul class="dropdown-menu" id="us_set_two_actasone">
+                      </ul>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+              <!-- Presets -->
+              <div class="card card-cover mt-1 mx-1 h-auto w-auto v-auto text-bg-auto rounded-4 shadow-lg text-center">
+                <div class="d-flex flex-row justify-content-center mb-0 pt-3 pb-0 text-auto text-shadow-1">
+                  <!-- Buttons -->
+                  <div class="justify-content-center text-center mx-1">
+                    <span class="d-block lh-1 fw-bold">Socket presets</span>
+                    <span class="d-block">
+                      <button id="preset-one-sid" class="btn btn-secondary mt-1" disabled>Single</button>
+                      <button id="preset-dual-sid" class="btn btn-secondary mt-1" disabled>Dual</button>
+                    </span>
+                    <span class="d-block">
+                      <button id="preset-mirror-sid" class="btn btn-secondary mt-1" disabled>Mirrored</button>
+                      <button id="preset-quad-sid" class="btn btn-secondary mt-1" disabled>Quad</button>
+                    </span>
+                    <span class="d-block">
+                      <button id="preset-triple-sid" class="btn btn-secondary mt-1" disabled>Triple One</button>
+                      <button id="preset-triple2-sid" class="btn btn-secondary mt-1" disabled>Triple Two</button>
+                    </span>
+                    <span class="d-block">
+                      <button id="preset-dual1-sid" class="btn btn-secondary mt-1" disabled>Dual One</button>
+                      <button id="preset-dual2-sid" class="btn btn-secondary mt-1" disabled>Dual Two</button>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Debug cards -->
+            <div id="debug-buttons" class="d-flex flex-row mb-2 pt-3 pb-0 text-auto text-shadow-1 d-none">
+              <!-- Test buttons -->
+              <div class="card card-cover mt-1 mx-1 h-auto w-auto v-auto text-bg-auto rounded-4 shadow-lg text-center">
+                <div class="d-flex flex-row justify-content-center mb-2 pt-3 pb-0 text-auto text-shadow-1">
+                  <div class="justify-content-center text-center mx-1">
+                    <span class="d-block lh-1 fw-bold">Testing</span>
+                    <span class="d-block">
+                      <button id="debug-test-all" class="btn btn-secondary mt-1" disabled>Test all SIDs</button>
+                    </span>
+                    <span class="d-block">
+                      <button id="debug-test-one" class="btn btn-secondary mt-1" disabled>Test SID 1</button>
+                      <button id="debug-test-two" class="btn btn-secondary mt-1" disabled>Test SID 2</button>
+                    </span>
+                    <span class="d-block">
+                      <button id="debug-test-three" class="btn btn-secondary mt-1" disabled>Test SID 3</button>
+                      <button id="debug-test-four" class="btn btn-secondary mt-1" disabled>Test SID 4</button>
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <!-- Debug buttons -->
+              <div class="card card-cover mt-1 mx-1 h-auto w-auto v-auto text-bg-auto rounded-4 shadow-lg text-center">
+                <div class="d-flex flex-row justify-content-center mb-2 pt-3 pb-0 text-auto text-shadow-1">
+                  <div class="justify-content-center text-center mx-1">
+                    <span class="d-block lh-1 fw-bold">Other</span>
+                    <span class="d-block">
+                      <button id="debug-apply-config" class="btn btn-secondary mt-1" disabled>Apply config</button>
+                    </span>
+                    <span class="d-block">
+                      <button id="debug-detect-sids" class="btn btn-secondary mt-1" disabled>Detect SIDs</button>
+                      <button id="debug-reset-sids" class="btn btn-secondary mt-1" disabled>Reset SIDs</button>
+                    </span>
+                    <span class="d-block">
+                      <button id="debug-reset-usbsid" class="btn btn-secondary mt-1" disabled>Reset USBSID</button>
+                      <button id="debug-bootloader" class="btn btn-secondary mt-1" disabled>Bootloader</button>
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <!-- RAW config data -->
+              <div class="card card-cover mt-1 mx-1 h-auto w-25 v-auto text-bg-auto rounded-4 shadow-lg text-center">
+                <div class="d-flex flex-row justify-content-center mb-2 pt-3 pb-0 text-auto text-shadow-1">
+                  <div class="justify-content-center text-center mx-1 w-auto">
+                    <span class="d-block lh-1 fw-bold">RAW config buffer</span>
+                    <span id="config-list" class="badge d-block text-wrap text-break text-danger"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="container" id="footer">
+        <footer class="d-flex flex-wrap justify-content-between align-items-center py-3 my-4 border-top">
+          <div class="col-md-4 d-flex align-items-center">
+            <a href="/" class="mb-3 me-2 mb-md-0 text-body-secondary text-decoration-none lh-1">
+              <img class="svg" id="usbsid-logo" src="img/usbsid-black.svg" width="100px">
+            </a>
+            <span class="mb-3 mb-md-0 text-body-secondary">&copy; 2025 LouD</span>
+          </div>
+
+          <ul class="nav col-md-4 justify-content-end list-unstyled d-flex">
+            <li class="ms-3"><a class="text-body-secondary" href="https://github.com/LouDnl"><svg class="bi" width="24" height="24"><use xlink:href="#github"/></svg></a></li>
+            <li class="ms-3"><a class="text-body-secondary" href="https://discord.gg/zG2rxXuT2g"><svg class="bi" width="24" height="24"><use xlink:href="#discord"/></svg></a></li>
+            <li class="ms-3"><a class="text-body-secondary" href="https://mastodon.social/@loudfpv"><svg class="bi" width="24" height="24"><use xlink:href="#mastodon"/></svg></a></li>
+            <li class="ms-3"><a class="text-body-secondary" href="https://bsky.app/profile/loudai.nl"><svg class="bi" width="24" height="24"><use xlink:href="#bluesky"/></svg></a></li>
+            <li class="ms-3"><a class="text-body-secondary" href="https://www.youtube.com/user/LouDnl"><svg class="bi" width="24" height="24"><use xlink:href="#youtube"/></svg></a></li>
+            <!-- <li class="ms-3"><a class="text-body-secondary" href="#"><svg class="bi" width="24" height="24"><use xlink:href="#instagram"/></svg></a></li> -->
+            <!-- <li class="ms-3"><a class="text-body-secondary" href="#"><svg class="bi" width="24" height="24"><use xlink:href="#facebook"/></svg></a></li> -->
+            <!-- <li class="ms-3"><a class="text-body-secondary" href="#"><svg class="bi" width="24" height="24"><use xlink:href="#twitter"/></svg></a></li> -->
+          </ul>
+        </footer>
+      </div>
+
+    </main>
+
+    <!-- Bootstrap JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+  </body>
+
+</html>

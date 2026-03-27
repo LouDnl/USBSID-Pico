@@ -31,6 +31,7 @@ Shop link: [https://greyandslate.etsy.com/?search_query=usbsid](https://greyands
   * [Chiptune trackers using SID's](#chiptune-trackers-using-sids)
   * [Driver code](#driver-code)
   * [Midi](#midi)
+  * [Cynthcart VST](#cynthcart-vst)
 * [Questions & Support](#questions-and-support)
 * [Project status](#project-status)
   * [Known issues](#known-issues)
@@ -119,6 +120,11 @@ Want to create your own implementation? You can by using the driver code example
 ## Midi
 USBSID-Pico acts as Midi device and supports basic Midi in ~ note that Midi is still in development and in Beta phase.  
 This means that no support is available here at this time, please visit the Discord for more information.
+
+## Cynthcart VST
+Raros has made a custom VST (Windows only) to use with the Cynthcart embedded firmware version.  
+Checkout the [README.md](examples/Cynthcart-Ninja_VST/README.md) he made for more information!
+
 
 # Questions and Support
 Any questions about or support with USBSID-Pico can be asked 

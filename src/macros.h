@@ -7,8 +7,6 @@
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
- * Source: https://stackoverflow.com/a/25108449
- *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 2.
@@ -32,7 +30,14 @@
 #endif
 
 
-/* --- PRINTF_BYTE_TO_BINARY macro's --- */
+/**
+ * @brief Printf macro's for printing binary
+ * @note printf("0b"PRINTF_BINARY_PATTERN_INT8"\n",
+ *         PRINTF_BYTE_TO_BINARY_INT8(yourvariable))
+ *
+ * @note Sourced from https://stackoverflow.com/a/25108449
+ *
+ */
 #define PRINTF_BINARY_PATTERN_INT8 "%c%c%c%c%c%c%c%c"
 #define PRINTF_BYTE_TO_BINARY_INT8(i) \
   (((i) & 0x80ll) ? '1' : '0'),   \
@@ -43,7 +48,6 @@
     (((i) & 0x04ll) ? '1' : '0'), \
     (((i) & 0x02ll) ? '1' : '0'), \
     (((i) & 0x01ll) ? '1' : '0')
-
 #define PRINTF_BINARY_PATTERN_INT16 \
   PRINTF_BINARY_PATTERN_INT8 PRINTF_BINARY_PATTERN_INT8
 #define PRINTF_BYTE_TO_BINARY_INT16(i) \

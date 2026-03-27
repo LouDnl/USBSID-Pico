@@ -23,17 +23,12 @@
  *
  */
 
+#include <globals.h>
+#include <logging.h>
+#include <config.h>
+#include <pio.h>
+#include <sid.h>
 
-#include "globals.h"
-#include "logging.h"
-#include "config.h"
-#include "pio.h"
-#include "sid.h"
-
-
-/* pio.c */
-extern const PIO bus_pio, clkcnt_pio;
-extern uint sm_control, sm_data, sm_clock, sm_delay, sm_clkcnt;
 
 /* DMA */
 int dma_tx_control = 0, dma_tx_data = 0, dma_rx_data = 0, dma_tx_delay = 0;
@@ -45,12 +40,9 @@ volatile uint32_t cycle_count_word;
 
 /* Shiny things */
 #if defined(PICO_DEFAULT_LED_PIN)
-extern const PIO led_pio;
-extern uint sm_pwmled;
 int dma_pwmled;
 volatile int pwm_value = 0;
 #if defined(USE_RGB)  /* No RGB LED on _w Pico's */
-extern uint sm_rgbled;
 int dma_rgbled;
 volatile uint32_t rgb_value = 0;
 #endif
@@ -60,7 +52,7 @@ volatile uint32_t rgb_value = 0;
 void setup_dmachannels(void)
 { /* NOTE: Do not manually assign DMA channels, this causes a Panic on the PicoW */
   usNFO("\n");
-  usCFG("[DMA CHANNELS INIT] START\n");
+  usCFG("Init DMA Channels\n");
 
   /* NOTICE: DMA read address is disabled for now, it is causing confirmed desync on the rp2040 (rp2350 seems to works, but needs improving) */
   /* NOTICE: DMA chaining on rp2350 causes desync with cycled writes, probably due to RP2350-E8 */
@@ -174,14 +166,13 @@ void setup_dmachannels(void)
   }
 #endif
 #if PICO_RP2350
-  usCFG("[DMA CHANNELS CLAIMED] C:%d TX:%d RX:%d D:%d CNT:%d\n",
+  usCFG("  DMA Channels claimed C:%d TX:%d RX:%d D:%d CNT:%d\n",
     dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay, dma_counter);
 #else
-  usCFG("[DMA CHANNELS CLAIMED] C:%d TX:%d RX:%d D:%d CNTA:%d CNTB:%d\n",
+  usCFG("  DMA Channels claimed C:%d TX:%d RX:%d D:%d CNTA:%d CNTB:%d\n",
     dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay, dma_counter, dma_counter_chain);
 #endif
 
-  usCFG("[DMA CHANNELS INIT] FINISHED\n");
   return;
 }
 
@@ -194,7 +185,7 @@ void setup_vu_dma(void)
     channel_config_set_transfer_data_size(&c_pwmled, DMA_SIZE_32);
     channel_config_set_read_increment(&c_pwmled, false);
     channel_config_set_write_increment(&c_pwmled, false);
-    channel_config_set_dreq(&c_pwmled, DREQ_PIO1_TX0);
+    channel_config_set_dreq(&c_pwmled, /* DREQ_PIO1_TX0 */DREQ_PIO1_TX1);
     dma_channel_configure(dma_pwmled, &c_pwmled, &led_pio->txf[sm_pwmled], &pwm_value, 1, true);
   }
   #if defined(USE_RGB)  /* No RGB LED on _w Pico's */
@@ -204,7 +195,7 @@ void setup_vu_dma(void)
     channel_config_set_transfer_data_size(&c_rgbled, DMA_SIZE_32);
     channel_config_set_read_increment(&c_rgbled, false);
     channel_config_set_write_increment(&c_rgbled, false);
-    channel_config_set_dreq(&c_rgbled, DREQ_PIO1_TX1);
+    channel_config_set_dreq(&c_rgbled, /* DREQ_PIO1_TX1 */DREQ_PIO1_TX2);
     dma_channel_configure(dma_rgbled, &c_rgbled, &led_pio->txf[sm_rgbled], &rgb_value, 1, true);
   }
   #endif

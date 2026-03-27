@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>USBSID-Pico Web Config</title>
+  <link rel="stylesheet" href="c64.css">
+  <!-- <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script> -->
+<!-- ─── Scripts ─────────────────────────────────────────── -->
+<!-- Load player + jsSID from the existing webconfig-tool directory -->
+<script src="jsSID-webusb.js"></script>
+<script src="player.js"></script>
+
+<!-- New driver + config + app (override webusb.writeReg after jsSID-webusb.js loads) -->
+<script src="usbsid-driver.js"></script>
+<script src="usbsid-config.js"></script>
+<script src="usbsid-app.js"></script>
+<script type="text/javascript" src="lib/opl.js"></script>
+<script type="text/javascript" src="opljs-if.js"></script>
+
+<script type="text/javascript" src="websid/player.js"></script>
+<script type="text/javascript" src="websid/usbsid_adapter.js"></script>
+</head>
+<body>
+
+<div id="c64-frame">
+
+  <!-- ╔═ HEADER ═══════════════════════════════════════╗ -->
+  <header id="c64-header">
+    <img src="images/usbsid-logo.png" alt="USBSID-Pico logo"
+         style="height:40px;vertical-align:middle;margin-right:12px;">
+    <h1 class="c64-cursor">USBSID-Pico</h1>
+    <div class="subtitle">Web Configuration &amp; SID Player</div>
+  </header>
+
+  <!-- ╔═ STATUS BAR ════════════════════════════════════╗ -->
+  <div id="c64-status">
+    <span class="status-led" id="status-led"></span>
+    <span class="status-text" id="status-text">Not connected</span>
+    <span class="status-version" id="version-display"></span>
+    <button id="btn-connect" class="c64-btn c64-btn-connect c64-btn-sm" style="margin-left:auto">CONNECT</button>
+  </div>
+
+  <!-- ╔═ TABS ══════════════════════════════════════════╗ -->
+  <div id="c64-tabs">
+    <button class="c64-tab" data-tab="player">&#9654; Player</button>
+    <button class="c64-tab" data-tab="regs">Registers</button>
+    <button class="c64-tab" data-tab="config">Config</button>
+    <button class="c64-tab" data-tab="about">About</button>
+    <button class="c64-tab-link" onclick="window.open('https://github.com/LouDnl/USBSID-Pico','_blank')" title="Open USBSID-Pico GitHub repository">GitHub</button>
+    <button class="c64-tab-link" onclick="window.open('https://github.com/LouDnl/USBSID-Pico/releases','_blank')" title="Open USBSID-Pico releases page">Firmware</button>
+  </div>
+
+  <!-- ╔══════════════════════════════════════════════════╗
+       ║  PANEL: PLAYER                                   ║
+       ╚══════════════════════════════════════════════════╝ -->
+  <div id="panel-player" class="c64-panel">
+
+    <!-- Emulator selector + ASID MIDI -->
+    <div class="c64-box">
+      <div class="c64-box-title">Emulator</div>
+      <div id="emulator-row">
+        <label for="sel-emulator">Mode:</label>
+        <select id="sel-emulator" class="c64-select">
+          <option value="webusb">WebUSB (hardware SID)</option>
+          <option value="sendsid">SendSID (onboard player)</option>
+          <option value="asid">ASID (MIDI sysex)</option>
+          <option value="hermit" selected>Hermit jsSID (software)</option>
+          <option value="websid">WebSID Alpha (Jürgen Wothke)</option>
+        </select>
+        &nbsp;
+        <span id="asid-midi-row" style="display:none">
+          <label for="asid-midi-outputs" style="margin-left:12px">ASID MIDI:</label>
+          <select id="asid-midi-outputs" class="c64-select">
+            <option value="">— no MIDI —</option>
+          </select>
+        </span>
+        <span id="sendsid-socket-row" style="display:none;align-items:center;gap:6px;margin-left:12px">
+          <input type="checkbox" id="chk-sendsid-socket2" style="cursor:pointer;accent-color:var(--c64-cyan)">
+          <label for="chk-sendsid-socket2" style="cursor:pointer;font-size:0.9rem;color:var(--c64-cyan);text-transform:uppercase;user-select:none">Force socket 2</label>
+        </span>
+      </div>
+    </div>
+
+    <!-- File loading -->
+    <div class="c64-box">
+      <div class="c64-box-title">SID File</div>
+      <div id="sid-file-row">
+        <label class="c64-btn c64-btn-sm" style="cursor:pointer">
+          BROWSE
+          <input type="file" id="sid-file-input" accept=".sid,.SID,.mus,.MUS,.prg,.PRG"
+                 style="display:none">
+        </label>
+        <span id="sid-file-name" class="c64-text-cyan" style="font-size:0.95rem;flex:1;min-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          No file loaded
+        </span>
+      </div>
+      <div id="sid-url-row" style="margin-top:6px">
+        <input type="text" id="sid-url-input" class="c64-input"
+               placeholder="e.g. https://csdb.dk/getinternalfile.php/277825/TheRingBearer.sid or https://csdb.dk/release/download.php?id=319737"
+               style="flex:1;min-width:120px">
+        <button id="btn-load-url" class="c64-btn c64-btn-sm" style="margin-left:6px">LOAD URL</button>
+      </div>
+      <div id="sid-meta" class="sid-meta" style="margin-top:4px"></div>
+    </div>
+
+    <!-- SID library list -->
+    <div class="c64-box" id="sid-list-box">
+      <div class="c64-box-title">SID Library
+        <span id="sid-list-count" style="font-size:0.8rem;color:var(--c64-text);margin-left:6px"></span>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <button id="btn-prev-sid" class="c64-btn c64-btn-sm" disabled>&#171; PREV SID</button>
+        <button id="btn-next-sid" class="c64-btn c64-btn-sm" disabled>NEXT SID &#187;</button>
+      </div>
+      <select id="sid-list-select" class="c64-select"
+              style="width:100%;font-size:0.85rem;height:140px" size="6"></select>
+    </div>
+
+    <!-- Transport controls -->
+    <div class="c64-box">
+      <div class="c64-box-title">Transport</div>
+      <div id="player-controls">
+        <div id="player-transport">
+          <button id="btn-prev-tune" class="c64-btn c64-btn-sm" disabled>&#171; PREV</button>
+          <button id="btn-play"      class="c64-btn c64-btn-play" disabled>PLAY</button>
+          <button id="btn-stop"      class="c64-btn c64-btn-stop c64-btn-sm" disabled>STOP</button>
+          <button id="btn-next-tune" class="c64-btn c64-btn-sm" disabled>NEXT &#187;</button>
+        </div>
+        <span class="subtune-info" id="subtune-display">Tune 1/1</span>
+        <div id="volume-row">
+          <label for="volume-slider">VOL:</label>
+          <input type="range" id="volume-slider" class="c64-range"
+                 min="0" max="100" value="100" style="width:100px">
+        </div>
+      </div>
+      <!-- WebUSB-only controls: shown when connected via WebUSB -->
+      <div id="webusb-player-btns" style="display:none;margin-top:6px;flex-wrap:wrap;gap:6px">
+        <button id="btn-player-toggle-audio" class="c64-btn c64-btn-sm">TOGGLE AUDIO</button>
+        <button id="btn-player-hotflip"      class="c64-btn c64-btn-sm">HOTFLIP</button>
+        <button id="btn-player-mute"         class="c64-btn c64-btn-sm">MUTE SID</button>
+        <button id="btn-player-retrieve-numsids" class="c64-btn c64-btn-sm">RETRIEVE # SIDS</button>
+        <label for="sel-player-sid-addr" style="font-size:0.85rem;color:var(--c64-text);align-self:center">Play on SID:</label>
+        <select id="sel-player-sid-addr" class="c64-select" style="min-width:70px" disabled>
+          <option value="0">$00</option>
+        </select>
+      </div>
+      <!-- ASID-only controls: shown when ASID (MIDI sysex) mode is active -->
+      <div id="asid-player-btns" style="display:none;margin-top:6px">
+        <button id="btn-player-sysex-audio" class="c64-btn c64-btn-sm">TOGGLE AUDIO</button>
+      </div>
+      <!-- SendSID controls: shown when SendSID mode + connected to Pico2 firmware -->
+      <div id="sendsid-player-btns" style="display:none;margin-top:6px;align-items:center;gap:6px">
+        <button id="btn-player-sendsid-toggle-audio" class="c64-btn c64-btn-sm">TOGGLE AUDIO</button>
+        <button id="btn-upload-sid" class="c64-btn c64-btn-sm">UPLOAD TO DEVICE</button>
+        <span id="sid-upload-status" style="font-size:0.85rem;color:var(--c64-cyan)"></span>
+      </div>
+    </div>
+
+    <!-- Log output -->
+    <div class="c64-box">
+      <div class="c64-box-title">Log</div>
+      <div id="player-log" class="c64-debug-log"></div>
+    </div>
+
+  </div><!-- /panel-player -->
+
+
+  <!-- ╔══════════════════════════════════════════════════╗
+       ║  PANEL: SID REGISTERS                            ║
+       ╚══════════════════════════════════════════════════╝ -->
+  <div id="panel-regs" class="c64-panel">
+    <div class="c64-box">
+      <div class="c64-box-title">SID Registers (live)</div>
+      <div id="sid-regs-container"></div>
+    </div>
+  </div><!-- /panel-regs -->
+
+
+  <!-- ╔══════════════════════════════════════════════════╗
+       ║  PANEL: CONFIGURATION                            ║
+       ╚══════════════════════════════════════════════════╝ -->
+  <div id="panel-config" class="c64-panel">
+
+    <!-- First-open hint (cleared once config is loaded) -->
+    <div id="config-status" style="font-size:0.9rem;color:var(--c64-cyan);margin-bottom:4px;padding:2px 4px">
+      Click &ldquo;RETRIEVE CONFIG&rdquo; to load the current device configuration.
+    </div>
+
+    <!-- Action buttons row -->
+    <div class="c64-box">
+      <div class="c64-box-title">Actions</div>
+      <div class="preset-row">
+        <button id="btn-retrieve-config" class="c64-btn" title="Click to retrieve the configuration from the board">RETRIEVE CONFIG</button>
+        <button id="btn-apply-config"    class="c64-btn" title="Apply the configuration set below to the board (doesn&#39;t save and is gone after rebooting the board)">APPLY CFG</button>
+        <button id="btn-save-config"     class="c64-btn" title="Save the configuration below to flash and apply it directly afterwards to the board">SAVE (no reboot)</button>
+        <button id="btn-save-reboot"     class="c64-btn c64-btn-warn"   title="Save the configuration below to flash and reboot the board (requires a reconnect)">SAVE + REBOOT</button>
+        <button id="btn-reset-config"    class="c64-btn c64-btn-danger" title="Reset the board&#39;s configuration to default settings (also reboots the board so will require a reconnect)">RESET DEFAULTS</button>
+        <button id="btn-reload-config"   class="c64-btn" title="Reload and apply the board configuration from flash">RELOAD FLASH</button>
+      </div>
+     </div>
+
+    <!-- Retry notice (always visible) -->
+    <div style="font-size:0.85rem;color:var(--c64-cyan);background:rgba(0,180,255,0.05);border:1px solid var(--c64-cyan);border-radius:3px;padding:5px 8px;margin-bottom:4px">
+      &#8505; If the config is not loaded after clicking &ldquo;RETRIEVE CONFIG&rdquo;, try clicking again &mdash; but do not repeat-click too fast.
+    </div>
+
+    <!-- SID preset layouts -->
+    <div class="c64-box">
+      <div class="c64-box-title">SID Presets</div>
+      <div class="preset-row">
+        <span class="preset-label">Layout:</span>
+        <button id="btn-preset-single"   class="c64-btn c64-btn-sm">SINGLE</button>
+        <button id="btn-preset-dual"     class="c64-btn c64-btn-sm">DUAL</button>
+        <button id="btn-preset-mirrored" class="c64-btn c64-btn-sm">MIRRORED</button>
+        <button id="btn-preset-triple"   class="c64-btn c64-btn-sm">TRIPLE (S1)</button>
+        <button id="btn-preset-triple2"  class="c64-btn c64-btn-sm">TRIPLE (S2)</button>
+        <button id="btn-preset-quad"     class="c64-btn c64-btn-sm">QUAD</button>
+        <button id="btn-preset-dual1"    class="c64-btn c64-btn-sm">DUAL-S1</button>
+        <button id="btn-preset-dual2"    class="c64-btn c64-btn-sm">DUAL-S2</button>
+        <button id="btn-preset-dualflip" class="c64-btn c64-btn-sm">DUAL-FLIP</button>
+        <button id="btn-preset-quadflip" class="c64-btn c64-btn-sm">QUAD-FLIP</button>
+        <button id="btn-preset-quadmix"  class="c64-btn c64-btn-sm">QUAD-MIX</button>
+        <button id="btn-preset-quadflipmix" class="c64-btn c64-btn-sm">QUAD-FLIP+MIX</button>
+      </div>
+    </div>
+
+    <!-- Save notice (always visible) -->
+    <div style="font-size:0.85rem;color:var(--c64-yellow);background:rgba(255,200,0,0.07);border:1px solid var(--c64-yellow);border-radius:3px;padding:5px 8px;margin-bottom:6px">
+      &#9888; Presets are automatically applied but not saved to flash. To save click <strong>SAVE (no reboot)</strong> or <strong>SAVE + REBOOT</strong>.
+    </div>
+    <!-- Save notice (always visible) -->
+    <div style="font-size:0.85rem;color:var(--c64-orange);background:rgba(255,200,0,0.07);border:1px solid var(--c64-orange);border-radius:3px;padding:5px 8px;margin-bottom:6px">
+      &#9888; Any configuration change done below must be applied (You can do multiple changes first): click <strong>SAVE (NO REBOOT)</strong>, <strong>SAVE + REBOOT</strong> or <strong>APPLY CFG</strong>.
+    </div>
+
+    <!-- Audio output (PCB v1.3+ only — shown after device connect) -->
+    <div id="box-audio" class="c64-box c64-hidden">
+      <div class="c64-box-title">Audio Output</div>
+      <div class="preset-row" style="align-items:center;gap:12px">
+        <div class="config-row" style="margin:0">
+          <label>Output</label>
+          <select id="sel-auswitch" class="c64-select"></select>
+        </div>
+        <div class="config-row" style="margin:0">
+          <label>Lock</label>
+          <select id="sel-lock-audiosw" class="c64-select"></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="c64-cols">
+
+      <!-- LEFT COLUMN -->
+      <div>
+
+        <!-- Clock section -->
+        <div class="c64-box">
+          <div class="c64-box-title">Clock</div>
+
+          <div class="config-row">
+            <label>Clock Rate</label>
+            <select id="sel-clockrate" class="c64-select"></select>
+            <span id="cfg-clockhz" class="config-value-display"></span>
+          </div>
+          <div class="config-row">
+            <label>Lock Clock</label>
+            <select id="sel-clocklock" class="c64-select"></select>
+          </div>
+        </div>
+
+        <!-- LED section -->
+        <div class="c64-box">
+          <div class="c64-box-title">Onboard LED</div>
+          <div class="config-row">
+            <label>LED Enabled</label>
+            <select id="sel-led-en" class="c64-select"></select>
+          </div>
+          <div class="config-row">
+            <label>LED Breathing</label>
+            <select id="sel-led-breathe" class="c64-select"></select>
+          </div>
+        </div>
+
+        <!-- RGB LED section -->
+        <div class="c64-box">
+          <div class="c64-box-title">RGB LED</div>
+          <div class="config-row">
+            <label>RGB Enabled</label>
+            <select id="sel-rgbled-en" class="c64-select"></select>
+          </div>
+          <div class="config-row">
+            <label>RGB Breathing</label>
+            <select id="sel-rgbled-breathe" class="c64-select"></select>
+          </div>
+          <div class="config-row">
+            <label>Brightness</label>
+            <select id="sel-rgbled-bright" class="c64-select" style="min-width:80px"></select>
+          </div>
+          <div class="config-row">
+            <label>SID to use</label>
+            <select id="sel-rgbled-sidno" class="c64-select"></select>
+          </div>
+        </div>
+
+        <!-- Protocols section -->
+        <div class="c64-box">
+          <div class="c64-box-title">Protocols</div>
+          <div class="config-row">
+            <label>ASID</label>
+            <select id="sel-asid-en" class="c64-select"></select>
+          </div>
+          <div class="config-row">
+            <label>MIDI</label>
+            <select id="sel-midi-en" class="c64-select"></select>
+          </div>
+        </div>
+
+        <!-- FMOpl -->
+        <div class="c64-box">
+          <div class="c64-box-title">FMOpl</div>
+          <div class="config-row">
+            <label>FMOpl Enabled</label>
+            <select id="sel-fmopl-en" class="c64-select"></select>
+          </div>
+          <div class="config-row">
+            <label>FMOpl SID #</label>
+            <select id="sel-fmopl-sidno" class="c64-select"></select>
+          </div>
+        </div>
+
+        <!-- SID routing flags -->
+        <div class="c64-box">
+          <div class="c64-box-title">SID Routing</div>
+          <div class="config-row">
+            <label>Flipped</label>
+            <select id="sel-flipped" class="c64-select"></select>
+          </div>
+          <div class="config-row">
+            <label>Mixed</label>
+            <select id="sel-mixed" class="c64-select"></select>
+          </div>
+        </div>
+
+      </div><!-- /left col -->
+
+      <!-- RIGHT COLUMN -->
+      <div>
+
+        <!-- Socket One -->
+        <div class="c64-box">
+          <div class="c64-box-title">Socket 1</div>
+          <div class="config-row">
+            <label>Enabled</label>
+            <select id="sel-one-en" class="c64-select"></select>
+          </div>
+          <div class="config-row">
+            <label>Dual SID</label>
+            <select id="sel-one-dual" class="c64-select"></select>
+          </div>
+          <div class="config-row">
+            <label>Chip Type</label>
+            <select id="sel-one-chip" class="c64-select"></select>
+          </div>
+          <div class="config-row">
+            <label>SID 1 Type</label>
+            <select id="sel-one-sid1" class="c64-select"></select>
+          </div>
+          <div class="config-row">
+            <label>SID 2 Type</label>
+            <select id="sel-one-sid2" class="c64-select"></select>
+          </div>
+        </div>
+
+        <!-- Socket Two -->
+        <div class="c64-box">
+          <div class="c64-box-title">Socket 2</div>
+          <div class="config-row">
+            <label>Enabled</label>
+            <select id="sel-two-en" class="c64-select"></select>
+          </div>
+          <div class="config-row">
+            <label>Dual SID</label>
+            <select id="sel-two-dual" class="c64-select"></select>
+          </div>
+          <div class="config-row">
+            <label>Chip Type</label>
+            <select id="sel-two-chip" class="c64-select"></select>
+          </div>
+          <div class="config-row">
+            <label>SID 1 Type</label>
+            <select id="sel-two-sid1" class="c64-select"></select>
+          </div>
+          <div class="config-row">
+            <label>SID 2 Type</label>
+            <select id="sel-two-sid2" class="c64-select"></select>
+          </div>
+          <div class="config-row">
+            <label>Mirrored</label>
+            <select id="sel-two-mirrored" class="c64-select"></select>
+          </div>
+        </div>
+
+      </div><!-- /right col -->
+    </div><!-- /c64-cols -->
+
+    <!-- Detection panel -->
+    <div class="c64-box">
+      <div class="c64-box-title">Detection</div>
+      <div class="preset-row">
+        <button id="btn-debug-auto-detect"   class="c64-btn c64-btn-sm"
+                title="Run chip and SID autodetection routine. Saves and applies the detected items afterwards. Reload the config with the button at the top of the page.">START AUTO DETECT</button>
+        <button id="btn-debug-detect-sids"   class="c64-btn c64-btn-sm"
+                title="Detect present SID types. Does not change config or return anything. Logging is on the board uart console.">DETECT SIDS</button>
+        <button id="btn-debug-detect-clones" class="c64-btn c64-btn-sm"
+                title="Detect present clone chips. Does not change config or return anything. Logging is on the board uart console.">DETECT CLONES</button>
+      </div>
+    </div>
+
+    <!-- SID Tests panel -->
+    <div class="c64-box">
+      <div class="c64-box-title">SID Tests</div>
+      <div class="preset-row">
+        <button id="btn-debug-test-all"   class="c64-btn c64-btn-sm">TEST ALL</button>
+        <button id="btn-debug-test-sid1"  class="c64-btn c64-btn-sm">TEST SID1</button>
+        <button id="btn-debug-test-sid2"  class="c64-btn c64-btn-sm">TEST SID2</button>
+        <button id="btn-debug-test-sid3"  class="c64-btn c64-btn-sm">TEST SID3</button>
+        <button id="btn-debug-test-sid4"  class="c64-btn c64-btn-sm">TEST SID4</button>
+        <button id="btn-debug-stop-tests-sid" class="c64-btn c64-btn-sm c64-btn-warn">STOP TESTS</button>
+      </div>
+    </div>
+
+    <!-- Config raw hex (debug) -->
+    <div class="c64-box">
+      <div class="c64-box-title">Raw Config (hex)</div>
+      <div id="cfg-raw-hex" style="font-size:0.75rem;color:var(--c64-cyan);white-space:pre;line-height:1.4">
+        —
+      </div>
+    </div>
+
+    <!-- Debug panel -->
+    <div id="debug-panel" class="c64-box">
+      <div class="c64-box-title">Debug</div>
+      <div class="preset-row" style="margin-bottom:6px">
+        <button id="btn-debug-restart-bus"   class="c64-btn c64-btn-sm">RESTART BUS</button>
+        <button id="btn-debug-restart-clk"   class="c64-btn c64-btn-sm">RESTART CLK</button>
+        <button id="btn-debug-sync-pios"     class="c64-btn c64-btn-sm">SYNC PIOS</button>
+      </div>
+      <div class="preset-row">
+        <button id="btn-debug-reset-sids"  class="c64-btn c64-btn-sm c64-btn-warn">RESET SIDS</button>
+        <button id="btn-debug-reset-mcu"   class="c64-btn c64-btn-sm c64-btn-danger">RESET MCU</button>
+        <button id="btn-debug-bootloader"  class="c64-btn c64-btn-sm c64-btn-danger">BOOTLOADER</button>
+      </div>
+      <hr class="c64-hr" style="margin-top:8px">
+      <div class="c64-box-title" style="margin-top:6px">Log</div>
+      <div id="debug-log" class="c64-debug-log"></div>
+    </div>
+
+  </div><!-- /panel-config -->
+
+
+  <!-- ╔══════════════════════════════════════════════════╗
+       ║  PANEL: ABOUT                                    ║
+       ╚══════════════════════════════════════════════════╝ -->
+  <div id="panel-about" class="c64-panel">
+    <div class="c64-box">
+      <div class="c64-box-title">About USBSID-Pico</div>
+      <p style="margin-bottom:8px;line-height:1.6;color:var(--c64-text)">
+        USBSID-Pico is a Raspberry Pi Pico / Pico 2 based board for interfacing
+        one or two MOS SID chips and/or hardware SID emulators (ARMSID, SKPico,
+        FPGASID, SwinSID) over USB / WebUSB with your computer.
+      </p>
+      <p style="line-height:1.6;color:var(--c64-text)">
+        This web configuration tool lets you configure the device and play SID
+        files directly from your browser without installing any software.
+      </p>
+      <hr class="c64-hr">
+      <p style="color:var(--c64-text);font-size:0.9rem">
+        Firmware &amp; web config: <span class="c64-text-cyan">LouD</span><br>
+        jsSID player: <span class="c64-text-cyan">Hermit / Mihaly Horvath</span><br>
+        WebUSB modifications: <span class="c64-text-cyan">LouD</span><br>
+        DeepSID modifications: <span class="c64-text-cyan">JCH &amp; Thomas Jansson</span><br>
+        WebSID: <span class="c64-text-cyan">Jürgen Wothke</span><br>
+        License: GPLv2
+      </p>
+      <hr class="c64-hr">
+      <p style="color:var(--c64-text);font-size:0.9rem">
+        <strong class="c64-text-yellow">Keyboard shortcuts (in player tab):</strong><br>
+        Space — Play / Pause &nbsp;|&nbsp;
+        S — Stop &nbsp;|&nbsp;
+        ← → — Prev / Next subtune
+      </p>
+    </div>
+
+    <div class="c64-box">
+      <div class="c64-box-title">PCB Revision</div>
+      <p style="color:var(--c64-text);font-size:0.9rem;line-height:1.6">
+        PCB v1.0 / v1.2: Standard board — no audio switch.<br>
+        PCB v1.3+: Audio switch (mono ↔ stereo) support.<br>
+        The audio switch row in Config is only shown for v1.3+ boards.
+      </p>
+    </div>
+  </div><!-- /panel-about -->
+
+
+  <!-- ╔═ FOOTER ════════════════════════════════════════╗ -->
+  <footer id="c64-footer">
+    USBSID-Pico &mdash; <a href="https://github.com/LouDnl/USBSID-Pico" target="_blank">GitHub</a>
+    &nbsp;&mdash;&nbsp; GPLv2
+  </footer>
+
+</div><!-- /#c64-frame -->
+
+<!-- Dummy element required by jsSID-webusb.js (it looks up #device-connect and #status-text) -->
+<span id="device-connect" style="display:none"></span>
+
+<!-- ─── Scripts ─────────────────────────────────────────── -->
+<!-- Load player + jsSID from the existing webconfig-tool directory -->
+<!-- <script src="jsSID-webusb.js"></script> -->
+<!-- <script src="player.js"></script> -->
+<!-- <script type="text/javascript" src="lib/opl.js"></script> -->
+<!-- <script type="text/javascript" src="opljs-if.js"></script> -->
+
+<!-- New driver + config + app (override webusb.writeReg after jsSID-webusb.js loads) -->
+<!-- <script src="usbsid-driver.js"></script> -->
+<!-- <script src="usbsid-config.js"></script> -->
+<!-- <script src="usbsid-app.js"></script> -->
+
+<script>
+/* ── Keyboard shortcuts ──────────────────────────────── */
+document.addEventListener('keydown', (e) => {
+  /* Only active when not typing in an input */
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  switch (e.key) {
+    case ' ':
+      e.preventDefault();
+      document.getElementById('btn-play')?.click();
+      break;
+    case 's': case 'S':
+      document.getElementById('btn-stop')?.click();
+      break;
+    case 'ArrowLeft':
+      document.getElementById('btn-prev-tune')?.click();
+      break;
+    case 'ArrowRight':
+      document.getElementById('btn-next-tune')?.click();
+      break;
+  }
+});
+
+/* ── Instant tooltips ────────────────────────────────
+ * Replace native title tooltips (delayed by ~1s in all browsers) with a
+ * custom div that appears immediately on mouseenter.
+ * Runs after all static HTML is parsed; dynamically-added elements can call
+ * initTooltip(el) individually if needed.
+ * ─────────────────────────────────────────────────── */
+(function () {
+  const tip = document.createElement('div');
+  tip.id = 'c64-tooltip';
+  tip.style.cssText = [
+    'position:fixed',
+    'z-index:9999',
+    'pointer-events:none',
+    'display:none',
+    'background:var(--c64-inset)',
+    'border:1px solid var(--c64-border)',
+    'color:var(--c64-text)',
+    'font-size:0.8rem',
+    'padding:4px 10px',
+    'border-radius:3px',
+    'max-width:320px',
+    'line-height:1.5',
+    'white-space:normal',
+    'box-shadow:0 2px 8px rgba(0,0,0,0.5)',
+  ].join(';');
+  document.body.appendChild(tip);
+
+  function position(e) {
+    const x = e.clientX + 14;
+    const y = e.clientY + 18;
+    /* Keep within viewport */
+    const right  = x + tip.offsetWidth;
+    const bottom = y + tip.offsetHeight;
+    tip.style.left = (right  > window.innerWidth  ? e.clientX - tip.offsetWidth  - 8 : x) + 'px';
+    tip.style.top  = (bottom > window.innerHeight ? e.clientY - tip.offsetHeight - 8 : y) + 'px';
+  }
+
+  function attach(el) {
+    const text = el.getAttribute('title');
+    if (!text) return;
+    el.removeAttribute('title');
+    el.dataset.tooltip = text;
+    el.addEventListener('mouseenter', e => {
+      tip.textContent = text;
+      tip.style.display = 'block';
+      position(e);
+    });
+    el.addEventListener('mousemove', position);
+    el.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+  }
+
+  document.querySelectorAll('[title]').forEach(attach);
+}());
+</script>
+
+</body>
+</html>

@@ -44,7 +44,7 @@ set pins, 2  ; Drive pin low,  binary 0 <--- 250 ns ;total 500 ns period
 
 
 %c-sdk{
-  /* Program to initialize the PIO */
+  /* Program to initialise the PIO */
   static inline void clock_program_init(PIO pio, uint sm, uint offset, uint pin, float clk_div) {
     pio_sm_config c = clock_program_get_default_config(offset); /* Get default configurations for the PIO state machine */
     sm_config_set_set_pins(&c, pin, 1);                         /* Set the state machine configurations on the given pin */

@@ -31,23 +31,8 @@
   extern "C" {
 #endif
 
-
-/* Default includes */
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-/* Pico libs */
-#include "pico/flash.h"
-#include "pico/stdlib.h"
-
-/* Hardware api's */
-#include "hardware/clocks.h"
-#include "hardware/flash.h"
-#include "hardware/sync.h"
-
-/* Required for default config */
-#include "sid.h"
+/* Project includes required for this header */
+#include <usbsid_constants.h>
 
 
 #ifdef PICO_DEFAULT_LED_PIN
@@ -116,8 +101,7 @@ typedef struct SIDChip {
 } SIDChip;
 
 typedef struct Socket {
-  uint8_t chiptype;     /* 0 = real, 1 = clone, 2 = unknown */
-  uint8_t clonetype;    /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
+  uint8_t chiptype;     /* 0 = real, 1 = unknown, 2...etc see config_logging.c */
   SIDChip sid1;
   SIDChip sid2;
   bool    enabled : 1;  /* enable / disable this socket */
@@ -130,11 +114,12 @@ typedef struct Config {
   int default_config;
   uint8_t config_saveid;
   /* Don't care from here */
-  uint32_t clock_rate;         /* clock speed identifier */
-  uint16_t refresh_rate;       /* refresh rate identifier based on clockspeed ~ not configurable */
-  uint16_t raster_rate;        /* raster rate identifier based on clockspeed ~ not configurable */
-  Socket   socketOne;          /* 1 */
-  Socket   socketTwo;          /* 2 */
+  uint32_t clock_rate;          /* clock speed identifier */
+  uint16_t refresh_rate;        /* refresh rate identifier based on clockspeed ~ not configurable */
+  uint16_t raster_rate;         /* raster rate identifier based on clockspeed ~ not configurable */
+  uint8_t  last_preset;         /* last applied preset */
+  Socket   socketOne;           /* 1 */
+  Socket   socketTwo;           /* 2 */
   struct {
     bool enabled : 1;
     bool idle_breathe : 1;
@@ -146,13 +131,14 @@ typedef struct Config {
     bool    idle_breathe : 1;
   } RGBLED;                     /* 4 */
   struct {
-    bool enabled : 1;
+    bool enabled : 1;           /* Cannot be disabled */
   } Cdc;                        /* 5 */
   struct {
-    bool enabled : 1;
+    bool enabled : 1;           /* Cannot be disabled */
   } WebUSB;                     /* 6 */
   struct {
     bool enabled : 1;
+    /* bool buffered : 1; */          /* Enable/Disable ASID buffering by default (protocal can enable this) */
   } Asid;                       /* 7 */
   struct {
     bool enabled : 1;
@@ -166,6 +152,8 @@ typedef struct Config {
   bool stereo_en : 1;           /* audio switch is off (mono) or on (stereo) ~ (PCB v1.3+ only) */
   bool lock_audio_sw : 1;       /* lock the audio switch into it's current stateand prevent it from being changed ~ (PCB v1.3+ only) */
   bool mirrored : 1;            /* act as socket 1 */
+  bool flipped : 1;             /* socket 1 is socket 2 and vice versa */
+  bool mixed : 1;               /* addresses are mixed up (quad SID only!) */
 } Config;
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
@@ -175,34 +163,33 @@ typedef struct Config {
   .clock_rate = DEFAULT, \
   .refresh_rate = HZ_DEFAULT, \
   .raster_rate = R_DEFAULT, \
+  .last_preset = 2, /* PRESET_DUAL_BOTH */ \
   .socketOne = { \
-    .chiptype = 0x0,  /* real */ \
-    .clonetype = 0x0, /* disabled */ \
+    .chiptype = 1,  /* unknown */ \
     .sid1 = { \
       .id = 0, \
       .addr = 0x00, \
       .type = 0,  /* unknown */ \
     }, \
     .sid2 = { \
-      .id = -1, \
+      .id = 0xFF, \
       .addr = 0xFF, \
-      .type = 0,  /* n/a */ \
+      .type = 1,  /* n/a */ \
     }, \
     .enabled = true, \
     .dualsid = false, \
   }, \
   .socketTwo = { \
-    .chiptype = 0x0,  /* real */ \
-    .clonetype = 0x0, /* disabled */ \
+    .chiptype = 1,  /* unknown */ \
     .sid1 = { \
       .id = 1, \
       .addr = 0x20, \
       .type = 0,  /* unknown */ \
     }, \
     .sid2 = { \
-      .id = -1, \
+      .id = 0xFF, \
       .addr = 0xFF, \
-      .type = 0,  /* n/a */ \
+      .type = 1,  /* n/a */ \
     }, \
     .enabled = true, \
     .dualsid = false, \
@@ -224,7 +211,8 @@ typedef struct Config {
     .enabled = true \
   }, \
   .Asid = { \
-    .enabled = true \
+    .enabled = true, \
+    /* .buffered = false */ \
   }, \
   .Midi = { \
     .enabled = true \
@@ -238,9 +226,9 @@ typedef struct Config {
   .stereo_en = false, \
   .lock_audio_sw = false, \
   .mirrored = false, \
+  .flipped = false, \
+  .mixed = false, \
 } \
-
-static const Config usbsid_default_config = USBSID_DEFAULT_CONFIG_INIT;
 
 typedef struct RuntimeCFG {
 
@@ -273,7 +261,7 @@ typedef struct RuntimeCFG {
   /* contains the physical sid order */
   uint8_t sidid[4];    /* config_bus.c:apply_bus_config() */
   /* contains the sid address in configured sid order */
-  uint8_t sidaddr[4];  /* config_bus.c:apply_bus_config() */ // NOTE: UNUSED, FOR FUTURE USE
+  uint8_t sidaddr[4];  /* config_bus.c:apply_bus_config() -> used in Midi handler! */
   /* contains the sid address masks */
   uint8_t sidmask[4];  /* config_bus.c:apply_bus_config() */
   uint8_t addrmask[4]; /* config_bus.c:apply_bus_config() */
@@ -284,6 +272,8 @@ typedef struct RuntimeCFG {
   bool sock_one_dual : 1;  /* config_socket.c:apply_socket_config() */
   bool sock_two_dual : 1;  /* config_socket.c:apply_socket_config() */
   bool mirrored : 1;       /* config_socket.c:apply_socket_config() */
+  bool flipped : 1;        /* config_socket.c:apply_socket_config() */
+  bool mixed : 1;          /* config_socket.c:apply_socket_config() */
   bool fmopl_enabled : 1;  /* config_socket.c:apply_fmopl_config() */
 
 } RuntimeCFG;
@@ -313,7 +303,11 @@ enum
   MIRRORED_SID     = 0x45,  /* Socket Two is linked to Socket One */
   DUAL_SOCKET1     = 0x46,  /* Two SID's in socket One, Socket Two disabled */
   DUAL_SOCKET2     = 0x47,  /* Two SID's in socket Two, Socket One disabled */
-  FLIP_SOCKETS     = 0x48,  /* Socket Two is Socket One and vice versa */
+  DUAL_FLIPPED     = 0x48,  /* Two SID's in 2 sockets, sockets flipped */
+  QUAD_FLIPPED     = 0x49,  /* Four SID's in 2 sockets, sockets flipped */
+  QUAD_MIXED       = 0x4A,  /* Four SID's in 2 sockets, mixed addresses */
+  QUAD_FLIPMIX     = 0x4B,  /* Four SID's in 2 sockets, sockets flipped and addresses flipped */
+  HOTFLIP_SOCKETS  = 0x4F,  /* Socket Two is Socket One and vice versa */
 
   SET_CLOCK        = 0x50,  /* Change SID clock frequency by array id */
   DETECT_SIDS      = 0x51,  /* Try to detect the SID types per socket ~ routines see sid_detection.c */
@@ -345,7 +339,6 @@ enum
 
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
   TEST_FN2         = 0x9A,  /* TODO: Remove before v1 release */
-  TEST_FN3         = 0x9B,  /* TODO: Remove before v1 release */
 
   /* Hardware SID clone configuration related */
   FPGASID          = 0xA0,  /* Config initiator byte for FPGASID */
@@ -361,12 +354,13 @@ enum
   UPLOAD_SID_SIZE  = 0xD3,  /* Packet containing the actual file size */
 
   /* Internal SID player */
-  SID_PLAYER_TUNE  = 0xE0,  /* Load SID file into SID player memory and initialize internal SID player */
+  SID_PLAYER_TUNE  = 0xE0,  /* Load SID file into SID player memory and initialise internal SID player */
   SID_PLAYER_START = 0xE1,  /* Start SID file play */
   SID_PLAYER_STOP  = 0xE2,  /* Stop SID file play */
   SID_PLAYER_PAUSE = 0xE3,  /* Pause/Unpause SID file play */
   SID_PLAYER_NEXT  = 0xE4,  /* Next SID subtune play */
   SID_PLAYER_PREV  = 0xE5,  /* Previous SID subtune play */
+  SID_PLAYER_TWO   = 0xE6,  /* Force play to play on socket two or sid two */
 
   /* Filetypes we can receive and process */
   SID_FILE         = 0x01,
@@ -381,6 +375,30 @@ enum {
   MIDI_CONFIG   = 0x20,
   MIDI_CCVALUES = 0x30,
 };
+
+/* Global variables from config.c */
+extern Config      usbsid_config;
+extern RuntimeCFG  cfg;
+extern ConfigError err;
+extern volatile bool first_boot;
+extern const char *us_product;
+extern const char *project_version;
+extern const char *pcb_version;
+
+/* Functions from config.c */
+void        load_config(Config *config);
+void        save_config_ext(void);
+void        handle_config_request(uint8_t *buffer, uint32_t size);
+void        print_config(void);
+ConfigError apply_new_presetconfig(void);
+ConfigError apply_config(bool at_boot);
+void        detect_default_config(void);
+int         return_clockrate(void);
+void        apply_clockrate(int n_clock, bool suspend_sids);
+void        save_load_config(void);
+void        save_load_apply_config(bool at_boot);
+void        verify_clockrate(void);
+
 
 #ifdef __cplusplus
   }

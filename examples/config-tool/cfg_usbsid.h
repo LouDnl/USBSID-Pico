@@ -23,6 +23,15 @@
  *
  */
 
+#ifndef _CFG_USBSID_H_
+#define _CFG_USBSID_H_
+#pragma once
+
+#ifdef __cplusplus
+  extern "C" {
+#endif
+
+
 /* Macros */
 #ifndef count_of
 #define count_of(a) (sizeof(a)/sizeof((a)[0]))
@@ -49,6 +58,7 @@ enum
   COMMAND      =   3,   /*       0b11 ~ 0xC0 */
   /* Lower 6 bits for byte count */
   /* Lower 6 bits for Commands */
+  CYCLED_READ  =   4,   /*      0b100 ~ 0x04 */
   PAUSE        =  10,   /*     0b1010 ~ 0x0A */
   UNPAUSE      =  11,   /*     0b1011 ~ 0x0B */
   MUTE         =  12,   /*     0b1100 ~ 0x0C */
@@ -61,6 +71,7 @@ enum
   RESET_MCU    =  19,   /*    0b10011 ~ 0x13 */
   BOOTLOADER   =  20,   /*    0b10100 ~ 0x14 */
 };
+
 enum
 {
   RESET_USBSID     = 0x20,  /* Resets the MCU including the USB connection */
@@ -75,7 +86,7 @@ enum
   READ_SOCKETCFG   = 0x37,  /* Read socket config as bytes */
   RELOAD_CONFIG    = 0x38,  /* Reload and apply stored config from flash */
   READ_NUMSIDS     = 0x39,  /* Returns the number of SIDs in byte 0 */
-  READ_FMOPLSID    = 0x3A,  /* Returns the sidno for FMOpl 1~4, 0 is disable  */
+  READ_FMOPLSID    = 0x3A,  /* Returns the sidno for FMOpl 1~4, 0 is disable */
 
   SINGLE_SID       = 0x40,  /* Single SID Socket One */
   DUAL_SID         = 0x41,  /* Dual SID Socket One */
@@ -85,10 +96,14 @@ enum
   MIRRORED_SID     = 0x45,  /* Socket Two is linked to Socket One */
   DUAL_SOCKET1     = 0x46,  /* Two SID's in socket One, Socket Two disabled */
   DUAL_SOCKET2     = 0x47,  /* Two SID's in socket Two, Socket One disabled */
-  FLIP_SOCKETS     = 0x48,  /* Socket Two is Socket One and vice versa */
+  DUAL_FLIPPED     = 0x48,  /* Two SID's in 2 sockets, sockets flipped */
+  QUAD_FLIPPED     = 0x49,  /* Four SID's in 2 sockets, sockets flipped */
+  QUAD_MIXED       = 0x4A,  /* Four SID's in 2 sockets, mixed addresses */
+  QUAD_FLIPMIX     = 0x4B,  /* Four SID's in 2 sockets, sockets flipped and addresses flipped */
+  HOTFLIP_SOCKETS  = 0x4F,  /* Socket Two is Socket One and vice versa */
 
   SET_CLOCK        = 0x50,  /* Change SID clock frequency by array id */
-  DETECT_SIDS      = 0x51,  /* Try to detect the SID types per socket */
+  DETECT_SIDS      = 0x51,  /* Try to detect the SID types per socket ~ routines see sid_detection.c */
   TEST_ALLSIDS     = 0x52,  /* Runs a very long test on all SID's */
   TEST_SID1        = 0x53,  /* Runs a very long test on SID 1 */
   TEST_SID2        = 0x54,  /* Runs a very long test on SID 2 */
@@ -110,9 +125,23 @@ enum
   RESTART_BUS      = 0x85,  /* Restart DMA & PIO */
   RESTART_BUS_CLK  = 0x86,  /* Restart PIO clocks */
   SYNC_PIOS        = 0x87,  /* Sync PIO clocks */
-  TOGGLE_AUDIO     = 0x88,  /* Toggle mono <-> stereo (v1.2+ boards only) */
-  SET_AUDIO        = 0x89,  /* Set mono <-> stereo (v1.2+ boards only) */
+  TOGGLE_AUDIO     = 0x88,  /* Toggle mono <-> stereo (v1.3+ boards only) */
+  SET_AUDIO        = 0x89,  /* Set mono <-> stereo (v1.3+ boards only) */
   LOCK_AUDIO       = 0x90,  /* Locks the audio switch into it's current state (v1.3+ boards only) */
+  GET_AUDIO        = 0x91,  /* Get current audio switch setting */
+
+  /* Hardware SID clone configuration related */
+  FPGASID          = 0xA0,  /* Config initiator byte for FPGASID */
+  SKPICO           = 0xA1,  /* Config initiator byte for SIDKICK-pico */
+  ARMSID           = 0xA2,  /* Config initiator byte for ARMSID */
+  PDSID            = 0xA3,  /* Holds the reset line for 5 seconds to change SID type on a PDSID */
+};
+
+/* Config constants */
+enum {
+  FLASH_PAGE_SIZE    = 256,
+  MAX_BUFFER_SIZE    = 64,
+  SOCKET_BUFFER_SIZE = 12,
 };
 
 /* Clock cycles per second
@@ -147,108 +176,122 @@ enum config_clockrates
 uint8_t read_data[1];
 uint8_t read_data_max[64];
 uint8_t read_data_uber[128];
-uint8_t read_buffer[3]    = { (READ << 6), 0x0, 0x0 };
-uint8_t write_buffer[3]   = { (WRITE << 6), 0x0, 0x0 };
-uint8_t command_buffer[3] = { (COMMAND << 6), 0x0, 0x0 };
-uint8_t config_buffer[6]  = { ((COMMAND << 6) | 18), 0x0, 0x0, 0x0, 0x0, 0x0 };
+uint8_t read_buffer[3]     = { (uint8_t)(READ << 6), 0x0, 0x0 };
+uint8_t write_buffer[3]    = { (uint8_t)(WRITE << 6), 0x0, 0x0 };
+uint8_t command_buffer[3]  = { (uint8_t)(COMMAND << 6), 0x0, 0x0 };
+uint8_t config_buffer[6]   = { (uint8_t)((COMMAND << 6) | 18), 0x0, 0x0, 0x0, 0x0, 0x0 };
 
-const char * error_type[] = {"ERROR"};
-const char * enabled[] = {"Disabled", "Enabled"};
-const char * intext[] = { "Internal", "External" };
-const char * onoff[] = {"Off", "On"};
-const char * truefalse[] = {"False", "True"};
-const char * us_socket[] = { "Single SID", "Dual SID" };
-const char * chiptypes[] = {"Real", "Clone", "Unknown"};
-const char * sidtypes[] = {"Unknown", "N/A", "MOS8580", "MOS6581", "FMopl"};
-const char * clonetypes[] = { "Disabled", "Other", "SKPico", "ARMSID", "FPGASID", "RedipSID" };
+const char * error_type[]  = { "ERROR" };
+const char * enabled[]     = { "Disabled", "Enabled" };
+const char * intext[]      = { "Internal", "External" };
+const char * onoff[]       = { "Off", "On" };
+const char * truefalse[]   = { "False", "True" };
+const char * locked[]      = { "Unlocked", "Locked" };
+const char * us_socket[]   = { "Single SID", "Dual SID" };
 const char * mono_stereo[] = { "Mono", "Stereo" };
 
+const char * chiptypes[]   = { "MOS", "Unknown", "SKPico", "ARMSID", "ARM2SID", "FPGASID", "RedipSID", "PDSID", "BackSID" };
+const char * sidtypes[]    = { "Unknown", "N/A", "8580", "6581", "FMOpl" };
+
+const uint8_t sid_addresses[4] = { 0x00, 0x20, 0x40, 0x60 };
+
 /* USBSID-Pico config struct */
+typedef struct SIDChip {
+  uint8_t id;    /* ID for this SID 0 ~ 4, 255 = disabled */
+  uint8_t addr;  /* Starting address to use for this SID, 255 = disabled */
+  uint8_t type;  /* 0 = unknown, 1 = N/A, 2 = MOS8580, 3 = MOS6581, 4 = FMopl */
+} SIDChip;
+
+typedef struct Socket {
+  uint8_t chiptype;     /* 0 = real, 1 = unknown, 2...etc see config_logging.c */
+  SIDChip sid1;
+  SIDChip sid2;
+  bool    enabled : 1;  /* enable / disable this socket */
+  bool    dualsid : 1;  /* enable / disable dual SID support for this socket (requires clone) */
+} Socket;
+
 typedef struct Config {
-  bool external_clock : 1;     /* enable / disable external oscillator */
-  uint32_t clock_rate;         /* clock speed identifier */
-  bool lock_clockrate : 1;     /* lock the set clockspeed from being changed */
-  struct
-  {
-    bool    enabled : 1;       /* enable / disable this socket */
-    bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
-    uint8_t chiptype;          /* 0 = real, 1 = clone, 2 = unknown */
-    uint8_t clonetype;         /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
-    uint8_t sid1type;          /* 0 = unknown, 1 = n/a, 2 = MOS8580, 3 = MOS6581 */
-    uint8_t sid2type;          /* 0 = unknown, 1 = FMopl, 2 = MOS8580, 3 = MOS6581 */
-  } socketOne;                 /* 1 */
-  struct {
-    bool    enabled : 1;       /* enable / disable this socket */
-    bool    dualsid : 1;       /* enable / disable dual SID support for this socket (requires clone) */
-    bool    act_as_one : 1;    /* act as socket 1 */
-    uint8_t chiptype;          /* 0 = real, 1 = clone, 2 = unknown */
-    uint8_t clonetype;         /* 0 = disabled, 1 = other, 2 = SKPico, 3 = ARMSID, 4 = FPGASID, 5 = RedipSID */
-    uint8_t sid1type;          /* 0 = unknown, 1 = n/a, 2 = MOS8580, 3 = MOS6581 */
-    uint8_t sid2type;          /* 0 = unknown, 1 = FMopl, 2 = MOS8580, 3 = MOS6581 */
-  } socketTwo;                 /* 2 */
+  /* Don't care from here */
+  uint32_t clock_rate;          /* clock speed identifier */
+  Socket   socketOne;           /* 1 */
+  Socket   socketTwo;           /* 2 */
   struct {
     bool enabled : 1;
     bool idle_breathe : 1;
-  } LED;                       /* 3 */
+  } LED;                        /* 3 */
   struct {
-    bool    enabled : 1;
-    bool    idle_breathe : 1;
     uint8_t brightness;
     int     sid_to_use;         /* 0/-1 = off, 1...4 = sid 1 ... sid 4 */
+    bool    enabled : 1;
+    bool    idle_breathe : 1;
   } RGBLED;                     /* 4 */
   struct {
-    bool enabled : 1;
+    bool enabled : 1;           /* Cannot be disabled */
   } Cdc;                        /* 5 */
   struct {
-    bool enabled : 1;
+    bool enabled : 1;           /* Cannot be disabled */
   } WebUSB;                     /* 6 */
   struct {
     bool enabled : 1;
+    /* bool buffered : 1; */          /* Enable/Disable ASID buffering by default (protocal can enable this) */
   } Asid;                       /* 7 */
   struct {
     bool enabled : 1;
-    uint8_t sid_states[4][32];  /* Stores states of each SID ~ 4 sids max */
   } Midi;                       /* 8 */
   struct {
-    bool enabled : 1;           /* Requires a clone SID! */
     int sidno;                  /* 0 = disabled, saves the sidno of the sid set to FMOpl */
+    bool enabled : 1;           /* Requires a clone SID! */
   } FMOpl;                      /* 9 */
-  bool stereo_en : 1;           /* audio switch is off (mono) or on (stereo) ~ (HW v1.3+ only) */
+  bool external_clock : 1;      /* enable / disable external oscillator */
+  bool lock_clockrate : 1;      /* lock the set clockspeed from being changed */
+  bool stereo_en : 1;           /* audio switch is off (mono) or on (stereo) ~ (PCB v1.3+ only) */
   bool lock_audio_sw : 1;       /* lock the audio switch into it's current stateand prevent it from being changed ~ (PCB v1.3+ only) */
+  bool mirrored : 1;            /* act as socket 1 */
+  bool flipped : 1;             /* socket 1 is socket 2 and vice versa */
+  bool mixed : 1;               /* addresses are mixed up (quad SID only!) */
 } Config;
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
-  .external_clock = false, \
   .clock_rate = DEFAULT, \
-  .lock_clockrate = false, \
-  .stereo_en = true,  /* PCB v1.3+ only */ \
-  .lock_audio_sw = false,  /* PCB v1.3+ only */ \
   .socketOne = { \
+    .chiptype = 1,  /* unknown */ \
+    .sid1 = { \
+      .id = 0, \
+      .addr = 0x00, \
+      .type = 0,  /* unknown */ \
+    }, \
+    .sid2 = { \
+      .id = 0xFF, \
+      .addr = 0xFF, \
+      .type = 1,  /* n/a */ \
+    }, \
     .enabled = true, \
     .dualsid = false, \
-    .chiptype = 0x0,  /* real */ \
-    .clonetype = 0x0, /* disabled */ \
-    .sid1type = 0x0,  /* unknown */ \
-    .sid2type = 0x0,  /* unknown */ \
   }, \
   .socketTwo = { \
+    .chiptype = 1,  /* unknown */ \
+    .sid1 = { \
+      .id = 1, \
+      .addr = 0x20, \
+      .type = 0,  /* unknown */ \
+    }, \
+    .sid2 = { \
+      .id = 0xFF, \
+      .addr = 0xFF, \
+      .type = 1,  /* n/a */ \
+    }, \
     .enabled = true, \
     .dualsid = false, \
-    .act_as_one = false, \
-    .chiptype = 0x0,  /* real */ \
-    .clonetype = 0x0, /* disabled */ \
-    .sid1type = 0x0,  /* unknown */ \
-    .sid2type = 0x0,  /* unknown */ \
   }, \
   .LED = { \
     .enabled = true, \
-    .idle_breathe = true, \
+    .idle_breathe = true \
   }, \
   .RGBLED = { \
-    .enabled = true, \
-    .idle_breathe = true, \
     .brightness = 0x7F,  /* Half of max brightness or disabled if no RGB LED */ \
     .sid_to_use = 1, \
+    .enabled = true, \
+    .idle_breathe = true, \
   }, \
   .Cdc = { \
     .enabled = true \
@@ -257,13 +300,28 @@ typedef struct Config {
     .enabled = true \
   }, \
   .Asid = { \
-    .enabled = true \
+    .enabled = true, \
+    /* .buffered = false */ \
   }, \
   .Midi = { \
     .enabled = true \
   }, \
   .FMOpl = { \
+    .sidno = 0, \
     .enabled = false, \
-    .sidno = -1, \
   }, \
+  .external_clock = false, \
+  .lock_clockrate = false, \
+  .stereo_en = false, \
+  .lock_audio_sw = false, \
+  .mirrored = false, \
+  .flipped = false, \
+  .mixed = false, \
 }
+
+
+#ifdef __cplusplus
+  }
+#endif
+
+#endif /* _CFG_USBSID_H_ */

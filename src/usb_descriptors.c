@@ -36,7 +36,7 @@
 #include "pico/unique_id.h"
 #include "tusb.h"
 
-#include "globals.h"
+#include <globals.h>
 
 
 /* MCU */
