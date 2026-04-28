@@ -190,7 +190,7 @@ const char * locked[]      = { "Unlocked", "Locked" };
 const char * us_socket[]   = { "Single SID", "Dual SID" };
 const char * mono_stereo[] = { "Mono", "Stereo" };
 
-const char * chiptypes[]   = { "MOS", "Unknown", "SKPico", "ARMSID", "ARM2SID", "FPGASID", "RedipSID", "PDSID", "BackSID" };
+const char * chiptypes[]   = { "MOS", "Unknown", "SKPico", "ARMSID", "ARM2SID", "FPGASID", "RedipSID", "PDSID", "BackSID", "SIDEmu" };
 const char * sidtypes[]    = { "Unknown", "N/A", "8580", "6581", "FMOpl" };
 
 const uint8_t sid_addresses[4] = { 0x00, 0x20, 0x40, 0x60 };

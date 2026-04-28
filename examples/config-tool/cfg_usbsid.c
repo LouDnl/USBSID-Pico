@@ -1733,12 +1733,12 @@ void config_usbsidpico(int argc, char **argv)
     }
     if (!strcmp(argv[param_count], "-dualmirror")) {
       printf("Set USBSID-Pico config to single -> dual mirrored SID\n");
-      write_config_command(MIRRORED_SID, 0, 0 ,0 ,0);
+      write_config_command(MIRRORED_SID, 1, 0 ,0 ,0);
       goto exit;
     }
     if (!strcmp(argv[param_count], "-dualflipped")) {
       printf("Set USBSID-Pico DUAL_FLIPPED to flipped Socket One <-> Two\n");
-      write_config_command(MIRRORED_SID, 0, 0 ,0 ,0);
+      write_config_command(DUAL_FLIPPED, 0, 0 ,0 ,0);
       goto exit;
     }
     if (!strcmp(argv[param_count], "-quadflipped")) {
