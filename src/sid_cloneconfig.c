@@ -37,6 +37,7 @@
 #include <sid_fpgasid.h>
 #include <sid_pdsid.h>
 #include <sid_skpico.h>
+#include <sid_sidemu.h>
 
 
 /* Init local variables */
@@ -536,6 +537,44 @@ void read_armsid_configuration(uint8_t base_address)
   usCFG("Current ARMSID settings\n");
   usCFG("  Chip: %c5xx FW: %d.%d Filt: %b %b  (Voltage = %d mV (%d %d))\n",
     chip, vh, vl, p, q, v, v1, v2);
+
+  return;
+}
+
+void read_sidemu_configuration(uint8_t base_address)
+{
+  /* TODO: Finish */
+  return;
+}
+
+/**
+ * @brief Set the sidemu sidtype
+ *
+ * @param uint8_t base_address
+ * @param uint8_t type
+ */
+void set_sidemu_sidtype(uint8_t base_address, uint8_t type)
+{
+  usCFG("SIDEmu enable config mode\n");
+  /* Enable config mode */
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_1,6); /* #66 */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_2,6); /* #69 */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+
+  usCFG("SIDEmu write command #$%02x without result\n", type);
+  /* Command without result :) */
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_OFFS_CMD,6); /* #$ff */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+  cycled_write_operation((SIDEMU_CFG_DATA + base_address),type,6); /* type */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+
+  usCFG("SIDEmu disable config mode\n");
+  /* Disable config mode */
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_1,6); /* #66 */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_3,6); /* #96 */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
 
   return;
 }

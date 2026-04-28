@@ -50,7 +50,12 @@ uint8_t     detect_sid_model(uint8_t start_addr);
 uint8_t     detect_sid_version(uint8_t start_addr);
 uint8_t     detect_sid_reflex(uint8_t start_addr);
 uint8_t     detect_sid_version_skpico_deprecated(uint8_t start_addr);
+bool        detect_fpgasid(uint8_t base_address);
+bool        detect_skpico(uint8_t base_address);
 bool        detect_pdsid(uint8_t base_address, bool silent);
+bool        detect_armsid(uint8_t base_address);
+bool        detect_backsid(uint8_t base_address);
+bool        detect_sidemu(uint8_t base_address);
 
 
 #ifdef __cplusplus

@@ -45,9 +45,9 @@ bool    set_pdsid_sid_type(uint8_t base_address, uint8_t type);
 void    print_backsid_filter_type(uint8_t base_address);
 void    print_backsid_version(uint8_t base_address);
 void    set_backsid_filter_type(uint8_t base_address, uint8_t type);
-bool    detect_armsid(uint8_t base_address);
 void    read_armsid_configuration(uint8_t base_address);
-
+void    read_sidemu_configuration(uint8_t base_address);
+void    set_sidemu_sidtype(uint8_t base_address, uint8_t type);
 
 #ifdef __cplusplus
   }

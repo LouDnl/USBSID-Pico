@@ -35,6 +35,7 @@
 #include <sid_fpgasid.h>
 #include <sid_pdsid.h>
 #include <sid_backsid.h>
+#include <sid_sidemu.h>
 
 
 /**
@@ -398,16 +399,16 @@ uint8_t detect_armsid(uint8_t base_address)
  * @return true
  * @return false
  */
-bool detect_pdsid(uint8_t base_address)
+bool detect_pdsid(uint8_t base_address, bool silent)
 {
-  usCFG("  Check for PDsid @ $%02x\n", base_address);
+  if (!silent) usCFG("  Check for PDsid @ $%02x\n", base_address);
   cycled_write_operation((PDREG_P + base_address),PDSID_P,6); /* 0x50 */
   cycled_delay_operation(4); /* 4 cycles */
   cycled_write_operation((PDREG_D+ base_address),PDSID_D,6); /* 0x44 */
   cycled_delay_operation(4); /* 4 cycles */
   uint8_t pdsid_id = cycled_read_operation((PDREG_D + base_address),6);
   if (pdsid_id == PDSID_ID) { /* 0x53 'S' */
-    usCFG("  Found PDsid @ $%02x\n", base_address);
+    if (!silent) usCFG("  Found PDsid @ $%02x\n", base_address);
     return true;
   }
   return false;
@@ -433,6 +434,55 @@ bool detect_backsid(uint8_t base_address)
   }
   return false;
 }
+
+/**
+ * @brief Detect SIDEmu presence
+ *
+ * @param uint8_t base_address
+ * @return true
+ * @return false
+ */
+bool detect_sidemu(uint8_t base_address)
+{
+  char sidemu_identifier[17] = {0};
+
+  /* Enable config mode */
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_1,6); /* #66 */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_2,6); /* #69 */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+
+  usCFG("  Check for SIDEmu @ $%02x\n", base_address);
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_OFFS_ID,6); /* #$fe */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+  uint8_t num = 0x0;
+RETRY:;
+  cycled_write_operation((SIDEMU_CFG_DATA + base_address),num,6); /* 0x0 */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+  uint8_t sidemu_id = cycled_read_operation((SIDEMU_CFG_DATA + base_address),6);
+  if ((sidemu_id & 0x3f) == 0) {
+    if ((num > 0) && sidemu_identifier[0] == 0x53) { /* 0x53 = 'S' */
+      usCFG("  Found %.17s @ $%02x\n", sidemu_identifier, base_address);
+    } else {
+      goto FAIL;
+    }
+  } else {
+    sidemu_identifier[num] = sidemu_id;
+    num++;
+    if (num > 20) goto FAIL;
+    goto RETRY;
+  }
+
+  /* Disable config mode */
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_1,6); /* #66 */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_3,6); /* #96 */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+  return true;
+FAIL:;
+  return false;
+}
+
 
 /**
  * @brief Detect chip type
@@ -461,12 +511,16 @@ ChipType detect_chiptype_at(uint8_t base_address)
     return CHIP_FPGASID;
   }
 
-  if (detect_pdsid(base_address)) {
+  if (detect_pdsid(base_address, false)) {
     return CHIP_PDSID;
   }
 
   if (detect_backsid(base_address)) {
     return CHIP_BACKSID;
+  }
+
+  if (detect_sidemu(base_address)) {
+    return CHIP_SIDEMU;
   }
 
   usCFG("No clone found @ $%02x, assuming real SID\n", base_address);
@@ -699,7 +753,7 @@ ConfigError sid_auto_detect(bool at_boot)
  */
 ConfigError sid_auto_detect_silent(void)
 {
-/* Run detection */
+  /* Run detection */
   DetectionResult det = detect_all();
 
   /* Apply results */
