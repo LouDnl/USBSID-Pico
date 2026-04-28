@@ -174,7 +174,7 @@ static inline void midi_buffer_task(uint8_t buffer)
         break;
       case 0xF7:  /* System Exclusive End of SysEx (EOX) */
         if (midimachine.bus == CLAIMED && midimachine.type == SYSEX) {
-          dtype = sysex; /* Set data type to ASID */
+          dtype = sysex; /* Set data type to SysEx */
           midimachine.streambuffer[midimachine.index] = buffer;
           midimachine.index++;
           process_sysex(midimachine.streambuffer, midimachine.index);
@@ -197,6 +197,7 @@ static inline void midi_buffer_task(uint8_t buffer)
       case 0xFD:  /* System Exclusive Undefined (Reserved) */
       case 0xFE:  /* System Exclusive Active Sensing */
       case 0xFF:  /* System Exclusive System Reset */
+        dtype = sysex; /* Set data type to SysEx */
         break;
       /* Midi 2 Bytes per message */
       case 0xC0 ... 0xCF:  /* Channel 0~16 Program (Patch) change */
