@@ -49,7 +49,7 @@ void init_gpio(void)
 { /* GPIO defaults for PIO bus */
   gpio_set_dir(RES, GPIO_OUT);
   gpio_set_function(RES, GPIO_FUNC_SIO);
-  cPIN(RES);  /* Make sure we do not yet enable the SID on boot! */
+  sPIN(RES);  /* Enable the SID directly on boot (SIDEmu hardfaults otherwise) */
   gpio_init(CS1);
   gpio_init(CS2);
   gpio_init(RW);
