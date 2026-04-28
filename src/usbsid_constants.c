@@ -41,7 +41,8 @@ static const char __in_flash("us_statics") *error_messages[] = {
   [CFG_ERR_INVALID_PRESET]        = "Invalid preset value",
   [CFG_ERR_DETECTION_FAILED]      = "Chip/SID detection failed",
   [CFG_ERR_NULL_POINTER]          = "NULL pointer passed to function",
-  [CFG_ERR_EQUAL_PRESET]          = "Preset supplied matches preset active"
+  [CFG_ERR_EQUAL_PRESET]          = "Preset supplied matches preset active",
+  [CFG_ERR_CHANGE_DETECTED]       = "Change in socket configuration detected",
 };
 
 /**
@@ -79,6 +80,7 @@ static const char __in_flash("us_statics") *chiptypes[] = {
   [CHIP_REDIPSID] = "RedipSID",
   [CHIP_PDSID]    = "PDSID",
   [CHIP_BACKSID]  = "BackSID",
+  [CHIP_SIDEMU]   = "SIDEmu",
 };
 
 /**

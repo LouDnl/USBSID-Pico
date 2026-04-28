@@ -70,6 +70,7 @@ typedef enum ConfigError {
   CFG_ERR_DETECTION_FAILED,       /* Chip/SID detection failed */
   CFG_ERR_NULL_POINTER,           /* NULL pointer passed to function */
   CFG_ERR_EQUAL_PRESET,           /* Preset supplied matches preset active */
+  CFG_ERR_CHANGE_DETECTED,        /* Change in socket configuration detected */
   CFG_ERROR_COUNT,                /* Number of config errors */
 } ConfigError;
 
@@ -128,6 +129,7 @@ typedef enum ChipType
   CHIP_REDIPSID,  /* RedipSID */
   CHIP_PDSID,     /* Public Domain SID */
   CHIP_BACKSID,   /* BackSID */
+  CHIP_SIDEMU,    /* SIDEmu */
   CHIP_COUNT,     /* Number of chiptypes */
 } ChipType;
 
