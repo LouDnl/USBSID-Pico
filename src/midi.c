@@ -256,9 +256,11 @@ static inline void midi_buffer_task(uint8_t buffer)
               } else
               if (emulator_running) { /* Cynthcart, yeah baby yeah! */
                 handle_emulater_data();
-              }
-              #else
+              } else {
+              #endif
               process_midi(midimachine.streambuffer, midimachine.index);
+              #ifdef ONBOARD_EMULATOR
+              }
               #endif
 
               midimachine.index = 0;
