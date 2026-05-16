@@ -258,7 +258,7 @@ static inline void midi_buffer_task(uint8_t buffer)
                 handle_emulater_data();
               } else {
               #endif
-              process_midi(midimachine.streambuffer, midimachine.index);
+                process_midi(midimachine.streambuffer, midimachine.index);
               #ifdef ONBOARD_EMULATOR
               }
               #endif
