@@ -3,7 +3,7 @@
  * for interfacing one or two MOS SID chips and/or hardware SID emulators over
  * (WEB)USB with your computer, phone or ASID supporting player
  *
- * midi_cc.h
+ * midi_defs.h
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
@@ -81,6 +81,7 @@ typedef struct midi_ccvalues {
   uint8_t CC_CSID;  /* Enable copy SID mode */
   uint8_t CC_LVCE;  /* Link/Unlink voice */
   uint8_t CC_LSID;  /* Link/Unlink SID */
+  uint8_t CC_VELM;  /* Velocity Mode */
   /* Fixed CC values ~ Cynthcart related */
   uint8_t CC_CEN;   /* Enable  Cynthcart */
   uint8_t CC_CDI;   /* Disable Cynthcart */
@@ -90,22 +91,25 @@ typedef struct midi_ccvalues {
   uint8_t CC_BLSB;  /* Bank Select LSB */
   uint8_t CC_MOD;   /* Modulation wheel */
   uint8_t CC_MODL;  /* Modulation wheel LSB */
-  uint8_t CC_AOFF;  /* All notes off */
+  uint8_t CC_ASOF;  /* All Sound Off */
+  uint8_t CC_RACT;  /* Reset All Controllers */
+  uint8_t CC_ANOF;  /* All Notes Off
+   */
 } midi_ccvalues;
 
 /* Default Control Change Byte values */
 #define MIDI_DEFAULT_CCVALUES_INIT { \
   /* Default values ~ Voice related */ \
-  .CC_NOTE =  0x16,  /*  22 ~ Note frequency for manual input */ \
-  .CC_PWM  =  0x15,  /*  21 ~ Pulse Width Modulation (Modulation wheel) */ \
-  .CC_NOIS =  0x00,  /*   0 ~ Noise waveform */ \
-  .CC_PULS =  0x01,  /*   1 ~ Pulse waveform */ \
-  .CC_SAWT =  0x02,  /*   2 ~ Sawtooth waveform */ \
-  .CC_TRIA =  0x03,  /*   3 ~ Triangle waveform */ \
-  .CC_TEST =  0x04,  /*   4 ~ Test bit */ \
-  .CC_RMOD =  0x05,  /*   5 ~ Ring modulator bit */ \
-  .CC_SYNC =  0x06,  /*   6 ~ Sync bit */ \
-  .CC_GATE =  0x07,  /*   7 ~ Gate bit */ \
+  .CC_NOTE =  0x1C,  /*  28 ~ Note frequency for manual input */ \
+  .CC_PWM  =  0x01,  /*   1 ~ Pulse Width Modulation (Modulation wheel) */ \
+  .CC_NOIS =  0x14,  /*  20 ~ Noise waveform */ \
+  .CC_PULS =  0x15,  /*  21 ~ Pulse waveform */ \
+  .CC_SAWT =  0x16,  /*  22 ~ Sawtooth waveform */ \
+  .CC_TRIA =  0x17,  /*  23 ~ Triangle waveform */ \
+  .CC_TEST =  0x18,  /*  24 ~ Test bit */ \
+  .CC_RMOD =  0x19,  /*  25 ~ Ring modulator bit */ \
+  .CC_SYNC =  0x1A,  /*  26 ~ Sync bit */ \
+  .CC_GATE =  0x1B,  /*  27 ~ Gate bit */ \
   .CC_ATT  =  0x11,  /*  17 ~ Attack */ \
   .CC_DEC  =  0x12,  /*  18 ~ Decay */ \
   .CC_SUS  =  0x13,  /*  19 ~ Sustain */ \
@@ -121,7 +125,7 @@ typedef struct midi_ccvalues {
   .CC_HPF  =  0x31,  /*  49 ~ High pass */ \
   .CC_BPF  =  0x32,  /*  50 ~ Band pass */ \
   .CC_LPF  =  0x33,  /*  51 ~ Low pass */ \
-  .CC_VOL  =  0x34,  /*  52 ~ Channel Volume */ \
+  .CC_VOL  =  0x07,  /*   7 ~ Channel Volume */ \
   /* Default CC values ~ SID / Voice selection */ \
   .CC_SID1 =  0x68,  /* 104 ~ Select SID 1 */ \
   .CC_SID2 =  0x69,  /* 105 ~ Select SID 2 */ \
@@ -131,12 +135,13 @@ typedef struct midi_ccvalues {
   .CC_VCE2 =  0x6D,  /* 109 ~ Select Voice 2 */ \
   .CC_VCE3 =  0x6E,  /* 110 ~ Select Voice 3 */ \
   /* Default CC values ~ custom commands */ \
-  .CC_GTEN =  0x40,  /*  64 ~ Gate auto enabled on noteon note off */ \
+  .CC_GTEN =  0x77,  /* 119 ~ Gate auto enabled on noteon note off */ \
   .CC_POLY =  0x6F,  /* 111 ~ Turn on polyfonic for current SID */ \
   .CC_CVCE =  0x08,  /*   8 ~ Enable copy voice mode */ \
   .CC_CSID =  0x18,  /*  24 ~ Enable copy SID mode */ \
   .CC_LVCE =  0x28,  /*  40 ~ Link/Unlink voice */ \
   .CC_LSID =  0x38,  /*  56 ~ Link/Unlink SID */ \
+  .CC_VELM =  0x48,  /*  72 ~ Velocity Mode */ \
   /* Cynthcart related _FIXED_ CC values */ \
   .CC_CEN  =  0x55,  /*  85 ~ Enable Cynthcart */ \
   .CC_CDI  =  0x56,  /*  86 ~ Disable Cynthcart */ \
@@ -146,7 +151,10 @@ typedef struct midi_ccvalues {
   .CC_BLSB =  0xFF,  /* 255 ~ Bank Select LSB */ \
   .CC_MOD  =  0xFF,  /* 255 ~ Modulation wheel */ \
   .CC_MODL =  0xFF,  /* 255 ~ Modulation wheel LSB */ \
-  .CC_AOFF =  0xFF,  /* 255 ~ All notes off */ \
+  /* Midi related ~ Fixed values */ \
+  .CC_ASOF =  0x78,  /* 120 ~ All Sound Off */ \
+  .CC_RACT =  0x79,  /* 121 ~ Reset All Controllers */ \
+  .CC_ANOF =  0x7B,  /* 123 ~ All Notes Off */ \
 } \
 
 /* static const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT; */

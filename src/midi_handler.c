@@ -41,7 +41,7 @@
 #include <sid.h>
 #include <sid_defs.h>
 #include <midi.h>
-#include <midi_cc.h>
+#include <midi_defs.h>
 #include <midi_handler.h>
 
 

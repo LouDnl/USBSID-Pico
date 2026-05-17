@@ -37,7 +37,7 @@
 #include <sid.h>
 #include <logging.h>
 #include <midi_handler.h>
-#include <midi_cc.h>
+#include <midi_defs.h>
 #include <sysex.h>
 
 #if defined(ONBOARD_EMULATOR)

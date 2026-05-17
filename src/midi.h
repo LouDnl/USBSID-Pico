@@ -45,7 +45,7 @@
 #include <stdio.h>
 
 /* MIDI CC values */
-#include <midi_cc.h>
+#include <midi_defs.h>
 
 
 /* Midi bus states */
