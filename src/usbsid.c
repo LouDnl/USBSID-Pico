@@ -43,9 +43,6 @@
 #include <logging.h>
 
 
-/* doubletap.c */
-extern int flagged;
-
 /* Declare variables ~ Do not change order to keep memory alignment! */
 uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);  /* 64 Bytes, 128 bytes aligned */
 uint8_t __not_in_flash("usbsid_buffer") sid_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);    /* 64 Bytes, 128 bytes aligned */
@@ -73,7 +70,6 @@ const char cdc = 'C', asid = 'A', midi = 'M', sysex = 'S', wusb = 'W', uart = 'U
 static bool web_serial_connected = false;
 
 volatile double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
-volatile bool auto_config = false;
 volatile bool offload_ledrunner = false;
 
 /* Cynthcart emulator */
@@ -127,7 +123,6 @@ static const tusb_desc_webusb_url_t desc_url =
 void reset_reason(void)
 {
 #if PICO_RP2040
-  usNFO("\n[RESET] Button double tapped? %d\n", flagged);
   io_rw_32 *rr = (io_rw_32 *) (VREG_AND_CHIP_RESET_BASE + VREG_AND_CHIP_RESET_CHIP_RESET_OFFSET);
   if (*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_POR_BITS)
     usNFO("[RESET] Caused by power-on reset or brownout detection\n");
@@ -137,7 +132,6 @@ void reset_reason(void)
     usNFO("[RESET] Caused by debug port\n");
 #elif PICO_RP2350
   /* io_rw_32 *rr = (io_rw_32 *) (POWMAN_BASE + POWMAN_CHIP_RESET_OFFSET); */
-  usNFO("\n[RESET] Button double tapped? %d %X\n", flagged, powman_hw->chip_reset);
   if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_DP_RESET_REQ_BITS)
     usNFO("[RESET] Caused by arm debugger\n");
   if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_RESCUE_BITS)
@@ -815,9 +809,6 @@ int main()
   /* Log reset reason */
   reset_reason();
 
-  /* Clear flagged */
-  if (flagged) { auto_config = true; flagged = 0; }  /* NOTE: Does not work on rp2350 */
-
   /* Launch Core 1 and wait for flash_safe_execute_core_init to complete */
   usBOOT("CORE0 Launching core1\n");
   multicore_launch_core1(core1_main);
@@ -843,18 +834,16 @@ int main()
   sid_hz = usbsid_config.clock_rate;
   sid_mhz = (sid_hz / 1000 / 1000);
   sid_us = (1 / sid_mhz);
-  if (!auto_config) {
-    usNFO("\n");
-    usNFO("[NFO] Clock information:\n");
-    usNFO("[NFO]   Pico Clock @ %lu Hz, %.0f MHz, %.4f uS\n",
-      clock_get_hz(clk_sys), cpu_mhz, cpu_us);
-    usNFO("[NFO]   C64 SID Clock @ %.0f Hz, %.6f MHz, %.4f uS\n",
-      sid_hz, sid_mhz, sid_us);
-    usNFO("[NFO]   C64 Refresh Rate = %lu Cycles\n",
-      usbsid_config.refresh_rate);
-    usNFO("[NFO]   C64 Raster Rate = %lu Cycles\n",
-      usbsid_config.raster_rate);
-  }
+  usNFO("\n");
+  usNFO("[NFO] Clock information:\n");
+  usNFO("[NFO]   Pico Clock @ %lu Hz, %.0f MHz, %.4f uS\n",
+    clock_get_hz(clk_sys), cpu_mhz, cpu_us);
+  usNFO("[NFO]   C64 SID Clock @ %.0f Hz, %.6f MHz, %.4f uS\n",
+    sid_hz, sid_mhz, sid_us);
+  usNFO("[NFO]   C64 Refresh Rate = %lu Cycles\n",
+    usbsid_config.refresh_rate);
+  usNFO("[NFO]   C64 Raster Rate = %lu Cycles\n",
+    usbsid_config.raster_rate);
 
   /* Signal Core 1 to continue (sync point 1) */
   usBOOT("<CORE 0> Signaling core1 ~ 1\n");
@@ -900,16 +889,9 @@ int main()
   /* Clear the dirt */
   memset(sid_memory, 0, SID_MEMORY_SIZE); /* Always no more then 128 bytes */
 
-  /* Check for default config bit
-   * NOTE: This cannot be run from Core 1! */
-  if (!auto_config) {
-    detect_default_config();
-  }
-  if (auto_config) {  /* NOTE: Does not work on rp2350 */
-    sid_auto_detect(true); /* At boot */
-    save_config_ext();
-    auto_config = false;
-    mcu_reset();
+  /* Check for default config bit */
+  detect_default_config();
+
   }
   /* Print config once at end of boot routine */
   print_config();

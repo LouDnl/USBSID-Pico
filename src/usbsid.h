@@ -76,8 +76,8 @@ extern volatile char tuneno;
 extern volatile bool is_prg;
 #endif /* ONBOARD_SIDPLAYER */
 
-/* Runtime flags */
-extern volatile bool auto_config, offload_ledrunner;
+/* Runtime flags intercore changeable */
+extern volatile bool offload_ledrunner;
 
 /* Inter-core queues */
 extern queue_t sidtest_queue;

@@ -328,7 +328,6 @@ endif()
 ### Source files to compile
 set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/usbsid.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/usbsid_doubletap.c
   ${CMAKE_CURRENT_LIST_DIR}/src/usbsid_constants.c
   ${CMAKE_CURRENT_LIST_DIR}/src/config.c
   ${CMAKE_CURRENT_LIST_DIR}/src/config_bus.c
