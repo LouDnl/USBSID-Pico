@@ -77,6 +77,20 @@ static uint8_t p_version_array[MAX_BUFFER_SIZE] = {0};
 static uint32_t cm_verification = 0;
 
 
+/**
+ * @brief Returns true if either of the variables is true
+ *
+ * @return bool
+ */
+bool config_unacknowledged(void)
+{
+#if PCB_VERSION_INT >= 15
+  return (usbsid_config.need_confirmation || detected_sid_change);
+#else
+  return false;
+#endif
+}
+
 void read_config(Config* config)
 {
   memset(config_array, 0, sizeof config_array);  /* Make sure we don't send garbled old data */
@@ -86,8 +100,8 @@ void read_config(Config* config)
   config_array[0] = READ_CONFIG;  /* Initiator byte */
   config_array[1] = 0x7F;  /* Verification byte */
 
-  config_array[2] = 0x00; /* Unused */
-  config_array[3] = 0x00; /* Unused */
+  config_array[2] = (int)config_unacknowledged();      /* Need configuration confirmation v1.5+ only */
+  config_array[3] = (int)config->disable_changedetect; /* Disable socket change detection v1.5+ only */
   config_array[4] = 0x00; /* Unused */
 
   /* Clockworx */
@@ -220,7 +234,8 @@ void __no_inline_not_in_flash_func(default_config)(Config* config)
 {
   config_saveid = config->config_saveid;  /* Preserve config saveid */
   memcpy(config, &usbsid_default_config, sizeof(Config));
-  config->config_saveid = config_saveid;  /* Copy saveid back into the default config */
+  /* Copy saveid (if in 0~15 range) back into the default config */
+  config->config_saveid = ((config_saveid <= 0xF) ? config_saveid : 0); /* Sanitise the id */
   return;
 }
 
@@ -235,18 +250,18 @@ AGAIN:
   /* NOTICE: Do not do any logging here after memcpy or the Pico will freeze! */
   memcpy(&temp_config, (void *)(XIP_BASE + (FLASH_CONFIG_OFFSET + (FLASH_PAGE_SIZE * savelocationid))), sizeof(Config));
   stdio_flush();
-  usCFG("  Flash position = %d (Saved config id = %d)\n", savelocationid, temp_config.config_saveid);
-  if (/* (temp_config.config_saveid >= 0) &&  */(temp_config.config_saveid <= 0xF) /* Max 16 saves */
+  usCFG("  Trying flash position = %d (Saved config id = %d)\n", savelocationid, temp_config.config_saveid);
+  if ((temp_config.config_saveid >= 0) && (temp_config.config_saveid <= 0xF) /* Max 16 saves */
     && temp_config.config_saveid == savelocationid) { /* Found previously saved config */
     savelocationid++;  /* Increase id and try again */
-    goto AGAIN;
+    goto AGAIN; /* Always tries again if config is found */
   } else { /* They are not equal, that means this config is an empty save location or corrupted, load the previous config */
-    usCFG("  Found latest configuration at position %d (255 == empty slot)\n", (savelocationid-1));
-    savelocationid--;
+    savelocationid--; /* This will now be the previous config_saveid */
     memcpy(config, (void *)(XIP_BASE + (FLASH_CONFIG_OFFSET + (FLASH_PAGE_SIZE * savelocationid))), sizeof(Config));
     stdio_flush();
   }
-  config_saveid = usbsid_config.config_saveid;  /* copy saveid into variable */
+  /* Do not assign savelocationid here but he actual saveid from the restored config */
+  config_saveid = usbsid_config.config_saveid;  /* copy saveid into global variable (for later saving use etc.) */
   usCFG("  Configuration loaded from position %d\n", usbsid_config.config_saveid);
 
   usCFG("Copied Configuration:\n");
@@ -397,6 +412,18 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       write_buffer_p[0] = (uint8_t)cfg.fmopl_sid;
       write_back_data(1);
       break;
+    case READ_CONFIGACK:
+#if PCB_VERSION_INT >= 15
+      usCFG("READ_CONFIGACK: %d\n", (int)config_unacknowledged());
+#else
+      usCFG("READ_CONFIGACK\n");
+#endif
+      memset(write_buffer_p, 0, 64);
+#if PCB_VERSION_INT >= 15
+      write_buffer_p[0] = (uint8_t)config_unacknowledged();
+#endif
+      write_back_data(1);
+      break;
     case APPLY_CONFIG:
       usCFG("APPLY_CONFIG\n");
       apply_config(false); /* Not at boot */
@@ -414,7 +441,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case SET_CONFIG:
       usCFG("SET_CONFIG\n");
       switch (buffer[1]) {
-        case  0:  /* clock_rate */
+        case BOARD_CLOCKRATE: /* clock_rate */
           /* will always be available to change the setting since it doesn't apply it */
           usbsid_config.clock_rate = clockrates[(int)buffer[2]];
           usbsid_config.refresh_rate = refreshrates[(int)buffer[2]]; /* Experimental */
@@ -423,81 +450,81 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
             usbsid_config.lock_clockrate = (bool)buffer[3];
           }
           break;
-        case  1:  /* socketOne */
+        case SOCKET_ONE:      /* socketOne */
           switch (buffer[2]) {
-              case 0: /* enabled */
-                if (buffer[3] <= 1) { /* 1 or 0 */
-                  usbsid_config.socketOne.enabled = (buffer[3] == 1) ? true : false;
-                };
-                break;
-              case 1: /* dualsid */
-                if (buffer[3] <= 1) { /* 1 or 0 */
-                  usbsid_config.socketOne.dualsid = (buffer[3] == 1) ? true : false;
-                };
-                break;
-              case 2: /* chiptype */
-                if (buffer[3] < CHIP_COUNT) {
-                  usbsid_config.socketOne.chiptype = buffer[3];
-                }
-                break;
-              case 3: /* UNUSED */
-                break;
-              case 4: /* sid1.type */
-                if (buffer[3] <= 4) {
-                  usbsid_config.socketOne.sid1.type = buffer[3];
-                }
-                break;
-              case 5: /* sid2.type */
+            case CONFIG_ENABLED:  /* enabled */
+              if (buffer[3] <= 1) { /* 1 or 0 */
+                usbsid_config.socketOne.enabled = (buffer[3] == 1) ? true : false;
+              };
+              break;
+            case SOCKET_DUALSID:  /* dualsid */
+              if (buffer[3] <= 1) { /* 1 or 0 */
+                usbsid_config.socketOne.dualsid = (buffer[3] == 1) ? true : false;
+              };
+              break;
+            case SOCKET_CHIPTYPE: /* chiptype */
+              if (buffer[3] < CHIP_COUNT) {
+                usbsid_config.socketOne.chiptype = buffer[3];
+              }
+              break;
+            case SOCKET_UNUSED:   /* UNUSED */
+              break;
+            case SOCKET_SID1TYPE: /* sid1.type */
+              if (buffer[3] <= 4) {
+                usbsid_config.socketOne.sid1.type = buffer[3];
+              }
+              break;
+            case SOCKET_SID2TYPE: /* sid2.type */
                 if (buffer[3] <= 4) {
                   usbsid_config.socketOne.sid2.type = buffer[3];
                 }
-                break;
+              break;
           };
           break;
-        case  2:  /* socketTwo */
+        case SOCKET_TWO:      /* socketTwo */
           switch (buffer[2]) {
-            case 0: /* enabled */
+            case CONFIG_ENABLED:  /* enabled */
               if (buffer[3] <= 1) { /* 1 or 0 */
                 usbsid_config.socketTwo.enabled = (buffer[3] == 1) ? true : false;
               };
               break;
-            case 1: /* dualsid */
+            case SOCKET_DUALSID:  /* dualsid */
               if (buffer[3] <= 1) { /* 1 or 0 */
                 usbsid_config.socketTwo.dualsid = (buffer[3] == 1) ? true : false;
               };
               break;
-            case 2: /* chiptype */
+            case SOCKET_CHIPTYPE: /* chiptype */
               if (buffer[3] < CHIP_COUNT) {
                 usbsid_config.socketTwo.chiptype = buffer[3];
               }
               break;
-            case 3: /* UNUSED */
+            case SOCKET_UNUSED:   /* UNUSED */
               break;
-            case 4: /* sid1.type */
+            case SOCKET_SID1TYPE: /* sid1.type */
               if (buffer[3] <= 4) {
                 usbsid_config.socketTwo.sid1.type = buffer[3];
               }
               break;
-            case 5: /* sid2.type */
+            case SOCKET_SID2TYPE: /* sid2.type */
               if (buffer[3] <= 4) {
                 usbsid_config.socketTwo.sid2.type = buffer[3];
               }
               break;
-            case 6: /* mirrored */ /* NOTE: Pre v0.7.0 fw backwards compatibility */
+            case OLD_S2_MIRRORED: /* mirrored */ /* NOTE: Pre v0.7.0 fw backwards compatibility */
               if (buffer[3] <= 1) { /* 1 or 0 */
                 usbsid_config.mirrored = (buffer[3] == 1) ? true : false;
               };
               break;
           };
           break;
-        case  3:  /* LED */
+        case BOARD_LED:       /* LED */
           switch (buffer[2]) {
-            case 0: /* enabled */
+            case CONFIG_ENABLED: /* enabled */
               if (buffer[3] <= 1) { /* 1 or 0 */
                 usbsid_config.LED.enabled = (buffer[3] == 1) ? true : false;
               };
               break;
-            case 1: /* idle_breathe */
+            case LED_IDLEBREATH: /* idle_breathe */
               if (buffer[3] <= 1) { /* 1 or 0 */
                 if (LED_PWM) {
                   usbsid_config.LED.idle_breathe = (buffer[3] == 1) ? true : false;
@@ -510,9 +537,9 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
               break;
           };
           break;
-        case  4:  /* RGBLED */
+        case BOARD_RGBLED:    /* RGBLED */
           switch (buffer[2]) {
-            case 0: /* enabled */
+            case CONFIG_ENABLED: /* enabled */
               if (buffer[3] <= 1) { /* 1 or 0 */
                 if (RGB_ENABLED) {
                   usbsid_config.RGBLED.enabled = (buffer[3] == 1) ? true : false;
@@ -521,7 +548,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
                 };
               };
               break;
-            case 1: /* idle_breathe */
+            case LED_IDLEBREATH: /* idle_breathe */
               if (buffer[3] <= 1) { /* 1 or 0 */
                 if (RGB_ENABLED) {
                   usbsid_config.RGBLED.idle_breathe = (buffer[3] == 1) ? true : false;
@@ -530,14 +557,14 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
                 };
               };
               break;
-            case 2: /* brightness */
+            case LED_BRIGHTNESS: /* brightness */
               if (RGB_ENABLED) {
                 usbsid_config.RGBLED.brightness = buffer[3];
               } else {
                 usbsid_config.RGBLED.brightness = 0;  /* No brightness needed if no RGB LED */
               };
               break;
-            case 3: /* sid_to_use */
+            case LED_SIDTOUSE:   /* sid_to_use */
               if (buffer[3] >= 1 && buffer[3] <= 4) {
                 if (RGB_ENABLED) {
                   usbsid_config.RGBLED.sid_to_use = buffer[3];
@@ -550,43 +577,46 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
               break;
           }
           break;
-        case  5:  /* CDC ~ Cannot be disabled */
-        case  6:  /* WEBUSB ~ Cannot be disabled */
+        case BOARD_CDC:       /* CDC ~ Cannot be disabled */
+            usNFO("[EASTER] Why you little!\n");
           break;
-        case  7:  /* ASID */
+        case BOARD_WEBUSB:    /* WEBUSB ~ Cannot be disabled */
+            usNFO("[EGG] H4ck3r b4by!\n");
+          break;
+        case BOARD_ASID:      /* ASID */
           usbsid_config.Asid.enabled = (bool)buffer[2];
           /* usbsid_config.Asid.buffered = (bool)buffer[3]; */
           break;
-        case  8:  /* MIDI */
+        case BOARD_MIDI:      /* MIDI */
           usbsid_config.Midi.enabled = (bool)buffer[2];
           break;
-        case  9:  /* FMOpl */
+        case BOARD_FMOPL:     /* FMOpl */
           usbsid_config.FMOpl.enabled = (bool)buffer[2];
           apply_fmopl_config();
           break;
-        case 10:  /* Audio switch */
+        case BOARD_AUSWITCH:  /* Audio switch */
           usbsid_config.stereo_en =
           (buffer[2] == 0 || buffer[2] == 1)
           ? (bool)buffer[2]
           : true;  /* Default to 1 ~ stereo if incorrect value */
           break;
-        case 11:  /* Lock audio switch */
+        case BOARD_AULOCK:    /* Lock audio switch */
           usbsid_config.lock_audio_sw =
           (buffer[2] == 0 || buffer[2] == 1)
           ? (bool)buffer[2]
           : false;  /* Default to unlocked incorrect value */
           break;
-        case 12: /* mirrored */
+        case BOARD_MIRRORED:  /* mirrored */
           if (buffer[2] <= 1) { /* 1 or 0 */
             usbsid_config.mirrored = (bool)buffer[2];
           };
           break;
-        case 13: /* flipped */
+        case BOARD_FLIPPED:   /* flipped */
           if (buffer[2] <= 1) { /* 1 or 0 */
             usbsid_config.flipped = (bool)buffer[2];
           };
           break;
-        case 14: /* mixed */
+        case BOARD_MIXED:     /* mixed */
           if (buffer[2] <= 1) { /* 1 or 0 */
             usbsid_config.mixed = (bool)buffer[2];
           };
@@ -724,7 +754,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       break;
     case TOGGLE_AUDIO:      /* Toggle the audio state regardless of config setting */
       usCFG("TOGGLE_AUDIO\n");
-      toggle_audio_switch();  /* if HAS_AUDIOSWITCH is not defined, this doesn't do anything */
+      toggle_audio_switch();  /* if PCB_VERSION_INT >= 13 is not defined, this doesn't do anything */
       break;
     case SET_AUDIO:         /* Set the audio state from buffer setting (saves config if provided) */
       usCFG("SET_AUDIO\n");
@@ -756,6 +786,29 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         usCFG("Saving config\n");
         save_load_apply_config(false);
       }
+      break;
+    case CONFIG_ACK: /* Power to both SID sockets is switched off and read/writes are dropped (v1.5+) */
+      usCFG("CONFIG_ACK\n");
+#if PCB_VERSION_INT >= 15
+      /* Can only acknowledge config, will save config _and_ turn power to both sockets on */
+      bool ack_state = config_unacknowledged();
+      usCFG("Configuration confirmed!\n");
+      usbsid_config.need_confirmation = detected_sid_change = false;
+      if (ack_state) {
+        save_config(&usbsid_config);
+        apply_socket_config_voltages();
+        clear_dma_channels();
+      }
+#endif
+      break;
+    case SOCKET_DETECT: /* Enable/disable automatic socket change detection on v1.5+ */
+      usCFG("SOCKET_DETECT\n");
+#if PCB_VERSION_INT >= 15
+      usbsid_config.disable_changedetect = (bool)buffer[1];
+      usCFG("Automatic socket change detection is now '%s'\n",
+        switch_str((int)!usbsid_config.disable_changedetect));
+      save_config(&usbsid_config);
+#endif
       break;
     case DETECT_SIDS:       /* Detect SID types per socket */
       if (buffer[1] == 0) {
@@ -818,6 +871,10 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case AUTO_DETECT:
       usCFG("AUTO_DETECT\n");
       err = sid_auto_detect(false); /* Not at boot */
+#if PCB_VERSION_INT >= 15
+      usbsid_config.need_confirmation = detected_sid_change = true; /* Force validation! */
+      voltage_state_off(); /* Turn off regulators again */
+#endif
       if (err != CFG_OK) {
         usERR("Auto detection failed: %s\n", config_error_str(err));
       }
@@ -929,7 +986,12 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case TEST_FN:
       uint8_t st = 0xFF;
       if (buffer[1] == 0) {
-        st = detect_armsid(buffer[2]);
+        if(buffer[2] == 0) st = detect_skpico(buffer[3]);
+        if(buffer[2] == 1) st = detect_armsid(buffer[3]);
+        if(buffer[2] == 2) st = detect_fpgasid(buffer[3]);
+        if(buffer[2] == 3) st = detect_pdsid(buffer[3]); // BUG: Causes dsync!
+        if(buffer[2] == 4) st = detect_backsid(buffer[3]);
+        if(buffer[2] == 5) st = detect_sidemu(buffer[3]);
         usCFG("Detect found: %02X\n", st);
       }
       if (buffer[1] == 1) {
@@ -1004,6 +1066,34 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
           dcyc, (float)(dcyc * sid_us),
           (test_after - test_before)
         );
+      }
+      if (buffer[1] == 0x0b) {
+        detect_socket_change();
+        clear_dma_channels();
+      }
+      #if PCB_VERSION_INT >= 15
+      if (buffer[1] == 0x0c) {
+        switch (buffer[2]) {
+          case 0:
+            set_SID5v_state((bool)buffer[3]);
+            break;
+          case 1:
+            set_SIDhv_state((bool)buffer[3]);
+            break;
+          case 2:
+            set_SID1_highvoltage((bool)buffer[3]);
+            break;
+          case 3:
+            set_SID2_highvoltage((bool)buffer[3]);
+            break;
+        }
+      }
+      #endif
+      if (buffer[1] == 0x0d) {
+        // set_sidemu_sidtype(buffer[2], buffer[3]);
+        extern uint8_t get_pin_states(void);
+        uint8_t pinstates = get_pin_states();
+        printf("PINSTATES: 0b%04b\n",pinstates);
       }
       break;
     case TEST_FN2:
@@ -1229,7 +1319,9 @@ ConfigError apply_config(bool at_boot)
   }
 
   /* Print config at end of apply if requested */
-  if (!at_boot && !auto_config) print_config();
+  if (!at_boot) {
+    print_config();
+  }
 
   return CFG_OK;
 }
@@ -1260,17 +1352,21 @@ void detect_default_config(void)
   usCFG("Detecting default configuration\n");
   usCFG("  Is default? %s\n",
     boolean_str((int)usbsid_config.default_config));
-  if(usbsid_config.default_config == 1) {
+  if(usbsid_config.default_config) {
     usCFG("  Default configuration detected!\n");
     usCFG("  MAGIC_SMOKE config_struct @ 0x%x cm_verification @ 0x%x\n",
       &usbsid_config.magic, &cm_verification);
     usCFG("  MAGIC_SMOKE verification config_struct = %u, header = %u, cm_verification = %u\n",
       usbsid_config.magic, MAGIC_SMOKE, cm_verification);
-    usbsid_config.default_config = 0;
+    usbsid_config.default_config = false;
     usCFG("  Default configuration state set to %s\n", boolean_str(usbsid_config.default_config));
     first_boot = true;  /* Only at first boot the link popup will be sent */
     /* default auto detect routine based on default config */
-    sid_auto_detect(true); /* At boot */
+    sid_auto_detect(true); /* At boot, turns on regulators for v1.5+ */
+#if PCB_VERSION_INT >= 15
+    usbsid_config.need_confirmation = detected_sid_change = true; /* Force validation! */
+    voltage_state_off(); /* Turn off regulators again */
+#endif
     save_config(&usbsid_config);
   }
   return;
