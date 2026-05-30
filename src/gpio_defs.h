@@ -36,6 +36,12 @@
 #define TX 16  /* uart 0 tx */
 #define RX 17  /* uart 0 rx */
 
+/* Unable to use PIO Uart on PCB v1.5+ */
+#if PCB_VERSION_INT >= 15
+#ifdef USE_PIO_UART
+#undef USE_PIO_UART /* Undefine the use of PIO Uart */
+#endif
+#endif
 /* PIO Uart */
 #ifdef USE_PIO_UART
 #define PIOUART_TX 26
@@ -67,10 +73,53 @@
 #define CS2  21  /* Chip Select for 2 or 3 & 4 with Clone SID */
 #define PHI1 22  /* Pico 1Mhz PWM out ~ External Clock In (v1.0 only) */
 
-/* Audio switch (v1.3+ only) */
-#if defined(HAS_AUDIOSWITCH)
-#define AU_SW 15
+/* v0.1, v0.2, v1.0 & v1.2 additional pin configuration */
+#if PCB_VERSION_INT < 13
+/* Unused */
+#define NIL0 14
+#define NIL1 15
+#ifndef USE_PIO_UART
+#define NIL2 26
+#define NIL3 27
 #endif
+#define NIL4 28
+/* v1.3 additional pin configuration */
+#elif PCB_VERSION_INT == 13
+/* Unused */
+#define NIL0  14
+#define AU_SW 15
+#ifndef USE_PIO_UART
+#define NIL2  26
+#define NIL3  27
+#endif
+#define NIL4 28
+/* v1.5+ additional pin configuration */
+#elif PCB_VERSION_INT == 15
+#define SIDVCC_EN 14 /* Active high, default to _off_ with pulldown */
+#define AU_SW     15 /* Default on ~ stereo */
+#define SIDHV_EN  26 /* Active high, default to _on_ */
+#define HV1_SEL   27 /* Active high, default to _off_ */
+#define HV2_SEL   28 /* Active high, default to _off_ */
+#endif
+/** v1.5+ Important additional information
+ *
+ * GPIO 14 -> SIDVCC_EN
+ * on v1.4 boards when SIDVCC_EN is off SID's will still get 5v directly from USB causing issues
+ * on v1.5 boards the 5v regulator is always on and SIDVCC_EN will toggle VCC input to both SID's on or off
+ *
+ * GPIO 26 -> SIDHV_EN
+ * on v1.4 & v1.5 boards the HV regulators are default off, SIDHV_EN will toggle VCC input to both HV regulators on or off
+ *
+ * GPIO 27 -> HV1_SEL
+ * GPIO 28 -> HV2_SEL
+ * HV1_SEL & HV2_SEL respectively toggle the HV regulators to 9v (off, default) and 12v (on)
+ * HV1_SEL & HV2_SEL automatically toggles the SID filter capacitors
+ * 22nF  (6582 & 8580) gets toggled off when GPIO is on and vice versa
+ * 470pF (6581) is always connected and gets added to the 22nF within the % deviation margin
+ * HV1_SEL & HV2_SEL (off) automatically toggle the 330k digiboost resistor for 6582 & 8580 SIDs
+ * HV1_SEL & HV2_SEL (on)  automatically toggle the 1k shunt resistor for 6581 SIDs
+ */
+
 
 /* LED */
 #if defined(PICO_DEFAULT_LED_PIN)
@@ -82,17 +131,6 @@
 #if defined(USE_RGB)
 #define WS2812_PIN 23  /* Only available on black clones with RGB LED onboard! */
 #endif
-
-/* Unused */
-#define NIL0 14
-#ifndef HAS_AUDIOSWITCH
-#define NIL1 15
-#endif
-#ifndef USE_PIO_UART
-#define NIL2 26
-#define NIL3 27
-#endif
-#define NIL4 28
 
 /* Masks */
 #define PIO_PINDIRMASK 0x3C3FFF  /* 0b00000000001111000011111111111111 18 GPIO pins */
