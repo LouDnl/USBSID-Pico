@@ -169,6 +169,7 @@ uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles)
   pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ1));  /* Clear the statemachine IRQ before starting */
   dma_channel_set_read_addr(dma_tx_delay, &delay_word, false);
   dma_channel_set_trans_count(dma_tx_delay, 1, false);  /* Reset transfer count to 1 */
+  __dsb();  /* ensure all config writes reach DMA controller before trigger */
   dma_hw->multi_channel_trigger = (1u << dma_tx_delay);  /* Delay cycles DMA transfer */
 
   for (;;) {  /* Keep mofo waiting yeah! */
@@ -256,6 +257,7 @@ uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t a
 
   dma_channel_set_read_addr(dma_tx_control, &control_word, false);
   dma_channel_set_read_addr(dma_tx_data, &data_word, false);
+  __dsb();  /* ensure all config writes reach DMA controller before trigger */
 
   cycled_delay_operation(cycles); /* Replaces the delay DMA */
   pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, PIO_IRQ0));  /* Preset the statemachine IRQ to not wait for a 1 */
@@ -292,6 +294,7 @@ void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint
   dma_channel_set_read_addr(dma_tx_delay, &delay_word, false);
   dma_channel_set_read_addr(dma_tx_control, &control_word, false);
   dma_channel_set_read_addr(dma_tx_data, &data_word, false);
+  __dsb();  /* ensure all config writes reach DMA controller before trigger */
   dma_hw->multi_channel_trigger = (
       1u << dma_tx_delay    /* Delay cycles DMA transfer */
   //#if PICO_PIO_VERSION > 0  /* rp2040 only for now, see notice in setup_dmachannels */
@@ -333,6 +336,7 @@ uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, ui
   dma_channel_set_read_addr(dma_tx_control, &control_word, false);
   dma_channel_set_read_addr(dma_tx_data, &data_word, false);
   dma_channel_set_write_addr(dma_rx_data, &read_data, false);
+  __dsb();  /* ensure all config writes reach DMA controller before trigger */
   dma_hw->multi_channel_trigger = (
       1u << dma_tx_delay    /* Delay cycles DMA transfer */
   //#if PICO_PIO_VERSION > 0  /* rp2040 only for now, see notice in setup_dmachannels */
