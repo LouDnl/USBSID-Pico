@@ -33,11 +33,20 @@
 
 
 /* Functions from gpio.c */
-void init_gpio(void);
-int  detect_clocksignal(void);
-void toggle_audio_switch(void);
-void set_audio_switch(bool state);
-
+void    init_vccvdd_control(void);
+void    init_bus_control(void);
+void    init_audio_switch(void);
+int     detect_clocksignal(void);
+void    toggle_audio_switch(void);
+void    set_audio_switch(bool state);
+void    set_SID5v_state(bool state);
+void    set_SIDhv_state(bool state);
+void    set_SID1_highvoltage(bool state);
+void    set_SID2_highvoltage(bool state);
+uint8_t get_pin_states(void);
+void    voltage_state_on(void);
+void    voltage_state_off(void);
+void    set_base_voltages(uint16_t wait_ms);
 
 #ifdef __cplusplus
   }
