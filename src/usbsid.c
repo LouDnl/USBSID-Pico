@@ -213,6 +213,7 @@ void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
   int state = 0;
   do {
     usbdata = 1;
+    vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
     state = do_buffer_tick(n_bytes, step);
   } while (state != 1);
 }
@@ -665,42 +666,57 @@ void core1_main(void)
 
   /* Signal Core 0 we're ready (sync point 1) */
   usBOOT("<CORE 1> Signaling core0 ready ~ 1\n");
-  __dmb();  /* Memory barrier before write */
   core_sync_state = SYNC_CORE1_STAGE1;
+  __dsb();  /* Data Synchronisation Barrier - ensures store completes before SEV */
   __sev();  /* Signal event to wake Core 0 from WFE */
 
   /* Wait for Core 0 to finish config loading */
   usBOOT("<CORE 1> Waiting for core0 sync ~ 1\n");
-  while (core_sync_state != SYNC_CORE0_STAGE1) {
+  while (true) {
     __wfe();  /* Wait for event - low power wait */
+    __dmb();  /* Data Memory Barrier */
+    if (core_sync_state == SYNC_CORE0_STAGE1) break;
   }
-  __dmb();  /* Memory barrier after read */
+  __dmb();  /* Data Memory Barrier after read */
 
   /* Init queues */
   queue_init(&sidtest_queue, sizeof(sidtest_queue_entry_t), 1);  /* 1 entry deep */
-  #ifdef WRITE_DEBUG  /* Only init this queue when needed */
+#ifdef WRITE_DEBUG  /* Only init this queue when needed */
   queue_init(&logging_queue, sizeof(writelogging_queue_entry_t), 16384);  /* 16384 entries deep so we don't skip any writes */
-  #endif
+#endif
 
   /* Initialise PIO Uart */
-  #ifdef USE_PIO_UART
+#ifdef USE_PIO_UART
   init_uart();
-  #endif
+#endif
 
   /* Signal Core 0 we're ready (sync point 2) */
   usBOOT("<CORE 1> Signaling core0 ready ~ 2\n");
-  __dmb();
   core_sync_state = SYNC_CORE1_STAGE2;
-  __sev();
+  __dsb(); /* Data Synchronisation Barrier - ensures store completes before SEV */
+  __sev(); /* Signal event to wake Core 0 from WFE */
 
   /* Wait for Core 0 to finish hardware init */
   usBOOT("<CORE 1> Waiting for core0 sync ~ 2\n");
-  while (core_sync_state != SYNC_CORE0_STAGE2) {
-    __wfe();
+  while (true) {
+    __wfe();  /* Wait for event - low power wait */
+    __dmb();  /* Data Memory Barrier */
+    if (core_sync_state == SYNC_CORE0_STAGE2) break;
   }
-  __dmb();
+  __dmb();  /* Data Memory Barrier after read */
 
   while (1) {
+
+    if (get_reset_state()) continue;
+
+    /* Blinky blinky? */
+    if (!offload_ledrunner) {
+      led_runner();
+    }
+
+#if PCB_VERSION_INT >= 15
+    if (detected_sid_change) continue;
+#endif
 
     /* Check SID test queue */
     if (running_tests) {
@@ -710,12 +726,7 @@ void core1_main(void)
       }
     }
 
-    /* Blinky blinky? */
-    if (!offload_ledrunner) {
-      led_runner();
-    }
-
-#if ONBOARD_SIDPLAYER
+#ifdef ONBOARD_SIDPLAYER
     if (sidplayer_init) {
       sidplayer_init = false;
       sidplayer_start = false;
@@ -819,6 +830,7 @@ int main()
     .speed = TUSB_SPEED_FULL
   };
   tusb_init(BOARD_TUD_RHPORT, &dev_init);
+  tud_disconnect();  /* Keep USB invisible to host during boot — set_base_voltages sleeps up to 4.5s */
   /* Init logging */
   init_logging();
   /* Log reset reason */
@@ -830,10 +842,12 @@ int main()
 
   /* Wait for Core 1 to signal ready (sync point 1) */
   usBOOT("CORE0 Waiting for core1 ready ~ 1\n");
-  while (core_sync_state != SYNC_CORE1_STAGE1) {
+  while (true) {
     __wfe();  /* Wait for event - low power wait */
+    __dmb();  /* Data Memory Barrier */
+    if (core_sync_state == SYNC_CORE1_STAGE1) break;
   }
-  __dmb();  /* Insert memory barrier after read */
+  __dmb();  /* Data Memory Barrier before write */
 
   /* Load config before init of USBSID settings ~ NOTE: This cannot be run from Core 1! */
   load_config(&usbsid_config);
@@ -862,60 +876,85 @@ int main()
 
   /* Signal Core 1 to continue (sync point 1) */
   usBOOT("<CORE 0> Signaling core1 ~ 1\n");
-  __dmb();  /* Insert memory barrier after read */
   core_sync_state = SYNC_CORE0_STAGE1;
+  __dsb();  /* Data Synchronisation Barrier - ensures store completes before SEV */
   __sev();  /* Signal event to wake Core 1 from WFE */
 
   /* Wait for Core 1 to finish queue/uart init (sync point 2) */
   usBOOT("<CORE 0> Waiting for core1 ready ~ 2\n");
-  while (core_sync_state != SYNC_CORE1_STAGE2) {
+  while (true) {
     __wfe();  /* Wait for event - low power wait */
+    __dmb();  /* Data Memory Barrier */
+    if (core_sync_state == SYNC_CORE1_STAGE2) break;
   }
-  __dmb();  /* Insert memory barrier after read */
+  __dmb();  /* Data Memory Barrier after read */
 
-  /* Init GPIO */
-  usBOOT("Initializing GPIO\n");
-  init_gpio();
   /* Start verification, detect and init sequence of SID clock */
   usBOOT("Setup SID clock\n");
   setup_sidclock();
+
+  /* Init C64 bus */
+  usBOOT("Initializing C64 bus\n");
+  init_bus_control();
+
+#if PCB_VERSION_INT >= 15
+  /* Init voltage control */
+  usBOOT("Initializing voltage control\n");
+  init_vccvdd_control();
+#endif
+
+#if PCB_VERSION_INT >= 13
+  /* Init audio switch */
+  usBOOT("Initializing audio switch\n");
+  init_audio_switch();
+#endif
+
   /* Init PIO */
   usBOOT("Setup PIO bus\n");
   setup_piobus();
   /* Sync PIOS */
   usBOOT("Synchronise PIO's\n");
   sync_pios(true);
+
   /* Init DMA */
   usBOOT("Setup DMA channels\n");
   setup_dmachannels();
+
   /* Start the VU */
   usBOOT("Initialise Vu\n");
   init_vu();
+
   /* Init midi */
   usBOOT("Initialise Midi\n");
   midi_init();
+
   /* Init ASID */
   usBOOT("Initialise ASID\n");
   asid_init();
-  /* Enable SID chips */
-  usBOOT("Enable SID chips\n");
-  enable_sid(false);
 
-  /* Clear the dirt */
-  memset(sid_memory, 0, SID_MEMORY_SIZE); /* Always no more then 128 bytes */
+  /* Init SID states */
+  usBOOT("Init SID states\n");
+  init_sid_states(); /* NOTE: Detecting SID types require 9v to be enabled for all MOS SID types */
 
   /* Check for default config bit */
-  detect_default_config();
-
+#if PCB_VERSION_INT >= 15
+  /* Only run autodetect sequence if not already waiting for confirmation */
+  if (!usbsid_config.need_confirmation) {
+    detect_default_config(); /* Saves config, always */
   }
-  /* Print config once at end of boot routine */
-  print_config();
+#else
+  detect_default_config(); /* Saves config, always */
+#endif
 
-  /* Reset SID chips */
-  usBOOT("Reset SID chips\n");
-  reset_sid(); /* WARNING: Might cause issues! */
-  usBOOT("Reset SID registers\n");
-  reset_sid_registers(); /* WARNING: Might cause issues! */
+  /* No need to reset SID registers or resetting the SID's
+     at this point on boot on pre v1.4 boards */
+
+#if PCB_VERSION_INT >= 15
+  verify_socket_config();
+#endif
+  /* Print config once at end of boot routine
+     detected_sid_change is always false on pre v1.5 boards */
+  if (!detected_sid_change) print_config();
 
   {
     usNFO("\n");
@@ -925,18 +964,26 @@ int main()
 #ifdef ONBOARD_SIDPLAYER
     usDBG("Firmware is compiled with onboard SID player\n");
 #endif
-    usDBG("%s v%s Started successfully\n\n", us_product, project_version);
+    if (!detected_sid_change) {
+      usDBG("%s v%s Started successfully\n\n", us_product, project_version);
+    } else {
+      usDBG("%s v%s\n", us_product, project_version);
+      usWRN("Please verify socket configuration before further use!\n\n");
+    }
   }
 
   /* Signal Core 1 to enter main loop (sync point 2) */
   usBOOT("<CORE 0> Signaling core1 ~ 2\n");
-  __dmb();  /* Memory barrier after read */
   core_sync_state = SYNC_CORE0_STAGE2;
+  __dsb();  /* Data Synchronisation Barrier - ensures store completes before SEV */
   __sev();  /* Signal event to wake Core 1 from WFE */
+
+  /* All hardware ready — allow host to enumerate */
+  if (!tud_connect()) usERR("!! USB CONNECTION ERROR !!");
 
   /* Loop IO tasks forever */
   while (1) {
-    tud_task_ext(/* UINT32_MAX */0, false);  /* equals tud_task(); */
+    tud_task_ext(0, false);  /* equals tud_task(); timout_ms already at 0 and is _always_ discarded in osal_none.h */
 #ifndef USE_CDC_CALLBACK
     cdc_task();  /* Only use this if no callbacks */
 #endif
