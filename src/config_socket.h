@@ -37,14 +37,18 @@
 
 
 /* Functions from config_socket.c */
+void        set_socketconfig_logging(bool enabled);
 ConfigError validate_config(void);
 void        socket_config_fallback(void);
 void        apply_fmopl_config(void);
 void        apply_preset_wrapper(SocketPreset preset);
 void        flip_sockets(void);
 ConfigError apply_detection_results(const DetectionResult *det);
+ConfigError verify_socket_detection_results(const DetectionResult *det);
 Socket      default_socket(int id);
-
+ConfigError detect_socket_change(void);
+void        apply_socket_config_voltages(void);
+void        verify_socket_config(void);
 
 #ifdef __cplusplus
   }

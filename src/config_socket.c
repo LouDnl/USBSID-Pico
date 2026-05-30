@@ -24,6 +24,8 @@
  */
 
 #include <globals.h>
+#include <gpio.h>
+#include <dma.h>
 #include <usbsid_constants.h>
 #include <config.h>
 #include <config_bus.h>
@@ -31,12 +33,27 @@
 #include <sid.h>
 #include <sid_detection.h>
 #include <logging.h>
+#include <usbsid.h>
 
 
 /* Pre declarations */
 ConfigError validate_config(void);
 Socket default_socket(int id);
 
+/* Local volatile variable to stop any logging when detecting socket changes */
+static volatile bool socket_logging = true;
+
+
+/**
+ * @brief Set the socket logging object
+ *
+ * @param boolean enabled
+ */
+void set_socketconfig_logging(bool enabled)
+{
+  socket_logging = enabled;
+  return;
+}
 
 #if defined(ONBOARD_EMULATOR)
 /**
@@ -162,9 +179,11 @@ void apply_sid_addresses(void)
   if (addrs[2] == 0xFF) usbsid_config.socketTwo.sid1.type = SID_NA;
   if (addrs[3] == 0xFF) usbsid_config.socketTwo.sid2.type = SID_NA;
 
-  usNFO("\n");
-  usCFG("SID addresses applied: S1.1=0x%02X S1.2=0x%02X S2.1=0x%02X S2.2=0x%02X (idx=%d)\n",
-    addrs[0], addrs[1], addrs[2], addrs[3], idx);
+  if (socket_logging) {
+    usNFO("\n");
+    usSOCK("SID addresses applied: S1.1=0x%02X S1.2=0x%02X S2.1=0x%02X S2.2=0x%02X (idx=%d)\n",
+      addrs[0], addrs[1], addrs[2], addrs[3], idx);
+  }
 
   return;
 }
@@ -197,10 +216,10 @@ ConfigError apply_detection_results(const DetectionResult *det)
 
   /* Ensure at least one socket is enabled */
   if (!usbsid_config.socketOne.enabled && !usbsid_config.socketTwo.enabled) {
-    /* Fallback: enable both sockets with unknown chips */
+    /* Fallback: enable only socket one and set both sockets to with unknown chip */
     usbsid_config.socketOne.enabled = true;
     usbsid_config.socketOne.chiptype = CHIP_UNKNOWN;
-    usbsid_config.socketTwo.enabled = true;
+    usbsid_config.socketTwo.enabled = false;
     usbsid_config.socketTwo.chiptype = CHIP_UNKNOWN;
   }
 
@@ -208,6 +227,69 @@ ConfigError apply_detection_results(const DetectionResult *det)
   apply_sid_addresses();
 
   return validate_config();
+}
+
+/**
+ * @brief Verifies detection results on socket change activity only
+ *
+ * @param det
+ * @return ConfigError
+ */
+ConfigError verify_socket_detection_results(const DetectionResult *det)
+{
+  usSOCK("Verifying socket detection results\n");
+  if (!det->success) {
+    return det->error != CFG_OK ? det->error : CFG_ERR_DETECTION_FAILED;
+  }
+
+  /* Verify Socket 1 results */
+  bool s1check1 = (usbsid_config.socketOne.chiptype  != det->socket[0].chiptype);
+  bool s1check2 = (usbsid_config.socketOne.dualsid   != det->socket[0].supports_dual);
+  bool s1check3 = (usbsid_config.socketOne.enabled   != det->socket[0].present);
+  /* Verify Socket 2 results */
+  bool s2check1 = (usbsid_config.socketTwo.chiptype  != det->socket[1].chiptype);
+  bool s2check2 = (usbsid_config.socketTwo.dualsid   != det->socket[1].supports_dual);
+  bool s2check3 = (usbsid_config.socketTwo.enabled   != det->socket[1].present);
+  if ((det->socket[0].chiptype == CHIP_REAL) && s1check1) {
+    /* TODO: Do something here because voltage change!? */
+  }
+  if ((det->socket[1].chiptype == CHIP_REAL) && s2check1) {
+    /* TODO: Do something here because voltage change!? */
+  }
+
+  /* Anything changed!? */
+  if (s1check1 || s1check2 || s1check3
+      || s2check1 || s2check2 || s2check3 ) {
+    usSOCK("  SocketOne detected changes:\n");
+    usSOCK("    Chip: %s was: %s detected: %s\n",
+      changed_str(s1check1),
+      chip_type_name(usbsid_config.socketOne.chiptype),
+      chip_type_name(det->socket[0].chiptype));
+    usSOCK("    Present: %s was: %s detected: %s\n",
+      changed_str(s1check3),
+      boolean_str(usbsid_config.socketOne.enabled),
+      boolean_str(det->socket[0].present));
+    usSOCK("    DualSID: %s was: %s detected: %s\n",
+      changed_str(s1check2),
+      boolean_str(usbsid_config.socketOne.dualsid),
+      boolean_str(det->socket[0].supports_dual));
+    usSOCK("  SocketTwo detected changes:\n");
+    usSOCK("    Chip: %s was: %s detected: %s\n",
+      changed_str(s1check1),
+      chip_type_name(usbsid_config.socketTwo.chiptype),
+      chip_type_name(det->socket[1].chiptype));
+    usSOCK("    Present: %s was: %s detected: %s\n",
+      changed_str(s2check3),
+      boolean_str(usbsid_config.socketTwo.enabled),
+      boolean_str(det->socket[1].present));
+    usSOCK("    DualSID: %s was: %s detected: %s\n",
+      changed_str(s2check2),
+      boolean_str(usbsid_config.socketTwo.dualsid),
+      boolean_str(det->socket[1].supports_dual));
+    return CFG_ERR_CHANGE_DETECTED;
+  }
+
+  return CFG_OK;
 }
 
 /**
@@ -445,6 +527,8 @@ static ConfigError apply_preset(SocketPreset preset)
     return CFG_ERR_EQUAL_PRESET;
   }
 
+  set_socketconfig_logging(false); /* Disable logging */
+
   /* Run autodetection before applying preset,
      this will ensure supporting chips and sids, etc */
   sid_auto_detect_silent();
@@ -453,6 +537,7 @@ static ConfigError apply_preset(SocketPreset preset)
 
   /* Validate the result */
   err = apply_new_presetconfig();
+  set_socketconfig_logging(true); /* Enable logging */
   if (err != CFG_OK) {
     usERR("Preset '%s' validation failed: %s\n", preset_name(preset), config_error_str(err));
   } else {
@@ -488,7 +573,7 @@ void apply_preset_wrapper(SocketPreset preset)
   save_load_config();
 
   usNFO("\n");
-  usCFG("Preset applied: %s\n", preset_name(preset));
+  usSOCK("Preset applied: %s\n", preset_name(preset));
   return;
 }
 
@@ -530,7 +615,7 @@ Socket default_socket(int id)
  */
 void socket_config_fallback(void)
 {
-  usCFG("Applying socket fallback configuration\n");
+  if (socket_logging) usSOCK("Applying socket fallback configuration\n");
   /* Socket One */
   usbsid_config.socketOne = default_socket(1);
   /* Socket Two */
@@ -546,5 +631,150 @@ void socket_config_fallback(void)
   memcpy(&cfg, &new_cfg, sizeof(RuntimeCFG));
   restore_interrupts(irq);
 
+  return;
+}
+
+/**
+ * @brief Autodetection for sock chip change
+ * @note Any change _will_ lock USBSID untill verification
+ *
+ * @return * ConfigError
+ */
+ConfigError detect_socket_change(void)
+{
+  /* Disable logging */
+  set_socketconfig_logging(false);
+  set_detection_logging(false);
+  set_busconfig_logging(false);
+
+#if PCB_VERSION_INT >= 15
+  /* Set base voltages, only does anything if PCB version is >= v1.5 */
+  set_base_voltages(500); /* Logically also resets the SID */
+#else
+  reset_sid();
+#endif
+
+  /* Run detection */
+  DetectionResult det = detect_all();
+
+  /* Verify results */
+  ConfigError change_detected = verify_socket_detection_results(&det);
+
+  err = apply_detection_results(&det);
+  if (err != CFG_OK) {
+    usERR("Error applying detection results: %s\n", config_error_str(err));
+  }
+
+  /* Re-enable logging */
+  set_socketconfig_logging(true);
+  set_busconfig_logging(true);
+  set_detection_logging(true);
+
+  /* Reset SID registers afterwards */
+  reset_sid_registers();
+
+  if (change_detected != CFG_OK) {
+#if PCB_VERSION_INT >= 15
+    voltage_state_off(); /* Turn off regulators if change detected */
+#endif
+    usWRN("SID Protection: %s\n", config_error_str(change_detected));
+    return change_detected;
+  }
+
+  return CFG_OK;
+}
+
+/**
+ * @brief Sets and applies socket config voltage according
+ *        to each sockets Chip and SID type
+ *
+ * @note only run this _after_ a detect_socket_change
+ *       returns a detected change and it is validated!!
+ *
+ */
+void apply_socket_config_voltages(void)
+{
+#if PCB_VERSION_INT >= 15
+  if ((usbsid_config.socketOne.chiptype == CHIP_REAL
+      && usbsid_config.socketOne.sid1.type == SID_6581)
+      || (usbsid_config.socketTwo.chiptype == CHIP_REAL
+      && usbsid_config.socketTwo.sid1.type == SID_6581)) {
+    /* If 12v is needed we disable all voltages and reconfigure the HV */
+    voltage_state_off();
+    /* SocketOne */
+    if (usbsid_config.socketOne.enabled) {
+      if (usbsid_config.socketOne.chiptype == CHIP_REAL) {
+        if (usbsid_config.socketOne.sid1.type == SID_6581) {
+          set_SID1_highvoltage(true); /* 12v */
+        } else {
+          set_SID1_highvoltage(false); /* 9v */
+        }
+      } else {
+        set_SID1_highvoltage(false); /* 9v */
+      }
+    }
+    /* SocketTwo */
+    if (usbsid_config.socketTwo.enabled) {
+      if (usbsid_config.socketTwo.chiptype == CHIP_REAL) {
+        if (usbsid_config.socketTwo.sid1.type == SID_6581) {
+          set_SID2_highvoltage(true); /* 12v */
+        } else {
+          set_SID2_highvoltage(false); /* 9v */
+        }
+      } else {
+        set_SID2_highvoltage(false);/* 9v */
+      }
+    }
+    voltage_state_on(); /* Turn on regulators */
+  } else { /* Not a real 6581? Then just fire up the 5v and 9v */
+    set_base_voltages(100);
+  }
+#endif
+  return;
+}
+
+/**
+ * @brief verifies the socket configuration loaded from flash
+ *        by running a socket change detection if needed
+ *        Will turn off regulators if waiting for confirmation
+ *        Will otherwise apply requested voltages if no change
+ *        is detected or if change detection is disabled
+ *
+ */
+void verify_socket_config(void)
+{
+#if PCB_VERSION_INT >= 15
+  /* Detect changes in socket configuration */
+  if (!usbsid_config.disable_changedetect) { /* If in config disabled then skip and apply voltages from config! */
+    if (!first_boot /* Set by detect default config */
+        && !usbsid_config.need_confirmation /* Not already waiting for confirmation */
+        && (detect_socket_change() != CFG_OK)) {
+      usbsid_config.need_confirmation = detected_sid_change = true;
+      /* Disable SID chips */
+      voltage_state_off();
+      /* Force save the config for confirmation check */
+      save_config_ext();
+    } else if (!usbsid_config.need_confirmation && !detected_sid_change) { /* No changes */
+      /* Apply voltage from configurated Chips */
+      apply_socket_config_voltages();
+    } else if (usbsid_config.need_confirmation && !detected_sid_change) { /* Change detected on previous boot */
+      detected_sid_change = true;
+      /* Disable SID chips if still enabled */
+      voltage_state_off();
+    } else if (usbsid_config.need_confirmation || detected_sid_change) { /* Fallback */
+      /* Disable SID chips if still enabled */
+      voltage_state_off();
+    }
+  } else { /* Just go with the flow and live dangerously! */
+    if (usbsid_config.need_confirmation || detected_sid_change) { /* Fallback check to disable these */
+      usbsid_config.need_confirmation = detected_sid_change = false;
+      save_config_ext();
+    }
+    /* Apply voltage from configurated Chips */
+    apply_socket_config_voltages();
+  }
+  /* Clear DMA channels and PIO bus afterwards */
+  clear_dma_channels();
+#endif
   return;
 }
