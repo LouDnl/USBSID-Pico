@@ -62,14 +62,29 @@ static const uint8_t addr_mask_by_slot[5] = {
   0x00,   /* N/A: no address decode */
 };
 
+/* Local volatile variable to stop any logging when detecting socket changes */
+static volatile bool bus_logging = true;
+
+/**
+ * @brief Set the bus logging object
+ *
+ * @param boolean enabled
+ */
+void set_busconfig_logging(bool enabled)
+{
+  bus_logging = enabled;
+  return;
+}
 
 /**
  * @brief Apply new busmask from supplied runtime configuration
  *        The busmask is used by bus.c functions
+ * @note  Does _not_ change the running Runtime cfg if rt supplied is not
+ *        the global Runtime cfg
  *
  * @param RuntimeCFG *rt
  */
-void apply_bus_masks(RuntimeCFG *rt)
+static void apply_bus_masks(RuntimeCFG *rt)
 {
   if (rt == NULL) return;
 
@@ -143,6 +158,8 @@ void apply_bus_masks(RuntimeCFG *rt)
 
 /**
  * @brief Applies a config to a runtime config and calls `apply_bus_masks`
+ * @note  Does _not_ change the running Runtime cfg if rt supplied is not
+ *        the global Runtime cfg
  *
  * @param Config *config
  * @param RuntimeCFG *rt
@@ -220,9 +237,10 @@ void apply_runtime_config(const Config *config, RuntimeCFG *rt)
   /* Apply bus control masks */
   apply_bus_masks(rt);
 
-  usNFO("\n");
-  usCFG("Applied RuntimeCFG sids=%d (s1=%d s2=%d) mirrored=%d\n",
-    rt->numsids, rt->sids_one, rt->sids_two, rt->mirrored);
+  if (bus_logging) {
+    usBUS("Applied RuntimeCFG sids=%d (s1=%d s2=%d) mirrored=%d\n",
+      rt->numsids, rt->sids_one, rt->sids_two, rt->mirrored);
+  }
 
   return;
 }
