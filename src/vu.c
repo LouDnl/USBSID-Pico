@@ -54,17 +54,30 @@ volatile static int _rgb = 0;
 
 
 /**
+ * @brief Assign supplied value to global variable and trigger
+ *
+ * @param uint32_t _rgb_value
+ */
+void __no_inline_not_in_flash_func(fill_and_trigger_rgb)(uint32_t _rgb_value)
+{
+#if defined(USE_RGB)
+  rgb_value = _rgb_value;
+  dma_hw->multi_channel_trigger = (1u << dma_rgbled);
+#endif
+  return;
+}
+
+/**
  * @brief Init the RGB LED
  *
  */
 void init_rgb(void)
 {
-  #if defined(USE_RGB)
+#if defined(USE_RGB)
   _rgb = RANDVAL(0, 5);  /* Select random color to start with */
   r_ = g_ = b_ = 0;
-  rgb_value = (UGRB_U32(r_,g_,b_) << 8u);
-  dma_hw->multi_channel_trigger = (1u << dma_rgbled);
-  #endif
+  fill_and_trigger_rgb(UGRB_U32(r_,g_,b_) << 8u);
+#endif
   return;
 }
 
@@ -91,15 +104,15 @@ void init_vu(void)
  * @brief It goes up and it goes down
  *
  */
-void led_vumeter_task(void)
+void __no_inline_not_in_flash_func(led_vumeter_task)(void)
 { /* Only the lower 8 bits of each oscillator frequency is used
      Adding the higher 8 bits only makes de LED brighter and the Vu uglier */
-  #if LED_PWM
+#if LED_PWM
   if (to_us_since_boot(get_absolute_time()) - start_us < usbsid_config.raster_rate) {  /* Wait time by rasterrate */
     return;  /* not enough time, not complete a raster */
   }
   start_us = to_us_since_boot(get_absolute_time());
-  if (usbdata == 1 && dtype != ntype) {
+  if (usbdata == 1/*  && dtype != ntype */) {
     /* LED always uses SID 1 */
     double osc1, osc2, osc3;
     osc1 = (sid_memory[0x00] * 0.596f);  /* Frequency in Hz of SID1 @ $D400 Oscillator 1 */
@@ -113,18 +126,17 @@ void led_vumeter_task(void)
       dma_hw->multi_channel_trigger = (1u << dma_pwmled);
     }
 
-    #if defined(USE_RGB)
+#if defined(USE_RGB)
     if(usbsid_config.RGBLED.enabled) {
       int sidno = (usbsid_config.RGBLED.sid_to_use - 1) * 0x20;
-      rgb_value = (
+      fill_and_trigger_rgb(
         (UGRB_U32(
           RGBB((sid_memory[0x00 + sidno] * 0.596f),usbsid_config.RGBLED.brightness),
           RGBB((sid_memory[0x07 + sidno] * 0.596f),usbsid_config.RGBLED.brightness),
           RGBB((sid_memory[0x0E + sidno] * 0.596f),usbsid_config.RGBLED.brightness))
         ) << 8u);
-      dma_hw->multi_channel_trigger = (1u << dma_rgbled);
     }
-    #endif
+#endif
 
     usMEM("[%c:%d][PWM]$%04x[V1]$%02X%02X$%02X%02X$%02X$%02X$%02X[V2]$%02X%02X$%02X%02X$%02X$%02X$%02X[V3]$%02X%02X$%02X%02X$%02X$%02X$%02X[FC]$%02x%02x$%02x[VOL]$%02x\n",
       dtype, usbdata, vu,
@@ -135,17 +147,17 @@ void led_vumeter_task(void)
 
   }
   return;
-  #endif
+#endif
 }
 
 /**
  * @brief Mouth breather!
  *
  */
-void led_breathe_task(void)
+void __no_inline_not_in_flash_func(led_breathe_task)(void)
 {
-  #if LED_PWM
-  if (usbdata == 0 && dtype == ntype) {
+#if LED_PWM
+  if (usbdata == 0/*  && dtype == ntype */) {
     if (to_us_since_boot(get_absolute_time()) - start_us < (uint32_t)BREATHE_INTV) {
       return;  /* not enough time since last check */
     }
@@ -156,9 +168,9 @@ void led_breathe_task(void)
     }
     if (pwm_value <= 0) {
       updown = 1;
-      #ifdef USE_RGB
+#ifdef USE_RGB
       _rgb = RANDVAL(0, 5);  /* Select random color when at 0 brightness */
-      #endif
+#endif
     }
 
     if (updown == 1 && pwm_value <= VU_MAX)
@@ -169,35 +181,67 @@ void led_breathe_task(void)
     if (usbsid_config.LED.enabled && usbsid_config.LED.idle_breathe) {
       dma_hw->multi_channel_trigger = (1u << dma_pwmled);
     }
-    #if defined(USE_RGB)
+#if defined(USE_RGB)
     if (usbsid_config.RGBLED.enabled && usbsid_config.RGBLED.idle_breathe) {
       int rgb_ = MAP(pwm_value, 0, VU_MAX, 0, 31);
       r_ = (_rgb == 0 || _rgb == 3 || _rgb == 5) ? (rgb_ * 8) : 0;
       g_ = (_rgb == 1 || _rgb == 3 || _rgb == 4) ? (rgb_ * 8) : 0;
       b_ = (_rgb == 2 || _rgb == 4 || _rgb == 5) ? (rgb_ * 8) : 0;
-      rgb_value = (
+      fill_and_trigger_rgb(
         (UGRB_U32(
           RGBB(r_,usbsid_config.RGBLED.brightness),
           RGBB(g_,usbsid_config.RGBLED.brightness),
           RGBB(b_,usbsid_config.RGBLED.brightness))
         ) << 8u);
-      dma_hw->multi_channel_trigger = (1u << dma_rgbled);
     } else {
-      rgb_value = ((UGRB_U32(0,0,0)) << 8u);
-      dma_hw->multi_channel_trigger = (1u << dma_rgbled);
+      fill_and_trigger_rgb((UGRB_U32(0,0,0)) << 8u);
     }
-    #endif
+#endif
   }
   return;
-  #endif
+#endif
+}
+
+/**
+ * @brief Blinky blinky on SID change :D
+ * Auto loops Core2 when SID has changed
+ *
+ */
+void __no_inline_not_in_flash_func(led_fast_blink)(void)
+{
+  if (to_us_since_boot(get_absolute_time()) - us_now < BLINK_INTV) {
+    /* do nothing */
+    return;
+  }
+  us_now = to_us_since_boot(get_absolute_time());
+  static bool state = true; /* default start with on */
+#if LED_PWM
+  pwm_value = (state ? ALWAYS_ON : VU_MAX);
+  state = !state;
+  dma_hw->multi_channel_trigger = (1u << dma_pwmled);
+#if defined(USE_RGB)
+  fill_and_trigger_rgb((UGRB_U32((state?248:0),0,0)) << 8u);
+#endif /* USE_RGB */
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+  /* Ask the wifi "driver" to set the GPIO on or off */
+  cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, state);
+  state = !state;
+#endif /* CYW43_WL_GPIO_LED_PIN */
+  return;
 }
 
 /**
  * @brief It just runs and runs and runs and...
  *
  */
-void led_runner(void)
-{ /* Called from Core 1 */
+void __no_inline_not_in_flash_func(led_runner)(void)
+{ /* Called from Core 0 or 1 (default) */
+#if PCB_VERSION_INT >= 15
+  if __us_unlikely(detected_sid_change) {
+    led_fast_blink();
+    return;
+  }
+#endif
   usbdata == 1 ? led_vumeter_task() : led_breathe_task();
   if (to_us_since_boot(get_absolute_time()) - us_now < CHECK_INTV) { /* 0.1 second */
     /* NOTICE: Testfix for core1 setting dtype to 0 */

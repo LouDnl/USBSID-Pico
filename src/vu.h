@@ -33,6 +33,7 @@
 
 /* Default includes */
 #include <stdint.h>
+#include <pico/platform.h>
 
 
 /* LED breathe levels */
@@ -42,6 +43,7 @@ enum
   ALWAYS_ON    = 0,       /* zero is on */
   CHECK_INTV   = 100000,  /* 100ms == 100000us */
   MAX_CHECKS   = 100,     /* 100 checks times 100ms == 10 seconds */
+  BLINK_INTV   = 100000,  /* 100ms blinky blinky interval */
   BREATHE_INTV = 1000,    /* 1ms == 1000us */
   BREATHE_STEP = 100,     /* steps in brightness */
   VU_MAX       = 65534,   /* max vu brightness */
@@ -53,7 +55,8 @@ extern volatile uint16_t vu;
 
 /* Functions from vu.c */
 void init_vu(void);
-void led_runner(void);
+void __no_inline_not_in_flash_func(led_runner)(void);
+void __no_inline_not_in_flash_func(led_fast_blink)(void);
 
 
 #ifdef __cplusplus
