@@ -40,22 +40,24 @@
 
 
 /* Functions from sid_detection.c */
-ConfigError sid_auto_detect(bool at_boot);
-ConfigError sid_auto_detect_silent(void);
-ChipType    detect_chiptype_at(uint8_t base_address);
-SIDType     detect_sidtype_at(uint8_t base_address, uint8_t chiptype);
-bool        detect_fmopl(uint8_t base_address);
-void        auto_detect_routine(void);
-uint8_t     detect_sid_model(uint8_t start_addr);
-uint8_t     detect_sid_version(uint8_t start_addr);
-uint8_t     detect_sid_reflex(uint8_t start_addr);
-uint8_t     detect_sid_version_skpico_deprecated(uint8_t start_addr);
-bool        detect_fpgasid(uint8_t base_address);
-bool        detect_skpico(uint8_t base_address);
-bool        detect_pdsid(uint8_t base_address, bool silent);
-bool        detect_armsid(uint8_t base_address);
-bool        detect_backsid(uint8_t base_address);
-bool        detect_sidemu(uint8_t base_address);
+void            set_detection_logging(bool enabled);
+ConfigError     sid_auto_detect(bool at_boot);
+ConfigError     sid_auto_detect_silent(void);
+ChipType        detect_chiptype_at(uint8_t base_address);
+SIDType         detect_sidtype_at(uint8_t base_address, uint8_t chiptype);
+DetectionResult detect_all(void);
+bool            detect_fmopl(uint8_t base_address);
+void            auto_detect_routine(void);
+uint8_t         detect_sid_model(uint8_t start_addr);
+uint8_t         detect_sid_version(uint8_t start_addr);
+uint8_t         detect_sid_reflex(uint8_t start_addr);
+uint8_t         detect_sid_version_skpico_deprecated(uint8_t start_addr);
+bool            detect_fpgasid(uint8_t base_address);
+bool            detect_skpico(uint8_t base_address);
+bool            detect_pdsid(uint8_t base_address);
+bool            detect_armsid(uint8_t base_address);
+bool            detect_backsid(uint8_t base_address);
+bool            detect_sidemu(uint8_t base_address);
 
 
 #ifdef __cplusplus
