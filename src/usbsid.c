@@ -27,6 +27,7 @@
 #include <usbsid.h>
 #include <usbsid_constants.h>
 #include <config.h>
+#include <config_socket.h>
 #include <gpio.h>
 #include <gpio_defs.h>
 #include <pio.h>
@@ -37,7 +38,6 @@
 #include <mcu.h>
 #include <sid.h>
 #include <sid_tests.h>
-#include <sid_detection.h>
 #include <midi.h>
 #include <asid.h>
 #include <logging.h>
@@ -71,6 +71,12 @@ static bool web_serial_connected = false;
 
 volatile double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
 volatile bool offload_ledrunner = false;
+#if PCB_VERSION_INT >= 15
+volatile bool detected_sid_change = false;
+volatile bool sid_change_unacknowledged = true;
+#else
+const bool detected_sid_change = false;
+#endif
 
 /* Cynthcart emulator */
 #if defined(ONBOARD_EMULATOR)
@@ -152,12 +158,12 @@ void reset_reason(void)
 /* Initialise debug logging if enabled */
 void init_logging(void)
 {
-  #if defined(USBSID_UART)
+#if defined(USBSID_UART)
   stdio_uart_init_full(uart0, BAUD_RATE, TX, RX);
   sleep_ms(100);  /* leave time for uart to settle */
   stdio_flush();
   usNFO("\n[NFO] Uart logging initialised\n");
-  #endif
+#endif
   return;
 }
 
@@ -219,8 +225,14 @@ void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volat
   uint8_t command = ((sid_buffer[0] & PACKET_TYPE) >> 6);
   uint8_t subcommand = (sid_buffer[0] & COMMAND_MASK);
   uint8_t n_bytes = (sid_buffer[0] & BYTE_MASK);
-  if __us_unlikely(get_reset_state() && (command != COMMAND)) { return; };  /* Drop incoming data if in reset state */
+  if __us_unlikely(get_reset_state()
+    && (command != COMMAND)
+    && ((subcommand != CYCLED_READ)
+      && (subcommand != DELAY_CYCLES))) { return; };  /* Drop incoming data if in reset state */
 
+  if __us_unlikely(config_unacknowledged()) {
+    goto SIDCHANGEDETECTED;
+  }
   if __us_likely(command == CYCLED_WRITE) {
     // n_bytes = (n_bytes == 0) ? 4 : n_bytes; /* if byte count is zero, this is a single write packet */
     if __us_unlikely(n_bytes == 0) {
@@ -260,7 +272,10 @@ void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volat
     vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
     return;
   };
+SIDCHANGEDETECTED:;
   if (command == COMMAND) {
+    if __us_unlikely(config_unacknowledged()
+     && (subcommand != CONFIG) && (subcommand != RESET_MCU) && (subcommand != BOOTLOADER)) return;
     switch (subcommand) {
       case CYCLED_READ:
         usIO("[I %d] [%c] $%02X %u\n", n_bytes, dtype, sid_buffer[1], (sid_buffer[2] << 8 | sid_buffer[3]));
@@ -374,7 +389,7 @@ void tud_resume_cb(void)
 
 /* USB MIDI CLASS TASK & CALLBACKS */
 
-void midi_task(void) /* Disabled in loop ~ keeping for later use */
+void midi_task(void) /* Disabled in loop ~ keeping for optional later use */
 { /* Same as the callback routine */
   if (tud_midi_n_mounted(MIDI_ITF)) {
     while (tud_midi_n_available(MIDI_ITF, MIDI_CABLE)) {  /* Loop as long as there is data available */
@@ -591,7 +606,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
            * Get landing page url and return it
            * if on default config first boot
            */
-          if (first_boot) {
+          if (first_boot || usbsid_config.need_confirmation || detected_sid_change) {
             return tud_control_xfer(rhport, request, (void*)(uintptr_t) &desc_url, desc_url.bLength);
             first_boot = false;
           } else {
