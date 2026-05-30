@@ -157,7 +157,8 @@ SECTIONS
         __data_start__ = .;
         *(vtable)
 
-        *(.time_critical*)
+        /* *(.time_critical*) */
+        *(SORT_BY_ALIGNMENT(.time_critical.*))
 
         /* remaining .text and .rodata; i.e. stuff we exclude above because we want it in RAM */
         *(.text*)
@@ -168,7 +169,8 @@ SECTIONS
         *(.data*)
 
         . = ALIGN(4);
-        *(.after_data.*)
+        /* *(.after_data.*) */
+        *(SORT_BY_ALIGNMENT(.after_data.*))
         . = ALIGN(4);
         /* preinit data */
         PROVIDE_HIDDEN (__mutex_array_start = .);
