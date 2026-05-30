@@ -74,20 +74,30 @@ do {                                 \
 
 #ifdef USBSID_DEBUG
 #define usDBG(fmt, ...) __DBG("[DBG] " fmt __VA_OPT__(,) __VA_ARGS__)
+#define usSID(fmt, ...) __DBG("[SID] " fmt __VA_OPT__(,) __VA_ARGS__)
 #else
 #define usDBG(...) ((void)0)
+#define usSID(...) ((void)0)
 #endif
 
 #ifdef USBSID_BOOTLOG
-#define usBOOT(fmt, ...) __DBG("[BOOT] " fmt __VA_OPT__(,) __VA_ARGS__)
+#define usBOOT(fmt, ...)                                 \
+do {                                                     \
+  __DBG("[BOOT] " fmt __VA_OPT__(,) __VA_ARGS__);        \
+  stdio_flush();                                         \
+} while(0)
 #else
 #define usBOOT(...) ((void)0)
 #endif
 
 #ifdef CONFIG_DEBUG
-#define usCFG(fmt, ...) __DBG("[CFG] " fmt __VA_OPT__(,) __VA_ARGS__)
+#define usCFG(fmt, ...)  __DBG("[CFG] " fmt __VA_OPT__(,) __VA_ARGS__)
+#define usBUS(fmt, ...)  __DBG("[BUS] " fmt __VA_OPT__(,) __VA_ARGS__)
+#define usSOCK(fmt, ...) __DBG("[SOCK] " fmt __VA_OPT__(,) __VA_ARGS__)
 #else
-#define usCFG(...) ((void)0)
+#define usCFG(...)  ((void)0)
+#define usBUS(...)  ((void)0)
+#define usSOCK(...) ((void)0)
 #endif
 
 #ifdef MEM_DEBUG
