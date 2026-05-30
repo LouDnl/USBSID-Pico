@@ -46,6 +46,7 @@ typedef struct {
 
 /* Functions from sid.c */
 void init_sid_chips(void);
+void init_sid_states(void);
 void clear_sid_memory(void);
 void clear_volume_state(void);
 void set_reset_state(bool state);
@@ -63,6 +64,7 @@ void clear_bus_all(void);
 void pause_sid(void);
 void pause_sid_withmute(void);
 void reset_sid(void);
+void clear_sid_registers_at_addr(uint8_t base_address);
 void clear_sid_registers(int sidno);
 void reset_sid_registers(void);
 
