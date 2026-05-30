@@ -87,6 +87,7 @@ enum
   RELOAD_CONFIG    = 0x38,  /* Reload and apply stored config from flash */
   READ_NUMSIDS     = 0x39,  /* Returns the number of SIDs in byte 0 */
   READ_FMOPLSID    = 0x3A,  /* Returns the sidno for FMOpl 1~4, 0 is disable */
+  READ_CONFIGACK   = 0x3F,  /* Returns 1 if socket power is disabled and read/writes are dropped */
 
   SINGLE_SID       = 0x40,  /* Single SID Socket One */
   DUAL_SID         = 0x41,  /* Dual SID Socket One */
@@ -135,6 +136,9 @@ enum
   SKPICO           = 0xA1,  /* Config initiator byte for SIDKICK-pico */
   ARMSID           = 0xA2,  /* Config initiator byte for ARMSID */
   PDSID            = 0xA3,  /* Holds the reset line for 5 seconds to change SID type on a PDSID */
+
+  CONFIG_ACK       = 0xFA,  /* Acknowledge the current configuration and switch on regulators (v1.5+ boards only) */
+  SOCKET_DETECT    = 0xFD,  /* Disable/enable automatic socket change detection on boot (v1.5+ boards only) */
 };
 
 /* Config constants */
@@ -249,6 +253,9 @@ typedef struct Config {
   bool mirrored : 1;            /* act as socket 1 */
   bool flipped : 1;             /* socket 1 is socket 2 and vice versa */
   bool mixed : 1;               /* addresses are mixed up (quad SID only!) */
+  /* PCB v1.5+ only */
+  bool need_confirmation : 1;    /* current configuration needs confirmation, SID's are disabled until confirmed! */
+  bool disable_changedetect : 1; /* disables socket change detection on boot */
 } Config;
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
@@ -317,6 +324,8 @@ typedef struct Config {
   .mirrored = false, \
   .flipped = false, \
   .mixed = false, \
+  .need_confirmation = false, \
+  .disable_changedetect = false, /* WARNING: This setting _can_ and _will_ fry your 9v SID if config is set to 6581 (12v) */ \
 }
 
 
