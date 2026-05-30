@@ -25,6 +25,13 @@
 ### Cmake minimum version
 cmake_minimum_required(VERSION 3.17)
 
+### Cmake compiler standard versions
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
+
+### CMake stuff for ZED
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 ### Project magic sprinkles
 set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
@@ -60,6 +67,9 @@ set(ONBOARD_SIDPLAYER 0 CACHE STRING "ONBOARD_SIDPLAYER")
 
 ### Enable/ Disable build with PIO Uart on unused pins 26/27
 set(USE_PIO_UART 0)
+
+### Enable/ Disable build with Bluetooth on rp2350_w
+set(ENABLE_BLUETOOTH 0 CACHE STRING "ENABLE_BLUETOOTH")
 
 ### Information on the use of CDC callback
 ## This is turned on/off by changing USE_CDC_CALLBACK in globals.h
@@ -174,10 +184,6 @@ elseif(${PICO_PLATFORM} MATCHES rp2350)
 else()
   set(PICO_COMPILER pico_arm_gcc)  # required for mem_ops on rp2040
 endif()
-
-### Cmake compiler standard versions
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 17)
 
 ### Target environment path
 set(CMAKE_FIND_ROOT_PATH $ENV{PICO_ENV_PATH})
@@ -301,28 +307,39 @@ endif()
 list(APPEND FILENAMES
   ${PROJECT_FILENAME}-v1.0
   ${PROJECT_FILENAME}-v1.3
+  ${PROJECT_FILENAME}-v1.5
 )
 list(APPEND PICOTYPES
   "LED"
-  "LED_AUDIOSWITCH"
+  "LED"
+  "LED"
 )
 list(APPEND PCBVERSIONS
   "1.0"
   "1.3"
+  "1.5"
 )
 if(${PICO_BOARD} STREQUAL "pico" OR ${PICO_BOARD} STREQUAL "pico2")
   list(APPEND FILENAMES
     ${PROJECT_FILENAME}-v1.0-rgb
     ${PROJECT_FILENAME}-v1.3-rgb
+    ${PROJECT_FILENAME}-v1.5-rgb
   )
   list(APPEND PICOTYPES
     "RGB"
-    "RGB_AUDIOSWITCH"
+    "RGB"
+    "RGB"
   )
   list(APPEND PCBVERSIONS
+  # "0.1"  ## Alpha builds only
+  # "0.2"  ## Unreliable
   "1.0"
+  # "1.1"  ## Never built
+  # "1.2"  ## Incorrect gpio pins placing
   "1.3"
-)
+  # "1.4"  ## Power delivery issue
+  "1.5"
+  )
 endif()
 
 ### Source files to compile
@@ -517,6 +534,27 @@ set(TARGET_LL
   tinyusb_board
 )
 
+### Bluetooth control for _w boards
+if(ENABLE_BLUETOOTH EQUAL 1)
+  if(${PICO_BOARD} STREQUAL "pico2_w")
+    set(SOURCEFILES
+      ${SOURCEFILES}
+      ${CMAKE_CURRENT_LIST_DIR}/src/bluetooth.c
+    )
+
+    set(TARGET_LL
+      ${TARGET_LL}
+      pico_cyw43_arch_none  # Select 'none', 'background', or 'rtos' architecture
+      pico_btstack_classic  # Main stack for Classic SPP Bluetooth
+      pico_btstack_cyw43    # Ties BTstack to the onboard CYW chip
+    )
+
+    set(BT_TARGET_PIO 2)    # Use rp2350 pio2
+    add_compile_definitions(USE_BLUETOOTH=1)
+  endif()
+endif()
+
+
 ### Pio files
 set(PIO_BUS     ${CMAKE_CURRENT_LIST_DIR}/src/pio/bus_control.pio)
 set(PIO_CLOCK   ${CMAKE_CURRENT_LIST_DIR}/src/pio/clock.pio)
@@ -626,17 +664,11 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   # executable
   add_executable(${BUILD} ${SOURCEFILES})
   # BUILD TYPES
+  string(REPLACE "." "" PCBVER_INT "${PCBVERSION}")
   if(PICOTYPE STREQUAL "RGB")
-    target_compile_definitions(${BUILD} PRIVATE USBSID USBSID_PRODUCT="${BUILD_VERSION}" USE_RGB=1 PCB_VERSION="${PCBVERSION}")
-    # add_compile_definitions(USE_RGB=1)
-  elseif(PICOTYPE STREQUAL "RGB_AUDIOSWITCH")
-    target_compile_definitions(${BUILD} PRIVATE USBSID USBSID_PRODUCT="${BUILD_VERSION}" USE_RGB=1 HAS_AUDIOSWITCH=1 PCB_VERSION="${PCBVERSION}")
-    # add_compile_definitions(USE_RGB=1 HAS_AUDIOSWITCH=1)
-  elseif(PICOTYPE STREQUAL "LED_AUDIOSWITCH")
-    target_compile_definitions(${BUILD} PRIVATE USBSID USBSID_PRODUCT="${BUILD_VERSION}" HAS_AUDIOSWITCH=1 PCB_VERSION="${PCBVERSION}")
-    # add_compile_definitions(HAS_AUDIOSWITCH=1)
+    target_compile_definitions(${BUILD} PRIVATE USBSID USBSID_PRODUCT="${BUILD_VERSION}" USE_RGB=1 PCB_VERSION="${PCBVERSION}" PCB_VERSION_INT=${PCBVER_INT})
   else()
-    target_compile_definitions(${BUILD} PRIVATE USBSID USBSID_PRODUCT="${BUILD_VERSION}" PCB_VERSION="${PCBVERSION}")
+    target_compile_definitions(${BUILD} PRIVATE USBSID USBSID_PRODUCT="${BUILD_VERSION}" PCB_VERSION="${PCBVERSION}" PCB_VERSION_INT=${PCBVER_INT})
   endif()
   # pio addition
   pico_generate_pio_header(${BUILD} ${PIO_BUS})
@@ -672,7 +704,12 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   endif()
   # tell the linker what libraries to link
   target_link_libraries(${BUILD} ${TARGET_LL})
-  if (PICO_CYW43_SUPPORTED)
+  if ((ENABLE_BLUETOOTH EQUAL 1) AND (${PICO_BOARD} STREQUAL "pico2_w"))
+    # Redirect the CYW43 wireless driver to use the third PIO block (PIO2)
+    target_compile_definitions(${BUILD} PRIVATE
+        CYW43_SPI_PIO_PREFERRED_PIO=${BT_TARGET_PIO}
+    )
+  elseif(PICO_CYW43_SUPPORTED AND NOT (ENABLE_BLUETOOTH EQUAL 1))
     target_link_libraries(${BUILD} pico_cyw43_arch_none)
   endif()
   # target usbsid types
@@ -684,4 +721,7 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   # enable uart output, disable usb output
   pico_enable_stdio_uart(${BUILD} 1)  # essentialy the same as LL pico_stdio_uart
   pico_enable_stdio_usb(${BUILD} 0)
+if(${PICO_BOARD} STREQUAL "pico2_w")
+  pico_add_extra_outputs(${BUILD})
+endif()
 endforeach()
