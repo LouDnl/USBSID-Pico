@@ -65,6 +65,7 @@ void midi_init(void)
   midimachine.state = IDLE;
   midimachine.index = 0;
   midimachine.midi_bytes = 3;
+  midimachine.last_status = 0;
 
   /* Clear stream buffers once */
   memset(midimachine.streambuffer, 0, sizeof midimachine.streambuffer);
@@ -129,7 +130,7 @@ inline void emulator_reset(void)
   return;
 }
 
-inline void handle_emulator_cc(void)
+static const void handle_emulator_cc(void)
 {
   if (midimachine.streambuffer[1] == midi_ccvalues_defaults.CC_CEN) { /* control emulator enable 0x55 (85) */
     if (!emulator_running) {
@@ -150,6 +151,12 @@ inline void handle_emulator_cc(void)
 }
 #endif
 
+/* Not yet implemented SysEx call handlers */
+static void handle_midi_clock(void)   { /* count 0xF8 pulses; 24 = 1 quarter note */ }
+static void handle_midi_start(void)   { /* reset beat counter */ }
+static void handle_midi_continue(void){ /* resume beat counter */ }
+static void handle_midi_stop(void)    { /* pause beat counter */ }
+
 /* Processes a 1 byte incoming midi buffer
  * Figures out if we're receiving midi or sysex */
 static inline void midi_buffer_task(uint8_t buffer)
@@ -158,10 +165,30 @@ static inline void midi_buffer_task(uint8_t buffer)
     if (midimachine.type != SYSEX) usMCMD(" [B%d]$%02x#%03d", midimachine.index, buffer, buffer);
   }
 
+  /* Real-Time messages: single byte, never touch running stream state */
+  if __us_unlikely(buffer >= 0xF8) {
+    printf("[RT] %02x\n",buffer);
+    dtype = sysex; /* Set data type to SysEx */
+    midimachine.last_status = 0;  /* SysEx cancels running status */
+    switch (buffer) {
+      case 0xF8: handle_midi_clock();    break; /* System Exclusive Timing clock */
+      case 0xF9: break;                         /* System Exclusive Undefined (Reserved) */
+      case 0xFA: handle_midi_start();    break; /* System Exclusive Start */
+      case 0xFB: handle_midi_continue(); break; /* System Exclusive Continue */
+      case 0xFC: handle_midi_stop();     break; /* System Exclusive Stop */
+      case 0xFD:                                /* System Exclusive Undefined (Reserved) */
+      case 0xFE: break;                         /* System Exclusive Active Sensing - reset watchdog if implemented */
+      case 0xFF: midi_processor_init();  break; /* System Exclusive System Reset */
+      default:   break;
+    }
+    return; /* return and do not fall into state machine below */
+  }
+
   if (buffer & 0x80) { /* Handle start byte */
     switch (buffer) {
       /* System Exclusive */
       case 0xF0:  /* System Exclusive Start */
+        midimachine.last_status = 0;  /* SysEx cancels running status */
         if (midimachine.bus != CLAIMED && midimachine.type == NONE) {
           dtype = sysex; /* Set data type to SysEx */
           midimachine.state = RECEIVING;
@@ -173,6 +200,7 @@ static inline void midi_buffer_task(uint8_t buffer)
         }
         break;
       case 0xF7:  /* System Exclusive End of SysEx (EOX) */
+        midimachine.last_status = 0;  /* SysEx cancels running status */
         if (midimachine.bus == CLAIMED && midimachine.type == SYSEX) {
           dtype = sysex; /* Set data type to SysEx */
           midimachine.streambuffer[midimachine.index] = buffer;
@@ -189,14 +217,7 @@ static inline void midi_buffer_task(uint8_t buffer)
       case 0xF4:  /* System Exclusive Undefined (Reserved) */
       case 0xF5:  /* System Exclusive Undefined (Reserved) */
       case 0xF6:  /* System Exclusive Tune request */
-      case 0xF8:  /* System Exclusive Timing clock */
-      case 0xF9:  /* System Exclusive Undefined (Reserved) */
-      case 0xFA:  /* System Exclusive Start */
-      case 0xFB:  /* System Exclusive Continue */
-      case 0xFC:  /* System Exclusive Stop */
-      case 0xFD:  /* System Exclusive Undefined (Reserved) */
-      case 0xFE:  /* System Exclusive Active Sensing */
-      case 0xFF:  /* System Exclusive System Reset */
+        midimachine.last_status = 0;  /* SysEx cancels running status */
         dtype = sysex; /* Set data type to SysEx */
         break;
       /* Midi 2 Bytes per message */
@@ -231,6 +252,7 @@ static inline void midi_buffer_task(uint8_t buffer)
           midimachine.streambuffer[midimachine.index] = buffer;
           midimachine.index++;
         }
+        midimachine.last_status = buffer;  /* Add cache for running status */
         break;
       default:
         break;
@@ -274,6 +296,11 @@ static inline void midi_buffer_task(uint8_t buffer)
         midimachine.state = WAITING_FOR_END;
         usMCMD("[EXCESS][IDX]%02d %02x \n", midimachine.index, buffer);
       }
+    } else if (midimachine.state == IDLE && midimachine.last_status != 0) {
+      /* Running status: re-enter as if last_status arrived fresh */
+      midi_buffer_task(midimachine.last_status);  /* synthetic status byte */
+      midi_buffer_task(buffer);                   /* then this data byte */
+      return;
     } else if (midimachine.state == WAITING_FOR_END) {
       /* Consuming SysEx messages, nothing else to do */
       usMCMD("[EXCESS][IDX]%02d %02x \n", midimachine.index, buffer);
