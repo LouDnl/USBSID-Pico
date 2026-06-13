@@ -527,8 +527,6 @@ static ConfigError apply_preset(SocketPreset preset)
     return CFG_ERR_EQUAL_PRESET;
   }
 
-  set_socketconfig_logging(false); /* Disable logging */
-
   /* Run autodetection before applying preset,
      this will ensure supporting chips and sids, etc */
   sid_auto_detect_silent();
@@ -555,6 +553,10 @@ static ConfigError apply_preset(SocketPreset preset)
  */
 void apply_preset_wrapper(SocketPreset preset)
 {
+  /* Completely disable logging */
+  set_socketconfig_logging(false);
+  set_detection_logging(false);
+
   /* Backup global */
   uint32_t irq = save_and_disable_interrupts();
   Config backup_cfg;
@@ -571,6 +573,10 @@ void apply_preset_wrapper(SocketPreset preset)
 
   /* Save and load the config */
   save_load_config();
+
+  /* Re-enable logging */
+  set_socketconfig_logging(true);
+  set_detection_logging(true);
 
   usNFO("\n");
   usSOCK("Preset applied: %s\n", preset_name(preset));
