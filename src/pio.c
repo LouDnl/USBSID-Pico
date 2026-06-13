@@ -119,6 +119,7 @@ void setup_piobus(void)
     (float)pico_hz / busclock_frequency / 2);
   usDBG("  C64 SID Clock = %d\n",
     (int)usbsid_config.clock_rate);
+  stdio_flush();
 
   { /* control bus */
     sm_control = 1;  /* PIO0 SM1 */
@@ -196,6 +197,10 @@ void sync_pios(bool at_boot)
   pio_sm_restart(bus_pio, 0b1111);
   #elif PICO_PIO_VERSION > 0  /* NOTE: rp2350 only */
   usDBG("Synchronise PIO's (Pico2 & Pico2_w)\n");
+  /* stdio_flush is required here because pio_clkdiv_restart_sm_multi_mask
+     (RP2350-only) briefly disrupts UART interrupt handling mid-transmission.
+     Flush ensures buffer empty before PIO operations.*/
+  stdio_flush();
   pio_clkdiv_restart_sm_multi_mask(bus_pio, 0, 0b1111, 0);
   // pio_clkdiv_restart_sm_multi_mask(clkcnt_pio, 0, 0b0011, 0); /* TODO: SYNC COUNTER PIO WITH BUS PIO */
   pio_clkdiv_restart_sm_multi_mask(clkcnt_pio, 0, 0b1000, 0);
