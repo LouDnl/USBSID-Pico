@@ -101,10 +101,16 @@ or
 == Firmware configuration
 USBSID-Pico has an extensive set of configuration options that expands with each firmware release. +
 
-=== Configuration tool
-You can configurate your board by using the commandline config-tool or together with the Python Configuration GUI by ISL/Samar if you prefer a GUI.
+=== USBSID-Pico-Configtool
+You can configurate your board by using the official USBSID-Pico-Configtool +
+The tool is available here https://github.com/LouDnl/USBSID-Pico-Configtool[USBSID-Pico-Configtool] in the releases section
 
-==== GUI downloads
+=== Commandline configuration tool
+You can configurate your board with:
+  - the commandline config-tool
+  - the commandline config-tool with the Python Configuration GUI by ISL/Samar if you prefer a GUI.
+
+==== Python Configuration GUI downloads
 https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/cfg_usbsid_GUI.py[Download script] +
 Python3 -> https://www.python.org/downloads/[Download] +
 TkInter -> https://tkdocs.com/tutorial/install.html[Installation guide] +
