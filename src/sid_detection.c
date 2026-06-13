@@ -692,9 +692,11 @@ static DetectionResult verify_socket_chip(DetectionResult result, const int sock
 {
   /* If possible real chip or unknown chip */
   if ((result.socket[socket].chiptype == CHIP_REAL) || (result.socket[socket].chiptype == CHIP_UNKNOWN)) {
-    /* If both SID types are N/A */
-    if (((result.socket[socket].sid1_type == SID_UNKNOWN) && (result.socket[socket].sid1_type == SID_UNKNOWN))
-       || ((result.socket[socket].sid1_type == SID_UNKNOWN) && (result.socket[socket].sid1_type == SID_NA))) {
+    /* If both SID types are N/A, UNKNOWN or a combination of both */
+    if (((result.socket[socket].sid1_type == SID_UNKNOWN) && (result.socket[socket].sid2_type == SID_UNKNOWN))
+       || ((result.socket[socket].sid1_type == SID_NA) && (result.socket[socket].sid2_type == SID_NA))
+       || ((result.socket[socket].sid1_type == SID_NA) && (result.socket[socket].sid2_type == SID_UNKNOWN))
+       || ((result.socket[socket].sid1_type == SID_UNKNOWN) && (result.socket[socket].sid2_type == SID_NA))) {
 
       /* Then there must not be a SID Chip present I guess!? */
       result.socket[socket].chiptype       = CHIP_UNKNOWN;
