@@ -111,8 +111,8 @@ typedef struct Socket {
 typedef struct Config { // TODO: Add overrides for detect_default_config and add 5v/9v/12 overrides so they cannot be changed
   /* First three items must stay in the same order! */
   uint32_t magic;                /* Contains firmware build magic */
-  int default_config;            /* Defines if config is default config or not */
-  uint8_t config_saveid;
+  int      default_config;       /* Defines if config is default config or not */
+  uint8_t  config_saveid;        /* What the nth position is in flash where this config comes from */
   /* Don't care from here */
   uint32_t clock_rate;           /* clock speed identifier */
   uint16_t refresh_rate;         /* refresh rate identifier based on clockspeed ~ not configurable */
@@ -387,12 +387,15 @@ enum
   SOCKET_DETECT    = 0xFD,  /* Disable/enable automatic socket change detection on boot (v1.5+ boards only) */
 };
 
-/* Config write command byte */
+/* Config read/write bytes */
 enum {
-  FULL_CONFIG   = 0x00,
-  SOCKET_CONFIG = 0x10,
-  MIDI_CONFIG   = 0x20,
-  MIDI_CCVALUES = 0x30,
+  FULL_CONFIG       = READ_CONFIG,    /* 0x30 */
+  SOCKET_CONFIG     = READ_SOCKETCFG, /* 0x37 */
+  MIDI_CONFIG       = 0x60,
+  MIDI_CCVALUES     = 0x70,
+  END_BYTE          = 0x8F,
+  TERMINATION_BYTE  = 0xFF,
+  VERIFICATION_BYTE = 0x7F,
 };
 
 /* SET_CONFIG values */
