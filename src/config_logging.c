@@ -162,8 +162,9 @@ void print_config_overview(void)
       usbsid_config.socketTwo.sid2.addr,
       usbsid_config.socketTwo.sid2.id);
   }
+  usCFG("\n");
   usCFG("  Mirror Socket Two to Socket One = %s\n", switch_str(usbsid_config.mirrored));
-  usCFG("  Flip Socket One and Socket One  = %s\n", switch_str(usbsid_config.flipped));
+  usCFG("  Flip Socket One and Socket Two  = %s\n", switch_str(usbsid_config.flipped));
   usCFG("  Mix socket addresses (Quad SID) = %s\n", switch_str(usbsid_config.mixed));
   usCFG("\n");
   usCFG("  FMOpl is %s\n",
