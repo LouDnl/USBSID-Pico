@@ -76,7 +76,7 @@ typedef struct midi_ccvalues {
   uint8_t CC_VCE3;  /* Select Voice 3 */
   /* Custom commands */
   uint8_t CC_GTEN;  /* Gate auto enabled on noteon note off */
-  uint8_t CC_POLY;  /* Turn on polyfonic for current SID */
+  uint8_t CC_SPLY;  /* Turn on polyfonic for current SID */
   uint8_t CC_CVCE;  /* Enable copy voice mode */
   uint8_t CC_CSID;  /* Enable copy SID mode */
   uint8_t CC_LVCE;  /* Link/Unlink voice */
@@ -86,15 +86,16 @@ typedef struct midi_ccvalues {
   uint8_t CC_CEN;   /* Enable  Cynthcart */
   uint8_t CC_CDI;   /* Disable Cynthcart */
   uint8_t CC_CRE;   /* Restart Cynthcart */
-  /* Unused values ~ Midi related */
+  /* Midi related */
   uint8_t CC_BMSB;  /* Bank Select MSB */
   uint8_t CC_BLSB;  /* Bank Select LSB */
   uint8_t CC_MOD;   /* Modulation wheel */
   uint8_t CC_MODL;  /* Modulation wheel LSB */
   uint8_t CC_ASOF;  /* All Sound Off */
   uint8_t CC_RACT;  /* Reset All Controllers */
-  uint8_t CC_ANOF;  /* All Notes Off
-   */
+  uint8_t CC_ANOF;  /* All Notes Off */
+  uint8_t CC_MONO;  /* Mono Mode On ~ Poly off & all notes off */
+  uint8_t CC_POLY;  /* Poly Mode On ~ Mono off & all notes off */
 } midi_ccvalues;
 
 /* Default Control Change Byte values */
@@ -136,7 +137,7 @@ typedef struct midi_ccvalues {
   .CC_VCE3 =  0x6E,  /* 110 ~ Select Voice 3 */ \
   /* Default CC values ~ custom commands */ \
   .CC_GTEN =  0x77,  /* 119 ~ Gate auto enabled on noteon note off */ \
-  .CC_POLY =  0x6F,  /* 111 ~ Turn on polyfonic for current SID */ \
+  .CC_SPLY =  0x6F,  /* 111 ~ Turn on polyfonic for current SID */ \
   .CC_CVCE =  0x08,  /*   8 ~ Enable copy voice mode */ \
   .CC_CSID =  0x18,  /*  24 ~ Enable copy SID mode */ \
   .CC_LVCE =  0x28,  /*  40 ~ Link/Unlink voice */ \
@@ -146,15 +147,17 @@ typedef struct midi_ccvalues {
   .CC_CEN  =  0x55,  /*  85 ~ Enable Cynthcart */ \
   .CC_CDI  =  0x56,  /*  86 ~ Disable Cynthcart */ \
   .CC_CRE  =  0x57,  /*  87 ~ Reset Cynthcart */ \
+  /* Midi related ~ Fixed values */ \
+  .CC_ASOF =  0x78,  /* 120 ~ All Sound Off */ \
+  .CC_RACT =  0x79,  /* 121 ~ Reset All Controllers */ \
+  .CC_ANOF =  0x7B,  /* 123 ~ All Notes Off */ \
+  .CC_MONO =  0x7E,  /* 126 ~ Mono Mode On ~ Poly off & all notes off */ \
+  .CC_POLY =  0x7F,  /* 127 ~ Poly Mode On ~ Mono off & all notes off */ \
   /* Unused values ~ Midi related */ \
   .CC_BMSB =  0xFF,  /* 255 ~ Bank Select MSB */ \
   .CC_BLSB =  0xFF,  /* 255 ~ Bank Select LSB */ \
   .CC_MOD  =  0xFF,  /* 255 ~ Modulation wheel */ \
   .CC_MODL =  0xFF,  /* 255 ~ Modulation wheel LSB */ \
-  /* Midi related ~ Fixed values */ \
-  .CC_ASOF =  0x78,  /* 120 ~ All Sound Off */ \
-  .CC_RACT =  0x79,  /* 121 ~ Reset All Controllers */ \
-  .CC_ANOF =  0x7B,  /* 123 ~ All Notes Off */ \
 } \
 
 /* static const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT; */
