@@ -593,9 +593,14 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
           unmute_sid();
         }
       }
-      if (request->bRequest == 0x22) {
+      if (request->bRequest == 0x22) { /* On connection */
         /* Webserial simulates the CDC_REQUEST_SET_CONTROL_LINE_STATE (0x22) to connect and disconnect */
         web_serial_connected = (request->wValue != 0);
+        /* Flush any data still in the fifo */
+        if (web_serial_connected) {
+          tud_vendor_n_read_flush(WUSB_ITF);
+          tud_vendor_n_write_flush(WUSB_ITF);
+        }
         /* Respond with status OK */
         return tud_control_status(rhport, request);
       }
