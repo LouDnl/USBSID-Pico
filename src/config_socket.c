@@ -753,7 +753,9 @@ void verify_socket_config(void)
       /* Disable SID chips */
       voltage_state_off();
       /* Force save the config for confirmation check */
+      /* usSOCK("Saving detection result\n"); */
       save_config_ext();
+      /* usSOCK("Save done, need_confirmation=%d\n", usbsid_config.need_confirmation); */
     } else if (!usbsid_config.need_confirmation && !detected_sid_change) { /* No changes */
       /* Apply voltage from configurated Chips */
       apply_socket_config_voltages();
@@ -768,7 +770,9 @@ void verify_socket_config(void)
   } else { /* Just go with the flow and live dangerously! */
     if (usbsid_config.need_confirmation || detected_sid_change) { /* Fallback check to disable these */
       usbsid_config.need_confirmation = detected_sid_change = false;
+      /* usSOCK("Saving detection result\n"); */
       save_config_ext();
+      /* usSOCK("Save done, need_confirmation=%d\n", usbsid_config.need_confirmation); */
     }
     /* Apply voltage from configurated Chips */
     apply_socket_config_voltages();
