@@ -232,7 +232,7 @@ void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volat
       && (subcommand != DELAY_CYCLES))) { return; };  /* Drop incoming data if in reset state */
 
   if __us_unlikely(config_unacknowledged()) {
-    goto SIDCHANGEDETECTED;
+    goto SIDCHANGEDETECTED; /* Skip to command sequence of unacknowledged */
   }
   if __us_likely(command == CYCLED_WRITE) {
     // n_bytes = (n_bytes == 0) ? 4 : n_bytes; /* if byte count is zero, this is a single write packet */
@@ -274,7 +274,7 @@ void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volat
     return;
   };
 SIDCHANGEDETECTED:;
-  if (command == COMMAND) {
+  if __us_likely(command == COMMAND) {
     if __us_unlikely(config_unacknowledged()
      && (subcommand != CONFIG) && (subcommand != RESET_MCU) && (subcommand != BOOTLOADER)) return;
     switch (subcommand) {
@@ -978,7 +978,7 @@ int main()
   __dsb();  /* Data Synchronisation Barrier - ensures store completes before SEV */
   __sev();  /* Signal event to wake Core 1 from WFE */
 
-  /* All hardware ready — allow host to enumerate */
+  /* All hardware ready - allow host to enumerate */
   if (!tud_connect()) usERR("!! USB CONNECTION ERROR !!");
 
   /* Loop IO tasks forever */
