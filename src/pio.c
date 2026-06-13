@@ -49,13 +49,13 @@ PIO led_pio = pio1;
 uint sm_pwmled, offset_pwmled;
 #if defined(USE_RGB)  /* No RGB LED on _w Pico's */
 uint sm_rgbled, offset_rgbled;
-#endif
-#endif
+#endif /* USE_RGB */
+#endif /* PICO_DEFAULT_LED_PIN */
 
 
 void setup_vu(void)
 {
-  #if defined(PICO_DEFAULT_LED_PIN)  /* Cannot use VU on PicoW :( */
+#if defined(PICO_DEFAULT_LED_PIN)  /* Cannot use VU on PicoW :( */
   { /* PWM led */
     offset_pwmled = pio_add_program(led_pio, &vu_program);
     sm_pwmled = 1;  /* PIO1 SM1 */
@@ -71,7 +71,7 @@ void setup_vu(void)
     pio_sm_exec(led_pio, sm_pwmled, pio_encode_out(pio_isr, 32));
     pio_sm_set_enabled(led_pio, sm_pwmled, true);
   }
-  #if defined(USE_RGB)  /* No RGB LED on _w Pico's */
+#if defined(USE_RGB)  /* No RGB LED on _w Pico's */
   { /* Init RGB */
     gpio_set_drive_strength(WS2812_PIN, GPIO_DRIVE_STRENGTH_2MA);
     offset_rgbled = pio_add_program(led_pio, &vu_rgb_program);
@@ -91,14 +91,16 @@ void setup_vu(void)
     pio_sm_init(led_pio, sm_rgbled, offset_rgbled, &c_rgbled);
     pio_sm_set_enabled(led_pio, sm_rgbled, true);
   }
-  #endif
+#endif /* USE_RGB */
   setup_vu_dma();
-  #elif defined(CYW43_WL_GPIO_LED_PIN)
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+#ifndef USE_BLUETOOTH
   /* For Pico W devices we need to initialise the driver etc */
   cyw43_arch_init();
   /* Ask the wifi "driver" to set the GPIO on or off */
   cyw43_arch_gpio_put(BUILTIN_LED, usbsid_config.LED.enabled);
-  #endif
+#endif /* USE_BLUETOOTH */
+#endif /* CYW43_WL_GPIO_LED_PIN */
   return;
 }
 
@@ -117,6 +119,7 @@ void setup_piobus(void)
     (float)pico_hz / busclock_frequency / 2);
   usDBG("  C64 SID Clock = %d\n",
     (int)usbsid_config.clock_rate);
+  stdio_flush();
 
   { /* control bus */
     sm_control = 1;  /* PIO0 SM1 */
@@ -172,6 +175,20 @@ void setup_piobus(void)
   return;
 }
 
+/**
+ * @brief Clear bus PIO's from any lingering data
+ *
+ */
+void clear_bus_fifos(void)
+{
+  pio_sm_clear_fifos(bus_pio, sm_clock);
+  pio_sm_clear_fifos(bus_pio, sm_control);
+  pio_sm_clear_fifos(bus_pio, sm_data);
+  pio_sm_clear_fifos(bus_pio, sm_delay);
+  pio_sm_clear_fifos(bus_pio, sm_clkcnt);
+  return;
+}
+
 void sync_pios(bool at_boot)
 { /* Sync PIO's */
   usNFO("\n");
@@ -180,15 +197,16 @@ void sync_pios(bool at_boot)
   pio_sm_restart(bus_pio, 0b1111);
   #elif PICO_PIO_VERSION > 0  /* NOTE: rp2350 only */
   usDBG("Synchronise PIO's (Pico2 & Pico2_w)\n");
+  /* stdio_flush is required here because pio_clkdiv_restart_sm_multi_mask
+     (RP2350-only) briefly disrupts UART interrupt handling mid-transmission.
+     Flush ensures buffer empty before PIO operations.*/
+  stdio_flush();
   pio_clkdiv_restart_sm_multi_mask(bus_pio, 0, 0b1111, 0);
   // pio_clkdiv_restart_sm_multi_mask(clkcnt_pio, 0, 0b0011, 0); /* TODO: SYNC COUNTER PIO WITH BUS PIO */
   pio_clkdiv_restart_sm_multi_mask(clkcnt_pio, 0, 0b1000, 0);
   #endif
   if __us_likely(!at_boot) {
-    pio_sm_clear_fifos(bus_pio, sm_clock);
-    pio_sm_clear_fifos(bus_pio, sm_control);
-    pio_sm_clear_fifos(bus_pio, sm_data);
-    pio_sm_clear_fifos(bus_pio, sm_delay);
+    clear_bus_fifos();
   };
   return;
 }
@@ -273,7 +291,7 @@ void setup_sidclock(void)
   verify_clockrate();
 
   /* Run only if PCB version 1.0 */
-  if ((strcmp(pcb_version, "1.0") == 0)) {
+  if (PCB_VERSION_INT == 10) {
     /* Detect optional external crystal */
     if __us_likely(detect_clocksignal() == 0) {
       usbsid_config.external_clock = false;
@@ -281,7 +299,7 @@ void setup_sidclock(void)
       init_sidclock();
     } else {  /* Do nothing gpio acts as input detection */
       usbsid_config.external_clock = true;
-      usbsid_config.clock_rate = CLOCK_DEFAULT;  /* Always 1MHz */
+      usbsid_config.clock_rate = CLOCK_DEFAULT;  /* Always fallback to 1MHz */
     }
   } else {
     usbsid_config.external_clock = false;

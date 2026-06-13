@@ -6,7 +6,7 @@
   <title>USBSID-Pico Web Config</title>
   <link rel="stylesheet" href="c64.css">
   <!-- <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script> -->
-<!-- ─── Scripts ─────────────────────────────────────────── -->
+<!-- Scripts -->
 <!-- Load player + jsSID from the existing webconfig-tool directory -->
 <script src="jsSID-webusb.js"></script>
 <script src="player.js"></script>
@@ -51,6 +51,12 @@
     <button class="c64-tab-link" onclick="window.open('https://github.com/LouDnl/USBSID-Pico/releases','_blank')" title="Open USBSID-Pico releases page">Firmware</button>
   </div>
 
+  <!-- ╔═ CONFIRMATION WARNING (v1.5+ only) ═══════════════╗ -->
+  <div id="warn-confirmation" class="c64-hidden">
+    <span style="font-size:1.3rem;flex-shrink:0">&#9888;</span>
+    <span>Socket change detected on last boot &mdash; SID sockets are powered off until the configuration is confirmed. Go to the <strong>Config</strong> tab, click <strong>RETRIEVE CONFIG</strong>, verify the settings, then click <strong>CONFIRM CONFIG</strong>.</span>
+  </div>
+
   <!-- ╔══════════════════════════════════════════════════╗
        ║  PANEL: PLAYER                                   ║
        ╚══════════════════════════════════════════════════╝ -->
@@ -72,7 +78,7 @@
         <span id="asid-midi-row" style="display:none">
           <label for="asid-midi-outputs" style="margin-left:12px">ASID MIDI:</label>
           <select id="asid-midi-outputs" class="c64-select">
-            <option value="">— no MIDI —</option>
+            <option value="">- no MIDI -</option>
           </select>
         </span>
         <span id="sendsid-socket-row" style="display:none;align-items:center;gap:6px;margin-left:12px">
@@ -197,8 +203,23 @@
         <button id="btn-save-reboot"     class="c64-btn c64-btn-warn"   title="Save the configuration below to flash and reboot the board (requires a reconnect)">SAVE + REBOOT</button>
         <button id="btn-reset-config"    class="c64-btn c64-btn-danger" title="Reset the board&#39;s configuration to default settings (also reboots the board so will require a reconnect)">RESET DEFAULTS</button>
         <button id="btn-reload-config"   class="c64-btn" title="Reload and apply the board configuration from flash">RELOAD FLASH</button>
+        <button id="btn-confirm-config"  class="c64-btn c64-hidden" disabled
+                title="Confirm the current socket configuration and enable socket power regulators. Available only after loading the config (v1.5+ boards only).">CONFIRM CONFIG</button>
       </div>
      </div>
+
+    <!-- Board status (v1.5+ boards only) -->
+    <div id="box-v15" class="c64-box c64-hidden">
+      <div class="c64-box-title">Board Status (PCB v1.5+)</div>
+      <div class="config-row">
+        <label title="Whether the current socket configuration needs user confirmation. Set by the board when a socket change is detected on boot. Read-only.">Config Status</label>
+        <span id="cfg-need-confirm" class="config-value-display" style="font-size:0.9rem">&#8212;</span>
+      </div>
+      <div class="config-row">
+        <label title="Disable automatic socket change detection on boot. When disabled the board skips socket comparison and applies the saved config voltages directly.">Socket Detect</label>
+        <select id="sel-socket-detect" class="c64-select" disabled></select>
+      </div>
+    </div>
 
     <!-- Retry notice (always visible) -->
     <div style="font-size:0.85rem;color:var(--c64-cyan);background:rgba(0,180,255,0.05);border:1px solid var(--c64-cyan);border-radius:3px;padding:5px 8px;margin-bottom:4px">
@@ -234,7 +255,7 @@
       &#9888; Any configuration change done below must be applied (You can do multiple changes first): click <strong>SAVE (NO REBOOT)</strong>, <strong>SAVE + REBOOT</strong> or <strong>APPLY CFG</strong>.
     </div>
 
-    <!-- Audio output (PCB v1.3+ only — shown after device connect) -->
+    <!-- Audio output (PCB v1.3+ only - shown after device connect) -->
     <div id="box-audio" class="c64-box c64-hidden">
       <div class="c64-box-title">Audio Output</div>
       <div class="preset-row" style="align-items:center;gap:12px">
@@ -434,7 +455,7 @@
     <div class="c64-box">
       <div class="c64-box-title">Raw Config (hex)</div>
       <div id="cfg-raw-hex" style="font-size:0.75rem;color:var(--c64-cyan);white-space:pre;line-height:1.4">
-        —
+        -
       </div>
     </div>
 
@@ -486,16 +507,16 @@
       <hr class="c64-hr">
       <p style="color:var(--c64-text);font-size:0.9rem">
         <strong class="c64-text-yellow">Keyboard shortcuts (in player tab):</strong><br>
-        Space — Play / Pause &nbsp;|&nbsp;
-        S — Stop &nbsp;|&nbsp;
-        ← → — Prev / Next subtune
+        Space - Play / Pause &nbsp;|&nbsp;
+        S - Stop &nbsp;|&nbsp;
+        ← → - Prev / Next subtune
       </p>
     </div>
 
     <div class="c64-box">
       <div class="c64-box-title">PCB Revision</div>
       <p style="color:var(--c64-text);font-size:0.9rem;line-height:1.6">
-        PCB v1.0 / v1.2: Standard board — no audio switch.<br>
+        PCB v1.0 / v1.2: Standard board - no audio switch.<br>
         PCB v1.3+: Audio switch (mono ↔ stereo) support.<br>
         The audio switch row in Config is only shown for v1.3+ boards.
       </p>
@@ -514,7 +535,7 @@
 <!-- Dummy element required by jsSID-webusb.js (it looks up #device-connect and #status-text) -->
 <span id="device-connect" style="display:none"></span>
 
-<!-- ─── Scripts ─────────────────────────────────────────── -->
+<!-- Scripts -->
 <!-- Load player + jsSID from the existing webconfig-tool directory -->
 <!-- <script src="jsSID-webusb.js"></script> -->
 <!-- <script src="player.js"></script> -->
@@ -527,7 +548,7 @@
 <!-- <script src="usbsid-app.js"></script> -->
 
 <script>
-/* ── Keyboard shortcuts ──────────────────────────────── */
+/* Keyboard shortcuts */
 document.addEventListener('keydown', (e) => {
   /* Only active when not typing in an input */
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -548,12 +569,12 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-/* ── Instant tooltips ────────────────────────────────
+/* Instant tooltips
  * Replace native title tooltips (delayed by ~1s in all browsers) with a
  * custom div that appears immediately on mouseenter.
  * Runs after all static HTML is parsed; dynamically-added elements can call
  * initTooltip(el) individually if needed.
- * ─────────────────────────────────────────────────── */
+ */
 (function () {
   const tip = document.createElement('div');
   tip.id = 'c64-tooltip';

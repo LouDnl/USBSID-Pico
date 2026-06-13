@@ -117,7 +117,7 @@ function SIDPlayer(emulator) {
 			this.emulatorFlags.offline			= false;
 			break;
 
-    
+
     case "hermit":
 
       /**
@@ -130,7 +130,7 @@ function SIDPlayer(emulator) {
        * - No encoding options
        * - Cannot play BASIC and digi tunes (RSID)
        * - Some CIA tunes doesn't work either
-       */
+        */
       this.hermit = new jsSID(($("body").attr("data-mobile") !== "0" ? 16384 : this.bufferSize[this.emulator]), 0.0005);
 
       this.emulatorFlags.supportFaster = true;
@@ -150,7 +150,7 @@ function SIDPlayer(emulator) {
       /**
        * jsSID by Hermit with WebUSB extension by LouD
        *
-       */
+        */
       this.hermit = new jsSID(0, 0, false, true);
 
       this.emulatorFlags.supportFaster = true;
@@ -173,7 +173,7 @@ function SIDPlayer(emulator) {
        * Current status
        * # Uses a silent audio context to get 50Hz buffer
        * # Same features as Hermit's
-       */
+        */
       this.hermit = new jsSID(0, 0, true, false);
 
       this.emulatorFlags.supportFaster = true;
@@ -221,7 +221,7 @@ SIDPlayer.prototype = {
    *
    * @handlers all
    *
-     * @param {number} subtune		The subtune to be played
+   * @param {number} subtune		The subtune to be played
    * @param {number} timeout		Number of seconds before the music times out
    * @param {string} file			Fullname (including prepended HVSC root)
    * @param {function} callback 	Function to call after the SID file has loaded
@@ -288,7 +288,7 @@ SIDPlayer.prototype = {
 				// 	setTimeout(function() {
 				// 		this.setVolume(1);
 				// 	}.bind(this), 500);
-					
+
 				// 	if (typeof callback === "function") {
 				// 		callback.call(this, error);
 				// 	}

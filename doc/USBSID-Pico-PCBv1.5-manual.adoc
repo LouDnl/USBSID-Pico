@@ -1,0 +1,43 @@
+= *USBSID-Pico PCB revision v1.5 manual*
+:author: LouD
+:description: This document contains important information about USBSID-Pico PCB revision v1.5
+:url-repo: https://www.github.com/LouDnl/USBSID-Pico
+:revdate: {localdate}
+:toc:
+:toc-placement!:
+
+Author: {author} - generated on {revdate}
+
+toc::[]
+[%always]
+<<<
+
+== Disclaimer
+include::disclaimer.adoc[]
+
+// == PCB top overview
+// .Click image for larger view
+// [#img-v13top,link=images/v1.3/v1.3b-top-marked.png]
+// image::images/v1.3/v1.3b-top-marked.png[title=PCB top overview]
+
+[%always]
+<<<
+
+== More information coming soon!
+Soon!
+
+
+[%always]
+<<<
+
+// == PCB bottom overview
+// .Click image for larger view
+// [#img-v13bottom,link=images/v1.3/v1.3b-bottom.png]
+// image::images/v1.3/v1.3b-bottom.png[title=PCB bottom overview]
+
+== License
+include::license-software.adoc[]
+
+include::license-hardware.adoc[]
+
+Author: {author} - generated on {revdate}

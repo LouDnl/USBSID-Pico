@@ -5,12 +5,12 @@
 
 'use strict';
 
-/* ─── Value label arrays ─────────────────────────────── */
+/* Value label arrays */
 const VA_ENABLED    = ['Disabled', 'Enabled'];
 const VA_TRUEFALSE  = ['False', 'True'];
 const VA_ONOFF      = ['Off', 'On'];
 const VA_MONOSTEREO = ['Mono', 'Stereo'];
-const VA_CHIPTYPES  = ['Real', 'Unknown', 'SKPico', 'ARMSID', 'ARM2SID', 'FPGASID', 'RedipSID', 'PDSID', 'BackSID'];
+const VA_CHIPTYPES  = ['MOS', 'Unknown', 'SKPico', 'ARMSID', 'ARM2SID', 'FPGASID', 'RedipSID', 'PDSID', 'BackSID', 'SIDEmu'];
 const VA_SIDTYPES   = ['Unknown', 'N/A', 'MOS8580', 'MOS6581', 'FMopl'];
 const VA_CLONETYPES = ['Disabled', 'Other', 'SKPico', 'ARMSID', 'FPGASID', 'RedipSID'];
 const VA_RGBSIDNO   = ['Off', '1', '2', '3', '4'];
@@ -19,43 +19,45 @@ const VA_CLOCKS     = ['1000000 (Default)', '985248 (PAL)', '1022727 (NTSC)', '1
 /* Clock speed Hz → array index */
 const clkspeed_id = { 1000000: 0, 985248: 1, 1022727: 2, 1023440: 3, 1022730: 4 };
 
-/* ─── Config byte-offset map (for reading) ───────────── */
+/* Config byte-offset map (for reading) */
 const cfgmap = {
-  CFG_CLOCKLOCK:       5,
-  CFG_EXT_CLOCK:       6,   /* external_clock boolean */
-  CFG_CLKRATE_H:       7,
-  CFG_CLKRATE_M:       8,
-  CFG_CLKRATE_L:       9,
-  CFG_ONE_EN:         10,
-  CFG_ONE_DUAL:       11,
-  CFG_ONE_CHIP:       12,
-  /* [13] = packed SID IDs (sid1.id | sid2.id<<4) — internal, read-only */
-  CFG_ONE_SID1:       14,
-  CFG_ONE_SID2:       15,
-  CFG_TWO_EN:         20,
-  CFG_TWO_DUAL:       21,
-  CFG_MIRRORED:       22,   /* mirrored flag (pre-v0.7 backwards compat byte) */
-  CFG_TWO_CHIP:       23,
-  /* [24] = packed SID IDs (sid1.id | sid2.id<<4) — internal, read-only */
-  CFG_TWO_SID1:       25,
-  CFG_TWO_SID2:       26,
-  CFG_LED_EN:         30,
-  CFG_LED_BREATHE:    31,
-  CFG_RGBLED_EN:      40,
-  CFG_RGBLED_BREATHE: 41,
-  CFG_RGBLED_BRIGHT:  42,
-  CFG_RGBLED_SIDNO:   43,
-  CFG_CDC_EN:         51,
-  CFG_WEBUSB_EN:      52,
-  CFG_ASID_EN:        53,
-  CFG_MIDI_EN:        54,
-  CFG_FMOPL_EN:       55,
-  CFG_FMOPL_SIDNO:    56,
-  CFG_AUSWITCH:       57,
-  CFG_LOCK_AUDIOSW:   58,
-  CFG_FLAGS:          60,   /* mirrored | (flipped<<1) | (mixed<<2) */
-  CFG_FLIPPED:        60,   /* bit 1 of FLAGS */
-  CFG_MIXED:          60,   /* bit 2 of FLAGS */
+  CFG_NEED_CONFIRM:         2,   /* need_confirmation (v1.5+) */
+  CFG_DISABLE_CHANGEDETECT: 3,   /* disable_changedetect (v1.5+) */
+  CFG_CLOCKLOCK:            5,
+  CFG_EXT_CLOCK:            6,   /* external_clock boolean */
+  CFG_CLKRATE_H:            7,
+  CFG_CLKRATE_M:            8,
+  CFG_CLKRATE_L:            9,
+  CFG_ONE_EN:              10,
+  CFG_ONE_DUAL:            11,
+  CFG_ONE_CHIP:            12,
+  /* [13] = packed SID IDs (sid1.id | sid2.id<<4) - internal, read-only */
+  CFG_ONE_SID1:            14,
+  CFG_ONE_SID2:            15,
+  CFG_TWO_EN:              20,
+  CFG_TWO_DUAL:            21,
+  CFG_MIRRORED:            22,   /* mirrored flag (pre-v0.7 backwards compat byte) */
+  CFG_TWO_CHIP:            23,
+  /* [24] = packed SID IDs (sid1.id | sid2.id<<4) - internal, read-only */
+  CFG_TWO_SID1:            25,
+  CFG_TWO_SID2:            26,
+  CFG_LED_EN:              30,
+  CFG_LED_BREATHE:         31,
+  CFG_RGBLED_EN:           40,
+  CFG_RGBLED_BREATHE:      41,
+  CFG_RGBLED_BRIGHT:       42,
+  CFG_RGBLED_SIDNO:        43,
+  CFG_CDC_EN:              51,
+  CFG_WEBUSB_EN:           52,
+  CFG_ASID_EN:             53,
+  CFG_MIDI_EN:             54,
+  CFG_FMOPL_EN:            55,
+  CFG_FMOPL_SIDNO:         56,
+  CFG_AUSWITCH:            57,
+  CFG_LOCK_AUDIOSW:        58,
+  CFG_FLAGS:               60,   /* mirrored | (flipped<<1) | (mixed<<2) */
+  CFG_FLIPPED:             60,   /* bit 1 of FLAGS */
+  CFG_MIXED:               60,   /* bit 2 of FLAGS */
 };
 
 /**
@@ -89,21 +91,21 @@ const selectConfigMap = {
   'sel-two-sid1':        { group: 2, item: 4 },
   'sel-two-sid2':        { group: 2, item: 5 },
   'sel-two-mirrored':    { group: 2, item: 6 },
-  /* Protocols — groups 7-8 use buffer[2] as value, so special='valueasitem' */
+  /* Protocols - groups 7-8 use buffer[2] as value, so special='valueasitem' */
   'sel-asid-en':         { group: 7, item: 0, special: 'valueasitem' },
   'sel-midi-en':         { group: 8, item: 0, special: 'valueasitem' },
-  /* FMOpl — group 9 uses buffer[2] as enabled value */
+  /* FMOpl - group 9 uses buffer[2] as enabled value */
   'sel-fmopl-en':        { group: 9, item: 0, special: 'valueasitem' },
   /* Audio switch (PCB v1.3+) */
   'sel-auswitch':        { group: 10, item: 1, special: 'auswitch' },
-  /* Lock audio switch — group 11 uses buffer[2] as value */
+  /* Lock audio switch - group 11 uses buffer[2] as value */
   'sel-lock-audiosw':    { group: 11, item: 0, special: 'valueasitem' },
-  /* Flipped / Mixed — groups 13-14 use buffer[2] as value */
+  /* Flipped / Mixed - groups 13-14 use buffer[2] as value */
   'sel-flipped':         { group: 13, item: 0, special: 'valueasitem' },
   'sel-mixed':           { group: 14, item: 0, special: 'valueasitem' },
 };
 
-/* ─── Helper: build <select> options from array ──────── */
+/* Helper: build <select> options from array */
 function buildSelectOptions(sel, arr) {
   sel.innerHTML = '';
   arr.forEach((label, i) => {
@@ -169,16 +171,19 @@ function buildAllSelectOptions() {
   const slaw = get('sel-lock-audiosw'); if (slaw) buildSelectOptions(slaw, VA_ENABLED);
   const sflp = get('sel-flipped');      if (sflp) buildSelectOptions(sflp, VA_ENABLED);
   const smix = get('sel-mixed');        if (smix) buildSelectOptions(smix, VA_ENABLED);
+
+  /* v1.5+: socket change detection (0=Enabled, 1=Disabled) */
+  const ssd = get('sel-socket-detect'); if (ssd) buildSelectOptions(ssd, ['Enabled', 'Disabled']);
 }
 
-/* ─── Convert 3-byte clock rate to Hz ───────────────── */
+/* Convert 3-byte clock rate to Hz */
 function convertClockRate(cfg) {
   return ((cfg[cfgmap.CFG_CLKRATE_H] << 16)
         | (cfg[cfgmap.CFG_CLKRATE_M] << 8)
         |  cfg[cfgmap.CFG_CLKRATE_L]);
 }
 
-/* ─── Set a select's selectedIndex safely ─────────────── */
+/* Set a select's selectedIndex safely */
 function setSelectIndex(id, index) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -187,17 +192,17 @@ function setSelectIndex(id, index) {
   }
 }
 
-/* ─── Present config data into select elements ─────────── */
+/* Present config data into select elements */
 function presentConfig(cfgData) {
   if (!cfgData || cfgData.length < 64) {
-    usbsidLog('presentConfig: data too short — got', cfgData ? cfgData.length : 0, 'bytes (need 64)');
-    usbsidSetStatus('Config read error (' + (cfgData ? cfgData.length : 0) + ' bytes) — please retry', 'red');
+    usbsidLog('presentConfig: data too short - got', cfgData ? cfgData.length : 0, 'bytes (need 64)');
+    usbsidSetStatus('Config read error (' + (cfgData ? cfgData.length : 0) + ' bytes) - please retry', 'red');
     return false;
   }
   /* Validate magic bytes */
   if (cfgData[0] !== 0x30 || cfgData[1] !== 127) {
     usbsidLog('presentConfig: invalid magic', cfgData[0], cfgData[1]);
-    usbsidSetStatus('Config validation failed — please retry', 'red');
+    usbsidSetStatus('Config validation failed - please retry', 'red');
     return false;
   }
 
@@ -264,11 +269,48 @@ function presentConfig(cfgData) {
       .trim();
   }
 
+  /* v1.5+ fields */
+  const needConfirm = cfgData[cfgmap.CFG_NEED_CONFIRM] ? 1 : 0;
+  const confirmEl   = document.getElementById('cfg-need-confirm');
+  if (confirmEl) {
+    if (needConfirm) {
+      confirmEl.textContent = 'Needs Confirmation';
+      confirmEl.style.color = 'var(--c64-red)';
+    } else {
+      confirmEl.textContent = 'Confirmed';
+      confirmEl.style.color = 'var(--c64-green)';
+    }
+  }
+  setSelectIndex('sel-socket-detect', cfgData[cfgmap.CFG_DISABLE_CHANGEDETECT] ? 1 : 0);
+
+  /* Enable v1.5 controls now that config is loaded */
+  const btnConfirm = document.getElementById('btn-confirm-config');
+  if (btnConfirm && !btnConfirm.classList.contains('c64-hidden')) {
+    btnConfirm.disabled = false;
+    if (needConfirm) {
+      btnConfirm.classList.add('c64-btn-glow');
+    } else {
+      btnConfirm.classList.remove('c64-btn-glow');
+    }
+  }
+  const selDetect = document.getElementById('sel-socket-detect');
+  if (selDetect && !selDetect.closest('#box-v15').classList.contains('c64-hidden')) {
+    selDetect.disabled = false;
+  }
+
+  /* Sync warning banner with current need_confirmation value */
+  const warnEl = document.getElementById('warn-confirmation');
+  if (warnEl) warnEl.classList.toggle('c64-hidden', !needConfirm);
+
+  /* Once config is loaded, remove glow from retrieve button */
+  const btnRetrieve = document.getElementById('btn-retrieve-config');
+  if (btnRetrieve) btnRetrieve.classList.remove('c64-btn-glow');
+
   usbsidSetStatus('Config loaded', 'green');
   return true;
 }
 
-/* ─── Read config from device ────────────────────────── */
+/* Read config from device */
 let _cfgReadInProgress = false;
 
 async function doReadConfig() {
@@ -295,7 +337,7 @@ async function doReadConfig() {
   }
 }
 
-/* ─── Write single config item from a <select> change ── */
+/* Write single config item from a <select> change */
 async function setConfigFromSelect(selectEl) {
   const id  = selectEl.id;
   const map = selectConfigMap[id];
@@ -324,7 +366,7 @@ async function setConfigFromSelect(selectEl) {
     cfg_item  = value;
     cfg_value = 0;
   } else if (special === 'valueasitem') {
-    /* Firmware groups 7-14 read buffer[2] (=cfg_item) as the value — no separate item index */
+    /* Firmware groups 7-14 read buffer[2] (=cfg_item) as the value - no separate item index */
     cfg_item  = value;
     cfg_value = 0;
   }
@@ -341,7 +383,7 @@ async function setConfigFromSelect(selectEl) {
   usbsidSetStatus(`Config: ${id} \u2192 ${selectEl.options[selectEl.selectedIndex].text}`);
 }
 
-/* ─── Attach change listeners to all config selects ──── */
+/* Attach change listeners to all config selects */
 function attachSelectListeners() {
   for (const id of Object.keys(selectConfigMap)) {
     const el = document.getElementById(id);
@@ -351,7 +393,7 @@ function attachSelectListeners() {
   }
 }
 
-/* ─── Preset buttons ─────────────────────────────────── */
+/* Preset buttons */
 const presetButtonMap = {
   'btn-preset-single':   async () => { await usbsidDevice.setSingleSID();   usbsidSetStatus('Preset: Single SID'); },
   'btn-preset-dual':     async () => { await usbsidDevice.setDualSID();     usbsidSetStatus('Preset: Dual SID'); },
@@ -367,7 +409,7 @@ const presetButtonMap = {
   'btn-preset-quadflipmix': async () => { await usbsidDevice.setQuadFlipMix(); usbsidSetStatus('Preset: Quad SID (flip+mix)'); },
 };
 
-/* ─── Config action buttons ──────────────────────────── */
+/* Config action buttons */
 const configButtonMap = {
   'btn-retrieve-config':   async () => { await doReadConfig(); },
   'btn-save-config':       async () => {
@@ -390,9 +432,17 @@ const configButtonMap = {
     setTimeout(() => doReadConfig(), 500);
   },
   'btn-apply-config':      async () => { await usbsidDevice.applyConfig();   usbsidSetStatus('Config applied'); },
+  'btn-confirm-config':    async () => {
+    if (!usbsidDevice.isOpen) { usbsidSetStatus('Not connected', 'red'); return; }
+    usbsidLog('Sending CONFIG_ACK…');
+    await usbsidDevice.confirmConfig();
+    usbsidSetStatus('Config confirmed - applying voltages, please wait…', 'green');
+    /* Firmware saves config to flash and applies socket voltages - allow time before read-back */
+    setTimeout(() => doReadConfig(), 1500);
+  },
 };
 
-/* ─── Debug buttons ──────────────────────────────────── */
+/* Debug buttons */
 const debugButtonMap = {
   'btn-debug-detect-sids':   async () => { await usbsidDevice.detectSIDs();    usbsidSetStatus('Detecting SID types\u2026'); },
   'btn-debug-detect-clones': async () => { await usbsidDevice.detectClones();  usbsidSetStatus('Detecting clone SIDs\u2026'); },
@@ -420,7 +470,7 @@ const debugButtonMap = {
   },
 };
 
-/* ─── Attach all button listeners ───────────────────── */
+/* Attach all button listeners */
 function attachButtonListeners() {
   const allMaps = [presetButtonMap, configButtonMap, debugButtonMap];
   allMaps.forEach(bmap => {
@@ -433,9 +483,9 @@ function attachButtonListeners() {
   });
 }
 
-/* ─── Check if PCB v1.3 (has audio switch) ──────────── */
+/* Check if PCB v1.3 (has audio switch) */
 function checkPCBVersion(vstr) {
-  /* Firmware returns e.g. "1.3" — match that directly */
+  /* Firmware returns e.g. "1.3" - match that directly */
   return typeof vstr === 'string' && vstr.includes('1.3');
 }
 
@@ -444,18 +494,56 @@ function applyPCBVersionUI(pcbver) {
   const isV13 = checkPCBVersion(pcbver);
   const box = document.getElementById('box-audio');
   if (box) box.classList.toggle('c64-hidden', !isV13);
+
+  applyV15UI(pcbver);  /* show/hide v1.5+ box and confirm button */
 }
 
-/* ─── Debug panel visibility ─────────────────────────── */
+/* PCB v1.5+ helpers */
+function isPCBv15plus(vstr) {
+  if (typeof vstr !== 'string') return false;
+  const m = vstr.match(/(\d+)\.(\d+)/);
+  if (!m) return false;
+  const major = parseInt(m[1], 10);
+  const minor = parseInt(m[2], 10);
+  return major > 1 || (major === 1 && minor >= 5);
+}
+
+/* Show/hide v1.5+ board status box and confirm button */
+function applyV15UI(pcbver) {
+  const isV15 = isPCBv15plus(pcbver);
+  const box = document.getElementById('box-v15');
+  if (box) box.classList.toggle('c64-hidden', !isV15);
+  const btn = document.getElementById('btn-confirm-config');
+  if (btn) btn.classList.toggle('c64-hidden', !isV15);
+  /* Reset controls - config not loaded yet after a connect */
+  if (btn) { btn.disabled = true; btn.classList.remove('c64-btn-glow'); }
+  const sel = document.getElementById('sel-socket-detect');
+  if (sel) sel.disabled = true;
+  const confirmEl = document.getElementById('cfg-need-confirm');
+  if (confirmEl) { confirmEl.textContent = '-'; confirmEl.style.color = ''; }
+}
+
+/* Debug panel visibility */
 function checkDebugMode() {
   const panel = document.getElementById('debug-panel');
   if (panel) panel.classList.add('visible');
 }
 
-/* ─── Init config UI ─────────────────────────────────── */
+/* Init config UI */
 function initConfigUI() {
   buildAllSelectOptions();
   attachSelectListeners();
   attachButtonListeners();
   checkDebugMode();
+
+  /* v1.5+: socket detect change sends SOCKET_DETECT command immediately */
+  const selSocketDetect = document.getElementById('sel-socket-detect');
+  if (selSocketDetect) {
+    selSocketDetect.addEventListener('change', async () => {
+      if (!usbsidDevice.isOpen) { usbsidSetStatus('Not connected', 'red'); return; }
+      const val = parseInt(selSocketDetect.value, 10);
+      await usbsidDevice.setSocketDetect(val);
+      usbsidSetStatus('Socket detect: ' + (val ? 'Disabled' : 'Enabled'));
+    });
+  }
 }

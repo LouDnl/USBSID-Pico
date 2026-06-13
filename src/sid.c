@@ -63,7 +63,8 @@ void init_sid_chips(void)
  */
 void clear_sid_memory(void)
 {
-  memset(sid_memory, 0, SID_MEMORY_SIZE);
+  /* Clear the dirt */
+  memset(sid_memory, 0, SID_MEMORY_SIZE); /* Always no more then 128 bytes */
   return;
 }
 
@@ -137,6 +138,19 @@ bool get_muted_state(void)
 }
 
 /**
+ * @brief init all states to their defaults
+ *
+ */
+void init_sid_states(void)
+{
+  clear_sid_memory();      /* Zero out SID memory space */
+  clear_volume_state();    /* Volume state to default */
+  set_muted_state(false);  /* not muted */
+  set_reset_state(false);  /* not in reset state */
+  set_paused_state(false); /* not in paused state */
+}
+
+/**
  * @brief unmute all sid's
  */
 void unmute_sid(void)
@@ -170,7 +184,6 @@ void mute_sid(void)
 void enable_sid(bool unmute)
 {
   set_paused_state(false);
-  // set_gpio(RES, 1);
   sPIN(RES);
   if (unmute) unmute_sid();
   return;
@@ -180,21 +193,27 @@ void disable_sid(void)
 {
   set_paused_state(true);
   mute_sid();
-  // set_gpio(CS1, 1);
-  // set_gpio(CS2, 1);
-  // set_gpio(RES, 0);
   sPIN(CS1);
   sPIN(CS2);
   cPIN(RES);
   return;
 }
 
+/**
+ * @brief Write zero to address 0x00 of sidno so the bus is all zeroes
+ *
+ * @param int sidno
+ */
 void clear_bus(int sidno)
 {
   cycled_write_operation((sidno * 0x20), 0x0, 0);
   return;
 }
 
+/**
+ * @brief Wrapper around `clear_bus` to write zeroes to each SID
+ *
+ */
 void clear_bus_all(void)
 {
   for (int sid = 0; sid < cfg.numsids; sid++) {
@@ -205,8 +224,6 @@ void clear_bus_all(void)
 
 void pause_sid(void)
 {
-  // set_gpio(CS1, 1);
-  // set_gpio(CS2, 1);
   sPIN(CS1);
   sPIN(CS2);
   return;
@@ -217,8 +234,6 @@ void pause_sid_withmute(void)
   usDBG("[PAUSE STATE PRE] %d\n", paused_state);
   if (!paused_state) mute_sid();
   if (paused_state) unmute_sid();
-  // set_gpio(CS1, 1);
-  // set_gpio(CS2, 1);
   pause_sid();
   set_paused_state(!paused_state);
   usDBG("[PAUSE STATE POST] %d\n", paused_state);
@@ -229,8 +244,8 @@ void reset_sid(void)
 {
   set_reset_state(true);
   set_paused_state(false);
-  memset(volume_state, 0, 4);
-  memset(sid_memory, 0, SID_MEMORY_SIZE);
+  clear_volume_state();    /* Volume state to default */
+  clear_sid_memory();      /* Zero out SID memory space */
   cPIN(RES);
   if (cfg.chip_one == 0 || cfg.chip_two == 0) {
     /* 10x PHI1(02) cycles as per datasheet for REAL SIDs only */
@@ -246,20 +261,32 @@ void reset_sid(void)
  *        6 cycle delay for each write to simulate LDA (2) + STA (4)
  * @note https://csdb.dk/forums/?roomid=11&topicid=85713&showallposts=1
  * @note thanks Wilfred for pointing this out!
+ * @param uint8_t base_address
+ */
+void clear_sid_registers_at_addr(uint8_t base_address)
+{
+  for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
+    cycled_write_operation((base_address | sid_registers[reg]), 0xff, 6);
+  }
+  for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
+    cycled_write_operation((base_address | sid_registers[reg]), 0x08, 6);
+  }
+  for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
+    cycled_write_operation((base_address | sid_registers[reg]), 0x0, 6);
+  }
+  clear_sid_memory();  /* Zero out SID memory space */
+  return;
+}
+
+/**
+ * @brief Clear SID register / reset registers
+ * @note wrapper function around `clear_sid_registers_at_addr`
+ *       for backwards compatibility
  * @param int sidno
  */
 void clear_sid_registers(int sidno)
 {
-  for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
-    cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0xff, 6);
-  }
-  for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
-    cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0x08, 6);
-  }
-  for (uint reg = 0; reg < count_of(sid_registers) - 4; reg++) {
-    cycled_write_operation(((sidno * 0x20) | sid_registers[reg]), 0x0, 6);
-  }
-  memset(sid_memory, 0, SID_MEMORY_SIZE);
+  clear_sid_registers_at_addr((sidno * 0x20));
   return;
 }
 

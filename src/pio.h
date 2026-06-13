@@ -111,6 +111,7 @@ void setup_sidclock(void);
 void init_sidclock(void);
 void deinit_sidclock(void);
 void setup_piobus(void);
+void clear_bus_fifos(void);
 void sync_pios(bool at_boot);
 void stop_pios(void);
 void restart_bus_clocks(void);

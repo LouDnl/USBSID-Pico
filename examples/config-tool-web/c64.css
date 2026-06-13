@@ -41,7 +41,7 @@ body {
   letter-spacing: 0.04em;
 }
 
-/* Scanlines overlay — 2px line on mobile, 1px on desktop */
+/* Scanlines overlay - 2px line on mobile, 1px on desktop */
 body::before {
   content: '';
   position: fixed;
@@ -79,7 +79,7 @@ body::before {
   box-shadow: 0 0 40px rgba(0,0,0,0.6), inset 0 0 12px rgba(0,0,0,0.2);
 }
 
-/* ─── Header ─────────────────────────────────────────── */
+/* Header */
 #c64-header {
   text-align: center;
   padding: 10px 0 6px;
@@ -101,7 +101,7 @@ body::before {
   letter-spacing: 0.2em;
 }
 
-/* ─── Status bar ─────────────────────────────────────── */
+/* Status bar */
 #c64-status {
   display: flex;
   align-items: center;
@@ -128,7 +128,7 @@ body::before {
 #c64-status .status-text { flex: 1; color: var(--c64-cyan); }
 #c64-status .status-version { color: var(--c64-cyan); font-size: 0.9rem; }
 
-/* ─── Tabs ───────────────────────────────────────────── */
+/* Tabs */
 #c64-tabs {
   display: flex;
   gap: 4px;
@@ -156,7 +156,7 @@ body::before {
   color: var(--c64-white);
   border-bottom-color: var(--c64-btn-bg);
 }
-/* External link buttons in the tab bar — same shape, cyan accent, pushed to right */
+/* External link buttons in the tab bar - same shape, cyan accent, pushed to right */
 .c64-tab-link {
   font-family: var(--font-main);
   font-size: 1rem;
@@ -184,7 +184,7 @@ body::before {
 .c64-panel { display: none; }
 .c64-panel.active { display: block; }
 
-/* ─── Generic box ────────────────────────────────────── */
+/* Generic box */
 .c64-box {
   border: 2px solid var(--c64-border);
   background: var(--c64-inset);
@@ -202,7 +202,7 @@ body::before {
   padding-bottom: 3px;
 }
 
-/* ─── Buttons ────────────────────────────────────────── */
+/* Buttons */
 .c64-btn {
   font-family: var(--font-main);
   font-size: 1rem;
@@ -232,7 +232,7 @@ body::before {
 .c64-btn.c64-btn-sm     { font-size: 0.85rem; padding: 2px 8px; }
 .c64-btn.active         { background: var(--c64-cyan); color: var(--c64-inset); }
 
-/* ─── Selects ────────────────────────────────────────── */
+/* Selects */
 .c64-select {
   font-family: var(--font-main);
   font-size: 1rem;
@@ -254,7 +254,7 @@ body::before {
 .c64-select:focus { border-color: var(--c64-cyan); color: var(--c64-white); }
 .c64-select option { background: var(--c64-inset); color: var(--c64-text); }
 
-/* ─── Inputs ─────────────────────────────────────────── */
+/* Inputs */
 .c64-input {
   font-family: var(--font-main);
   font-size: 1rem;
@@ -268,7 +268,7 @@ body::before {
 }
 .c64-input:focus { border-color: var(--c64-cyan); }
 
-/* ─── Player section ─────────────────────────────────── */
+/* Player section */
 #player-controls {
   display: flex;
   flex-wrap: wrap;
@@ -347,7 +347,7 @@ input[type=range].c64-range::-moz-range-thumb {
   cursor: pointer;
 }
 
-/* ─── SID Registers table ────────────────────────────── */
+/* SID Registers table */
 #regs-panel .c64-box {
   overflow-x: auto;
 }
@@ -371,7 +371,7 @@ input[type=range].c64-range::-moz-range-thumb {
 .sid-reg-cell.reg-written { background: var(--c64-darkgray); }
 .sid-reg-cell.reg-written .reg-val { color: var(--c64-yellow); }
 
-/* ─── Config section ─────────────────────────────────── */
+/* Config section */
 .config-section-title {
   font-size: 1.1rem;
   text-transform: uppercase;
@@ -429,7 +429,7 @@ input[type=range].c64-range::-moz-range-thumb {
   margin-right: 4px;
 }
 
-/* ─── Debug section ──────────────────────────────────── */
+/* Debug section */
 #debug-panel {
   display: none;
 }
@@ -448,7 +448,7 @@ input[type=range].c64-range::-moz-range-thumb {
   word-break: break-all;
 }
 
-/* ─── Footer ─────────────────────────────────────────── */
+/* Footer */
 #c64-footer {
   text-align: center;
   color: var(--c64-gray);
@@ -462,7 +462,7 @@ input[type=range].c64-range::-moz-range-thumb {
 #c64-footer a { color: var(--c64-cyan); text-decoration: none; }
 #c64-footer a:hover { color: var(--c64-white); }
 
-/* ─── Utility / misc ─────────────────────────────────── */
+/* Utility / misc */
 .c64-hidden { display: none !important; }
 .c64-text-white  { color: var(--c64-white); }
 .c64-text-cyan   { color: var(--c64-cyan); }
@@ -527,3 +527,30 @@ input[type=range].c64-range::-moz-range-thumb {
   background: var(--c64-orange);
   box-shadow: 0 0 6px var(--c64-orange);
 }
+
+/* Glow animation for attention-requiring buttons */
+@keyframes c64glow {
+  0%,100% { box-shadow: 0 0 6px var(--c64-orange), 0 0 14px rgba(224,136,48,0.4); }
+  50%     { box-shadow: 0 0 18px var(--c64-orange), 0 0 32px rgba(224,136,48,0.7); }
+}
+.c64-btn-glow {
+  animation: c64glow 1.5s ease-in-out infinite;
+  border-color: var(--c64-orange) !important;
+}
+
+/* Persistent confirmation warning banner */
+#warn-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(255,60,60,0.13);
+  border: 2px solid var(--c64-red);
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin: 6px 8px;
+  color: var(--c64-red);
+  font-size: 0.9rem;
+  font-weight: bold;
+  line-height: 1.5;
+}
+#warn-confirmation.c64-hidden { display: none !important; }

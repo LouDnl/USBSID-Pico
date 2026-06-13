@@ -28,6 +28,9 @@
 ### Cmake minimum version
 cmake_minimum_required(VERSION 3.17)
 
+### CMake stuff for ZED
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 ### Project magic sprinkles
 set(PROJECT_NAME send_sid)
 set(EXECUTABLE ${PROJECT_NAME} CACHE STRING "EXECUTABLE")

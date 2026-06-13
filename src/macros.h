@@ -76,6 +76,12 @@
 #define MIN(a,b)            (((a) < (b)) ? (a) : (b))
 #endif
 
+/* Helper macro for rounding a value to the nearest integer (positive integers only) */
+#ifndef ROUND
+#define ROUND(n)            ((int)((n) + 0.5))
+/* If negative values needed change to  (int)((n) < 0 ? (n) - 0.5 : (n) + 0.5) */
+#endif
+
 /* Helper macro that creates a random value */
 #ifndef RANDVAL
 #define RANDVAL(min,max)    (min + rand() / (RAND_MAX / (max - min + 1) + 1))

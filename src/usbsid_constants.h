@@ -53,6 +53,18 @@ typedef enum ZeroOne {
 } ZeroOne;
 
 /**
+ * @brief SocketNum
+ *
+ */
+typedef enum SocketNumber {
+  SOCK_ONE = 0,
+  SOCK_TWO,
+  SOCK_THREE,
+  SOCK_FOUR,
+  SOCK_COUNT,
+} SocketNumber;
+
+/**
  * @brief Configuration error codes
  * All _config_ validation and application functions (should) return these codes.
  * CFG_OK (0) indicates success, all other values indicate specific errors.
@@ -70,6 +82,7 @@ typedef enum ConfigError {
   CFG_ERR_DETECTION_FAILED,       /* Chip/SID detection failed */
   CFG_ERR_NULL_POINTER,           /* NULL pointer passed to function */
   CFG_ERR_EQUAL_PRESET,           /* Preset supplied matches preset active */
+  CFG_ERR_CHANGE_DETECTED,        /* Change in socket configuration detected */
   CFG_ERROR_COUNT,                /* Number of config errors */
 } ConfigError;
 
@@ -128,6 +141,7 @@ typedef enum ChipType
   CHIP_REDIPSID,  /* RedipSID */
   CHIP_PDSID,     /* Public Domain SID */
   CHIP_BACKSID,   /* BackSID */
+  CHIP_SIDEMU,    /* SIDEmu */
   CHIP_COUNT,     /* Number of chiptypes */
 } ChipType;
 
@@ -178,6 +192,7 @@ extern const uint8_t __in_flash("us_uints") sid_addresses[];
 
 /* These strings are made for logging */
 
+extern const char * const config_socket_num(SocketNumber num);
 extern const char * const config_error_str(ConfigError err);
 extern const char * const preset_name(SocketPreset preset);
 extern const char * const chip_type_name(ChipType chiptype);
@@ -185,6 +200,8 @@ extern const char * const sid_type_name(SIDType sidtype);
 extern const char * const in_ext_str(ZeroOne val);
 extern const char * const switch_str(ZeroOne val);
 extern const char * const boolean_str(ZeroOne val);
+extern const char * const confirmation_str(ZeroOne val);
+extern const char * const changed_str(ZeroOne val);
 extern const char * const locked_str(ZeroOne val);
 extern const char * const dualsingle_str(ZeroOne val);
 extern const char * const monostereo_str(ZeroOne val);

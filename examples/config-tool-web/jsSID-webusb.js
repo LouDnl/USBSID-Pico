@@ -260,7 +260,7 @@ function asidSendEnv() {
     bits4-1 : speed, 1x to 16x (value 0-15)
     bit5    : 1 = custom speed (only framedelta valid)
     bit6    : 1 = buffering requested by user
-    */
+  */
   ASidOutBuffer[index++] =
     ((isBufferingRequested ? 1:0)   << 6) |
     ((custom_speed? 1:0)            << 5) |
@@ -388,7 +388,7 @@ function jsSID(bufferlen, background_noise, asid_enable = false, webusb_enable =
     if (savedport != null) {
       webusb.autoConnect();
     } else {
-      console.warn("[jsSID] No saved port — use usbsidDevice.connect() to connect first");
+      console.warn("[jsSID] No saved port - use usbsidDevice.connect() to connect first");
     }
     maxsid = 4;
   }

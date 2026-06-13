@@ -27,6 +27,7 @@
 #include <usbsid.h>
 #include <usbsid_constants.h>
 #include <config.h>
+#include <config_socket.h>
 #include <gpio.h>
 #include <gpio_defs.h>
 #include <pio.h>
@@ -37,14 +38,10 @@
 #include <mcu.h>
 #include <sid.h>
 #include <sid_tests.h>
-#include <sid_detection.h>
 #include <midi.h>
 #include <asid.h>
 #include <logging.h>
 
-
-/* doubletap.c */
-extern int flagged;
 
 /* Declare variables ~ Do not change order to keep memory alignment! */
 uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);  /* 64 Bytes, 128 bytes aligned */
@@ -73,8 +70,13 @@ const char cdc = 'C', asid = 'A', midi = 'M', sysex = 'S', wusb = 'W', uart = 'U
 static bool web_serial_connected = false;
 
 volatile double cpu_mhz = 0, cpu_us = 0, sid_hz = 0, sid_mhz = 0, sid_us = 0;
-volatile bool auto_config = false;
 volatile bool offload_ledrunner = false;
+#if PCB_VERSION_INT >= 15
+volatile bool detected_sid_change = false;
+volatile bool sid_change_unacknowledged = true;
+#else
+const bool detected_sid_change = false;
+#endif
 
 /* Cynthcart emulator */
 #if defined(ONBOARD_EMULATOR)
@@ -127,7 +129,6 @@ static const tusb_desc_webusb_url_t desc_url =
 void reset_reason(void)
 {
 #if PICO_RP2040
-  usNFO("\n[RESET] Button double tapped? %d\n", flagged);
   io_rw_32 *rr = (io_rw_32 *) (VREG_AND_CHIP_RESET_BASE + VREG_AND_CHIP_RESET_CHIP_RESET_OFFSET);
   if (*rr & VREG_AND_CHIP_RESET_CHIP_RESET_HAD_POR_BITS)
     usNFO("[RESET] Caused by power-on reset or brownout detection\n");
@@ -137,7 +138,6 @@ void reset_reason(void)
     usNFO("[RESET] Caused by debug port\n");
 #elif PICO_RP2350
   /* io_rw_32 *rr = (io_rw_32 *) (POWMAN_BASE + POWMAN_CHIP_RESET_OFFSET); */
-  usNFO("\n[RESET] Button double tapped? %d %X\n", flagged, powman_hw->chip_reset);
   if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_DP_RESET_REQ_BITS)
     usNFO("[RESET] Caused by arm debugger\n");
   if (/* *rr */ powman_hw->chip_reset & POWMAN_CHIP_RESET_HAD_RESCUE_BITS)
@@ -158,12 +158,12 @@ void reset_reason(void)
 /* Initialise debug logging if enabled */
 void init_logging(void)
 {
-  #if defined(USBSID_UART)
+#if defined(USBSID_UART)
   stdio_uart_init_full(uart0, BAUD_RATE, TX, RX);
   sleep_ms(100);  /* leave time for uart to settle */
   stdio_flush();
   usNFO("\n[NFO] Uart logging initialised\n");
-  #endif
+#endif
   return;
 }
 
@@ -213,6 +213,7 @@ void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
   int state = 0;
   do {
     usbdata = 1;
+    vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
     state = do_buffer_tick(n_bytes, step);
   } while (state != 1);
 }
@@ -225,8 +226,14 @@ void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volat
   uint8_t command = ((sid_buffer[0] & PACKET_TYPE) >> 6);
   uint8_t subcommand = (sid_buffer[0] & COMMAND_MASK);
   uint8_t n_bytes = (sid_buffer[0] & BYTE_MASK);
-  if __us_unlikely(get_reset_state() && (command != COMMAND)) { return; };  /* Drop incoming data if in reset state */
+  if __us_unlikely(get_reset_state()
+    && (command != COMMAND)
+    && ((subcommand != CYCLED_READ)
+      && (subcommand != DELAY_CYCLES))) { return; };  /* Drop incoming data if in reset state */
 
+  if __us_unlikely(config_unacknowledged()) {
+    goto SIDCHANGEDETECTED; /* Skip to command sequence of unacknowledged */
+  }
   if __us_likely(command == CYCLED_WRITE) {
     // n_bytes = (n_bytes == 0) ? 4 : n_bytes; /* if byte count is zero, this is a single write packet */
     if __us_unlikely(n_bytes == 0) {
@@ -266,7 +273,10 @@ void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volat
     vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
     return;
   };
-  if (command == COMMAND) {
+SIDCHANGEDETECTED:;
+  if __us_likely(command == COMMAND) {
+    if __us_unlikely(config_unacknowledged()
+     && (subcommand != CONFIG) && (subcommand != RESET_MCU) && (subcommand != BOOTLOADER)) return;
     switch (subcommand) {
       case CYCLED_READ:
         usIO("[I %d] [%c] $%02X %u\n", n_bytes, dtype, sid_buffer[1], (sid_buffer[2] << 8 | sid_buffer[3]));
@@ -380,7 +390,7 @@ void tud_resume_cb(void)
 
 /* USB MIDI CLASS TASK & CALLBACKS */
 
-void midi_task(void) /* Disabled in loop ~ keeping for later use */
+void midi_task(void) /* Disabled in loop ~ keeping for optional later use */
 { /* Same as the callback routine */
   if (tud_midi_n_mounted(MIDI_ITF)) {
     while (tud_midi_n_available(MIDI_ITF, MIDI_CABLE)) {  /* Loop as long as there is data available */
@@ -583,9 +593,14 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
           unmute_sid();
         }
       }
-      if (request->bRequest == 0x22) {
+      if (request->bRequest == 0x22) { /* On connection */
         /* Webserial simulates the CDC_REQUEST_SET_CONTROL_LINE_STATE (0x22) to connect and disconnect */
         web_serial_connected = (request->wValue != 0);
+        /* Flush any data still in the fifo */
+        if (web_serial_connected) {
+          tud_vendor_n_read_flush(WUSB_ITF);
+          tud_vendor_n_write_flush(WUSB_ITF);
+        }
         /* Respond with status OK */
         return tud_control_status(rhport, request);
       }
@@ -597,7 +612,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
            * Get landing page url and return it
            * if on default config first boot
            */
-          if (first_boot) {
+          if (first_boot || usbsid_config.need_confirmation || detected_sid_change) {
             return tud_control_xfer(rhport, request, (void*)(uintptr_t) &desc_url, desc_url.bLength);
             first_boot = false;
           } else {
@@ -656,42 +671,66 @@ void core1_main(void)
 
   /* Signal Core 0 we're ready (sync point 1) */
   usBOOT("<CORE 1> Signaling core0 ready ~ 1\n");
-  __dmb();  /* Memory barrier before write */
   core_sync_state = SYNC_CORE1_STAGE1;
+  __dsb();  /* Data Synchronisation Barrier - ensures store completes before SEV */
   __sev();  /* Signal event to wake Core 0 from WFE */
 
   /* Wait for Core 0 to finish config loading */
   usBOOT("<CORE 1> Waiting for core0 sync ~ 1\n");
-  while (core_sync_state != SYNC_CORE0_STAGE1) {
+  while (true) {
     __wfe();  /* Wait for event - low power wait */
+    __dmb();  /* Data Memory Barrier */
+    if (core_sync_state == SYNC_CORE0_STAGE1) break;
   }
-  __dmb();  /* Memory barrier after read */
+  __dmb();  /* Data Memory Barrier after read */
 
   /* Init queues */
   queue_init(&sidtest_queue, sizeof(sidtest_queue_entry_t), 1);  /* 1 entry deep */
-  #ifdef WRITE_DEBUG  /* Only init this queue when needed */
+#ifdef WRITE_DEBUG  /* Only init this queue when needed */
   queue_init(&logging_queue, sizeof(writelogging_queue_entry_t), 16384);  /* 16384 entries deep so we don't skip any writes */
-  #endif
+#endif
 
   /* Initialise PIO Uart */
-  #ifdef USE_PIO_UART
+#ifdef USE_PIO_UART
   init_uart();
-  #endif
+#endif
+
+  /* Initialise Bluetooth Uart */
+#ifdef USE_BLUETOOTH
+  extern void setup_bluetooth();
+  setup_bluetooth();
+#endif
 
   /* Signal Core 0 we're ready (sync point 2) */
   usBOOT("<CORE 1> Signaling core0 ready ~ 2\n");
-  __dmb();
   core_sync_state = SYNC_CORE1_STAGE2;
-  __sev();
+  __dsb(); /* Data Synchronisation Barrier - ensures store completes before SEV */
+  __sev(); /* Signal event to wake Core 0 from WFE */
 
   /* Wait for Core 0 to finish hardware init */
   usBOOT("<CORE 1> Waiting for core0 sync ~ 2\n");
-  while (core_sync_state != SYNC_CORE0_STAGE2) {
-    __wfe();
+  while (true) {
+    __wfe();  /* Wait for event - low power wait */
+    __dmb();  /* Data Memory Barrier */
+    if (core_sync_state == SYNC_CORE0_STAGE2) break;
   }
-  __dmb();
+  __dmb();  /* Data Memory Barrier after read */
 
   while (1) {
+
+    if (get_reset_state()) continue;
+
+    /* Blinky blinky? */
+    if (!offload_ledrunner) {
+      led_runner();
+#ifdef USE_BLUETOOTH
+      cyw43_arch_poll();
+#endif
+    }
+
+#if PCB_VERSION_INT >= 15
+    if (detected_sid_change) continue;
+#endif
 
     /* Check SID test queue */
     if (running_tests) {
@@ -701,12 +740,7 @@ void core1_main(void)
       }
     }
 
-    /* Blinky blinky? */
-    if (!offload_ledrunner) {
-      led_runner();
-    }
-
-#if ONBOARD_SIDPLAYER
+#ifdef ONBOARD_SIDPLAYER
     if (sidplayer_init) {
       sidplayer_init = false;
       sidplayer_start = false;
@@ -810,13 +844,11 @@ int main()
     .speed = TUSB_SPEED_FULL
   };
   tusb_init(BOARD_TUD_RHPORT, &dev_init);
+  tud_disconnect();  /* Keep USB invisible to host during boot — set_base_voltages sleeps up to 4.5s */
   /* Init logging */
   init_logging();
   /* Log reset reason */
   reset_reason();
-
-  /* Clear flagged */
-  if (flagged) { auto_config = true; flagged = 0; }  /* NOTE: Does not work on rp2350 */
 
   /* Launch Core 1 and wait for flash_safe_execute_core_init to complete */
   usBOOT("CORE0 Launching core1\n");
@@ -824,10 +856,12 @@ int main()
 
   /* Wait for Core 1 to signal ready (sync point 1) */
   usBOOT("CORE0 Waiting for core1 ready ~ 1\n");
-  while (core_sync_state != SYNC_CORE1_STAGE1) {
+  while (true) {
     __wfe();  /* Wait for event - low power wait */
+    __dmb();  /* Data Memory Barrier */
+    if (core_sync_state == SYNC_CORE1_STAGE1) break;
   }
-  __dmb();  /* Insert memory barrier after read */
+  __dmb();  /* Data Memory Barrier before write */
 
   /* Load config before init of USBSID settings ~ NOTE: This cannot be run from Core 1! */
   load_config(&usbsid_config);
@@ -843,82 +877,98 @@ int main()
   sid_hz = usbsid_config.clock_rate;
   sid_mhz = (sid_hz / 1000 / 1000);
   sid_us = (1 / sid_mhz);
-  if (!auto_config) {
-    usNFO("\n");
-    usNFO("[NFO] Clock information:\n");
-    usNFO("[NFO]   Pico Clock @ %lu Hz, %.0f MHz, %.4f uS\n",
-      clock_get_hz(clk_sys), cpu_mhz, cpu_us);
-    usNFO("[NFO]   C64 SID Clock @ %.0f Hz, %.6f MHz, %.4f uS\n",
-      sid_hz, sid_mhz, sid_us);
-    usNFO("[NFO]   C64 Refresh Rate = %lu Cycles\n",
-      usbsid_config.refresh_rate);
-    usNFO("[NFO]   C64 Raster Rate = %lu Cycles\n",
-      usbsid_config.raster_rate);
-  }
+  usNFO("\n");
+  usNFO("[NFO] Clock information:\n");
+  usNFO("[NFO]   Pico Clock @ %lu Hz, %.0f MHz, %.4f uS\n",
+    clock_get_hz(clk_sys), cpu_mhz, cpu_us);
+  usNFO("[NFO]   C64 SID Clock @ %.0f Hz, %.6f MHz, %.4f uS\n",
+    sid_hz, sid_mhz, sid_us);
+  usNFO("[NFO]   C64 Refresh Rate = %lu Cycles\n",
+    usbsid_config.refresh_rate);
+  usNFO("[NFO]   C64 Raster Rate = %lu Cycles\n",
+    usbsid_config.raster_rate);
 
   /* Signal Core 1 to continue (sync point 1) */
   usBOOT("<CORE 0> Signaling core1 ~ 1\n");
-  __dmb();  /* Insert memory barrier after read */
   core_sync_state = SYNC_CORE0_STAGE1;
+  __dsb();  /* Data Synchronisation Barrier - ensures store completes before SEV */
   __sev();  /* Signal event to wake Core 1 from WFE */
 
   /* Wait for Core 1 to finish queue/uart init (sync point 2) */
   usBOOT("<CORE 0> Waiting for core1 ready ~ 2\n");
-  while (core_sync_state != SYNC_CORE1_STAGE2) {
+  while (true) {
     __wfe();  /* Wait for event - low power wait */
+    __dmb();  /* Data Memory Barrier */
+    if (core_sync_state == SYNC_CORE1_STAGE2) break;
   }
-  __dmb();  /* Insert memory barrier after read */
+  __dmb();  /* Data Memory Barrier after read */
 
-  /* Init GPIO */
-  usBOOT("Initializing GPIO\n");
-  init_gpio();
   /* Start verification, detect and init sequence of SID clock */
   usBOOT("Setup SID clock\n");
   setup_sidclock();
+
+  /* Init C64 bus */
+  usBOOT("Initializing C64 bus\n");
+  init_bus_control();
+
+#if PCB_VERSION_INT >= 15
+  /* Init voltage control */
+  usBOOT("Initializing voltage control\n");
+  init_vccvdd_control();
+#endif
+
+#if PCB_VERSION_INT >= 13
+  /* Init audio switch */
+  usBOOT("Initializing audio switch\n");
+  init_audio_switch();
+#endif
+
   /* Init PIO */
   usBOOT("Setup PIO bus\n");
   setup_piobus();
   /* Sync PIOS */
   usBOOT("Synchronise PIO's\n");
   sync_pios(true);
+
   /* Init DMA */
   usBOOT("Setup DMA channels\n");
   setup_dmachannels();
+
   /* Start the VU */
   usBOOT("Initialise Vu\n");
   init_vu();
+
   /* Init midi */
   usBOOT("Initialise Midi\n");
   midi_init();
+
   /* Init ASID */
   usBOOT("Initialise ASID\n");
   asid_init();
-  /* Enable SID chips */
-  usBOOT("Enable SID chips\n");
-  enable_sid(false);
 
-  /* Clear the dirt */
-  memset(sid_memory, 0, SID_MEMORY_SIZE); /* Always no more then 128 bytes */
+  /* Init SID states */
+  usBOOT("Init SID states\n");
+  init_sid_states(); /* NOTE: Detecting SID types require 9v to be enabled for all MOS SID types */
 
-  /* Check for default config bit
-   * NOTE: This cannot be run from Core 1! */
-  if (!auto_config) {
-    detect_default_config();
+  /* Check for default config bit */
+#if PCB_VERSION_INT >= 15
+  /* Only run autodetect sequence if not already waiting for confirmation */
+  if (!usbsid_config.need_confirmation) {
+    detect_default_config(); /* Saves config, always */
   }
-  if (auto_config) {  /* NOTE: Does not work on rp2350 */
-    sid_auto_detect(true); /* At boot */
-    save_config_ext();
-    auto_config = false;
-    mcu_reset();
-  }
-  /* Print config once at end of boot routine */
-  print_config();
+#else
+  detect_default_config(); /* Saves config, always */
+#endif
 
-  /* Reset SID chips */
-  usBOOT("Reset SID chips\n");
-  reset_sid(); /* WARNING: Might cause issues! */
-  usBOOT("Reset SID registers\n");
-  reset_sid_registers(); /* WARNING: Might cause issues! */
+  /* No need to reset SID registers or resetting the SID's
+     at this point on boot on pre v1.4 boards */
+
+#if PCB_VERSION_INT >= 15
+  verify_socket_config();
+#endif
+  /* Print config once at end of boot routine
+     detected_sid_change is always false on pre v1.5 boards */
+  if (!detected_sid_change) print_config();
 
   {
     usNFO("\n");
@@ -928,18 +978,26 @@ int main()
 #ifdef ONBOARD_SIDPLAYER
     usDBG("Firmware is compiled with onboard SID player\n");
 #endif
-    usDBG("%s v%s Started successfully\n\n", us_product, project_version);
+    if (!detected_sid_change) {
+      usDBG("%s v%s Started successfully\n\n", us_product, project_version);
+    } else {
+      usDBG("%s v%s\n", us_product, project_version);
+      usWRN("Please verify socket configuration before further use!\n\n");
+    }
   }
 
   /* Signal Core 1 to enter main loop (sync point 2) */
   usBOOT("<CORE 0> Signaling core1 ~ 2\n");
-  __dmb();  /* Memory barrier after read */
   core_sync_state = SYNC_CORE0_STAGE2;
+  __dsb();  /* Data Synchronisation Barrier - ensures store completes before SEV */
   __sev();  /* Signal event to wake Core 1 from WFE */
+
+  /* All hardware ready - allow host to enumerate */
+  if (!tud_connect()) usERR("!! USB CONNECTION ERROR !!");
 
   /* Loop IO tasks forever */
   while (1) {
-    tud_task_ext(/* UINT32_MAX */0, false);  /* equals tud_task(); */
+    tud_task_ext(0, false);  /* equals tud_task(); timout_ms already at 0 and is _always_ discarded in osal_none.h */
 #ifndef USE_CDC_CALLBACK
     cdc_task();  /* Only use this if no callbacks */
 #endif
@@ -949,6 +1007,9 @@ int main()
 
     if (offload_ledrunner) {
       led_runner();
+#ifdef USE_BLUETOOTH
+      cyw43_arch_poll();
+#endif
     }
   }
 

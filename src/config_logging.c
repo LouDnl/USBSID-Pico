@@ -99,10 +99,10 @@ void print_pico_features(void)
   usCFG("  PIO version = %d\n", PICO_PIO_VERSION);  /* pio.h */
   #if defined(PICO_DEFAULT_LED_PIN)
   usCFG("  Default LED pin = %d\n", PICO_DEFAULT_LED_PIN);  /* pico*.h */
+  usCFG("  PWM on LED = %d\n", LED_PWM);  /* config.h */
   #elif defined(CYW43_WL_GPIO_LED_PIN)
   usCFG("  WiFi LED pin = %d\n", CYW43_WL_GPIO_LED_PIN);  /* pico*.h */
   #endif
-  usCFG("  PWM on LED = %d\n", LED_PWM);  /* config.h */
 
   return;
 }
@@ -162,8 +162,9 @@ void print_config_overview(void)
       usbsid_config.socketTwo.sid2.addr,
       usbsid_config.socketTwo.sid2.id);
   }
+  usCFG("\n");
   usCFG("  Mirror Socket Two to Socket One = %s\n", switch_str(usbsid_config.mirrored));
-  usCFG("  Flip Socket One and Socket One  = %s\n", switch_str(usbsid_config.flipped));
+  usCFG("  Flip Socket One and Socket Two  = %s\n", switch_str(usbsid_config.flipped));
   usCFG("  Mix socket addresses (Quad SID) = %s\n", switch_str(usbsid_config.mixed));
   usCFG("\n");
   usCFG("  FMOpl is %s\n",
@@ -172,7 +173,7 @@ void print_config_overview(void)
     usCFG("  FMOpl available @ SID %d\n",
       (int)usbsid_config.FMOpl.sidno);
   usCFG("\n");
-#if defined(HAS_AUDIOSWITCH)
+#if PCB_VERSION_INT >= 13
   usCFG("  Audio switch is set to %s\n",
     monostereo_str((int)usbsid_config.stereo_en));
   usCFG("  Audio switch position = %s\n",
@@ -202,7 +203,14 @@ void print_config_overview(void)
     switch_str((int)usbsid_config.Midi.enabled));
   usCFG("  ASID feature = %s\n",
     switch_str((int)usbsid_config.Asid.enabled));
-
+#if PCB_VERSION_INT >= 14
+  usCFG("\n");
+  usCFG("Verification of socket change detection on boot = %s\n",
+    switch_str((int)!usbsid_config.disable_changedetect));
+  if (config_unacknowledged()) {
+    usCFG("\n!! CURRENT CONFIGURATION NEEDS TO BE VERIFIED AND ACKNOWLEDGED !!\n\n");
+  }
+#endif
   return;
 }
 

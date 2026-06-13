@@ -36,6 +36,7 @@
 
 
 /* Functions from config_bus.c */
+void set_busconfig_logging(bool enabled);
 void apply_runtime_config(const Config *config, RuntimeCFG *rt);
 
 

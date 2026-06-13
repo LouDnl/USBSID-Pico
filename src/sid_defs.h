@@ -119,50 +119,54 @@ static const enum raster_rates rasterrates[]  = { R_DEFAULT, R_PAL, R_NTSC, R_NT
 /* Masks we use */
 typedef enum {
   /* How's your counting game? */
-  ZERO          =      0,
-  ONE           =      1,
-  MIN_VAL       =      0,
+  ZERO           =      0,
+  ONE            =      1,
+  MIN_VAL        =      0,
   /* Squeeky squaky */
-  PITCH_MAX     =     16,
-  SCALE_MAX     =     95, /* Max musical note scale */
-  CUTOFF_MAX    =   2047,
+  PITCH_MAX      =     16,
+  SCALE_MAX      =     95, /* Max musical note scale */
+  CUTOFF_MAX     =   2047,
   /* So slow... */
-  MIDI_CC_MAX   =   0x7F,
-  MIDI_HALF     = 0x3fc0, /* 16320 */
-  MIDI_MAX      = 0x7f7f,
+  MIDI_CC_MAX    =   0x7F,
+  MIDI_HALF      = 0x3fc0, /* 16320 */
+  MIDI_MAX       = 0x7f7f,
+  MIDI_TRANSPOSE =    -12,
   /* Nip tuck, or just nipples */
-  L_NIBBLE      =   0xf0,
-  R_NIBBLE      =   0x0f,
-  BYTE          =   0xff,
-  H_BYTE        = 0xff00,
-  NIBBLE_MAX    =    0xf,
-  TRIPLE_NIBBLE =  0xfff,
-  NIBBLE_3      =  0xf00,
-  /* Register stuffs */
-  MAX_VOICES    =      3, /* 3 voices per SID */
-  VOICE_REGS    =      7, /* 7 registers per voice */
-  MAX_REGS      =     25, /* 29 - 4 non writeable ($18 is the max writeable SID register) */
-  VOICE_FREQLO  =   BYTE,
-  VOICE_FREQHI  =   BYTE,
-  F_MASK_HI     =  0x7f8, /* filter mask high */
-  F_MASK_LO     =    0x7, /* filter mask low */
+  L_NIBBLE       =   0xf0,
+  R_NIBBLE       =   0x0f,
+  BYTE           =   0xff,
+  H_BYTE         = 0xff00,
+  NIBBLE_MAX     =    0xf,
+  TRIPLE_NIBBLE  =  0xfff,
+  NIBBLE_3       =  0xf00,
+  /* USBSID & Midi thingies */
+  MAX_CHANNELS   =     16, /* Max customisable channels */
+  MAX_SIDS       =      4, /* Maximum SID's per USBSID-Pico */
+    /* Register stuffs */
+  MAX_VOICES     =      3, /* Maximum of 3 voices per SID */
+  VOICE_REGS     =      7, /* 7 registers per voice */
+  MAX_REGS       =     25, /* 29 - 4 non writeable ($18 is the max writeable SID register) */
+  VOICE_FREQLO   =   BYTE,
+  VOICE_FREQHI   =   BYTE,
+  F_MASK_HI      =  0x7f8, /* filter mask high */
+  F_MASK_LO      =    0x7, /* filter mask low */
   /* Bits n shifts n parts */
-  SHIFT_1       =      1,
-  SHIFT_2       =      2,
-  SHIFT_3       =      3,
-  SHIFT_4       =      4,
-  SHIFT_5       =      5,
-  SHIFT_6       =      6,
-  SHIFT_7       =      7,
-  SHIFT_8       =      8,
-  BIT_0         =    0x1,
-  BIT_1         =    0x2,
-  BIT_2         =    0x4,
-  BIT_3         =    0x8,
-  BIT_4         =   0x10,
-  BIT_5         =   0x20,
-  BIT_6         =   0x40,
-  BIT_7         =   0x80
+  SHIFT_1        =      1,
+  SHIFT_2        =      2,
+  SHIFT_3        =      3,
+  SHIFT_4        =      4,
+  SHIFT_5        =      5,
+  SHIFT_6        =      6,
+  SHIFT_7        =      7,
+  SHIFT_8        =      8,
+  BIT_0          =    0x1,
+  BIT_1          =    0x2,
+  BIT_2          =    0x4,
+  BIT_3          =    0x8,
+  BIT_4          =   0x10,
+  BIT_5          =   0x20,
+  BIT_6          =   0x40,
+  BIT_7          =   0x80
 } masks_n_vals;
 
 /*
@@ -268,6 +272,8 @@ static const uint8_t attack_decayrelease[16] =
 
 /*
  * Osc Fn (Hex), No, Musical Note, Freq (Hz), Osc Fn (Decimal)
+ * Note index is exactly off by one octave (12 semitones) when
+ * compared to the standard midi note
  */
 static const uint32_t musical_scale_values[96] =
 {

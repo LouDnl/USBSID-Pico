@@ -27,6 +27,17 @@
 
 
 /**
+ * @brief Socket naming
+ *
+ */
+static const char __in_flash("us_statics") *socket_numbers[] = {
+  [SOCK_ONE]   = "SocketOne",
+  [SOCK_TWO]   = "SocketTwo",
+  [SOCK_THREE] = "SocketThree",
+  [SOCK_FOUR]  = "SocketFour",
+};
+
+/**
  * @brief Error message strings
  *
  */
@@ -41,7 +52,8 @@ static const char __in_flash("us_statics") *error_messages[] = {
   [CFG_ERR_INVALID_PRESET]        = "Invalid preset value",
   [CFG_ERR_DETECTION_FAILED]      = "Chip/SID detection failed",
   [CFG_ERR_NULL_POINTER]          = "NULL pointer passed to function",
-  [CFG_ERR_EQUAL_PRESET]          = "Preset supplied matches preset active"
+  [CFG_ERR_EQUAL_PRESET]          = "Preset supplied matches preset active",
+  [CFG_ERR_CHANGE_DETECTED]       = "Change in physical socket configuration detected",
 };
 
 /**
@@ -79,6 +91,7 @@ static const char __in_flash("us_statics") *chiptypes[] = {
   [CHIP_REDIPSID] = "RedipSID",
   [CHIP_PDSID]    = "PDSID",
   [CHIP_BACKSID]  = "BackSID",
+  [CHIP_SIDEMU]   = "SIDEmu",
 };
 
 /**
@@ -118,6 +131,24 @@ static const char __in_flash("us_statics") *enabled[] = {
 static const char __in_flash("us_statics") *false_true[] = {
   [CFG_OFF] = "False",
   [CFG_ON]  = "True",
+};
+
+/**
+ * @brief Confirmation strings
+ *
+ */
+static const char __in_flash("us_statics") *no_yes[] = {
+  [CFG_OFF] = "No",
+  [CFG_ON]  = "Yes",
+};
+
+/**
+ * @brief Confirmation strings
+ *
+ */
+static const char __in_flash("us_statics") *un_changed[] = {
+  [CFG_OFF] = "Unchanged",
+  [CFG_ON]  = "Changed",
 };
 
 /**
@@ -215,6 +246,20 @@ const uint8_t __in_flash("us_uints") sid_addresses[4] = {
 
 
 /**
+ * @brief Helper function for socket name retrieval
+ *
+ * @param SocketNumber num
+ * @return const char* socket name
+ */
+const char * config_socket_num(SocketNumber num)
+{
+  if (num >= 0 && num < SOCK_COUNT) {
+    return socket_numbers[num];
+  }
+  return "Unknown socket";
+}
+
+/**
  * @brief Helper function for config error message retrieval
  *
  * @param ConfigError err
@@ -310,6 +355,34 @@ const char * boolean_str(ZeroOne val)
     return false_true[val];
   }
   return false_true[0]; /* False */
+}
+
+/**
+ * @brief Helper function
+ *
+ * @param ZeroOne val
+ * @return const char* string
+ */
+const char * confirmation_str(ZeroOne val)
+{
+  if (val >= 0 && val < OF_MAX) {
+    return no_yes[val];
+  }
+  return no_yes[0]; /* No */
+}
+
+/**
+ * @brief Helper function
+ *
+ * @param ZeroOne val
+ * @return const char* string
+ */
+const char * changed_str(ZeroOne val)
+{
+  if (val >= 0 && val < OF_MAX) {
+    return un_changed[val];
+  }
+  return un_changed[0]; /* Unchanged */
 }
 
 /**

@@ -1,21 +1,21 @@
 /**
- * USBSID-Pico Web Config — Main Application
+ * USBSID-Pico Web Config - Main Application
  * Handles device connection, player integration, and config UI wiring.
  */
 
 'use strict';
 
-/* ── Globals expected by jsSID-webusb.js / player.js ─── */
-/* NOTE: jsSID-webusb.js declares these with 'let' — do NOT redeclare here:
+/* Globals expected by jsSID-webusb.js / player.js */
+/* NOTE: jsSID-webusb.js declares these with 'let' - do NOT redeclare here:
  *   webusbplaying, webusbconnected, configavailable, webusb, port, savedport
  * We may safely redeclare 'var'-declared ones: webusb_enabled, usbsid, Mute_SID
  */
-var webusb_enabled = false;   /* jsSID-webusb.js uses var — safe to initialize here */
-var Mute_SID       = 0;       /* jsSID-webusb.js uses var — safe to initialize here */
+var webusb_enabled = false;   /* jsSID-webusb.js uses var - safe to initialize here */
+var Mute_SID       = 0;       /* jsSID-webusb.js uses var - safe to initialize here */
 var usbsid         = { version: '', nosids: 1, fmoplsid: 0 }; /* var in jsSID-webusb.js */
 
-/* ── Global stubs for functions removed from jsSID-webusb.js ── */
-/* setClock(rateId) — called by jsSID after parsing SID file header.
+/* Global stubs for functions removed from jsSID-webusb.js */
+/* setClock(rateId) - called by jsSID after parsing SID file header.
  * rateId: 0=DEFAULT, 1=PAL, 2=NTSC, 3=DREAN (matches usbsidDevice.setClock) */
 function setClock(rateId) {
   if (webusb_enabled && usbsidDevice.isOpen) {
@@ -23,29 +23,30 @@ function setClock(rateId) {
   }
 }
 
-/* ── App state ─────────────────────────────────────────── */
+/* App state */
 var _browser        = null;
 var _player         = null;
+var _pcbver         = '';        /* PCB version string from device descriptor */
 var _emulator       = 'hermit';  /* matches the default selected option in index.html */
 var _hasSIDPlayer   = false;     /* true when connected device productName contains 'Pico2' */
 var _loadedBytes    = null;      /* Uint8Array of the currently loaded SID file */
 var _sendsidPlaying = false;     /* playback state for SendSID onboard player mode */
-var _websid         = null;  /* variable that holds the websid object when used */
-var _currentFile    = null;  /* { url, name } — url is blob: or http: */
-var _currentBlob    = null;  /* active Blob URL to revoke on next local load */
+var _websid         = null;      /* variable that holds the websid object when used */
+var _currentFile    = null;      /* { url, name } - url is blob: or http: */
+var _currentBlob    = null;      /* active Blob URL to revoke on next local load */
 var _currentSubtune = 0;
 var _maxSubtunes    = 1;
 var _sidFiles          = [];    /* entries from SID/sidfilelist.txt */
 var _sidFileIdx        = -1;    /* currently selected index in _sidFiles */
 var _webusbSidOffset   = 0;     /* SID address offset for WebUSB play-on-SID selector (0x00/0x20/0x40/0x60) */
 
-/* Path to SID library — same directory as this page, then SID/ */
+/* Path to SID library - same directory as this page, then SID/ */
 const SID_PATH = (function() {
   const base = window.location.pathname.replace(/\/[^/]*$/, '/');
   return base + 'SID/';
 }());
 
-/* ── Utility: log to debug panel + console ────────────── */
+/* Utility: log to debug panel + console */
 function usbsidLog(...args) {
   console.log('[USBSID]', ...args);
   const line = args.join(' ') + '\n';
@@ -55,7 +56,7 @@ function usbsidLog(...args) {
   });
 }
 
-/* ── Utility: set status bar text ─────────────────────── */
+/* Utility: set status bar text */
 function usbsidSetStatus(msg, color) {
   const el = document.getElementById('status-text');
   if (el) {
@@ -67,7 +68,7 @@ function usbsidSetStatus(msg, color) {
   }
 }
 
-/* ── Utility: set LED state ───────────────────────────── */
+/* Utility: set LED state */
 function setLED(connected) {
   const led = document.getElementById('status-led');
   if (!led) return;
@@ -75,7 +76,7 @@ function setLED(connected) {
   else led.classList.remove('connected');
 }
 
-/* ── Tab switching ─────────────────────────────────────── */
+/* Tab switching */
 function initTabs() {
   const tabs   = document.querySelectorAll('.c64-tab');
   const panels = document.querySelectorAll('.c64-panel');
@@ -93,10 +94,10 @@ function initTabs() {
   if (tabs.length) tabs[0].click();
 }
 
-/* ── Device connection ─────────────────────────────────── */
+/* Device connection */
 async function connectDevice() {
   if (!navigator.usb) {
-    usbsidSetStatus('WebUSB not available — use HTTPS or localhost', 'red');
+    usbsidSetStatus('WebUSB not available - use HTTPS or localhost', 'red');
     usbsidLog('ERROR: navigator.usb is undefined. WebUSB requires a secure context (HTTPS or localhost).');
     return;
   }
@@ -159,7 +160,7 @@ async function onDeviceConnected() {
   webusbconnected = true;   /* jsSID-webusb.js checks this; keep in sync with our connection */
   savedport       = 'usbsidpico'; /* non-null → prevents "Autoconnect not actived yet" alert */
 
-  /* Update connect button IMMEDIATELY — before any async reads so the UI
+  /* Update connect button IMMEDIATELY - before any async reads so the UI
    * reflects the actual state before the user can click again */
   const btn = document.getElementById('btn-connect');
   if (btn) {
@@ -167,9 +168,8 @@ async function onDeviceConnected() {
     btn.classList.remove('c64-btn-connect');
     btn.classList.add('c64-btn-warn');
   }
-  usbsidSetStatus('Connected — reading device info\u2026', 'green');
-
-  /* Parse FW and PCB version from USB device descriptor strings — no USB
+  usbsidSetStatus('Connected - reading device info\u2026', 'green');
+  /* Parse FW and PCB version from USB device descriptor strings - no USB
    * bulk transfers needed.  Both strings are part of the device descriptor
    * and are fetched by the browser during enumeration.
    *   productName:      "USBSID-Pico2 v1.3"           → PCB ver = last token
@@ -181,12 +181,19 @@ async function onDeviceConnected() {
   const ver    = fwMatch ? fwMatch[1] : '';                       /* "v0.7.0-20260308" */
   usbsid.version = ver;
   const verEl = document.getElementById('version-display');
-  if (verEl) verEl.textContent = 'FW: ' + (ver || '—') + '  PCB: ' + (pcbver || '—');
+  if (verEl) verEl.textContent = 'FW: ' + (ver || '-') + '  PCB: ' + (pcbver || '-');
   usbsidLog('FW version:', ver, '  PCB:', pcbver);
 
   applyPCBVersionUI(pcbver);
+  _pcbver = pcbver;
+  let isv15 = isPCBv15plus(pcbver);
 
-  /* Detect onboard SID player capability — Pico2 firmware builds only.
+  /* v1.5+: check if config acknowledgment is needed */
+  if (isv15 && webusbconnected) {
+    await checkConfigAck(pcbver);
+  }
+
+  /* Detect onboard SID player capability - Pico2 firmware builds only.
    * readFMOplSID() is intentionally deferred to after config load so we only
    * issue it when the config confirms FMOpl is enabled on a SID socket. */
   _hasSIDPlayer = pname.includes('Pico2');
@@ -198,7 +205,7 @@ async function onDeviceConnected() {
   const configPanel = document.getElementById('panel-config');
   if (configPanel) configPanel.classList.remove('c64-hidden');
 
-  usbsidSetStatus('Connected — ' + (ver || pname || 'USBSID-Pico'), 'green');
+  usbsidSetStatus('Connected - ' + (ver || pname || 'USBSID-Pico'), 'green');
 
   updateRegsTabVisibility();
   updateConfTabVisibility();
@@ -219,6 +226,37 @@ async function onDeviceConnected() {
 
   /* Auto-read config */
   /* setTimeout(() => doReadConfig(), 300); */
+}
+
+/* Check if v1.5+ board needs config confirmation and update UI accordingly */
+async function checkConfigAck(pcbver) {
+  if (!usbsidDevice.isOpen) return;
+  /* Wait for device to finish any post-connect initialisation before sending
+   * READ_CONFIGACK. Without this delay the command can arrive while the
+   * device endpoint is still draining and the firmware may not respond in
+   * time, triggering configCmdRead's reopen path which then causes a disconnect. */
+  await us_delay(400);
+  if (!usbsidDevice.isOpen) return;  /* may have disconnected during delay */
+  try {
+    usbsidLog('v1.5+: checking config acknowledgment status…');
+    const ack = await usbsidDevice.readConfigAck();
+    usbsidLog('Config ACK status:', ack);
+    if (ack === 1) {
+      /* Show persistent warning banner */
+      const warnEl = document.getElementById('warn-confirmation');
+      if (warnEl) warnEl.classList.remove('c64-hidden');
+      /* Navigate to config tab so user sees the warning in context */
+      const configTab = document.querySelector('.c64-tab[data-tab="config"]');
+      if (configTab) configTab.click();
+      /* Glow on retrieve-config button to guide the user */
+      const btnRetrieve = document.getElementById('btn-retrieve-config');
+      if (btnRetrieve) btnRetrieve.classList.add('c64-btn-glow');
+      usbsidLog('Config needs confirmation - SID socket power is off');
+      usbsidSetStatus('Config confirmation required - load and confirm config', 'red');
+    }
+  } catch (e) {
+    usbsidLog('checkConfigAck error:', e);
+  }
 }
 
 function onDeviceDisconnected() {
@@ -244,6 +282,13 @@ function onDeviceDisconnected() {
   _hasSIDPlayer = false;
   _sendsidPlaying = false;
   _webusbSidOffset = 0;
+  /* Clear v1.5 state */
+  const warnEl = document.getElementById('warn-confirmation');
+  if (warnEl) warnEl.classList.add('c64-hidden');
+  const btnRetrieve = document.getElementById('btn-retrieve-config');
+  if (btnRetrieve) btnRetrieve.classList.remove('c64-btn-glow');
+  applyV15UI('');   /* hides box-v15 and confirm button, resets controls */
+  _pcbver = '';
   /* Reset SID address selector */
   const selAddr = document.getElementById('sel-player-sid-addr');
   if (selAddr) { selAddr.innerHTML = '<option value="0">$00</option>'; selAddr.disabled = true; }
@@ -261,7 +306,7 @@ function onDeviceDisconnected() {
   updatePlayerSideButtons();
 }
 
-/* ── Player integration ────────────────────────────────── */
+/* Player integration */
 function createPlayer(emulator) {
   if (typeof SIDPlayer !== 'undefined') {
     return new SIDPlayer(emulator);
@@ -278,7 +323,7 @@ function getPlayer() {
 
 /* Workaround to always subtract 1 from subtune as the player expects this */
 function _loadTune(subtune, timeout, file, callback) {
-  const p = _player;  /* use existing player only — do NOT call getPlayer() here, as that
+  const p = _player;  /* use existing player only - do NOT call getPlayer() here, as that
                         would create a new player for the current (possibly wrong) emulator */
   if (!p) return;
   subtune = (subtune != 0 ? (subtune - 1) : subtune);
@@ -286,7 +331,7 @@ function _loadTune(subtune, timeout, file, callback) {
   p.load(subtune, timeout, file, callback);
 }
 
-/* Core load — url must be a full URL (blob: or http:) */
+/* Core load - url must be a full URL (blob: or http:) */
 async function doLoadSID(url, displayName, subtune) {
   _currentFile    = { url, name: displayName };
   _currentSubtune = subtune != null ? subtune : 1;
@@ -339,7 +384,7 @@ async function doLoadSID(url, displayName, subtune) {
   // }, ((_emulator !== "websid") ? 300 : 1000));
 }
 
-/* Load from local <input type=file> — wraps binary in a Blob URL */
+/* Load from local <input type=file> - wraps binary in a Blob URL */
 async function loadSID(fileData, fileName) {
   _loadedBytes = fileData;  /* keep raw bytes for onboard player upload */
   /* SendSID mode: upload directly, skip software player */
@@ -373,14 +418,14 @@ async function playPause() {
     } catch (e) { usbsidLog('sendsid playPause error:', e); }
     return;
   }
-  const p = _player;  /* use existing player only — do NOT call getPlayer() here, as that
+  const p = _player;  /* use existing player only - do NOT call getPlayer() here, as that
                       would create a new player for the current (possibly wrong) emulator */
   if (!p) return;
   try {
     if (!_currentFile) {
       /* nothing loaded yet */
     } else if (!webusbplaying) {
-      /* not playing — resume from pause or start fresh */
+      /* not playing - resume from pause or start fresh */
       p.setVolume(1);
       if (p.paused) {
         p.play();
@@ -390,7 +435,7 @@ async function playPause() {
       }
       webusbplaying = true;
     } else {
-      /* currently playing — pause */
+      /* currently playing - pause */
       p.setVolume(0);
       p.pause();
       webusbplaying = false;
@@ -411,7 +456,7 @@ async function stopPlay() {
     usbsidSetStatus('Stopped');
     return;
   }
-  const p = _player;  /* use existing player only — do NOT call getPlayer() here, as that
+  const p = _player;  /* use existing player only - do NOT call getPlayer() here, as that
                          would create a new player for the current (possibly wrong) emulator */
   if (!p) return;
   try {
@@ -435,7 +480,7 @@ async function prevSubtune() {
   }
   if (_currentSubtune > 1) {
     _currentSubtune--;
-    const p = _player;  /* use existing player only — do NOT call getPlayer() here, as that
+    const p = _player;  /* use existing player only - do NOT call getPlayer() here, as that
                          would create a new player for the current (possibly wrong) emulator */
     if (!p) return;
     if (p && _currentFile) {
@@ -456,7 +501,7 @@ async function nextSubtune() {
   }
   if (_currentSubtune < _maxSubtunes) {
     _currentSubtune++;
-    const p = _player;  /* use existing player only — do NOT call getPlayer() here, as that
+    const p = _player;  /* use existing player only - do NOT call getPlayer() here, as that
                          would create a new player for the current (possibly wrong) emulator */
     if (!p) return;
     if (p && _currentFile) {
@@ -468,7 +513,7 @@ async function nextSubtune() {
   }
 }
 
-/* Navigate SID list by index — skips non-.sid entries */
+/* Navigate SID list by index - skips non-.sid entries */
 async function selectSIDByIndex(idx) {
   if (idx < 0 || idx >= _sidFiles.length) return;
   _sidFileIdx = idx;
@@ -570,11 +615,11 @@ function setLoadButtons(enabled) {
   if (browseLabel) browseLabel.style.pointerEvents = enabled ? '' : 'none';
 }
 
-/* ── Visibility helpers for emulator-dependent UI ──────── */
+/* Visibility helpers for emulator-dependent UI */
 function updateConnectButtonVisibility() {
   const btn = document.getElementById('btn-connect');
   if (!btn) return;
-  const show = (_emulator === 'webusb' || _emulator === 'sendsid'/*  || _emulator === 'websid' */);
+  const show = (_emulator === 'webusb' || _emulator === 'sendsid'/* || _emulator === 'websid' */);
   btn.style.display = show ? '' : 'none';
 }
 
@@ -596,7 +641,7 @@ function updateConfTabVisibility() {
 }
 
 function updateRegsTabVisibility() {
-  /* Registers tab is shown whenever WebUSB mode is selected — no need to wait
+  /* Registers tab is shown whenever WebUSB mode is selected - no need to wait
    * for device open, which avoids auto-connect timing races. */
   const tab = document.querySelector('.c64-tab[data-tab="regs"]');
   const panel = document.getElementById('panel-regs');
@@ -621,13 +666,13 @@ function updatePlayerSideButtons() {
   if (sendsidBtns) sendsidBtns.style.display = (_emulator === 'sendsid' && usbsidDevice.isOpen && _hasSIDPlayer) ? 'flex' : 'none';
 }
 
-/* ── Emulator switching ────────────────────────────────── */
+/* Emulator switching */
 function switchEmulator(em) {
   /* Stop websid WASM worker before discarding the player to prevent memory leaks */
   if (_player && _player.emulator === 'websid' && _player.webusbsid) {
     _player.webusbsid.StopWorker();
   }
-  stopPlay();   /* uses _player directly now — safe to call before changing _emulator */
+  stopPlay();   /* uses _player directly now - safe to call before changing _emulator */
   _emulator = em;
   _player   = null;
   webusb_enabled = (em === 'webusb');
@@ -671,15 +716,15 @@ function switchEmulator(em) {
   updatePlayerSideButtons();
 }
 
-/* ── Volume control ────────────────────────────────────── */
+/* Volume control */
 function setVolume(val) {
-  const p = _player;  /* use existing player only — do NOT call getPlayer() here, as that
+  const p = _player;  /* use existing player only - do NOT call getPlayer() here, as that
                       would create a new player for the current (possibly wrong) emulator */
   if (!p) return;
   if (p && p.setVolume) p.setVolume(val / 100);
 }
 
-/* ── SID register display ──────────────────────────────── */
+/* SID register display */
 const SID_REG_NAMES = [
   'FR1L','FR1H','PW1L','PW1H','CR1','AT1','SU1',
   'FR2L','FR2H','PW2L','PW2H','CR2','AT2','SU2',
@@ -756,13 +801,13 @@ function updateSIDReg(sid, reg, val) {
 }
 
 
-/* ── SID library list (SID/sidfilelist.txt) ────────────── */
+/* SID library list (SID/sidfilelist.txt) */
 async function initSIDList() {
   const sel = document.getElementById('sid-list-select');
   if (!sel) return;
   /* On touch devices (Firefox Android etc.) a multi-row <select> triggers an
    * extra native picker overlay, causing a double-select. Use a single-row
-   * dropdown instead — the native picker is the correct UX on mobile anyway. */
+   * dropdown instead - the native picker is the correct UX on mobile anyway. */
   if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     sel.size = 1;
     sel.style.height = '';
@@ -779,7 +824,7 @@ async function initSIDList() {
     _sidFiles = text.trim().split(/\r?\n/).filter(l => l.trim());
     sel.innerHTML = '';
     let count = 0;
-    const sections = [];  /* { name, headingOptIdx } — populated below */
+    const sections = [];  /* { name, headingOptIdx } - populated below */
     _sidFiles.forEach((entry, i) => {
       const opt = document.createElement('option');
       if (entry.toLowerCase().endsWith('.sid')) {
@@ -800,7 +845,7 @@ async function initSIDList() {
     const countEl = document.getElementById('sid-list-count');
     if (countEl) countEl.textContent = '(' + count + ' files)';
 
-    /* Section jump buttons — recreate on every list load */
+    /* Section jump buttons - recreate on every list load */
     let sectionBar = document.getElementById('sid-section-buttons');
     if (!sectionBar) {
       sectionBar = document.createElement('div');
@@ -817,7 +862,7 @@ async function initSIDList() {
       btn.addEventListener('click', () => {
         /* Scroll so the section heading sits at the top of the visible list.
          * scrollHeight / options.length gives the per-option row height.
-         * We do NOT set selectedIndex — no change event, no auto-play. */
+         * We do NOT set selectedIndex - no change event, no auto-play. */
         if (sel.options.length === 0) return;
         const rowH = sel.scrollHeight / sel.options.length;
         sel.scrollTop = Math.round(rowH * headingOptIdx);
@@ -838,7 +883,7 @@ async function initSIDList() {
   }
 }
 
-/* ── File loading ──────────────────────────────────────── */
+/* File loading */
 function initFileLoading() {
   const fileInput = document.getElementById('sid-file-input');
   if (fileInput) {
@@ -861,7 +906,7 @@ function initFileLoading() {
       if (!url) return;
       const name = url.split('/').pop().split('?')[0] || 'remote.sid';
       usbsidSetStatus('Fetching: ' + name + '\u2026');
-      /* CORS proxy fallbacks — tried in order when direct fetch is blocked.
+      /* CORS proxy fallbacks - tried in order when direct fetch is blocked.
        * Own server proxy uses path-based routing (no encoding) so nginx receives
        * the target URL verbatim without needing to URL-decode a query parameter. */
       const CORS_PROXIES = [
@@ -877,11 +922,11 @@ function initFileLoading() {
           resp = await fetch(url);
         } catch (corsErr) {
           if (!(corsErr instanceof TypeError)) throw corsErr;
-          /* 2. CORS blocked — try each proxy in turn */
+          /* 2. CORS blocked - try each proxy in turn */
           let lastErr = corsErr;
           for (const makeProxy of CORS_PROXIES) {
             const proxyUrl = makeProxy(url);
-            usbsidSetStatus('CORS blocked — retrying via proxy\u2026', 'yellow');
+            usbsidSetStatus('CORS blocked - retrying via proxy\u2026', 'yellow');
             usbsidLog('Trying proxy:', proxyUrl);
             try {
               const pr = await fetch(proxyUrl);
@@ -898,18 +943,18 @@ function initFileLoading() {
         /* Validate SID/MUS magic bytes before handing to player */
         const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
         if (magic !== 'PSID' && magic !== 'RSID') {
-          throw new Error('not a SID file (got "' + magic + '") — URL may point to an HTML page or redirect');
+          throw new Error('not a SID file (got "' + magic + '") - URL may point to an HTML page or redirect');
         }
         await loadSID(bytes, name);
       } catch (e) {
-        usbsidSetStatus('Load failed: ' + e.message + ' — download the file and use Browse', 'red');
+        usbsidSetStatus('Load failed: ' + e.message + ' - download the file and use Browse', 'red');
         usbsidLog('URL load error:', e);
       }
     });
   }
 }
 
-/* ── ASID MIDI port listing ────────────────────────────── */
+/* ASID MIDI port listing */
 /* NOTE: jsSID-webusb.js also populates #asid-midi-outputs when ASID player is
  * created (new jsSID(0,0,true,false)).  Our initMIDI only runs at startup to
  * pre-populate the list for modes that don't trigger jsSID ASID init.
@@ -929,13 +974,13 @@ function initMIDI() {
   }
   navigator.requestMIDIAccess({ sysex: true }).then(access => {
     /* Pre-set jsSID's midiAccessObj global so it is available immediately when
-     * jsSID's init() runs for the first tune — avoids a null-dereference crash
+     * jsSID's init() runs for the first tune - avoids a null-dereference crash
      * that occurs when jsSID's own requestMIDIAccess hasn't resolved yet. */
     if (typeof midiAccessObj !== 'undefined') window.midiAccessObj = access;
     sel.innerHTML = '';
     const outputs = Array.from(access.outputs.values());
     if (!outputs.length) {
-      sel.innerHTML = '<option value="">— no MIDI outputs —</option>';
+      sel.innerHTML = '<option value="">- no MIDI outputs -</option>';
       return;
     }
     outputs.forEach((output, i) => {
@@ -976,7 +1021,7 @@ function initMIDI() {
   });
 }
 
-/* ── Emulator select ───────────────────────────────────── */
+/* Emulator select */
 function initEmulatorSelect() {
   const sel = document.getElementById('sel-emulator');
   if (!sel) return;
@@ -999,27 +1044,27 @@ function initEmulatorSelect() {
   });
 }
 
-/* ── Volume slider ─────────────────────────────────────── */
+/* Volume slider */
 function initVolumeSlider() {
   const slider = document.getElementById('volume-slider');
   if (!slider) return;
   slider.addEventListener('input', () => setVolume(parseInt(slider.value, 10)));
 }
 
-/* ── Connect button ────────────────────────────────────── */
+/* Connect button */
 function initConnectButton() {
   const btn = document.getElementById('btn-connect');
   if (!btn) { console.error('[USBSID] btn-connect not found'); return; }
   btn.addEventListener('click', async () => {
     /* In websid mode the USB connection is managed by USBSIDBackendAdapter
      * (registered on this same button by USPlayer). Do not also open the
-     * WebUSB usbsidDevice — that would claim the device and prevent the
+     * WebUSB usbsidDevice - that would claim the device and prevent the
      * WASM libusb path (emu_connect_USBSID) from opening it. */
     if (_emulator === 'websid') return;
     try {
       if (typeof usbsidDevice === 'undefined') {
         usbsidSetStatus('Driver not loaded', 'red');
-        usbsidLog('ERROR: usbsidDevice is undefined — usbsid-driver.js may have failed to load.');
+        usbsidLog('ERROR: usbsidDevice is undefined - usbsid-driver.js may have failed to load.');
         return;
       }
       if (usbsidDevice.isOpen) {
@@ -1035,7 +1080,7 @@ function initConnectButton() {
   });
 }
 
-/* ── Onboard SID player upload ─────────────────────────── */
+/* Onboard SID player upload */
 async function uploadCurrentSID() {
   if (!usbsidDevice.isOpen) { usbsidSetStatus('Not connected', 'red'); return; }
   if (!_hasSIDPlayer) { usbsidSetStatus('Incompatible: SendSID requires Pico 2 firmware', 'red'); return; }
@@ -1069,7 +1114,7 @@ async function uploadCurrentSID() {
   }
 }
 
-/* ── Transport buttons ─────────────────────────────────── */
+/* Transport buttons */
 function initTransportButtons() {
   const btns = {
     'btn-play':      () => playPause(),
@@ -1136,7 +1181,7 @@ function initTransportButtons() {
   setPlayerButtons(false);
 }
 
-/* ── WebUSB device events ──────────────────────────────── */
+/* WebUSB device events */
 function initDeviceEvents() {
   if (navigator.usb) {
     navigator.usb.addEventListener('connect', async (e) => {
@@ -1154,7 +1199,7 @@ function initDeviceEvents() {
   }
 }
 
-/* ── Browser verification ──────────────────────────────── */
+/* Browser verification */
 function detectBrowser() {
   if ((navigator.userAgent.indexOf("Opera") || navigator.userAgent.indexOf('OPR')) != -1) {
     _browser = 'opera';
@@ -1177,7 +1222,7 @@ function detectBrowser() {
 }
 
 
-/* ── DOMContentLoaded ──────────────────────────────────── */
+/* DOMContentLoaded */
 document.addEventListener('DOMContentLoaded', () => {
   try {
 
@@ -1186,12 +1231,12 @@ document.addEventListener('DOMContentLoaded', () => {
      * with usbsidDevice (both can't claim the same USB interface).
      * Promises queued by autoConnect() haven't resolved yet at this point,
      * so overriding connect/autoConnect here catches those calls too.
-     */
+    */
     if (typeof webusb === 'object') {
       webusb.autoConnect  = function() {};
       webusb.connect      = function() {};
       webusb.connectNow   = function() {};
-      /* Safe stubs — overridden by onDeviceConnected() once connected */
+      /* Safe stubs - overridden by onDeviceConnected() once connected */
       webusb.writeReg     = function() {};
       webusb.readReg      = function() {};
     }
@@ -1219,14 +1264,14 @@ document.addEventListener('DOMContentLoaded', () => {
     /* Warn if WebUSB is not available */
     if (!navigator.usb) {
       if (_browser != 'chrome' && _browser != 'edge') {
-        usbsidSetStatus('WebUSB unavailable — WebUSB requires an Edge or Chromium based browser', 'yellow');
+        usbsidSetStatus('WebUSB unavailable - WebUSB requires an Edge or Chromium based browser', 'yellow');
         usbsidLog('WARNING: navigator.usb is not defined. WebUSB requires an Edge or Chromium based browser. The connect button will not work.');
       } else {
-        usbsidSetStatus('WebUSB unavailable — WebUSB requires permissions and a secure context (HTTPS or localhost)', 'yellow');
+        usbsidSetStatus('WebUSB unavailable - WebUSB requires permissions and a secure context (HTTPS or localhost)', 'yellow');
         usbsidLog('WARNING: navigator.usb is not defined. WebUSB requires permissions and a secure context (HTTPS or localhost). The connect button will not work.');
       }
     } else {
-      usbsidSetStatus('Ready — click CONNECT to connect device');
+      usbsidSetStatus('Ready - click CONNECT to connect device');
       /* Try auto-reconnect (previously-permitted devices) */
       if ((_emulator !== 'websid') && (_emulator !== 'hermit')) { /* No autoconnect for websid & hermit */
         setTimeout(() => reconnectDevice(), 200);

@@ -45,7 +45,7 @@
 #include <stdio.h>
 
 /* MIDI CC values */
-#include <midi_cc.h>
+#include <midi_defs.h>
 
 
 /* Midi bus states */
@@ -78,8 +78,9 @@ typedef struct {
   int fmopl;
   int midi_bytes;
   uint8_t index;
-  uint8_t usbstreambuffer[64];   /* Normal speed max buffer size for TinyUSB */
-  uint8_t streambuffer[64];   /* Normal speed max buffer size for TinyUSB */
+  uint8_t usbstreambuffer[64];  /* Normal speed max buffer size for TinyUSB */
+  uint8_t streambuffer[64];     /* Normal speed max buffer size for TinyUSB */
+  uint8_t last_status;          /* running status cache */
 } midi_machine;
 
 /* Global MIDI state machine (defined in midi.c) */

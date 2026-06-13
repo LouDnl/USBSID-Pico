@@ -351,6 +351,7 @@ void usbsid_close(void)
     libusb_close(devh);
   libusb_exit(ctx);
   devh = NULL;
+  usid_dev = -1;
 }
 
 int usbsid_init(void)
@@ -607,6 +608,12 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
     switch(i) {
       case 0 ... 1:
         continue;
+      case 2:
+        usbsid_config.need_confirmation = (bool)buff[i];
+        break;
+      case 3:
+        usbsid_config.disable_changedetect = (bool)buff[i];
+        break;
       case 5:
         usbsid_config.lock_clockrate = buff[i];
         break;
@@ -840,7 +847,14 @@ void print_config(void)
     enabled[(int)usbsid_config.Midi.enabled]);
   printf("  ASID feature = %s\n",
     enabled[(int)usbsid_config.Asid.enabled]);
-    return;
+  printf("\n");
+  printf("Verification of socket change detection on boot = %s\n",
+    enabled[(int)!usbsid_config.disable_changedetect]);
+
+  if (usbsid_config.need_confirmation) {
+    printf("\n!! CURRENT CONFIGURATION NEEDS TO BE VERIFIED AND ACKNOWLEDGED !!\n\n");
+  }
+  return;
 }
 
 void print_socket_config(void)
@@ -1539,8 +1553,9 @@ void print_help(void)
   printf("  -rc,      --read-clock-speed  : Read and print USBSID-Pico SID clock speed\n");
   printf("  -rs,      --read-sock-config  : Read and print USBSID-Pico socket config settings only\n");
   printf("  -rn,      --read-num-sids     : Read and print USBSID-Pico configured number of SID's only\n");
-
-  printf("  -w,       --write-config      : Write single config item to USBSID-Pico (will read the full config first!)\n");
+  printf("  -rn,      --read-num-sids     : Read and print USBSID-Pico configured number of SID's only\n");
+  printf("  -ack,     --acknowledge       : Acknowledge the configuration to apply voltage to the sockets (v1.5+ only!)\n");
+  printf("                                  __MAKE SURE YOU READ AND VERIFY THE CONFIG FIRST!__  (v1.5+ only!)\n");
   printf("  -a,       --apply-config      : Apply the current config settings (from USBSID-Pico memory) that you changed with '-w'\n");
   printf("  -s,       --save-config       : Send the save config command to USBSID-Pico\n");
   printf("  -sr,      --save-reboot       : Send the save config command to USBSID-Pico and reboot it\n");
@@ -1559,6 +1574,8 @@ void print_help(void)
   printf("  -sau,     --set-audio N       : Set and save the mono/stereo audio switch (PCB v1.3+ only!)\n");
   printf("                                  0: %s, 1:%s\n", mono_stereo[0], mono_stereo[1]);
   printf("  -lau N,   --lock-audio N      : Lock and the audio switch in it's current state until reboot: True (1) False (0)\n");
+  printf("  -sad  N,  --sock-autodetect N : Disable/enable and save the automatic socket change detection on boot (PCB v1.5+ only!)\n");
+  printf("                                  0: %s, 1:%s\n", enabled[0], enabled[1]);
   printf("--[PRESETS]-------------------------------------------------------------------------------------------------------------\n");
   printf("  -single,  --single-sid        : Socket 1 enabled @ single SID, Socket 2 disabled\n");
   printf("  -single2, --single-sid-s2     : Socket 1 disabled, Socket 2 enabled @ single SID\n");
@@ -1620,6 +1637,8 @@ void print_help(void)
   printf("                                  Enabled (1) or Disabled (0)\n");
   printf("--[OTHER]---------------------------------------------------------------------------------------------------------------\n");
   printf("  -d,       --debug             : Enable debug prints\n");
+  printf("  -configr N                    : Read back N bytes from a write config command, use _before_ `-config`\n");
+  printf("                                  Example: `cfg_usbsid -configr 1 -config CMD`\n");
   printf("  -config   --config-command    : Send custom config command, requires followup hex strings\n");
   printf("  -command                      : Send arbitrary command in hex, requires followup hex strings\n");
   printf("  -control                      : Send libusb control transfer\n");
@@ -1733,12 +1752,12 @@ void config_usbsidpico(int argc, char **argv)
     }
     if (!strcmp(argv[param_count], "-dualmirror")) {
       printf("Set USBSID-Pico config to single -> dual mirrored SID\n");
-      write_config_command(MIRRORED_SID, 0, 0 ,0 ,0);
+      write_config_command(MIRRORED_SID, 1, 0 ,0 ,0);
       goto exit;
     }
     if (!strcmp(argv[param_count], "-dualflipped")) {
       printf("Set USBSID-Pico DUAL_FLIPPED to flipped Socket One <-> Two\n");
-      write_config_command(MIRRORED_SID, 0, 0 ,0 ,0);
+      write_config_command(DUAL_FLIPPED, 0, 0 ,0 ,0);
       goto exit;
     }
     if (!strcmp(argv[param_count], "-quadflipped")) {
@@ -1828,6 +1847,11 @@ void config_usbsidpico(int argc, char **argv)
       printf("USBSID-Pico is configured to use %d SID's\n", read_data[0]);
       break;
     }
+    if (!strcmp(argv[param_count], "-ack") || !strcmp(argv[param_count], "--acknowledge")) {
+      printf("Acknowledging the detected/current configuration!\n");
+      write_config_command(CONFIG_ACK, 0x0, 0x0, 0x0, 0x0);
+      break;
+    }
     if (!strcmp(argv[param_count], "-tau") || !strcmp(argv[param_count], "--toggle-audio")) {
       printf("Toggling mono/stereo audio switch\n");
       write_config_command(TOGGLE_AUDIO, 0x0, 0x0, 0x0, 0x0);
@@ -1850,6 +1874,25 @@ void config_usbsidpico(int argc, char **argv)
       printf("Lock audio switch from being changed set to '%s'\n", truefalse[lock]);
       write_config_command(LOCK_AUDIO, lock, 0x0, 0x0, 0x0);
       break;
+    }
+    if (!strcmp(argv[param_count], "-sad") || !strcmp(argv[param_count], "--sock-autodetect")) {
+      param_count++;
+      int det = atoi(argv[param_count]);
+      if(det > 1) {
+        printf("%d is not a correct socket autodetect option!\n", det);
+        goto exit;
+      }
+      printf("Disable automatic socket change detection on boot set to '%s'\n", enabled[det]);
+      write_config_command(SOCKET_DETECT, det, 0x0, 0x0, 0x0);
+      break;
+    }
+    int size = 0;
+    if (!strcmp(argv[param_count], "-configr")) {
+      param_count++;  /* skip usbsid executable and -config self */
+      size = atoi(argv[param_count++]);
+      printf("size %d\n", size);
+      argc-=2;
+      /* break; */
     }
     if (!strcmp(argv[param_count], "-config") || !strcmp(argv[param_count], "--config-command")) {
       printf("-config requires 5 additional config commands and cannot run with any other option!\n");
@@ -1879,6 +1922,12 @@ void config_usbsidpico(int argc, char **argv)
       if (argc >= 7)  d = strtol(argv[param_count++], NULL, 16);
       printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", cmd, a, b, c, d);
       write_config_command(cmd, a, b, c, d);
+      if (size != 0) {
+        int len;
+        memset(read_data, 0, count_of(read_data));
+        len = read_chars(read_data, size);
+        printf("[R %u] %02X\n", len, read_data[0]);
+      }
       break;
     }
     if (!strcmp(argv[param_count], "-mute")) {
@@ -1932,7 +1981,7 @@ void config_usbsidpico(int argc, char **argv)
       }
       printf("\n");
 
-      if (cmd < 0xF0) {
+      if (cmd <= 0xF0) {
         printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", cmd, a, b, c, d);
         uint8_t buf[5] = { cmd, a, b, c, d };
         write_chars(buf, count_of(buf));
@@ -1942,7 +1991,7 @@ void config_usbsidpico(int argc, char **argv)
           len = read_chars(read_data, count_of(read_data));
           printf("[R %u] %02X\n", len, read_data[0]);
         }
-      } else if (cmd == 0xF0) {
+      } /* else if (cmd == 0xF0) {
         printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", cmd, a, b, c, d);
         uint8_t buf[5] = { cmd, a, b, c, d };
         write_chars(buf, count_of(buf));
@@ -1952,7 +2001,7 @@ void config_usbsidpico(int argc, char **argv)
           len = read_chars(read_data, count_of(read_data));
           printf("[R %u] %02X\n", len, read_data[0]);
         }
-      } else if (cmd == 0xFF) {
+      } */ else if (cmd == 0xFF) {
         printf("Sending: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n", a, b, c, d, e);
         uint8_t buf[5] = { a, b, c, d, e };
         for (int i = 0; i < 50; i++)
@@ -2007,6 +2056,15 @@ void config_usbsidpico(int argc, char **argv)
       bool reboot = ((argv[param_count+1] != NULL) && !startsWith(argv[param_count+1], "-")) ? atoi(argv[++param_count]) : 1;
       printf("Sending start autodetection and reboot command to USBSID-Pico (%s)\n", (reboot?"with reboot":"without reboot"));
       run_autodetection(reboot);
+      if (reboot) {
+        if (usid_dev != -1 || usid_dev == 0) {
+          usbsid_close();
+        }
+        printf("Waiting 5 seconds for USBSID-Pico to reboot...\n");
+        sleep(5);
+        usbsid_init();
+        read_config();
+      }
       printf("Printing config\n");
       print_config();
       break;

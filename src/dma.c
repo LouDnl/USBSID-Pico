@@ -146,7 +146,7 @@ void setup_dmachannels(void)
       false
     );
 
-    /* Channel B — identical transfer, chains back to A */
+    /* Channel B - identical transfer, chains back to A */
     dma_channel_config cfg_b = dma_channel_get_default_config(dma_counter_chain);
     channel_config_set_transfer_data_size(&cfg_b, DMA_SIZE_32);
     channel_config_set_read_increment(&cfg_b, false);
@@ -161,7 +161,7 @@ void setup_dmachannels(void)
       1,
       false);
 
-    /* Start channel A — it will chain to B, B chains back, forever */
+    /* Start channel A - it will chain to B, B chains back, forever */
     dma_channel_start(dma_counter_chain);
   }
 #endif
@@ -202,7 +202,43 @@ void setup_vu_dma(void)
   #endif
 }
 
-void stop_dma_channels(void)
+/**
+ * @brief Stop all in progress DMA transfers and
+ *        clear bus PIO fifo's afterwards
+ *
+ */
+void clear_dma_channels(void)
+{ /* Abort the 4 bus DMA channels and flush the backing PIO FIFOs */
+  uint32_t abort_mask = (1u << dma_tx_control) | (1u << dma_tx_data)
+                      | (1u << dma_rx_data)    | (1u << dma_tx_delay)
+#if PICO_RP2350
+                      | (1u << dma_counter);
+#else
+                      | (1u << dma_counter)    | (1u << dma_counter_chain);
+#endif
+  /* RP2040-E13 / RP2350-E5: disable IRQ enables for these channels before
+   * aborting so a pending completion cannot block the abort */
+  uint32_t saved_inte0 = dma_hw->inte0 & abort_mask;
+  hw_clear_bits(&dma_hw->inte0, abort_mask);
+  /* Atomically abort all four channels */
+  dma_hw->abort = abort_mask;
+  while (dma_hw->abort & abort_mask) tight_loop_contents();
+  /* Clear any spurious interrupt status raised during abort */
+  dma_hw->ints0 = abort_mask;
+  /* Restore interrupt enables */
+  hw_set_bits(&dma_hw->inte0, saved_inte0);
+  /* Flush PIO FIFOs so no stale data remains for the next transfer */
+  clear_bus_fifos();
+  dma_hw->multi_channel_trigger =
+#if PICO_RP2350
+    (1u << dma_counter);
+#else
+    (1u << dma_counter)    | (1u << dma_counter_chain);
+#endif
+  return;
+}
+
+void stop_dma_channels(void) /* TODO: Fix like `clear_dma_channels` */
 { // TODO: Fix and finish per RP2040-E13 and RP2350-E5
   // usCFG("[STOP DMA CHANNELS]\n");
   /* Clear any Interrupt enable bits as per RP2040-E13 */

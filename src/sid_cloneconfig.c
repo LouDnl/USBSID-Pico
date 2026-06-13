@@ -37,6 +37,7 @@
 #include <sid_fpgasid.h>
 #include <sid_pdsid.h>
 #include <sid_skpico.h>
+#include <sid_sidemu.h>
 
 
 /* Init local variables */
@@ -351,7 +352,8 @@ void reset_switch_pdsid_type(void)
  */
 uint8_t read_pdsid_sid_type(uint8_t base_address)
 {
-  detect_pdsid(base_address, true);
+  set_detection_logging(false);
+  detect_pdsid(base_address);
   cycled_write_operation((base_address + PDREG_P),PDSID_P,6);  /* 'P' */
   sleep_ms(33); /* 2 jiffies of 16,8ms each */
   cycled_write_operation((base_address + PDREG_D),PDSID_D,6);  /* 'D' */
@@ -359,6 +361,7 @@ uint8_t read_pdsid_sid_type(uint8_t base_address)
   uint8_t result = cycled_read_operation((base_address + PDREG_S),6); /* 0 = 6581, 1 = 8580 */
   sleep_ms(33); /* 2 jiffies of 16,8ms each */
   // cycled_write_operation((base_address + PDREG_P),0x00,6);  /* end config mode */
+  set_detection_logging(true);
   return result;
 }
 
@@ -373,7 +376,8 @@ uint8_t read_pdsid_sid_type(uint8_t base_address)
 bool set_pdsid_sid_type(uint8_t base_address, uint8_t type)
 {
   if (type > 1) { return false; } /* Cannot do that here! */
-  detect_pdsid(base_address, true);
+  set_detection_logging(false);
+  detect_pdsid(base_address);
   cycled_write_operation((base_address + PDREG_P),PDSID_P,6); /* 'P' */
   sleep_ms(33); /* 2 jiffies of 16,8ms each */
   cycled_write_operation((base_address + PDREG_D),PDSID_D,6); /* 'D' */
@@ -381,6 +385,7 @@ bool set_pdsid_sid_type(uint8_t base_address, uint8_t type)
   cycled_write_operation((base_address + PDREG_S),type,6); /* 0 = 6581, 1 = 8580 */
   sleep_ms(33); /* 2 jiffies of 16,8ms each */
   // cycled_write_operation((base_address + PDREG_P),0x00,6);  /* end config mode */
+  set_detection_logging(true);
   return true;
 }
 
@@ -536,6 +541,43 @@ void read_armsid_configuration(uint8_t base_address)
   usCFG("Current ARMSID settings\n");
   usCFG("  Chip: %c5xx FW: %d.%d Filt: %b %b  (Voltage = %d mV (%d %d))\n",
     chip, vh, vl, p, q, v, v1, v2);
+
+  return;
+}
+
+void read_sidemu_configuration(uint8_t base_address)
+{ /* TODO: Finish */
+  return;
+}
+
+/**
+ * @brief Set the sidemu sidtype
+ *
+ * @param uint8_t base_address
+ * @param uint8_t type
+ */
+void set_sidemu_sidtype(uint8_t base_address, uint8_t type)
+{ /* TODO: Finish */
+  usCFG("SIDEmu enable config mode\n");
+  /* Enable config mode */
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_1,6); /* #66 */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_2,6); /* #69 */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+
+  usCFG("SIDEmu write command #$%02x without result\n", type);
+  /* Command without result :) */
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_OFFS_CMD,6); /* #$ff */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+  cycled_write_operation((SIDEMU_CFG_DATA + base_address),type,6); /* type */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+
+  usCFG("SIDEmu disable config mode\n");
+  /* Disable config mode */
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_1,6); /* #66 */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_3,6); /* #96 */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
 
   return;
 }

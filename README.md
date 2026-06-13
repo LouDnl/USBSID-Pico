@@ -2,6 +2,12 @@
 # [<img src="images/usbsid-logo.png" width="250em">](images/usbsid-logo.png)![LouD](images/loud.png)
 USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board for interfacing one or two MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer, phone, ASID supporting player or USB midi controller.  
 
+
+# NEW: USBSID-Pico Configtool
+Checkout the new [USBSID-Pico Configtool](https://github.com/LouDnl/USBSID-Pico-Configtool)  
+[<img src="images/screenshot-linux.png" width="500em">](https://github.com/LouDnl/USBSID-Pico-Configtool)  
+
+
 # This is USBSID-Pico! :)
 | **“Raster Bar” (8-bit)** | **Van Halen's Jump<br>dual SID in Stereo!** | **Next Level** | **Outerversal<br>dual SID in Stereo!** |
 |:-:|:-:|:-:|:-:|
@@ -11,6 +17,7 @@ USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based b
 |:-:|:-:|:-:|:-:|
 | [<img src="https://img.youtube.com/vi/7hiAkLAqsiI/0.jpg" width=75%>](https://www.youtube.com/watch?v=7hiAkLAqsiI)<br><small><sub>by Censor Design</sub></small> | [<img src="https://img.youtube.com/vi/4gckiwzOW9U/0.jpg" width=75%>](https://www.youtube.com/watch?v=4gckiwzOW9U)<br><small><sub>by Censor Design</sub></small> | [<img src="https://img.youtube.com/vi/q4Fg7V2DYCI/0.jpg" width=75%>](https://www.youtube.com/watch?v=q4Fg7V2DYCI)<br><small><sub>by Censor Design</sub> | [<img src="https://img.youtube.com/vi/RTtmsbH4jC0/0.jpg" width=75%>](https://www.youtube.com/watch?v=RTtmsbH4jC0)<br><small><sub>by Censor Design</sub></small> |
 
+
 # Swag!
 Do you like swag!? I sure do!! [greyandslate](https://bsky.app/profile/greyandslate.bsky.social) created these great t-shirt designs which are available for purchase in his [Etsy shop](https://greyandslate.etsy.com/?search_query=usbsid), link below.  
 **Use coupon code USBSID15 for a 15% discount!**  
@@ -19,6 +26,7 @@ Shop link: [https://greyandslate.etsy.com/?search_query=usbsid](https://greyands
 [<img src="images/tees/usbsid-pico-tshirt-board_logo.jpg" width="250em">](https://www.etsy.com/nl/listing/4426318364/retrocomputing-t-shirt-usbsid-pico-sid?etsrc=sdt)<br>
 [<img src="images/tees/usbsid-pico-tshirt-logo.jpg" width="250em">](https://www.etsy.com/nl/listing/4426327960/t-shirt-usbsid-pico-logo-chiptune?etsrc=sdt)
 [<img src="images/tees/usbsid-pico-tshirt-board.jpg" width="250em">](https://www.etsy.com/nl/listing/4426320773/usbsid-pico-chiptune-board-t-shirt-met?etsrc=sdt)
+
 
 # Index
 * [Software support & Features](#software-support-and-features)
@@ -63,6 +71,7 @@ Shop link: [https://greyandslate.etsy.com/?search_query=usbsid](https://greyands
 * [Disclaimer](#disclaimer)
 * [License](#license)
 * [Certification](#certification)
+
 
 # Software support and features
 ![USBSID-Pico](images/pcbv1.3-pdsid.png)  
@@ -132,6 +141,7 @@ Any questions about or support with USBSID-Pico can be asked
 * [Github discussions](https://github.com/LouDnl/USBSID-Pico/discussions)
 * [USBSID manuals](doc/)
 
+
 # Project status
 Visit the [Project Page](https://github.com/users/LouDnl/projects/1) for an up-to-date list of things being worked on.
 While in development any mentioned features, options, etc. are subject to change.  
@@ -188,11 +198,14 @@ An example rule file can be found [here](examples/udev-rules/69-usbsid-permissio
 #### Windows driver
 See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for driver installation information!
 
+
 # Firmware
 See the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on what's changed and previous releases.  
 
 ### Configuring your board's firmware
-See the [Firmware manual](doc/USBSID-Pico-firmware-manual.adoc) for more information on how to set up your board!  
+Use the new official [USBSID-Pico-Configtool](https://github.com/LouDnl/USBSID-Pico-Configtool) to configure your board.  
+Downloads are available in the [releases](https://github.com/LouDnl/USBSID-Pico-Configtool/releases) section of the tools githubpage.  
+Make sure you read the [Firmware manual](doc/USBSID-Pico-firmware-manual.adoc) for more information on how to set up your board!  
 
 #### Testing your board
 You can test your board with WebUSB and ASID here on the same site as the web configuration tool here: [USBSID web configuration tool](https://usbsid.loudai.nl/?player=webusb) (requires a Chrome based browser).  
@@ -224,10 +237,15 @@ The firmware is still in development so features might change, be added or remov
   - Requires Black Pico clone board with RGB LED onboard!
   - SID voices to use for calculation can be changed in config
 - Uses the [TinyUSB](https://github.com/hathach/tinyusb) stack
+#### v1.3+ PCB
+- Audio switch Stereo/Mono control
+#### v1.4+ PCB
+- Socket voltage control
 
 ### Building
 You can build the firmware using the Pico SDK 2.1.1 and the included TinyUSB. Be sure to clone the SDK with `--recurse-submodules`.  
 After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py PICO_PLATFORM` where PICO_PLATFORM is either rp2040 or rp2350 depending on the board you are using.
+
 
 # Hardware
 ## Where to buy
@@ -238,20 +256,24 @@ Sponsored by [<img src="images/pcbway.png" width="150em">](images/pcbway.png)
 #### PCBWay
 At a minimum of 5 bare or assembled boards it is also possible to purchase PCB's at PCBWay  
 No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral link](https://pcbway.com/g/2458i7) to register, thanks!  
+[PCB revision v1.5 (not yet!)](#)  
+[PCB revision v1.3](https://www.pcbway.com/project/shareproject/USBSID_Pico_v1_3_05f2b88e.html)  
 [PCB revision v1.0](https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html)  
-[PCB revision v1.3](https://www.pcbway.com/project/shareproject/USBSID_Pico_v1_3_05f2b88e.html)
 #### Known and approved resellers
 [Run Stop Re-Store](https://www.runstoprestore.nl) at [Retro8BITshop](https://www.retro8bitshop.com) is the first reseller to sell licensed USBSID-Pico boards.  
 PCB revision v1.3 [product page](https://www.retro8bitshop.com/product/usbsid-pico-by-loud/)
 
 ## PCB usage information
 Your USBSID-Pico PCB has several hardware features like jumpers and pins that require your attention. Click on the viewing method
-### PCB revision v1.0 manual
-- [Open online PCB v1.0 manual](doc/USBSID-Pico-PCBv1.0-manual.adoc)
-- [Download PCB v1.0 PDF manual](doc/USBSID-Pico-PCBv1.0-manual.pdf)
+### PCB revision v1.5 manual
+- [Open online PCB v1.5 manual](doc/USBSID-Pico-PCBv1.5-manual.adoc)
+- [Download PCB v1.5 PDF manual](doc/USBSID-Pico-PCBv1.5-manual.pdf)
 ### PCB revision v1.3 manual
 - [Open online PCB v1.3 manual](doc/USBSID-Pico-PCBv1.3-manual.adoc)
 - [Download PCB v1.3 PDF manual](doc/USBSID-Pico-PCBv1.3-manual.pdf)
+### PCB revision v1.0 manual
+- [Open online PCB v1.0 manual](doc/USBSID-Pico-PCBv1.0-manual.adoc)
+- [Download PCB v1.0 PDF manual](doc/USBSID-Pico-PCBv1.0-manual.pdf)
 
 ## Cases
 All USBSID-Pico community created cases are available in the [cases](cases/) directory, direct links below.  
@@ -264,6 +286,25 @@ _Cases for PCB revision v1.3:_
 * [Dual USBSID-Pico Commodore 64 Case](cases/v1.3/Dual_USBSID-Pico_Commodore_64_Case) by [@OlefinMakes](https://github.com/OlefinMakes/)
 
 ## PCB Features
+### revision v1.5
+- Improved voltage and audio filtering
+  - Input voltage filtering with LC filter
+  - ESD protection diode on audio port for (minimal) backwards reverse voltage protection
+  - Extra capacitors on SID 5v and hv (9v/12v) voltage inpuit
+  - Softpull to gnd when headphone jack is empty (should help against clicks on jack insert)
+- Jumperless design
+  - Automatic 9v/12v selection based on detected Chip/SID
+    - sockets are independently configuratble for 9v or 12
+    - 5v and hv (9v/12v) on/off is for both sockets (sorry not enough gpios!)
+  - Automatic per socket SID filter capacitor selection based on detected Chip/SID
+  - Automatic per socket 6581 shunt resistor on/off based on detected Chip/SID
+  - Automatic per socket 8580 digiboost based on detected Chip/SID
+- Updated audio expansion pins
+  - Plug and play ready for the new "Volume daughterboard"
+  - Ext IN always connected 
+    - Be carefull when connecting anything to this pin!
+  - Now includes SID voltage pin
+- Includes all other features from v1.3
 ### revision v1.3
 - Supports all MOS SID chips e.g. MOS6581, MOS6582 & MOS8580
 - Supports SID chip replacements e.g. [SIDKick-Pico](https://github.com/frntc/SIDKick-pico), [ARMSID](https://www.nobomi.cz/8bit/armsid/index_en.php) & [FPGASID](https://www.fpgasid.de), [SwinSID](https://github.com/dmantione/swinsid).
@@ -336,8 +377,10 @@ the open source KiCad design files and gerbers documents below.
 * v0.1 testboard<br>
   [<img src="images/v0.1-top.png" width="50%">](images/v0.1-top.png) 
 
+
 # Examples
 Visit my [Youtube channel](https://www.youtube.com/channel/UCOu1hPBTsEbG7ZFnk9-29KQ), [other socials](https://github.com/LouDnl) or the [SHOWCASE](SHOWCASE.md) page to see more examples of the board in action.
+
 
 # Acknowledgements
 Special thanks goes out to [@tobozo](https://github.com/tobozo/) for making the USBSID-Pico logo and for his (mental🤣) support since starting this project.  
@@ -355,14 +398,18 @@ Some of those projects are - in no particular order:
 * [SID Factory II by Chordian](https://github.com/Chordian/sidfactory2)
 * [Cynthcart by PaulSlocum](https://github.com/PaulSlocum/cynthcart)
 
+
 # Disclaimer
 I do this stuff in my free time for my enjoyment. Since I like to share my joy in creating this with everyone I try my best to provide a working PCB and Firmware. I am in no way an electronics engineer and can give __no guarantees__ that this stuff does not break or damage your hardware, computer, phone, or whatever you try to hook it up to. Be sure to take great care when inserting any real MOS SID chips into the board. While everything has been tested with real chips, this is in no way a guarantee that nothing could go wrong. Use of this board and firmware at your own risk! I am in no way responsible for your damaged hardware. That being said, have fun!
+
 
 # License
 ### Software License ~ GNUv2
 All code written by me in this repository is licensed under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
 Any code in this repository that is not written by me automatically falls under the licensing conditions by the authors of said code as mentioned in the source code header.
 For for more information about this license please read the LICENSE document in the root of the USBSID-Pico repository.
+
+### USBSID-Pico v1.5 PCB Hardware License ~ TBD
 
 ### USBSID-Pico v1.3 PCB Hardware License ~ Creative Commons
 <a href="https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/USBSID-Pico-v1.3">USBSID-Pico v1.3 PCB</a> © 2025-2026 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/">Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/nc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/nd.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;">
