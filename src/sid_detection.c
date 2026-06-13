@@ -585,7 +585,7 @@ FAIL:;
  * @return uint8_t ChipType
  */
 ChipType detect_chiptype_at(uint8_t base_address)
-{
+{ /* QUESTION: Maybe clear registers between detections? */
   if(detection_logging) usSID("Detecting ChipType @ $%02x\n", base_address);
 
   /* Detect in order of prevalence/speed */
@@ -605,13 +605,14 @@ ChipType detect_chiptype_at(uint8_t base_address)
     return CHIP_BACKSID;
   }
 
-  /* This detection routine is known to freeze when a BackSID is present */
-  if (detect_sidemu(base_address)) {
-    return CHIP_SIDEMU;
-  }
-
   if (detect_skpico(base_address)) {
     return CHIP_SKPICO;
+  }
+
+  /* This detection routine is known to freeze when
+     a BackSID or SKPico is present */
+  if (detect_sidemu(base_address)) {
+    return CHIP_SIDEMU;
   }
 
   /* This detection routine is known to cause desync, so we do this as last */
