@@ -75,6 +75,12 @@ static uint8_t socket_config_array[SOCKET_BUFFER_SIZE];
 static uint8_t p_version_array[MAX_BUFFER_SIZE] = {0};
 /* Config magic verification storage */
 static uint32_t cm_verification = 0;
+/* Number of writes to host we need to do on a config read depending on the config_array size */
+static int cfg_read_writes = 0;
+/* Temporary buffer to store incoming data */
+uint8_t * data_buffer = NULL;
+/* Well, how big is it? */
+volatile int data_buffer_size = 0;
 
 
 /**
@@ -89,6 +95,35 @@ bool config_unacknowledged(void)
 #else
   return false;
 #endif
+}
+
+/**
+ * @brief
+ *
+ * @note 64 byte buffer before reaching this function:
+ * @note { CMD, CFGCMD, INIT, VER, DATA ... 58 bytes max, VER, END }
+ * @note 62 byte buffer reaching this function:
+ * @note { INIT, VER, DATA ... 58 bytes max, VER, END }
+ * @note if more then 64 bytes, VER and END are not in this packet
+ *
+ * @param buffer
+ * @param size
+ * @return * void
+ */
+void handle_config_buffer(uint8_t * buffer, uint32_t size)
+{
+  print_cfg(buffer, size, false);
+  /* TODO: Add something along the line
+     like this: sidfile = (uint8_t*)calloc(1, 0x10000); */
+  switch (buffer[1]) {
+    case FULL_CONFIG:
+    case SOCKET_CONFIG:
+    case MIDI_CONFIG:
+    case MIDI_CCVALUES:
+    default:
+      break;
+  }
+  return;
 }
 
 void read_config(Config* config)
@@ -182,9 +217,22 @@ void read_config(Config* config)
   config_array[60] = ((int)config->mirrored | ((int)config->flipped << 1) | ((int)config->mixed << 2));
 
   config_array[61] = 0x00; /* Unused */
-  config_array[62] = 0x00; /* Unused */
 
-  config_array[63] = 0xFF;  /* Terminator byte */
+  config_array[62] = 0x8F; /* Mark end of config */
+  config_array[63] = 0xFF; /* Terminator byte */
+
+  /* Yes, I know, I can assign cfg_read_writes manually, but I do not want to keep wondering if I need to change it */
+  for (int n = 0; n < count_of(config_array); n++) { /* Find number of writes by terminator byte */
+    static int endbyte = 0;
+    if (config_array[n] == 0x8F) { endbyte = n;
+      if (config_array[n+1] == 0xFF) {
+        /* n = 62, 62+2 = 64, 64/64 = 1 */
+        /* n = 117, 117+2 = 119, 119/64 = 1 */
+        cfg_read_writes = ROUND((n+2)/64);
+        break;
+      }
+    }
+  }
 
   return;
 }
@@ -234,8 +282,7 @@ void __no_inline_not_in_flash_func(default_config)(Config* config)
 {
   config_saveid = config->config_saveid;  /* Preserve config saveid */
   memcpy(config, &usbsid_default_config, sizeof(Config));
-  /* Copy saveid (if in 0~15 range) back into the default config */
-  config->config_saveid = ((config_saveid <= 0xF) ? config_saveid : 0); /* Sanitise the id */
+  config->config_saveid = config_saveid;  /* Copy saveid back into the default config */
   return;
 }
 
@@ -244,25 +291,31 @@ void __no_inline_not_in_flash_func(load_config)(Config* config)
   print_cfg_addr();
   usNFO("\n");
   usCFG("Loading configuration from flash\n");
-  int savelocationid = 0;  /* counter for finding the current save location */
+  uint8_t savelocationid = 0;  /* counter for finding the current save location */
 AGAIN:
   Config temp_config;
-  /* NOTICE: Do not do any logging here after memcpy or the Pico will freeze! */
+  usCFG("  Trying flash position '%u'", savelocationid);
+  /* NOTICE: Do not do any logging directly after memcpy without stdio_flush or the Pico will freeze! */
   memcpy(&temp_config, (void *)(XIP_BASE + (FLASH_CONFIG_OFFSET + (FLASH_PAGE_SIZE * savelocationid))), sizeof(Config));
   stdio_flush();
-  usCFG("  Trying flash position = %d (Saved config id = %d)\n", savelocationid, temp_config.config_saveid);
+  usNFO(", flash contains config id '%u' (255 == empty slot)\n",
+     temp_config.config_saveid);
   if ((temp_config.config_saveid >= 0) && (temp_config.config_saveid <= 0xF) /* Max 16 saves */
     && temp_config.config_saveid == savelocationid) { /* Found previously saved config */
     savelocationid++;  /* Increase id and try again */
     goto AGAIN; /* Always tries again if config is found */
   } else { /* They are not equal, that means this config is an empty save location or corrupted, load the previous config */
     savelocationid--; /* This will now be the previous config_saveid */
+    usCFG("  Found %s configuration at position %u\n",
+      ((savelocationid == 255) ? "empty" : "latest"), savelocationid);
     memcpy(config, (void *)(XIP_BASE + (FLASH_CONFIG_OFFSET + (FLASH_PAGE_SIZE * savelocationid))), sizeof(Config));
     stdio_flush();
   }
   /* Do not assign savelocationid here but he actual saveid from the restored config */
   config_saveid = usbsid_config.config_saveid;  /* copy saveid into global variable (for later saving use etc.) */
-  usCFG("  Configuration loaded from position %d\n", usbsid_config.config_saveid);
+  usCFG("  %s loaded from position %u\n",
+    (usbsid_config.config_saveid == 255 ? "Empty configuration" : "Configuration"),
+    usbsid_config.config_saveid);
 
   usCFG("Copied Configuration:\n");
   usCFG("  From 0x%x\n",
@@ -323,7 +376,7 @@ void __no_inline_not_in_flash_func(save_config)(Config* config)
   int noerr = (usbsid_config.config_saveid == config_saveid);
   if (noerr) {
     /* Only increase id's if both are equal */
-    config_saveid++;
+    config_saveid++; /* If it was 255 this means first boot up, will automatically be increased to 0 */
     config_saveid = usbsid_config.config_saveid = (config_saveid <= 0xF ? config_saveid : 0);
     usCFG("  Config id = %d, saving to 0x%x (%u)\n", config_saveid,
       (FLASH_CONFIG_OFFSET + (FLASH_PAGE_SIZE * config_saveid)), (FLASH_CONFIG_OFFSET + (FLASH_PAGE_SIZE * config_saveid)));
@@ -383,14 +436,14 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
          Although 4 writes are performed, only the first 2 are received, (due to zero content data) */
       read_config(&usbsid_config);
       print_cfg(config_array, count_of(config_array), false);
-      /* TODO: Add check for terminator byte (end) or continue byte (moar packets coming in!) */
-      /* int writes = count_of(config_array) / 64; */
       memset(write_buffer_p, 0, 64);
-      /* NOTICE: Temporarily fixed the writes to 1 only, config isn't bigger anyway */
-      for (int i = 0; i < 1/* writes */; i++) {
+      for (int i = 0; i < cfg_read_writes; i++) {
+        usCFG("Write back config array part %d of %d\n", i, cfg_read_writes);
         memcpy(write_buffer_p, config_array + (i * 64), 64);
         write_back_data(64);
       }
+      memcpy(write_buffer_p, config_array, 64);
+      write_back_data(64);
       break;
     case READ_SOCKETCFG:
       usCFG("READ_SOCKETCFG\n");
@@ -415,12 +468,11 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case READ_CONFIGACK:
 #if PCB_VERSION_INT >= 15
       usCFG("READ_CONFIGACK: %d\n", (int)config_unacknowledged());
+      memset(write_buffer_p, 0, 64);
+      write_buffer_p[0] = (uint8_t)config_unacknowledged();
 #else
       usCFG("READ_CONFIGACK\n");
-#endif
       memset(write_buffer_p, 0, 64);
-#if PCB_VERSION_INT >= 15
-      write_buffer_p[0] = (uint8_t)config_unacknowledged();
 #endif
       write_back_data(1);
       break;
@@ -649,15 +701,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case WRITE_CONFIG:  /* TODO: FINISH */
       /* Max size of incoming buffer = 61 */
       usCFG("WRITE_CONFIG\n");
-      print_cfg(buffer, size, false);
-      switch (buffer[1]) {
-        case FULL_CONFIG:
-        case SOCKET_CONFIG:
-        case MIDI_CONFIG:
-        case MIDI_CCVALUES:
-        default:
-          break;
-      }
+      handle_config_buffer(buffer, size);
       break;
     case SINGLE_SID:
       int single_socket = (
@@ -966,7 +1010,8 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
           }
       } else {  /* Small write single byte */
         memset(write_buffer_p, 0, 64);
-        int pcbver = (strcmp(pcb_version, "1.3") == 0 ? 13 : 10);
+        /* int pcbver = (strcmp(pcb_version, "1.3") == 0 ? 13 : 10); */
+        int pcbver = PCB_VERSION_INT;
         write_buffer_p[0] = pcbver;
         write_back_data(1);
       }
@@ -1124,7 +1169,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         break;
       }
       break;
-    #if defined(ONBOARD_SIDPLAYER)
+#if defined(ONBOARD_SIDPLAYER)
     case UPLOAD_SID_START:
       usCFG("UPLOAD_SID_START: %d\n",buffer[1]);
       receiving_sidfile = true;
@@ -1185,22 +1230,22 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       /* SID resets are handled in the emulator */
       break;
     case SID_PLAYER_PAUSE:
-    usCFG("SID_PLAYER_PAUSE\n");
+      usCFG("SID_PLAYER_PAUSE\n");
       sidplayer_playing = !sidplayer_playing;
       break;
     case SID_PLAYER_NEXT:
-    usCFG("SID_PLAYER_NEXT\n");
+      usCFG("SID_PLAYER_NEXT\n");
       sidplayer_next = true;
       break;
     case SID_PLAYER_PREV:
-    usCFG("SID_PLAYER_PREV\n");
+      usCFG("SID_PLAYER_PREV\n");
       sidplayer_prev = true;
       break;
     case SID_PLAYER_TWO:
-    usCFG("SID_PLAYER_TWO\n");
+      usCFG("SID_PLAYER_TWO\n");
       force_socktwo();
       break;
-    #endif
+#endif
     default:
       break;
     }
@@ -1234,7 +1279,7 @@ void apply_rgbled_config()
 }
 
 void print_config(void)
-{ /* The truth, and nothing but the truth!   */
+{ /* The truth, and nothing but the truth! */
   print_pico_features();
   print_config_overview();
   print_config_summary();
@@ -1242,9 +1287,9 @@ void print_config(void)
   return;
 }
 
-void apply_busclock_settings(void)
+void apply_busclock_settings(bool silent)
 {
-  usCFG("  Applying bus clock settings\n");
+  if (!silent) usCFG("  Applying bus clock settings\n");
   stop_dma_channels();
   restart_bus_clocks();
   sync_pios(false);
@@ -1274,7 +1319,7 @@ ConfigError apply_new_presetconfig(void)
   restore_interrupts(irq);
 
   /* Apply to hardware (unless boot) */
-  apply_busclock_settings();
+  apply_busclock_settings(true);
 
   return CFG_OK;
 }
@@ -1306,7 +1351,7 @@ ConfigError apply_config(bool at_boot)
   /* Apply to hardware (unless boot) */
   if (!at_boot) {
     usCFG("  Restarting PIO\n");
-    apply_busclock_settings();
+    apply_busclock_settings(false);
   }
 
   usCFG("  Success: %d SIDs active\n", cfg.numsids);
