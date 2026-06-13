@@ -146,7 +146,7 @@ void setup_dmachannels(void)
       false
     );
 
-    /* Channel B — identical transfer, chains back to A */
+    /* Channel B - identical transfer, chains back to A */
     dma_channel_config cfg_b = dma_channel_get_default_config(dma_counter_chain);
     channel_config_set_transfer_data_size(&cfg_b, DMA_SIZE_32);
     channel_config_set_read_increment(&cfg_b, false);
@@ -161,7 +161,7 @@ void setup_dmachannels(void)
       1,
       false);
 
-    /* Start channel A — it will chain to B, B chains back, forever */
+    /* Start channel A - it will chain to B, B chains back, forever */
     dma_channel_start(dma_counter_chain);
   }
 #endif
