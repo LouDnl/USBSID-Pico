@@ -301,7 +301,7 @@ SIDPlayer.prototype = {
 				// 	setTimeout(function() {
 				// 		this.setVolume(1);
 				// 	}.bind(this), 500);
-					
+
 				// 	if (typeof callback === "function") {
 				// 		callback.call(this, error);
 				// 	}
@@ -889,9 +889,9 @@ SIDPlayer.prototype = {
 
 	/**
 	 * Return the type of digi, if used by the song. Not all handlers support this.
-	 * 
+	 *
 	 * @handlers websid, legacy
-	 * 
+	 *
 	 * @return {string}		Returns a short ID string, or empty if digi is not used
 	 */
 	getDigiType: function() {

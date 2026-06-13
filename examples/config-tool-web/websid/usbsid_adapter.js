@@ -43,7 +43,7 @@
  * @document WEBSID Adapter for USBSID-Pico
  */
 
-class USBSIDBackendAdapter/*  extends usbsid_SIDBackendAdapter.SIDBackendAdapter */ {
+class USBSIDBackendAdapter/* extends usbsid_SIDBackendAdapter.SIDBackendAdapter */ {
 
   static Port = class {
     constructor(device)
@@ -122,7 +122,7 @@ class USBSIDBackendAdapter/*  extends usbsid_SIDBackendAdapter.SIDBackendAdapter
    * this.promiseState(this.Device()).then(state => {
    * 	 if(state != 'rejected') { do it }
    * });
-    */
+   */
   promiseState(p) {
     const t = {};
     return Promise.race([p, t])
