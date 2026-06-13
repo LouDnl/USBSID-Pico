@@ -695,6 +695,12 @@ void core1_main(void)
   init_uart();
 #endif
 
+  /* Initialise Bluetooth Uart */
+#ifdef USE_BLUETOOTH
+  extern void setup_bluetooth();
+  setup_bluetooth();
+#endif
+
   /* Signal Core 0 we're ready (sync point 2) */
   usBOOT("<CORE 1> Signaling core0 ready ~ 2\n");
   core_sync_state = SYNC_CORE1_STAGE2;
@@ -717,6 +723,9 @@ void core1_main(void)
     /* Blinky blinky? */
     if (!offload_ledrunner) {
       led_runner();
+#ifdef USE_BLUETOOTH
+      cyw43_arch_poll();
+#endif
     }
 
 #if PCB_VERSION_INT >= 15
@@ -998,6 +1007,9 @@ int main()
 
     if (offload_ledrunner) {
       led_runner();
+#ifdef USE_BLUETOOTH
+      cyw43_arch_poll();
+#endif
     }
   }
 
