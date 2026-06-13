@@ -71,17 +71,25 @@ void init_vccvdd_control(void)
 
   gpio_set_dir(HV2_SEL, GPIO_OUT);
   cPIN(HV2_SEL);  /* Clear hv2 to set 9v */
-
   gpio_set_function(HV2_SEL, GPIO_FUNC_SIO);
-  gpio_set_dir(SIDVCC_EN, GPIO_OUT);
-  /* Remember, v1.4 has a leaky 5v, this can cause desync like behaviour */
-  if (config_unacknowledged()) { cPIN(SIDVCC_EN); } /* Disable 5v on boot */
-  else { sPIN(SIDVCC_EN); } /* Enable 5v on boot */
-  gpio_set_function(SIDVCC_EN, GPIO_FUNC_SIO);
 
+  gpio_set_dir(SIDVCC_EN, GPIO_OUT);
   gpio_set_dir(SIDHV_EN, GPIO_OUT);
-  if (config_unacknowledged()) { cPIN(SIDHV_EN); } /* Disable HV on boot */
-  else { sPIN(SIDHV_EN); } /* Enable HV on boot */
+
+  /* Remember, v1.4 has a leaky 5v, this can cause desync like behaviour */
+  /* Also remember that the RES pin needs to be deasserted _before_ enabling voltage!!
+     Otherwise this will ALSO cause desync like behaviour */
+  if (config_unacknowledged()) {
+    cPIN(SIDVCC_EN);
+    cPIN(SIDHV_EN);
+  } else {
+    cPIN(RES);       /* hold reset before powering on */
+    sPIN(SIDVCC_EN);
+    sPIN(SIDHV_EN);
+    sleep_ms(200);   /* wait for regulator + FPGASID FPGA config */
+    sPIN(RES);       /* release - FPGASID initializes cleanly */
+  }
+  gpio_set_function(SIDVCC_EN, GPIO_FUNC_SIO);
   gpio_set_function(SIDHV_EN, GPIO_FUNC_SIO);
 #endif
 }
@@ -97,7 +105,11 @@ void init_bus_control(void)
 {
   /* GPIO defaults for PIO bus */
   gpio_set_dir(RES, GPIO_OUT);
-  sPIN(RES);  /* Enable the SID directly on boot (SIDEmu hardfaults otherwise) */
+#if PCB_VERSION_INT >= 15
+  cPIN(RES);  /* Deassert reset pin on boot immediately */
+#else
+  sPIN(RES);  /* Enable the SID directly on boot v1.3 (SIDEmu hardfaults otherwise) */
+#endif
   gpio_set_function(RES, GPIO_FUNC_SIO);
 
   gpio_set_dir(CS1, GPIO_OUT);
@@ -383,6 +395,9 @@ void set_base_voltages(uint16_t wait_ms)
     sPIN(RES);
   } else {
     usCFG("Base voltages already at default state\n");
+    cPIN(RES);
+    sleep_ms(wait_ms);
+    sPIN(RES);
   }
 #else
   (void)wait_ms;
