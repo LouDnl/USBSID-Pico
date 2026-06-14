@@ -19,7 +19,8 @@ include::disclaimer.adoc[]
 
 == Firmware types
 image:images/firmware/logo-v1.0.jpg[Title=PCB logo v1.0]
-image:images/firmware/logo-v1.3.jpg[Title=PCB logo v1.3] +
+image:images/firmware/logo-v1.3.jpg[Title=PCB logo v1.3]
+image:images/firmware/logo-v1.5.jpg[Title=PCB logo v1.5] +
 Each PCB revision is the firmware designator, please check your PCB revision, this is under the MOS logo and next to *USBSID-Pico* on your PCB. +
 Firmware filenames contain the PCB revision number e.g. `usbsidpico-rgb-v1.X.uf2` is for PCB revision `v1.0` and for use with a black clone Pico containing an RGB LED.
 
@@ -30,13 +31,25 @@ Below are the filenames used for each Pico and board type, take great care in se
 === Board revision
 The 1.X in each filename equals for the PCB revision as mentioned under firmware types. Don't worry if you flash a firmware for the incorrect PCB revision, this causes no harm. +
 
-=== Firmwares for the rp2040 Pico1
+=== Firmware naming
+`usbsidA-BC.uf2` examples: `usbsidpico-v1.0-rgb.uf2`, `usbsidpico2_w-v1.3.uf2` or `usbsidpico2-v1.5-rgb_sp`. +
+A: The pico board type e.g. `pico`, `pico2`, `pico_2` or `pico2_w` +
+B: The PCB version e.g. `v1.0`, `v1.3` or `v1.5` +
+C: A combination of optional features e.g. `-rgb`, `_em` or `_sp`
+
+=== Firmware naming per Pico type
+Firmwares suitable for rp2040 Pico1 boards start with `usbsidpico-`
+Firmwares suitable for rp2040 Pico1_w boards start with `usbsidpico_2-` +
+Firmwares suitable for rp2350 Pico2 boards start with `usbsidpico2-` +
+Firmwares suitable for rp2350 Pico2_w boards start with `usbsidpico2_w-` +
+
+=== Naming examples for the rp2040 Pico1
 Firmware naming suited for the pico 1 always start with `usbsidpico-` +
 `usbsidpico-v1.X.uf2` for regular green rp2040 Pico boards. +
 `usbsidpico-rgb-v1.X.uf2` for black clone rp2040 Pico boards with RGB LED onboard. +
 `usbsidpico_w-v1.X.uf2` for regular green rp2040 PicoW boards.
 
-=== Firmwares for the rp2350 Pico2
+=== Naming examples for the rp2350 Pico2
 Firmware naming suited for the pico 2 always start with `usbsidpico2-` +
 `usbsidpico2-v1.X.uf2` for regular green rp2350 Pico2 boards. +
 `usbsidpico2-rgb-v1.X.uf2` for black clone rp2350 Pico2 boards with RGB LED onboard. +
@@ -82,10 +95,18 @@ With the cable not plugged in to your computer and Pico and also not seated on t
 
 With the cable already plugged into your computer and Pico and seated on the board (using software):
 
+- With the GUI config tool
+- Go to the `DEBUG` tab and click on `BOOTLOADER`
+- A new drive should appear on your computer called `RPI-RP2` or `RP2350` depending on your Pico type.
+- Copy the correct `uf2` firmware file to this directory.
+- After copying the Pico will reboot and your Pico is flashed.
+
+or
+
 - Go to the config webpage (https://usbsid.loudai.nl/index.html?player=webusb&debug=usbsidpico):
 - Connect to the board using `WebUSB (Hermit)` as emulator
-- Click on `Open config`
-- Scroll to the bottom of the page and click on `Bootloader` in the box marked `other`
+- Click on `CONFIG` to open the configuration tab
+- Scroll to the bottom of the page and click on `BOOTLOADER` in the box named `DEBUG`
 - A new drive should appear on your computer called `RPI-RP2` or `RP2350` depending on your Pico type.
 - Copy the correct `uf2` firmware file to this directory.
 - After copying the Pico will reboot and your Pico is flashed.
@@ -97,6 +118,7 @@ or
 - A new drive should appear on your computer called `RPI-RP2` or `RP2350` depending on your Pico type.
 - Copy the correct `uf2` firmware file to this directory.
 - After copying the Pico will reboot and your Pico is flashed.
+
 
 == Firmware configuration
 USBSID-Pico has an extensive set of configuration options that expands with each firmware release. +
@@ -117,7 +139,7 @@ TkInter -> https://tkdocs.com/tutorial/install.html[Installation guide] +
 And either one of the Linux or Windows CLI downloads below
 
 ==== Linux / Windows downloads
-The latest version of the config tool is available in a zip file called `tools.zip` from release v0.6.0-BETA and up
+The latest version of the CLI config tool is available in a zip file called `tools.zip` from release v0.6.0-BETA and up
 
 ==== Windows downloads
 If the DLL's are missing from the zip file you can always download them from here: +
@@ -125,15 +147,12 @@ https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/libusb-1.
 https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/libwinpthread-1.dll[Download DLL 2]
 
 === Configuration web page (for Chrome/Edge based browsers using webusb)
-https://usbsid.loudai.nl/?player=webusb&debug=usbsidpico[USBSID web configuration tool] (requires a Chrome based browser). +
+https://usbsid.loudai.nl/?player=webusb[USBSID web configuration tool] (requires a Chrome based browser). +
 If needed you can change your USBSID configuration after selecting WebUSB and clicking on `Open config`. +
-image:images/firmware/usbsidpico-config-dark.png[Title=Config Dark,300]image:images/firmware/usbsidpico-config-light.png[Title=Config Light,300] +
+image:images/firmware/usbsidpico-configwebsite.png[Title=Config Commodore theme,500] +
 _The player is set up with borrowed code from Deepsid using Hermit's JsSID implementation._
 
-==== Debug functions
-For additional testing there are some debug functions available on the https://usbsid.loudai.nl/?player=webusb&debug=usbsidpicoUSBSID Debug site (requires a Chrome based browser).
-
-=== Default configuration
+=== Default configuration (depends on the board version)
 Each firmware version comes with the same default configuration. +
 An explanation for these settings can be found further on in this document. +
 Board clock rate: `1000000Hz` +
@@ -185,6 +204,33 @@ When set to `Mono` the audio of both SID sockets will be combined to mono. +
 When set to `Stereo` the audio of both SID sockets will be separated into left for `SID1` and right for `SID2` +
 Available options are: +
 `Mono`, `Stereo`
+
+=== SID Voltage & Configuration confirmation
+_PCB revision v1.5 only_ +
+The board boots with 5v and 9v enabled to automatically detect any changes in the socket / chip configuration, it does this by running a chip and SID detection. +
+When a change is detected the boards turns off the 9v and 5v and the onboard (RGB)LED starts flashing, making the board unusable until the configuration is validated and confirmed. +
+_Please verify the configuration with care before confirming, failure to do so might damage/kill your SID chips, and we don't want that!_ +
+There are multiple ways to validate and confirm the configuration: +
+**GUI Configtool** +
+On opening the configtool and connecting to the board there will be a text stating the configuration needs to be confirmed. Verify the config on the `SOCKETS` tab and when done click `CONFIRM` +
+image:images/firmware/configgui-v1.5-confirm.png[Title=GUI Confirm] +
+**Web Configtool** +
+On opening the config website and connecting to the board there will be a text stating the configuration needs to be confirmed. Verify the config on the `CONFIG` tab by clicking `RETRIEVE CONFIG` first and when done validating click `CONFIRM CONFIG`. Both buttons will glow when a click is needed +
+image:images/firmware/configwebsite-v1.5-confirm.png[Title=Web Confirm] +
+**CLI Configtool** +
+First read the configuration with `cfg_usbsid -r`, the printed configuration will have a line that states the config needs confirmation. You can do this with `cfg_usbsid -ack`.
+
+=== Disable socket change detection
+_PCB revision v1.5 only_ +
+When you have a fixed socket setup, e.g. you do not plan on changing the chips anytime soon, it is possible to disable the change detection on boot. This will make the board start up with 5v and 9v and then - if 12v is required - switch to the required voltage setting during the boot process by switching the voltage back off, setting the correct hv voltage and then switching it back on. +
+When the socket detection _is_ on, the board will _always_ try to detect any changes in the configuration _before_ the required voltage is applied. +
+By setting the `Disable socket detection on boot` option you can control the above behaviour: +
+**GUI Configtool** +
+image:images/firmware/configgui-v1.5-settings.png[Title=GUI Setting] +
+**Web Configtool** +
+image:images/firmware/configwebsite-v1.5-settings.png[Title=Web Setting] +
+**CLI Configtool** +
+Change the behaviour with `cfg_usbsid -sad N` where N can be 0 (disabled) or 1 (enabled)
 
 === Socket settings
 Each socket comes with its own set of configurable options.
