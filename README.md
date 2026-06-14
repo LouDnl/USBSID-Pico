@@ -1,4 +1,4 @@
-![USBSID-Pico](images/pcbv1.3.jpg)<br>
+![USBSID-Pico](images/pcbv1.5b.jpg)<br>
 # [<img src="images/usbsid-logo.png" width="250em">](images/usbsid-logo.png)![LouD](images/loud.png)
 USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board for interfacing one or two MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer, phone, ASID supporting player or USB midi controller.  
 
@@ -17,18 +17,11 @@ Checkout the new [USBSID-Pico Configtool](https://github.com/LouDnl/USBSID-Pico-
 |:-:|:-:|:-:|:-:|
 | [<img src="https://img.youtube.com/vi/7hiAkLAqsiI/0.jpg" width=75%>](https://www.youtube.com/watch?v=7hiAkLAqsiI)<br><small><sub>by Censor Design</sub></small> | [<img src="https://img.youtube.com/vi/4gckiwzOW9U/0.jpg" width=75%>](https://www.youtube.com/watch?v=4gckiwzOW9U)<br><small><sub>by Censor Design</sub></small> | [<img src="https://img.youtube.com/vi/q4Fg7V2DYCI/0.jpg" width=75%>](https://www.youtube.com/watch?v=q4Fg7V2DYCI)<br><small><sub>by Censor Design</sub> | [<img src="https://img.youtube.com/vi/RTtmsbH4jC0/0.jpg" width=75%>](https://www.youtube.com/watch?v=RTtmsbH4jC0)<br><small><sub>by Censor Design</sub></small> |
 
-
-# Swag!
-Do you like swag!? I sure do!! [greyandslate](https://bsky.app/profile/greyandslate.bsky.social) created these great t-shirt designs which are available for purchase in his [Etsy shop](https://greyandslate.etsy.com/?search_query=usbsid), link below.  
-**Use coupon code USBSID15 for a 15% discount!**  
-Shop link: [https://greyandslate.etsy.com/?search_query=usbsid](https://greyandslate.etsy.com/?search_query=usbsid)  
-[<img src="images/tees/usbsid-pico-tshirt-sids_logo.jpg" width="250em">](https://www.etsy.com/nl/listing/4426327828/usbsid-pico-met-mos-sid-chips-t-shirt?etsrc=sdt)
-[<img src="images/tees/usbsid-pico-tshirt-board_logo.jpg" width="250em">](https://www.etsy.com/nl/listing/4426318364/retrocomputing-t-shirt-usbsid-pico-sid?etsrc=sdt)<br>
-[<img src="images/tees/usbsid-pico-tshirt-logo.jpg" width="250em">](https://www.etsy.com/nl/listing/4426327960/t-shirt-usbsid-pico-logo-chiptune?etsrc=sdt)
-[<img src="images/tees/usbsid-pico-tshirt-board.jpg" width="250em">](https://www.etsy.com/nl/listing/4426320773/usbsid-pico-chiptune-board-t-shirt-met?etsrc=sdt)
-
-
 # Index
+* [Volume board (Soon™)](#volume-board-soon)
+* [NEW: USBSID-Pico Configtool](#new-usbsid-pico-configtool)
+* [This is USBSID-Pico! :)](#this-is-usbsid-pico-)
+* [Swag!](#swag)
 * [Software support & Features](#software-support-and-features)
   * [Software manual](doc/USBSID-Pico-software-manual.adoc) [PDF](doc/USBSID-Pico-software-manual.pdf)
   * [SID files](#sid-files)
@@ -41,8 +34,8 @@ Shop link: [https://greyandslate.etsy.com/?search_query=usbsid](https://greyands
   * [Midi](#midi)
   * [Cynthcart VST](#cynthcart-vst)
 * [Questions & Support](#questions-and-support)
+* [Known issues](#known-issues)
 * [Project status](#project-status)
-  * [Known issues](#known-issues)
   * [Code status](#code-status)
   * [Supported platforms](#supported-platforms)
   * [Linux Udev rules](#linux-udev-rules)
@@ -73,8 +66,28 @@ Shop link: [https://greyandslate.etsy.com/?search_query=usbsid](https://greyands
 * [Certification](#certification)
 
 
+# Volume board (Soon™)
+Coming soon, an optional volume board to control left and right audio independently.  
+- Plug and play compatible with v1.5+ boards. 
+- Compatibale with v1.0 and v1.3 boards with a small modification to provide voltage.  
+  An how to will be provided when released.  
+![USBSID-Pico](images/volume_daughterboard_seated.jpg)  
+![USBSID-Pico](images/volume_daughterboard_bottom.jpg)  
+_Yes! I have cats ;-)_  
+
+
+# Swag!
+Do you like swag!? I sure do!! [greyandslate](https://bsky.app/profile/greyandslate.bsky.social) created these great t-shirt designs which are available for purchase in his [Etsy shop](https://greyandslate.etsy.com/?search_query=usbsid), link below.  
+**Use coupon code USBSID15 for a 15% discount!**  
+Shop link: [https://greyandslate.etsy.com/?search_query=usbsid](https://greyandslate.etsy.com/?search_query=usbsid)  
+[<img src="images/tees/usbsid-pico-tshirt-sids_logo.jpg" width="250em">](https://www.etsy.com/nl/listing/4426327828/usbsid-pico-met-mos-sid-chips-t-shirt?etsrc=sdt)
+[<img src="images/tees/usbsid-pico-tshirt-board_logo.jpg" width="250em">](https://www.etsy.com/nl/listing/4426318364/retrocomputing-t-shirt-usbsid-pico-sid?etsrc=sdt)<br>
+[<img src="images/tees/usbsid-pico-tshirt-logo.jpg" width="250em">](https://www.etsy.com/nl/listing/4426327960/t-shirt-usbsid-pico-logo-chiptune?etsrc=sdt)
+[<img src="images/tees/usbsid-pico-tshirt-board.jpg" width="250em">](https://www.etsy.com/nl/listing/4426320773/usbsid-pico-chiptune-board-t-shirt-met?etsrc=sdt)
+
+
 # Software support and features
-![USBSID-Pico](images/pcbv1.3-pdsid.png)  
+![USBSID-Pico](images/pcbv1.3.jpg)  
 See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for more information on how to use supported software!  
 
 ## SID files
@@ -142,12 +155,25 @@ Any questions about or support with USBSID-Pico can be asked
 * [USBSID manuals](doc/)
 
 
+# Known issues
+**PCB/Audio/etc**
+* Possible audible low/high alternating hum when using a Pico1 or Pico2 board that has an RGB LED onboard.  
+  - __Cause:__ Ground loop, when two or more interconnected pieces of audio equipment are plugged into different power outlets (with or without ground pins), creating multiple paths to the electrical ground.  
+  - __Example:__ When powering the board from your computer and routing the audio out back into your computer.  
+  - __Example:__ When powering the board from your computer and routing the audio out into speakers but both connected to different outlets.  
+  - __Fix:__ Route the audio out through a ground loop isolator.  
+  - __Fix:__ Connect audio out to headphones.  
+  - __Note:__ Its more present on v1.0 and v1.3 board, but still there on v1.5 boards. To fix this on the board would require significant layout and pcb changes.  
+
+**Firmware/Software**
+* Enabling and then disabling the onboard cynthcart emulator without restarting the board causes audio glitches
+* Switching on readmode and then switching it off again without restarting the PCB and Vice _will_ result in distorted audio  
+
+
 # Project status
 Visit the [Project Page](https://github.com/users/LouDnl/projects/1) for an up-to-date list of things being worked on.
 While in development any mentioned features, options, etc. are subject to change.  
-### Known issues
-* Enabling and then disabling the onboard cynthcart emulator without restarting the board causes audio glitches
-* Switching on readmode and then switching it off again without restarting the PCB and Vice _will_ result in distorted audio  
+
 ### Code status
 |          | Master             | Dev                    |
 | -------  | :-----             | :-----                 |
@@ -239,7 +265,7 @@ The firmware is still in development so features might change, be added or remov
 - Uses the [TinyUSB](https://github.com/hathach/tinyusb) stack
 #### v1.3+ PCB
 - Audio switch Stereo/Mono control
-#### v1.4+ PCB
+#### v1.5+ PCB
 - Socket voltage control
 
 ### Building
@@ -256,6 +282,7 @@ Sponsored by [<img src="images/pcbway.png" width="150em">](images/pcbway.png)
 #### PCBWay
 At a minimum of 5 bare or assembled boards it is also possible to purchase PCB's at PCBWay  
 No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral link](https://pcbway.com/g/2458i7) to register, thanks!  
+[Volume daughterboard (net yet!)](#)  
 [PCB revision v1.5 (not yet!)](#)  
 [PCB revision v1.3](https://www.pcbway.com/project/shareproject/USBSID_Pico_v1_3_05f2b88e.html)  
 [PCB revision v1.0](https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html)  
@@ -288,9 +315,9 @@ _Cases for PCB revision v1.3:_
 ## PCB Features
 ### revision v1.5
 - Improved voltage and audio filtering
-  - Input voltage filtering with LC filter
-  - ESD protection diode on audio port for (minimal) backwards reverse voltage protection
-  - Extra capacitors on SID 5v and hv (9v/12v) voltage inpuit
+  - Input voltage filtering with π LC filter
+  - ESD protection diode on audio port for (minimal) backwards/reverse voltage protection
+  - Extra filter capacitors on SID 5v and hv (9v/12v) voltage input
   - Softpull to gnd when headphone jack is empty (should help against clicks on jack insert)
 - Jumperless design
   - Automatic 9v/12v selection based on detected Chip/SID
@@ -361,21 +388,37 @@ the open source KiCad design files and gerbers documents below.
 - [USBSID-Pico v1.3 schematic](hardware/v1.3-schematic.pdf)
 - [USBSID-Pico v1.3 interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/hardware/v1.3-ibom.html)
 - [USBSID-Pico v1.3 gerber files](hardware/USBSID-Pico-v1.3/README.md)
+- [USBSID-Pico v1.3 KiCad project & gerber files]() (not yet!)
+#### revision v1.5 (not yet!)
+- [USBSID-Pico v1.5 schematic]()
+- [USBSID-Pico v1.5 interactive BOM]()
 #### Datasheets of parts used
 [Datasheets](resources/)
 
 ## PCB Development
-* v1.3b release board<br>
-  [<img src="images/v1.3b-top.png" width="50%">](images/v1.3b-top.png) 
-* v1.2 testboard<br>
-  [<img src="images/v1.2-top.png" width="50%">](images/v1.2-top.png) 
-* v1.1 unfinished and skipped
-* v1.0 release board<br>
-  [<img src="images/v1.0-top.png" width="50%">](images/v1.0-top.png) 
-* v0.2 improved testboard<br>
-  [<img src="images/v0.2-top.png" width="50%">](images/v0.2-top.png) 
-* v0.1 testboard<br>
-  [<img src="images/v0.1-top.png" width="50%">](images/v0.1-top.png) 
+* v1.5c **release** board (not yet!)<br>
+  <!-- [<img src="images/v1.5c-top.png" width="50%">](images/v1.5c-top.png)   -->
+* v1.5b _unreleased_ board<br>
+  [<img src="images/v1.5b-top.png" width="50%">](images/v1.5b-top.png)  
+* v1.5 _unreleased_ board<br>
+  [<img src="images/v1.5-top.png" width="50%">](images/v1.5-top.png)  
+* v1.4d _unreleased_ board<br>
+  [<img src="images/v1.4d-top.png" width="50%">](images/v1.4d-top.png)  
+* v1.4 _unreleased_ board<br>
+  [<img src="images/v1.4-top.png" width="50%">](images/v1.4-top.png)  
+* v1.3c _unreleased_ board<br>
+  [<img src="images/v1.3c-top.png" width="50%">](images/v1.3c-top.png)  
+* v1.3b **release** board<br>
+  [<img src="images/v1.3b-top.png" width="50%">](images/v1.3b-top.png)  
+* v1.2 _unreleased_ board<br>
+  [<img src="images/v1.2-top.png" width="50%">](images/v1.2-top.png)  
+* v1.1 _unreleased_, unfinished and skipped
+* v1.0 **release** board<br>
+  [<img src="images/v1.0-top.png" width="50%">](images/v1.0-top.png)  
+* v0.2 _unreleased_ testboard<br>
+  [<img src="images/v0.2-top.png" width="50%">](images/v0.2-top.png)  
+* v0.1 _unreleased_ testboard<br>
+  [<img src="images/v0.1-top.png" width="50%">](images/v0.1-top.png)  
 
 
 # Examples
@@ -418,6 +461,9 @@ For for more information about this license please read the LICENSE document in 
 <a href="https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/USBSID-Pico-v1.0">USBSID-Pico v1.0 PCB</a> © 2024-2026 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;">  
 
 # Certification
+### USBSID-Pico v1.3 PCB OSHWA certification
+(not yet!)
+
 ### USBSID-Pico v1.0 PCB OSHWA certification
 [<img src="hardware/USBSID-Pico-v1.0/logos/certification-mark-NL000035-stacked.png" width="20%">](https://certification.oshwa.org/nl000035.html)  
 [OSHW] NL000035 | Certified open source hardware | [oshwa.org/cert](https://certification.oshwa.org/nl000035.html)
