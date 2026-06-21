@@ -49,10 +49,15 @@ do {                                 \
   for (int i = 0; i < count; i ++) tud_cdc_n_write_char(1, _tempbuf[i]); \
   tud_cdc_n_write_flush(1);          \
   tud_task_ext(0, true);             \
+  stdio_flush();                     \
 } while(0)
 #define _US_DBG(...) cdc_printf(__VA_ARGS__)
 #else
-#define _US_DBG(...) printf(__VA_ARGS__)
+#define _US_DBG(...)   \
+do {                   \
+  printf(__VA_ARGS__); \
+  stdio_flush();       \
+} while (0)
 #endif
 
 
@@ -81,11 +86,7 @@ do {                                 \
 #endif
 
 #ifdef USBSID_BOOTLOG
-#define usBOOT(fmt, ...)                                 \
-do {                                                     \
-  __DBG("[BOOT] " fmt __VA_OPT__(,) __VA_ARGS__);        \
-  stdio_flush();                                         \
-} while(0)
+#define usBOOT(fmt, ...) __DBG("[BOOT] " fmt __VA_OPT__(,) __VA_ARGS__)
 #else
 #define usBOOT(...) ((void)0)
 #endif
