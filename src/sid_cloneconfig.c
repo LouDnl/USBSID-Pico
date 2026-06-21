@@ -41,6 +41,8 @@
 
 
 /* Init local variables */
+static volatile bool read_config = false;
+static uint8_t * chip_config = NULL;
 static uint8_t skpico_config[64] = {0xff};
 static uint8_t skpico_version_result[32] = {0xff};
 static char skpico_version[32] = {0};
@@ -94,13 +96,15 @@ static void print_fpgasid_sidconfig(int slot, int sidno, uint8_t * configarray)
 void read_fpgasid_configuration(uint8_t base_address)
 {
   if ((usbsid_config.socketOne.chiptype != CHIP_FPGASID) && (usbsid_config.socketTwo.chiptype != CHIP_FPGASID)) {
-      usERR("No FPGASID configured, socketOne: %s (%d) socketTwo: %s (%d)\n",
-        chip_type_name((int)usbsid_config.socketOne.chiptype), usbsid_config.socketOne.chiptype,
-        chip_type_name((int)usbsid_config.socketTwo.chiptype), usbsid_config.socketTwo.chiptype
-      );
+    usERR("No FPGASID configured, socketOne: %s (%d) socketTwo: %s (%d)\n",
+      chip_type_name((int)usbsid_config.socketOne.chiptype), usbsid_config.socketOne.chiptype,
+      chip_type_name((int)usbsid_config.socketTwo.chiptype), usbsid_config.socketTwo.chiptype
+    );
     return; /* Do nothing if no FPGASID configured */
   }
+
   static uint8_t idHi, idLo, cpld, fpga, pca, select_pins, idxa, idxb, flta, fltb;
+  static uint16_t frequency_r;
   static float frequency = 0.0;
   static uint8_t unique_id[8];
   static uint8_t sid_one_a[3];
@@ -151,6 +155,7 @@ void read_fpgasid_configuration(uint8_t base_address)
   for (int i = 0; i < 10; i++) {
     frequency += cycled_read_operation((0x0C + base_address), 4);  /* Read Ø2 frequency */
   }
+  frequency_r = (uint16_t)frequency; // assign for readback
   frequency /= 10;   // 10 reads
   frequency *= 12.5; // kHz
   frequency /= 1000; // to uS
@@ -159,35 +164,59 @@ void read_fpgasid_configuration(uint8_t base_address)
   cycled_write_operation((0x19 + base_address), 0x0, 6);   /* Clear magic cookie Hi */
   cycled_write_operation((0x1A + base_address), 0x0, 6);   /* Clear magic cookie Lo */
 
-  usCFG("FPGASID Diagnostic result:\n");
-  usCFG("  Identifier:        %04X (FPGASID)\n", fpgasid_id);
-  usCFG("  CPLD Revision:     %02X\n", cpld);
-  usCFG("  FPGA Revision:     %02X\n", fpga);
-  usCFG("  PCA Revision:      %02X\n", pca);
-  usCFG("  Unique identifier: %02X%02X%02X%02X%02X%02X%02X%02X\n",
-    unique_id[0], unique_id[1], unique_id[2], unique_id[3],
-    unique_id[4], unique_id[5], unique_id[6], unique_id[7]);
-  usCFG("  Clock frequency:   %.3fμs\n", frequency);
-  usCFG("  Select pins:       %02X\n", select_pins);
-  usCFG("  Index config A:    %02X\n", idxa);
-  usCFG("    SID 1 A:         %02X%02X%02X\n",
-    sid_one_a[0], sid_one_a[1], sid_one_a[2]);
-  usCFG("    SID 2 A:         %02X%02X%02X\n",
-    sid_two_a[0], sid_two_a[1], sid_two_a[2]);
-  usCFG("    Filterbias A\n");
-  usCFG("      SID1/SID2:     %02x\n", flta);
-  usCFG("  Index config B:    %02X\n", idxb);
-  usCFG("    SID 1 B:         %02X%02X%02X\n",
-    sid_one_b[0], sid_one_b[1], sid_one_b[2]);
-  usCFG("    SID 2 B:         %02X%02X%02X\n",
-    sid_two_b[0], sid_two_b[1], sid_two_b[2]);
-  usCFG("    Filterbias B\n");
-  usCFG("      SID1/SID2:     %02x\n", fltb);
+  if (!read_config) {
+    usCFG("FPGASID Diagnostic result:\n");
+    usCFG("  Identifier:        %04X (FPGASID)\n", fpgasid_id);
+    usCFG("  CPLD Revision:     %02X\n", cpld);
+    usCFG("  FPGA Revision:     %02X\n", fpga);
+    usCFG("  PCA Revision:      %02X\n", pca);
+    usCFG("  Unique identifier: %02X%02X%02X%02X%02X%02X%02X%02X\n",
+      unique_id[0], unique_id[1], unique_id[2], unique_id[3],
+      unique_id[4], unique_id[5], unique_id[6], unique_id[7]);
+    usCFG("  Clock frequency:   %.3fμs\n", frequency);
+    usCFG("  Select pins:       %02X\n", select_pins);
+    usCFG("  Index config A:    %02X\n", idxa);
+    usCFG("    SID 1 A:         %02X%02X%02X\n",
+      sid_one_a[0], sid_one_a[1], sid_one_a[2]);
+    usCFG("    SID 2 A:         %02X%02X%02X\n",
+      sid_two_a[0], sid_two_a[1], sid_two_a[2]);
+    usCFG("    Filterbias A\n");
+    usCFG("      SID1/SID2:     %02x\n", flta);
+    usCFG("  Index config B:    %02X\n", idxb);
+    usCFG("    SID 1 B:         %02X%02X%02X\n",
+      sid_one_b[0], sid_one_b[1], sid_one_b[2]);
+    usCFG("    SID 2 B:         %02X%02X%02X\n",
+      sid_two_b[0], sid_two_b[1], sid_two_b[2]);
+    usCFG("    Filterbias B\n");
+    usCFG("      SID1/SID2:     %02x\n", fltb);
 
-  print_fpgasid_sidconfig(0, 1, sid_one_a);
-  print_fpgasid_sidconfig(0, 2, sid_two_a);
-  print_fpgasid_sidconfig(1, 1, sid_one_b);
-  print_fpgasid_sidconfig(1, 2, sid_two_b);
+    print_fpgasid_sidconfig(0, 1, sid_one_a);
+    print_fpgasid_sidconfig(0, 2, sid_two_a);
+    print_fpgasid_sidconfig(1, 1, sid_one_b);
+    print_fpgasid_sidconfig(1, 2, sid_two_b);
+  }
+
+  usNFO("read_config: %d\n",read_config);
+  if (read_config) {
+    chip_config[2] = idHi;
+    chip_config[3] = idLo;
+    chip_config[4] = cpld;
+    chip_config[5] = fpga;
+    chip_config[6] = pca;
+    chip_config[7] = select_pins;
+    chip_config[8] = idxa;
+    chip_config[9] = idxb;
+    chip_config[10] = flta;
+    chip_config[11] = fltb;
+    chip_config[12] = (uint8_t)((frequency_r&0xff00) >> 8);
+    chip_config[13] = (uint8_t)(frequency_r&0xff);
+    int idx = 14;
+    memcpy(chip_config+idx, unique_id, 8);
+    memcpy(chip_config+(idx+=3), sid_one_a, 3);
+    memcpy(chip_config+(idx+=3), sid_two_a, 3);
+    memcpy(chip_config+(idx+=3), sid_one_b, 3);
+    memcpy(chip_config+(idx+=3), sid_two_b, 3);
+  }
 
   usNFO("\n");
 
@@ -580,4 +609,42 @@ void set_sidemu_sidtype(uint8_t base_address, uint8_t type)
   clockcycle_delay(SIDEMU_WAIT_CYCLES);
 
   return;
+}
+
+bool read_chip_configuration(uint8_t base_address, int command, uint8_t * chip_config_r)
+{ /* TODO: Finish */
+
+  read_config = true;
+  chip_config = (uint8_t*)calloc(1, MAX_BUFFER_SIZE);
+  memset(chip_config, 0, MAX_BUFFER_SIZE);
+
+  chip_config[0] = command;
+  chip_config[1] = VERIFICATION_BYTE;
+
+  switch (command) {
+    case READ_FPGASID:
+      read_fpgasid_configuration(base_address);
+      break;
+    default:
+      break;
+  }
+
+  chip_config[62] = END_BYTE;
+  chip_config[63] = TERMINATION_BYTE;
+
+  usNFO("DATA READ:\n");
+  for (int i = 0; i < MAX_BUFFER_SIZE; i++) usNFO("%02x ", chip_config[i]);
+  usNFO("\n");
+
+  memcpy(chip_config_r, chip_config, 64);
+
+  free(chip_config);
+  read_config = false;
+  return true;
+}
+
+bool write_chip_configuration(int command)
+{ /* TODO: Finish */
+
+  return false;
 }
