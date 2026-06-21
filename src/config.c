@@ -819,7 +819,16 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         return;
       }
       break;
-    case GET_AUDIO: /* TODO: Finish */
+    case GET_AUDIO: /* Returns the audio switch state */
+#if PCB_VERSION_INT >= 13
+      usCFG("GET_AUDIO: %d\n", (int)usbsid_config.stereo_en);
+      memset(write_buffer_p, 0, 64);
+      write_buffer_p[0] = (uint8_t)usbsid_config.stereo_en;
+#else
+      usCFG("GET_AUDIO Not supported\n");
+      memset(write_buffer_p, 0, 64);
+#endif
+      write_back_data(1);
       break;
     case LOCK_AUDIO:
       usCFG("LOCK_AUDIO\n");
