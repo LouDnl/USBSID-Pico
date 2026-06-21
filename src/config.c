@@ -1124,10 +1124,23 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       }
       usNFO("\n");
       break;
-    case FPGASID: break; /* Reserved for config implementation */
-    case SKPICO: break;  /* Reserved for config implementation */
-    case ARMSID: break;  /* Reserved for config implementation */
-    case PDSID:
+    case READ_CLONECHIP: /* Read configuration / data from clone Chips */
+      usCFG("READ_CLONECHIP: $%02x @ $%02x\n", buffer[1], buffer[2]);
+      if ((buffer[1]&0x0f) > CHIP_COUNT) break;
+      memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
+      if (!read_chip_configuration(buffer[2], buffer[1], write_buffer_p)) {
+        usNFO("READ ERROR!\n");
+      }
+      usNFO("WRITE BACK:\n");
+      for (int i = 0; i < MAX_BUFFER_SIZE; i++) usNFO("%02x ", write_buffer_p[i]);
+      usNFO("\n");
+      usNFO("SENDING\n");
+      write_back_data(MAX_BUFFER_SIZE);
+      break;
+    case WRITE_CLONECHIP: /* Write configuration / data to clone Chips */
+      write_chip_configuration(buffer[2]);
+      break;
+    case PDSID: /* TODO: Deprecate and remove */
       if (buffer[1] == 0) {
         usCFG("Toggle PDSID type\n");
         reset_switch_pdsid_type();
