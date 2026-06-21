@@ -357,9 +357,9 @@ enum
   TEST_FN2         = 0x9A,  /* TODO: Remove before v1 release */
 
   /* Hardware SID clone configuration related */
-  FPGASID          = 0xA0,  /* Config initiator byte for FPGASID */
-  SKPICO           = 0xA1,  /* Config initiator byte for SIDKICK-pico */
-  ARMSID           = 0xA2,  /* Config initiator byte for ARMSID */
+  READ_CLONECHIP   = 0xA0,  /* Chip config read initiator byte */
+  WRITE_CLONECHIP  = 0xB0,  /* Chip config write initiator byte */
+  /* legacy commands */
   PDSID            = 0xA3,  /* Holds the reset line for 5 seconds to change SID type on a PDSID */
 
 #if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
@@ -393,9 +393,30 @@ enum {
   SOCKET_CONFIG     = READ_SOCKETCFG, /* 0x37 */
   MIDI_CONFIG       = 0x60,
   MIDI_CCVALUES     = 0x70,
+  VERIFICATION_BYTE = 0x7F,
   END_BYTE          = 0x8F,
   TERMINATION_BYTE  = 0xFF,
-  VERIFICATION_BYTE = 0x7F,
+};
+
+/* Clone chip config read/write initiator bytes */
+enum {
+  READ_SKPICO    = (READ_CLONECHIP|CHIP_SKPICO),    /* a2 */
+  READ_ARMSID    = (READ_CLONECHIP|CHIP_ARMSID),    /* a3 */
+  READ_ARM2SID   = (READ_CLONECHIP|CHIP_ARM2SID),   /* a4 */
+  READ_FPGASID   = (READ_CLONECHIP|CHIP_FPGASID),   /* a5 */
+  READ_REDIPSID  = (READ_CLONECHIP|CHIP_REDIPSID),  /* a6 */
+  READ_PDSID     = (READ_CLONECHIP|CHIP_PDSID),     /* a7 */
+  READ_BACKSID   = (READ_CLONECHIP|CHIP_BACKSID),   /* a8 */
+  READ_SIDEMU    = (READ_CLONECHIP|CHIP_SIDEMU),    /* a9 */
+  //
+  WRITE_SKPICO   = (WRITE_CLONECHIP|CHIP_SKPICO),   /* b2 */
+  WRITE_ARMSID   = (WRITE_CLONECHIP|CHIP_ARMSID),   /* b3 */
+  WRITE_ARM2SID  = (WRITE_CLONECHIP|CHIP_ARM2SID),  /* b4 */
+  WRITE_FPGASID  = (WRITE_CLONECHIP|CHIP_FPGASID),  /* b5 */
+  WRITE_REDIPSID = (WRITE_CLONECHIP|CHIP_REDIPSID), /* b6 */
+  WRITE_PDSID    = (WRITE_CLONECHIP|CHIP_PDSID),    /* b7 */
+  WRITE_BACKSID  = (WRITE_CLONECHIP|CHIP_BACKSID),  /* b8 */
+  WRITE_SIDEMU   = (WRITE_CLONECHIP|CHIP_SIDEMU),   /* b9 */
 };
 
 /* SET_CONFIG values */
