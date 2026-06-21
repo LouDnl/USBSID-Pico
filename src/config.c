@@ -1113,7 +1113,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         // set_sidemu_sidtype(buffer[2], buffer[3]);
         extern uint8_t get_pin_states(void);
         uint8_t pinstates = get_pin_states();
-        printf("PINSTATES: 0b%04b\n",pinstates);
+        usNFO("PINSTATES: 0b%04b\n",pinstates);
       }
       break;
     case TEST_FN2:
