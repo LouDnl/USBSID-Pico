@@ -814,7 +814,8 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         }
       } else {
         usCFG("Audio switch is %s, requested change to %d (%s)\n",
-          monostereo_str((int)usbsid_config.stereo_en), buffer[1], monostereo_str(buffer[1]));
+          monostereo_str((int)usbsid_config.stereo_en),
+          buffer[1], monostereo_str(buffer[1]));
         return;
       }
       break;
