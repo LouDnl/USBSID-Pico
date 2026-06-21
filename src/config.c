@@ -116,10 +116,10 @@ void handle_config_buffer(uint8_t * buffer, uint32_t size)
   /* TODO: Add something along the line
      like this: sidfile = (uint8_t*)calloc(1, 0x10000); */
   switch (buffer[1]) {
-    case FULL_CONFIG:
-    case SOCKET_CONFIG:
-    case MIDI_CONFIG:
-    case MIDI_CCVALUES:
+    case FULL_CONFIG: break;
+    case SOCKET_CONFIG: break;
+    case MIDI_CONFIG: break;
+    case MIDI_CCVALUES: break;
     default:
       break;
   }
