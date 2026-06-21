@@ -1927,6 +1927,9 @@ void config_usbsidpico(int argc, char **argv)
         memset(read_data, 0, count_of(read_data));
         len = read_chars(read_data, size);
         printf("[R %u] %02X\n", len, read_data[0]);
+        if (size > 1) {
+          print_cfg_buffer(read_data, size);
+        }
       }
       break;
     }
