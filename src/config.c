@@ -116,10 +116,10 @@ void handle_config_buffer(uint8_t * buffer, uint32_t size)
   /* TODO: Add something along the line
      like this: sidfile = (uint8_t*)calloc(1, 0x10000); */
   switch (buffer[1]) {
-    case FULL_CONFIG:
-    case SOCKET_CONFIG:
-    case MIDI_CONFIG:
-    case MIDI_CCVALUES:
+    case FULL_CONFIG: break;
+    case SOCKET_CONFIG: break;
+    case MIDI_CONFIG: break;
+    case MIDI_CCVALUES: break;
     default:
       break;
   }
@@ -471,7 +471,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       memset(write_buffer_p, 0, 64);
       write_buffer_p[0] = (uint8_t)config_unacknowledged();
 #else
-      usCFG("READ_CONFIGACK\n");
+      usCFG("READ_CONFIGACK Not supported\n");
       memset(write_buffer_p, 0, 64);
 #endif
       write_back_data(1);
@@ -698,7 +698,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         apply_config(false); /* Not at boot */
       }
       break;
-    case WRITE_CONFIG:  /* TODO: FINISH */
+    case WRITE_CONFIG: /* Incoming write from Host */ /* TODO: FINISH */
       /* Max size of incoming buffer = 61 */
       usCFG("WRITE_CONFIG\n");
       handle_config_buffer(buffer, size);
@@ -814,11 +814,21 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         }
       } else {
         usCFG("Audio switch is %s, requested change to %d (%s)\n",
-          monostereo_str((int)usbsid_config.stereo_en), buffer[1], monostereo_str(buffer[1]));
+          monostereo_str((int)usbsid_config.stereo_en),
+          buffer[1], monostereo_str(buffer[1]));
         return;
       }
       break;
-    case GET_AUDIO: /* TODO: Finish */
+    case GET_AUDIO: /* Returns the audio switch state */
+#if PCB_VERSION_INT >= 13
+      usCFG("GET_AUDIO: %d\n", (int)usbsid_config.stereo_en);
+      memset(write_buffer_p, 0, 64);
+      write_buffer_p[0] = (uint8_t)usbsid_config.stereo_en;
+#else
+      usCFG("GET_AUDIO Not supported\n");
+      memset(write_buffer_p, 0, 64);
+#endif
+      write_back_data(1);
       break;
     case LOCK_AUDIO:
       usCFG("LOCK_AUDIO\n");
@@ -868,14 +878,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
         read_config(&usbsid_config);    /* Read the config into the config buffer */
         memcpy(write_buffer_p, config_array, 64);  /* Copy the first 64 bytes from the buffer into the write buffer */
-        switch (rtype) {
-          case 'C':
-            cdc_write(cdc_itf, 64);
-            break;
-          case 'W':
-            webserial_write(wusb_itf, 64);
-            break;
-        }
+        write_back_data(64);
       } else if (buffer[1] == 1) { /* Only if 1, else just skip! */
         if (buffer[2] < 4) {
           usCFG("DETECT_SIDS @ $%02x\n", buffer[3]);
@@ -903,14 +906,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
       read_config(&usbsid_config);  /* Read the config into the config buffer */
       memcpy(write_buffer_p, config_array, 64);  /* Copy the first 64 bytes from the buffer into the write buffer */
-      switch (rtype) {
-        case 'C':
-          cdc_write(cdc_itf, 64);
-          break;
-        case 'W':
-          webserial_write(wusb_itf, 64);
-          break;
-      }
+      write_back_data(64);
       break;
     case AUTO_DETECT:
       usCFG("AUTO_DETECT\n");
@@ -930,14 +926,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
         read_config(&usbsid_config);    /* Read the config into the config buffer */
         memcpy(write_buffer_p, config_array, 64);  /* Copy the first 64 bytes from the buffer into the write buffer */
-        switch (rtype) {
-          case 'C':
-            cdc_write(cdc_itf, 64);
-            break;
-          case 'W':
-            webserial_write(wusb_itf, 64);
-            break;
-        }
+        write_back_data(64);
       }
       break;
     case TEST_ALLSIDS:
@@ -984,14 +973,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       read_firmware_version();
       memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
       memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
-        switch (rtype) {
-          case 'C':
-            cdc_write(cdc_itf, MAX_BUFFER_SIZE);
-            break;
-          case 'W':
-            webserial_write(wusb_itf, MAX_BUFFER_SIZE);
-            break;
-        }
+      write_back_data(MAX_BUFFER_SIZE);
       break;
     case US_PCB_VERSION:
       usCFG("READ_PCB_VERSION\n");
@@ -1000,14 +982,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         read_pcb_version();
         memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
         memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
-          switch (rtype) {
-            case 'C':
-              cdc_write(cdc_itf, MAX_BUFFER_SIZE);
-              break;
-            case 'W':
-              webserial_write(wusb_itf, MAX_BUFFER_SIZE);
-              break;
-          }
+        write_back_data(MAX_BUFFER_SIZE);
       } else {  /* Small write single byte */
         memset(write_buffer_p, 0, 64);
         /* int pcbver = (strcmp(pcb_version, "1.3") == 0 ? 13 : 10); */
@@ -1138,7 +1113,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         // set_sidemu_sidtype(buffer[2], buffer[3]);
         extern uint8_t get_pin_states(void);
         uint8_t pinstates = get_pin_states();
-        printf("PINSTATES: 0b%04b\n",pinstates);
+        usNFO("PINSTATES: 0b%04b\n",pinstates);
       }
       break;
     case TEST_FN2:
@@ -1149,10 +1124,23 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       }
       usNFO("\n");
       break;
-    case FPGASID: break; /* Reserved for config implementation */
-    case SKPICO: break;  /* Reserved for config implementation */
-    case ARMSID: break;  /* Reserved for config implementation */
-    case PDSID:
+    case READ_CLONECHIP: /* Read configuration / data from clone Chips */
+      usCFG("READ_CLONECHIP: $%02x @ $%02x\n", buffer[1], buffer[2]);
+      if ((buffer[1]&0x0f) > CHIP_COUNT) break;
+      memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
+      if (!read_chip_configuration(buffer[2], buffer[1], write_buffer_p)) {
+        usNFO("READ ERROR!\n");
+      }
+      usNFO("WRITE BACK:\n");
+      for (int i = 0; i < MAX_BUFFER_SIZE; i++) usNFO("%02x ", write_buffer_p[i]);
+      usNFO("\n");
+      usNFO("SENDING\n");
+      write_back_data(MAX_BUFFER_SIZE);
+      break;
+    case WRITE_CLONECHIP: /* Write configuration / data to clone Chips */
+      write_chip_configuration(buffer[2]);
+      break;
+    case PDSID: /* TODO: Deprecate and remove */
       if (buffer[1] == 0) {
         usCFG("Toggle PDSID type\n");
         reset_switch_pdsid_type();

@@ -1574,7 +1574,7 @@ void print_help(void)
   printf("  -sau,     --set-audio N       : Set and save the mono/stereo audio switch (PCB v1.3+ only!)\n");
   printf("                                  0: %s, 1:%s\n", mono_stereo[0], mono_stereo[1]);
   printf("  -lau N,   --lock-audio N      : Lock and the audio switch in it's current state until reboot: True (1) False (0)\n");
-  printf("  -sad  N,  --sock-autodetect N : Disable/enable and save the automatic socket change detection on boot (PCB v1.5+ only!)\n");
+  printf("  -sad N,   --sock-autodetect N : Disable/enable and save the automatic socket change detection on boot (PCB v1.5+ only!)\n");
   printf("                                  0: %s, 1:%s\n", enabled[0], enabled[1]);
   printf("--[PRESETS]-------------------------------------------------------------------------------------------------------------\n");
   printf("  -single,  --single-sid        : Socket 1 enabled @ single SID, Socket 2 disabled\n");
@@ -1927,6 +1927,9 @@ void config_usbsidpico(int argc, char **argv)
         memset(read_data, 0, count_of(read_data));
         len = read_chars(read_data, size);
         printf("[R %u] %02X\n", len, read_data[0]);
+        if (size > 1) {
+          print_cfg_buffer(read_data, size);
+        }
       }
       break;
     }
