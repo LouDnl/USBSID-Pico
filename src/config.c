@@ -471,7 +471,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       memset(write_buffer_p, 0, 64);
       write_buffer_p[0] = (uint8_t)config_unacknowledged();
 #else
-      usCFG("READ_CONFIGACK\n");
+      usCFG("READ_CONFIGACK Not supported\n");
       memset(write_buffer_p, 0, 64);
 #endif
       write_back_data(1);
