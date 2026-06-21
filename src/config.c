@@ -698,7 +698,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         apply_config(false); /* Not at boot */
       }
       break;
-    case WRITE_CONFIG:  /* TODO: FINISH */
+    case WRITE_CONFIG: /* Incoming write from Host */ /* TODO: FINISH */
       /* Max size of incoming buffer = 61 */
       usCFG("WRITE_CONFIG\n");
       handle_config_buffer(buffer, size);
