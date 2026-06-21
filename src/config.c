@@ -878,14 +878,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
         read_config(&usbsid_config);    /* Read the config into the config buffer */
         memcpy(write_buffer_p, config_array, 64);  /* Copy the first 64 bytes from the buffer into the write buffer */
-        switch (rtype) {
-          case 'C':
-            cdc_write(cdc_itf, 64);
-            break;
-          case 'W':
-            webserial_write(wusb_itf, 64);
-            break;
-        }
+        write_back_data(64);
       } else if (buffer[1] == 1) { /* Only if 1, else just skip! */
         if (buffer[2] < 4) {
           usCFG("DETECT_SIDS @ $%02x\n", buffer[3]);
@@ -913,14 +906,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
       read_config(&usbsid_config);  /* Read the config into the config buffer */
       memcpy(write_buffer_p, config_array, 64);  /* Copy the first 64 bytes from the buffer into the write buffer */
-      switch (rtype) {
-        case 'C':
-          cdc_write(cdc_itf, 64);
-          break;
-        case 'W':
-          webserial_write(wusb_itf, 64);
-          break;
-      }
+      write_back_data(64);
       break;
     case AUTO_DETECT:
       usCFG("AUTO_DETECT\n");
@@ -940,14 +926,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         memset(write_buffer_p, 0 ,64);  /* Empty the write buffer pointer */
         read_config(&usbsid_config);    /* Read the config into the config buffer */
         memcpy(write_buffer_p, config_array, 64);  /* Copy the first 64 bytes from the buffer into the write buffer */
-        switch (rtype) {
-          case 'C':
-            cdc_write(cdc_itf, 64);
-            break;
-          case 'W':
-            webserial_write(wusb_itf, 64);
-            break;
-        }
+        write_back_data(64);
       }
       break;
     case TEST_ALLSIDS:
@@ -994,14 +973,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       read_firmware_version();
       memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
       memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
-        switch (rtype) {
-          case 'C':
-            cdc_write(cdc_itf, MAX_BUFFER_SIZE);
-            break;
-          case 'W':
-            webserial_write(wusb_itf, MAX_BUFFER_SIZE);
-            break;
-        }
+      write_back_data(MAX_BUFFER_SIZE);
       break;
     case US_PCB_VERSION:
       usCFG("READ_PCB_VERSION\n");
@@ -1010,14 +982,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         read_pcb_version();
         memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
         memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
-          switch (rtype) {
-            case 'C':
-              cdc_write(cdc_itf, MAX_BUFFER_SIZE);
-              break;
-            case 'W':
-              webserial_write(wusb_itf, MAX_BUFFER_SIZE);
-              break;
-          }
+        write_back_data(MAX_BUFFER_SIZE);
       } else {  /* Small write single byte */
         memset(write_buffer_p, 0, 64);
         /* int pcbver = (strcmp(pcb_version, "1.3") == 0 ? 13 : 10); */
