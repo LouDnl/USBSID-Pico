@@ -26,7 +26,7 @@ workflow:
         - src/**
         - lib/**
         - CMakeLists.txt
-        - .gitlab-ci.yml
+        - .gitlab/.gitlab-ci.yml
       variables:
         PIPELINE_TYPE: "dev-firmware"
     # Dev branch - tools changes
@@ -34,6 +34,7 @@ workflow:
       changes:
         - examples/config-tool/**
         - examples/send_sid/**
+        - .gitlab/.gitlab-ci.yml
       variables:
         PIPELINE_TYPE: "dev-tools"
     # Master branch push
@@ -427,7 +428,7 @@ release:firmware:pico2_w_sidplayer:
     - ls -lhai
     - rm ${BUILDNAME} || true
     - cmake -S . -B build -DEXECUTABLE=${BUILDNAME}
-    - cmake --build build -j${BUILD_THREADS}
+    - cmake --build build -j$(nproc)
     - ls -lhai
   artifacts:
     name: "tools-${BUILDNAME}-linux"
@@ -435,49 +436,52 @@ release:firmware:pico2_w_sidplayer:
       - examples/${DIRECTORY}/${BUILDNAME}
     expire_in: 1 week
 
-.tools_windows_template:
-  stage: build-tools
-  tags:
-    - windows
-    - msys2
-  before_script:
-    - pacman -Syu --noconfirm
-    - pacman -S --noconfirm --needed
-        mingw-w64-x86_64-gcc
-        mingw-w64-x86_64-libusb
-        mingw-w64-x86_64-cmake
-        mingw-w64-x86_64-pkg-config
-        mingw-w64-x86_64-ninja
-  script:
-    - cd examples/${DIRECTORY}
-    - ls -lhai
-    - rm ${BUILDNAME}.exe || true
-    - cmake -S . -B build -DEXECUTABLE=${BUILDNAME}
-    - cmake --build build -j${BUILD_THREADS}
-    - ls -lhai
-  artifacts:
-    name: "tools-${BUILDNAME}-windows"
-    paths:
-      - examples/${DIRECTORY}/${BUILDNAME}.exe
-      - examples/${DIRECTORY}/*.dll
-    expire_in: 1 week
+# NOTE: Windows and macOS runners are not yet available on GitLab.
+#       Uncomment when runners become available.
 
-.tools_macos_template:
-  stage: build-tools
-  tags:
-    - macos
-  script:
-    - cd examples/${DIRECTORY}
-    - ls -lhai
-    - rm ${BUILDNAME} || true
-    - cmake -S . -B build -DEXECUTABLE=${BUILDNAME}
-    - cmake --build build -j${BUILD_THREADS}
-    - ls -lhai
-  artifacts:
-    name: "tools-${BUILDNAME}-macos-${MACOS_VERSION}"
-    paths:
-      - examples/${DIRECTORY}/${BUILDNAME}
-    expire_in: 1 week
+# .tools_windows_template:
+#   stage: build-tools
+#   tags:
+#     - windows
+#     - msys2
+#   before_script:
+#     - pacman -Syu --noconfirm
+#     - pacman -S --noconfirm --needed
+#         mingw-w64-x86_64-gcc
+#         mingw-w64-x86_64-libusb
+#         mingw-w64-x86_64-cmake
+#         mingw-w64-x86_64-pkg-config
+#         mingw-w64-x86_64-ninja
+#   script:
+#     - cd examples/${DIRECTORY}
+#     - ls -lhai
+#     - rm ${BUILDNAME}.exe || true
+#     - cmake -S . -B build -DEXECUTABLE=${BUILDNAME}
+#     - cmake --build build -j${BUILD_THREADS}
+#     - ls -lhai
+#   artifacts:
+#     name: "tools-${BUILDNAME}-windows"
+#     paths:
+#       - examples/${DIRECTORY}/${BUILDNAME}.exe
+#       - examples/${DIRECTORY}/*.dll
+#     expire_in: 1 week
+
+# .tools_macos_template:
+#   stage: build-tools
+#   tags:
+#     - macos
+#   script:
+#     - cd examples/${DIRECTORY}
+#     - ls -lhai
+#     - rm ${BUILDNAME} || true
+#     - cmake -S . -B build -DEXECUTABLE=${BUILDNAME}
+#     - cmake --build build -j$(nproc)
+#     - ls -lhai
+#   artifacts:
+#     name: "tools-${BUILDNAME}-macos-${MACOS_VERSION}"
+#     paths:
+#       - examples/${DIRECTORY}/${BUILDNAME}
+#     expire_in: 1 week
 
 # ============================================================================
 # DEV TOOLS BUILDS
@@ -500,72 +504,75 @@ tools:send_sid:ubuntu:
   rules:
     - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
 
-# Windows tools
-tools:config-tool:windows:
-  extends: .tools_windows_template
-  variables:
-    DIRECTORY: "config-tool"
-    BUILDNAME: "cfg_usbsid"
-  rules:
-    - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
+# NOTE: Windows and macOS runners are not yet available on GitLab.
+#       Uncomment when runners become available.
 
-tools:send_sid:windows:
-  extends: .tools_windows_template
-  variables:
-    DIRECTORY: "send_sid"
-    BUILDNAME: "send_sid"
-  rules:
-    - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
+# # Windows tools
+# tools:config-tool:windows:
+#   extends: .tools_windows_template
+#   variables:
+#     DIRECTORY: "config-tool"
+#     BUILDNAME: "cfg_usbsid"
+#   rules:
+#     - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
+#
+# tools:send_sid:windows:
+#   extends: .tools_windows_template
+#   variables:
+#     DIRECTORY: "send_sid"
+#     BUILDNAME: "send_sid"
+#   rules:
+#     - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
 
-# macOS 14 (ARM64) tools
-tools:config-tool:macos14:
-  extends: .tools_macos_template
-  tags:
-    - macos
-    - arm64
-  variables:
-    DIRECTORY: "config-tool"
-    BUILDNAME: "cfg_usbsid_macos14"
-    MACOS_VERSION: "14"
-  rules:
-    - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
+# # macOS 14 (ARM64) tools
+# tools:config-tool:macos14:
+#   extends: .tools_macos_template
+#   tags:
+#     - macos
+#     - arm64
+#   variables:
+#     DIRECTORY: "config-tool"
+#     BUILDNAME: "cfg_usbsid_macos14"
+#     MACOS_VERSION: "14"
+#   rules:
+#     - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
+#
+# tools:send_sid:macos14:
+#   extends: .tools_macos_template
+#   tags:
+#     - macos
+#     - arm64
+#   variables:
+#     DIRECTORY: "send_sid"
+#     BUILDNAME: "send_sid_macos14"
+#     MACOS_VERSION: "14"
+#   rules:
+#     - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
 
-tools:send_sid:macos14:
-  extends: .tools_macos_template
-  tags:
-    - macos
-    - arm64
-  variables:
-    DIRECTORY: "send_sid"
-    BUILDNAME: "send_sid_macos14"
-    MACOS_VERSION: "14"
-  rules:
-    - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
-
-# macOS 15 (Intel) tools
-tools:config-tool:macos15-intel:
-  extends: .tools_macos_template
-  tags:
-    - macos
-    - x86_64
-  variables:
-    DIRECTORY: "config-tool"
-    BUILDNAME: "cfg_usbsid_macos15intel"
-    MACOS_VERSION: "15-intel"
-  rules:
-    - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
-
-tools:send_sid:macos15-intel:
-  extends: .tools_macos_template
-  tags:
-    - macos
-    - x86_64
-  variables:
-    DIRECTORY: "send_sid"
-    BUILDNAME: "send_sid_macos15intel"
-    MACOS_VERSION: "15-intel"
-  rules:
-    - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
+# # macOS 15 (Intel) tools
+# tools:config-tool:macos15-intel:
+#   extends: .tools_macos_template
+#   tags:
+#     - macos
+#     - x86_64
+#   variables:
+#     DIRECTORY: "config-tool"
+#     BUILDNAME: "cfg_usbsid_macos15intel"
+#     MACOS_VERSION: "15-intel"
+#   rules:
+#     - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
+#
+# tools:send_sid:macos15-intel:
+#   extends: .tools_macos_template
+#   tags:
+#     - macos
+#     - x86_64
+#   variables:
+#     DIRECTORY: "send_sid"
+#     BUILDNAME: "send_sid_macos15intel"
+#     MACOS_VERSION: "15-intel"
+#   rules:
+#     - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
 
 # ============================================================================
 # RELEASE TOOLS BUILDS
@@ -591,81 +598,84 @@ release:tools:send_sid:ubuntu:
   rules:
     - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
 
-release:tools:config-tool:windows:
-  extends: .tools_windows_template
-  variables:
-    DIRECTORY: "config-tool"
-    BUILDNAME: "cfg_usbsid"
-  artifacts:
-    expire_in: 4 weeks
-  rules:
-    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+# NOTE: Windows and macOS runners are not yet available on GitLab.
+#       Uncomment when runners become available.
 
-release:tools:send_sid:windows:
-  extends: .tools_windows_template
-  variables:
-    DIRECTORY: "send_sid"
-    BUILDNAME: "send_sid"
-  artifacts:
-    expire_in: 4 weeks
-  rules:
-    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+# release:tools:config-tool:windows:
+#   extends: .tools_windows_template
+#   variables:
+#     DIRECTORY: "config-tool"
+#     BUILDNAME: "cfg_usbsid"
+#   artifacts:
+#     expire_in: 4 weeks
+#   rules:
+#     - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+#
+# release:tools:send_sid:windows:
+#   extends: .tools_windows_template
+#   variables:
+#     DIRECTORY: "send_sid"
+#     BUILDNAME: "send_sid"
+#   artifacts:
+#     expire_in: 4 weeks
+#   rules:
+#     - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
 
-release:tools:config-tool:macos14:
-  extends: .tools_macos_template
-  tags:
-    - macos
-    - arm64
-  variables:
-    DIRECTORY: "config-tool"
-    BUILDNAME: "cfg_usbsid_macos14"
-    MACOS_VERSION: "14"
-  artifacts:
-    expire_in: 4 weeks
-  rules:
-    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+# release:tools:config-tool:macos14:
+#   extends: .tools_macos_template
+#   tags:
+#     - macos
+#     - arm64
+#   variables:
+#     DIRECTORY: "config-tool"
+#     BUILDNAME: "cfg_usbsid_macos14"
+#     MACOS_VERSION: "14"
+#   artifacts:
+#     expire_in: 4 weeks
+#   rules:
+#     - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+#
+# release:tools:send_sid:macos14:
+#   extends: .tools_macos_template
+#   tags:
+#     - macos
+#     - arm64
+#   variables:
+#     DIRECTORY: "send_sid"
+#     BUILDNAME: "send_sid_macos14"
+#     MACOS_VERSION: "14"
+#   artifacts:
+#     expire_in: 4 weeks
+#   rules:
+#     - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
 
-release:tools:send_sid:macos14:
-  extends: .tools_macos_template
-  tags:
-    - macos
-    - arm64
-  variables:
-    DIRECTORY: "send_sid"
-    BUILDNAME: "send_sid_macos14"
-    MACOS_VERSION: "14"
-  artifacts:
-    expire_in: 4 weeks
-  rules:
-    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
-
-release:tools:config-tool:macos15-intel:
-  extends: .tools_macos_template
-  tags:
-    - macos
-    - x86_64
-  variables:
-    DIRECTORY: "config-tool"
-    BUILDNAME: "cfg_usbsid_macos15intel"
-    MACOS_VERSION: "15-intel"
-  artifacts:
-    expire_in: 4 weeks
-  rules:
-    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
-
-release:tools:send_sid:macos15-intel:
-  extends: .tools_macos_template
-  tags:
-    - macos
-    - x86_64
-  variables:
-    DIRECTORY: "send_sid"
-    BUILDNAME: "send_sid_macos15intel"
-    MACOS_VERSION: "15-intel"
-  artifacts:
-    expire_in: 4 weeks
-  rules:
-    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+# release:tools:config-tool:macos15-intel:
+#   extends: .tools_macos_template
+#   tags:
+#     - macos
+#     - x86_64
+#   variables:
+#     DIRECTORY: "config-tool"
+#     BUILDNAME: "cfg_usbsid_macos15intel"
+#     MACOS_VERSION: "15-intel"
+#   artifacts:
+#     expire_in: 4 weeks
+#   rules:
+#     - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+#
+# release:tools:send_sid:macos15-intel:
+#   extends: .tools_macos_template
+#   tags:
+#     - macos
+#     - x86_64
+#   variables:
+#     DIRECTORY: "send_sid"
+#     BUILDNAME: "send_sid_macos15intel"
+#     MACOS_VERSION: "15-intel"
+#   artifacts:
+#     expire_in: 4 weeks
+#   rules:
+#     - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
 
 # ============================================================================
 # PACKAGE STAGE - Collect and zip tools
@@ -681,8 +691,9 @@ package:tools:
     # Collect all tools from artifacts
     - cp -v examples/config-tool/cfg_usbsid* tools-output/ || true
     - cp -v examples/send_sid/send_sid* tools-output/ || true
-    - cp -v examples/config-tool/*.dll tools-output/ || true
-    - cp -v examples/send_sid/*.dll tools-output/ || true
+    # Uncomment when Windows runner is available
+    # - cp -v examples/config-tool/*.dll tools-output/ || true
+    # - cp -v examples/send_sid/*.dll tools-output/ || true
     - ls -la tools-output/
     - zip -r -j tools.zip tools-output/
   artifacts:
@@ -695,18 +706,19 @@ package:tools:
       optional: true
     - job: release:tools:send_sid:ubuntu
       optional: true
-    - job: release:tools:config-tool:windows
-      optional: true
-    - job: release:tools:send_sid:windows
-      optional: true
-    - job: release:tools:config-tool:macos14
-      optional: true
-    - job: release:tools:send_sid:macos14
-      optional: true
-    - job: release:tools:config-tool:macos15-intel
-      optional: true
-    - job: release:tools:send_sid:macos15-intel
-      optional: true
+    # Uncomment when Windows/macOS runners are available
+    # - job: release:tools:config-tool:windows
+    #   optional: true
+    # - job: release:tools:send_sid:windows
+    #   optional: true
+    # - job: release:tools:config-tool:macos14
+    #   optional: true
+    # - job: release:tools:send_sid:macos14
+    #   optional: true
+    # - job: release:tools:config-tool:macos15-intel
+    #   optional: true
+    # - job: release:tools:send_sid:macos15-intel
+    #   optional: true
   rules:
     - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
 
