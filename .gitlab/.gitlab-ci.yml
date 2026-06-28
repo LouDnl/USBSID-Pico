@@ -74,6 +74,10 @@ default:
 
 .pico_sdk_cache:
   cache:
+    - key: arm-gnu-toolchain-13.2
+      paths:
+        - arm-gnu-toolchain/
+      policy: pull-push
     - key: pico-sdk-${PICO_SDK_REF}
       paths:
         - pico-sdk/
@@ -98,9 +102,18 @@ default:
   before_script:
     # Install base dependencies
     - apt-get update
-    - apt-get install -y build-essential cmake ninja-build git python3 python3-pip wget curl
-    # Install ARM toolchain
-    - apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
+    - apt-get install -y build-essential cmake ninja-build git python3 python3-pip wget curl xz-utils
+    # Install ARM toolchain (13.2 Rel1 — same as GitHub Actions carlosperate/arm-none-eabi-gcc-action@v1)
+    - |
+      ARM_GCC_DIR="${CI_PROJECT_DIR}/arm-gnu-toolchain"
+      if [ ! -x "${ARM_GCC_DIR}/bin/arm-none-eabi-gcc" ]; then
+        wget -q "https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-x86_64-arm-none-eabi.tar.xz" -O /tmp/arm-gcc.tar.xz
+        mkdir -p "${ARM_GCC_DIR}"
+        tar xf /tmp/arm-gcc.tar.xz -C "${ARM_GCC_DIR}" --strip-components=1
+        rm /tmp/arm-gcc.tar.xz
+      fi
+    - export PATH="${CI_PROJECT_DIR}/arm-gnu-toolchain/bin:${PATH}"
+    - arm-none-eabi-gcc --version
     # Install xa65 and bin2h for SID player builds
     - |
       if [ "${WITH_SIDPLAYER}" = "1" ]; then
