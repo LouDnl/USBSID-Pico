@@ -276,8 +276,8 @@ After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py
 # Hardware
 ## Where to buy
 #### My SmallRun store
-You can purchase/pre-order (semi) assembled boards with or without Pico via my [SmallRun store](https://bsky.app/profile/loudai.nl)!  
-[<img src="images/smallrun-35.png" width="150em">](https://bsky.app/profile/loudai.nl)  
+You can purchase/pre-order (semi) assembled boards with or without Pico via my [SmallRun store](https://smallrun.net/shop/loud)!  
+[<img src="images/smallrun-35.png" width="150em">](https://smallrun.net/shop/loud)  
 <!-- Sponsored by [<img src="images/pcbway.png" width="150em">](images/pcbway.png) -->
 #### PCBWay
 At a minimum of 5 bare or assembled boards it is also possible to purchase PCB's at PCBWay  
