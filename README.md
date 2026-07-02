@@ -394,6 +394,9 @@ the open source KiCad design files and gerbers documents below.
 #### revision v1.5c
 - [USBSID-Pico v1.5 schematic](hardware/v1.5c-schematic.pdf)
 - [USBSID-Pico v1.5 interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/hardware/v1.5c-ibom.html)
+#### volume-daughterboard v1.0
+- [USBSID-Volume-daughterboard schematic](hardware/volume-daughterboard-schematic.pdf)
+- [USBSID-Volume-daughterboard KiCad project & gerber files](hardware/Volume-daughterboard/README.md) 
 #### Datasheets of parts used
 [Datasheets](resources/)
 
@@ -462,6 +465,9 @@ USBSID-Pico v1.5 PCB © 2026 by <a href="https://github.com/LouDnl">LouD</a> is 
 
 ### USBSID-Pico v1.0 PCB Hardware License ~ Creative Commons
 <a href="https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/USBSID-Pico-v1.0">USBSID-Pico v1.0 PCB</a> © 2024-2026 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;">  
+
+### USBSID-Volume-daughterboard PCB Hardware License ~ Creative Commons
+<a href="https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/Volume-daughterboard">Volume-daughterboard v1.0 PCB</a> © 2026 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;">  
 
 # Certification
 ### USBSID-Pico v1.3 PCB OSHWA certification
