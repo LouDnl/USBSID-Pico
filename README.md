@@ -275,10 +275,10 @@ After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py
 
 # Hardware
 ## Where to buy
-#### My Tindie store
-You can purchase/pre-order (semi) assembled boards minus Pico via my [Tindie store](https://www.tindie.com/stores/loud/)!  
-[<img src="images/tindie.png" width="150em">](https://www.tindie.com/stores/loud/)  
-Sponsored by [<img src="images/pcbway.png" width="150em">](images/pcbway.png)
+#### My SmallRun store
+You can purchase/pre-order (semi) assembled boards with or without Pico via my [SmallRun store](https://bsky.app/profile/loudai.nl)!  
+[<img src="images/smallrun-35.png" width="150em">](https://bsky.app/profile/loudai.nl)  
+<!-- Sponsored by [<img src="images/pcbway.png" width="150em">](images/pcbway.png) -->
 #### PCBWay
 At a minimum of 5 bare or assembled boards it is also possible to purchase PCB's at PCBWay  
 No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral link](https://pcbway.com/g/2458i7) to register, thanks!  
