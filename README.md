@@ -282,8 +282,8 @@ You can purchase/pre-order (semi) assembled boards with or without Pico via my [
 #### PCBWay
 At a minimum of 5 bare or assembled boards it is also possible to purchase PCB's at PCBWay  
 No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral link](https://pcbway.com/g/2458i7) to register, thanks!  
-[Volume daughterboard (net yet!)](#)  
-[PCB revision v1.5 (not yet!)](#)  
+[Volume daughterboard (soon!)](#)  
+[PCB revision v1.5 (soon!)](#)  
 [PCB revision v1.3](https://www.pcbway.com/project/shareproject/USBSID_Pico_v1_3_05f2b88e.html)  
 [PCB revision v1.0](https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html)  
 #### Known and approved resellers
@@ -292,7 +292,7 @@ PCB revision v1.3 [product page](https://www.retro8bitshop.com/product/usbsid-pi
 
 ## PCB usage information
 Your USBSID-Pico PCB has several hardware features like jumpers and pins that require your attention. Click on the viewing method
-### PCB revision v1.5 manual
+### PCB revision v1.5 manual (soon!)
 - [Open online PCB v1.5 manual](doc/USBSID-Pico-PCBv1.5-manual.adoc)
 - [Download PCB v1.5 PDF manual](doc/USBSID-Pico-PCBv1.5-manual.pdf)
 ### PCB revision v1.3 manual
@@ -311,6 +311,9 @@ _Cases for PCB revision v1.0:_
 _Cases for PCB revision v1.3:_
 * [spotUP Cartridge case revisited](cases/v1.3/spotUP-revisited) by [@LouD](https://github.com/LouDnl/)
 * [Dual USBSID-Pico Commodore 64 Case](cases/v1.3/Dual_USBSID-Pico_Commodore_64_Case) by [@OlefinMakes](https://github.com/OlefinMakes/)
+
+_Cases for PCB revision v1.5:_  
+* COMING SOON!  
 
 ## PCB Features
 ### revision v1.5
@@ -387,17 +390,16 @@ the open source KiCad design files and gerbers documents below.
 #### revision v1.3
 - [USBSID-Pico v1.3 schematic](hardware/v1.3-schematic.pdf)
 - [USBSID-Pico v1.3 interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/hardware/v1.3-ibom.html)
-- [USBSID-Pico v1.3 gerber files](hardware/USBSID-Pico-v1.3/README.md)
-- [USBSID-Pico v1.3 KiCad project & gerber files]() (not yet!)
-#### revision v1.5 (not yet!)
-- [USBSID-Pico v1.5 schematic]()
-- [USBSID-Pico v1.5 interactive BOM]()
+- [USBSID-Pico v1.3 KiCad project & gerber files](hardware/USBSID-Pico-v1.3/README.md) 
+#### revision v1.5c
+- [USBSID-Pico v1.5 schematic](hardware/v1.5c-schematic.pdf)
+- [USBSID-Pico v1.5 interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/hardware/v1.5c-ibom.html)
 #### Datasheets of parts used
 [Datasheets](resources/)
 
 ## PCB Development
-* v1.5c **release** board (not yet!)<br>
-  <!-- [<img src="images/v1.5c-top.png" width="50%">](images/v1.5c-top.png)   -->
+* v1.5c **release** board<br>
+  [<img src="images/v1.5c-top.png" width="50%">](images/v1.5c-top.png)  
 * v1.5b _unreleased_ board<br>
   [<img src="images/v1.5b-top.png" width="50%">](images/v1.5b-top.png)  
 * v1.5 _unreleased_ board<br>
@@ -452,17 +454,18 @@ All code written by me in this repository is licensed under the terms of the GNU
 Any code in this repository that is not written by me automatically falls under the licensing conditions by the authors of said code as mentioned in the source code header.
 For for more information about this license please read the LICENSE document in the root of the USBSID-Pico repository.
 
-### USBSID-Pico v1.5 PCB Hardware License ~ TBD
+### USBSID-Pico v1.5 PCB Hardware License ~ Creative Commons
+USBSID-Pico v1.5 PCB © 2026 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/">Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/nc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/nd.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;">
 
 ### USBSID-Pico v1.3 PCB Hardware License ~ Creative Commons
-<a href="https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/USBSID-Pico-v1.3">USBSID-Pico v1.3 PCB</a> © 2025-2026 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/">Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/nc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/nd.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;">
+<a href="https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/USBSID-Pico-v1.3">USBSID-Pico v1.3 PCB</a> © 2025-2026 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;">  
 
 ### USBSID-Pico v1.0 PCB Hardware License ~ Creative Commons
 <a href="https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/USBSID-Pico-v1.0">USBSID-Pico v1.0 PCB</a> © 2024-2026 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;">  
 
 # Certification
 ### USBSID-Pico v1.3 PCB OSHWA certification
-(not yet!)
+(soon!)
 
 ### USBSID-Pico v1.0 PCB OSHWA certification
 [<img src="hardware/USBSID-Pico-v1.0/logos/certification-mark-NL000035-stacked.png" width="20%">](https://certification.oshwa.org/nl000035.html)  

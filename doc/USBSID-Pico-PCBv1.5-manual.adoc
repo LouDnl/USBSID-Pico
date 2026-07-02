@@ -17,8 +17,8 @@ include::disclaimer.adoc[]
 
 == PCB top overview
 .Click image for larger view
-[#img-v13top,link=images/v1.5/v1.5b-top.png]
-image::images/v1.5/v1.5b-top.png[title=PCB top overview]
+[#img-v13top,link=images/v1.5/v1.5c-top.png]
+image::images/v1.5/v1.5c-top.png[title=PCB top overview]
 
 [%always]
 <<<
@@ -32,8 +32,8 @@ Soon!
 
 == PCB bottom overview
 .Click image for larger view
-[#img-v13bottom,link=images/v1.5/v1.5b-bottom.png]
-image::images/v1.5/v1.5b-bottom.png[title=PCB bottom overview]
+[#img-v13bottom,link=images/v1.5/v1.5c-bottom.png]
+image::images/v1.5/v1.5c-bottom.png[title=PCB bottom overview]
 
 == License
 include::license-software.adoc[]
