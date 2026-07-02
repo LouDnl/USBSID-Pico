@@ -263,7 +263,7 @@ set(COMPILE_OPTS PRIVATE
   ${D_OPT}
   ${W_OPT}
   ${O_OPT}
-  -save-temps
+  -save-temps=obj
   -fverbose-asm
   -Wl,--wrap=ceil
   -Wl,--wrap=memcpy
