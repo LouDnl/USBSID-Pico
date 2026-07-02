@@ -17,6 +17,11 @@ Checkout the new [USBSID-Pico Configtool](https://github.com/LouDnl/USBSID-Pico-
 |:-:|:-:|:-:|:-:|
 | [<img src="https://img.youtube.com/vi/7hiAkLAqsiI/0.jpg" width=75%>](https://www.youtube.com/watch?v=7hiAkLAqsiI)<br><small><sub>by Censor Design</sub></small> | [<img src="https://img.youtube.com/vi/4gckiwzOW9U/0.jpg" width=75%>](https://www.youtube.com/watch?v=4gckiwzOW9U)<br><small><sub>by Censor Design</sub></small> | [<img src="https://img.youtube.com/vi/q4Fg7V2DYCI/0.jpg" width=75%>](https://www.youtube.com/watch?v=q4Fg7V2DYCI)<br><small><sub>by Censor Design</sub> | [<img src="https://img.youtube.com/vi/RTtmsbH4jC0/0.jpg" width=75%>](https://www.youtube.com/watch?v=RTtmsbH4jC0)<br><small><sub>by Censor Design</sub></small> |
 
+
+# USBSID-Pro (Soon™)
+In development is a modular USBSID-Pro featuring 4 SID sockets with 4 mono out ports, switchable audio channels into a single stereo out jack , Midi port, an onboard rp2350b and more. No release date has been planned yet!
+
+
 # Index
 * [Volume board (Soon™)](#volume-board-soon)
 * [NEW: USBSID-Pico Configtool](#new-usbsid-pico-configtool)
