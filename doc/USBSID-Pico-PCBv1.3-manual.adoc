@@ -46,7 +46,7 @@ image:images/v1.3/pcb-bottom.png[Title=Jumpers on the bottom,240]
 
 == SID placement orientation
 In the PCB overview image at the top of this document each SID socket has `Pin 1` marked with text and an arrow. +
-Please use your full attention when placing your SID chips on the board so they in the correct orientation. +
+Please use your full attention when placing your SID chips on the board so they are in the correct orientation. +
 _Incorrect placement orientation will result in frying your precious SID chip unicorn and creating a nice keychain!_
 *_I am not responsible for your broken SID chips!_*
 

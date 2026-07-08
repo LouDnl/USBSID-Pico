@@ -123,9 +123,9 @@ or
 == Firmware configuration
 USBSID-Pico has an extensive set of configuration options that expands with each firmware release. +
 
-=== USBSID-Pico-Configtool
-You can configurate your board by using the official USBSID-Pico-Configtool +
-The tool is available here https://github.com/LouDnl/USBSID-Pico-Configtool[USBSID-Pico-Configtool] in the releases section
+=== USBSID-Configtool
+You can configurate your board by using the official USBSID-Configtool +
+The tool is available here https://github.com/LouDnl/USBSID-Configtool[USBSID-Configtool] in the releases section
 
 === Commandline configuration tool
 You can configurate your board with:
