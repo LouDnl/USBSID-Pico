@@ -1,0 +1,64 @@
+= *USBSID-Configtool manual*
+:author: LouD
+:description: This document contains information about the USBSID-Configtool and how to use it
+:url-repo: https://www.github.com/LouDnl/USBSID-Configtool
+:revdate: {localdate}
+:hide-uri-scheme:
+:toc:
+:toclevels: 4
+:toc-placement!:
+
+Author: {author} - generated on {revdate}
+
+toc::[]
+[%always]
+<<<
+
+== Disclaimer
+include::disclaimer.adoc[]
+
+
+== About
+What is there to say, you can configure your board with this tool and it is self explanatory.
+
+
+== Screens
+
+=== Welcome screen
+image:images/configtool/screen-welcome.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/configtool/screen-welcome.png",width="600"] +
+image:images/configtool/screen-welcome-connected-1.5.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/configtool/screen-welcome-connected-1.5.png",width="600"] +
+image:images/configtool/screen-welcome-connected-1.3.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/configtool/screen-welcome-connected-1.3.png",width="600"] +
+
+=== v1.5 Sockets confirmation message
+image:images/configtool/screen-sockets-confirmation.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/configtool/screen-sockets-confirmation.png",width="600"] +
+
+=== Sockets screen
+image:images/configtool/screen-sockets-1.5.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/configtool/screen-sockets-1.5.png",width="600"] +
+image:images/configtool/screen-sockets-1.3.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/configtool/screen-sockets-1.3.png",width="600"] +
+
+=== Clock screen
+image:images/configtool/screen-clock.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/configtool/screen-clock.png",width="600"] +
+
+=== LEDS screen
+image:images/configtool/screen-leds.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/configtool/screen-leds.png",width="600"] +
+
+=== Features screen
+image:images/configtool/screen-features-1.5.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/configtool/screen-features-1.5.png",width="600"] +
+image:images/configtool/screen-features-1.3.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/configtool/screen-features-1.3.png",width="600"] +
+
+=== SID tests screen
+image:images/configtool/screen-sidtests.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/configtool/screen-sidtests.png",width="600"] +
+
+=== Debug screen
+image:images/configtool/screen-debug.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/configtool/screen-debug.png",width="600"] +
+
+== Development
+More information about USBSID-Configtool is available on the https://github.com/LouDnl/USBSID-Configtool[github repo]
+
+
+== License
+include::license-software.adoc[]
+
+include::license-hardware.adoc[]
+
+Author: {author} - generated on {revdate}

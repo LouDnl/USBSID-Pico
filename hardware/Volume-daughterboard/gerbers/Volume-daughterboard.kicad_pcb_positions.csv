@@ -1,0 +1,33 @@
+﻿pos_x,pos_y,rotation,side,designator,mpn,pack,footprint,value,mount_type
+214.309153,-117.328393,0.0,bottom,C1,,,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,0.1uF,smt
+203.9,-119.66,90.0,bottom,C10,,,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,1uF,smt
+218.299153,-121.518393,0.0,bottom,C11,,,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,10uF,smt
+227.689153,-124.458393,90.0,bottom,C2,,,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,0.1uF,smt
+232.122601,-124.905385,-90.0,bottom,C3,,,CP_Elec_5x5.4,47uF 16v,smt
+213.79,-124.905385,-90.0,bottom,C4,,,CP_Elec_5x5.4,47uF 16v,smt
+220.229153,-130.770893,90.0,bottom,C5,,,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,10uF,smt
+225.659153,-130.808393,90.0,bottom,C6,,,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,10uF,smt
+218.299153,-119.558393,0.0,bottom,C7,,,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,100pF,smt
+227.769153,-117.068393,180.0,bottom,C8,,,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,100pF,smt
+241.97,-119.67,90.0,bottom,C9,,,C_0805_2012Metric_Pad1.18x1.45mm_HandSolder,1uF,smt
+222.94,-127.58,90.0,bottom,D1,,,SOT-23,BAT54C,smt
+198.859016,-132.065984,-90.0,bottom,J1,,,PinSocket_1x04_P2.54mm_Vertical,GND/S1,tht
+247.002866,-132.049434,90.0,bottom,J2,,,PinSocket_1x04_P2.54mm_Vertical,S2/GND,tht
+223.1275,-133.895327,180.0,top,J4,,,Lumberg 1503 17,1503 17,tht
+206.498254,-125.539239,-45.0,bottom,JP1,,,SolderJumper-3_P1.3mm_Open_RoundedPad1.0x1.5mm,J1 Jumper,tht
+239.379239,-125.539239,-135.0,bottom,JP2,,,SolderJumper-3_P1.3mm_Open_RoundedPad1.0x1.5mm,J2 Jumper,tht
+201.299778,-125.539239,-135.0,bottom,JP3,,,SolderJumper-3_P1.3mm_Open_RoundedPad1.0x1.5mm,J1 Jumper,tht
+244.549251,-125.537693,-45.0,bottom,JP4,,,SolderJumper-3_P1.3mm_Open_RoundedPad1.0x1.5mm,J1 Jumper,tht
+230.135327,-130.649992,-90.0,bottom,R1,,,R_0805_2012Metric,10k,smt
+213.892039,-130.649992,-90.0,bottom,R10,,,R_0805_2012Metric,10k,smt
+215.792056,-130.649992,-90.0,bottom,R2,,,R_0805_2012Metric,10k,smt
+217.889153,-117.328393,180.0,bottom,R3,,,R_0805_2012Metric,10r,smt
+224.979153,-124.478393,0.0,bottom,R4,,,R_0805_2012Metric,10r,smt
+205.577766,-116.83,0.0,bottom,R5,,,R_0805_2012Metric,47k,smt
+202.220266,-116.83,0.0,bottom,R6,,,R_0805_2012Metric,47k,smt
+240.281616,-116.84,180.0,bottom,R7,,,R_0805_2012Metric,47k,smt
+243.644116,-116.84,180.0,bottom,R8,,,R_0805_2012Metric,47k,smt
+232.029153,-130.650893,-90.0,bottom,R9,,,R_0805_2012Metric,10k,smt
+206.399016,-129.036934,90.0,top,RV1,,,PotentioMeter,Left Volume,tht
+244.462866,-129.036934,90.0,top,RV2,,,PotentioMeter,Right Volume,tht
+222.895,-119.61,-90.0,bottom,U1,,SOIC-8 Texas Instruments,SOIC127P599X175-8N,OPA1688IDR,smt

@@ -53,10 +53,13 @@
 !cases/**
 !doc
 !doc/images
+!doc/images/configtool
 !doc/images/firmware
 !doc/images/software
 !doc/images/v1.0
 !doc/images/v1.3
+!doc/images/v1.5
+!doc/images/vol
 !hardware
 !hardware/**
 !images
