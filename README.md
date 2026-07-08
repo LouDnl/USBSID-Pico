@@ -3,11 +3,6 @@
 USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board for interfacing one or two MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer, phone, ASID supporting player or USB midi controller.  
 
 
-# NEW: USBSID-Pico Configtool
-Checkout the new [USBSID-Pico Configtool](https://github.com/LouDnl/USBSID-Pico-Configtool)  
-[<img src="images/screenshot-linux.png" width="500em">](https://github.com/LouDnl/USBSID-Pico-Configtool)  
-
-
 # This is USBSID-Pico! :)
 | **“Raster Bar” (8-bit)** | **Van Halen's Jump<br>dual SID in Stereo!** | **Next Level** | **Outerversal<br>dual SID in Stereo!** |
 |:-:|:-:|:-:|:-:|
@@ -23,11 +18,10 @@ In development is a modular USBSID-Pro featuring 4 SID sockets with 4 mono out p
 
 
 # Index
-* [Volume board (Soon™)](#volume-board-soon)
-* [NEW: USBSID-Pico Configtool](#new-usbsid-pico-configtool)
 * [This is USBSID-Pico! :)](#this-is-usbsid-pico-)
 * [Swag!](#swag)
 * [Software support & Features](#software-support-and-features)
+  * [USBSID-Configtool](#usbsid-configtool)
   * [Software manual](doc/USBSID-Pico-software-manual.adoc) [PDF](doc/USBSID-Pico-software-manual.pdf)
   * [SID files](#sid-files)
     - [Webbased SID players](#webbased-sid-players)
@@ -56,6 +50,7 @@ In development is a modular USBSID-Pro featuring 4 SID sockets with 4 mono out p
   * [How to configure your board](doc/USBSID-Pico-firmware-manual.adoc) [(PDF)](doc/USBSID-Pico-firmware-manual.pdf)
   * [Building](#building)
 * [Hardware](#hardware)
+  * [Volume board](#volume-board)
   * [Where to buy](#where-to-buy)
   * [PCB usage information](#pcb-usage-information)
     * [PCB revision v1.0 manual](#pcb-revision-v10-manual)
@@ -71,16 +66,6 @@ In development is a modular USBSID-Pro featuring 4 SID sockets with 4 mono out p
 * [Certification](#certification)
 
 
-# Volume board (Soon™)
-Coming soon, an optional volume board to control left and right audio independently.  
-- Plug and play compatible with v1.5+ boards. 
-- Compatibale with v1.0 and v1.3 boards with a small modification to provide voltage.  
-  An how to will be provided when released.  
-![USBSID-Pico](images/volume_daughterboard_seated.jpg)  
-![USBSID-Pico](images/volume_daughterboard_bottom.jpg)  
-_Yes! I have cats ;-)_  
-
-
 # Swag!
 Do you like swag!? I sure do!! [greyandslate](https://bsky.app/profile/greyandslate.bsky.social) created these great t-shirt designs which are available for purchase in his [Etsy shop](https://greyandslate.etsy.com/?search_query=usbsid), link below.  
 **Use coupon code USBSID15 for a 15% discount!**  
@@ -94,6 +79,11 @@ Shop link: [https://greyandslate.etsy.com/?search_query=usbsid](https://greyands
 # Software support and features
 ![USBSID-Pico](images/pcbv1.3.jpg)  
 See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for more information on how to use supported software!  
+
+## USBSID-Configtool
+The [USBSID-Configtool](https://github.com/LouDnl/USBSID-Configtool) is a _must have_ tool to configure your board!  
+Checkout the [Configtool manual](doc/USBSID-Pico-software-manual.adoc) or [PDF](doc/USBSID-Pico-software-manual.pdf)  
+[<img src="images/screenshot-linux.png" width="500em">](https://github.com/LouDnl/USBSID-Configtool)  
 
 ## SID files
 USBSID-Pico supports various ways of playing SID files.
@@ -234,8 +224,8 @@ See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for driver insta
 See the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on what's changed and previous releases.  
 
 ### Configuring your board's firmware
-Use the new official [USBSID-Pico-Configtool](https://github.com/LouDnl/USBSID-Pico-Configtool) to configure your board.  
-Downloads are available in the [releases](https://github.com/LouDnl/USBSID-Pico-Configtool/releases) section of the tools githubpage.  
+Use the new official [USBSID-Configtool](https://github.com/LouDnl/USBSID-Configtool) to configure your board.  
+Downloads are available in the [releases](https://github.com/LouDnl/USBSID-Configtool/releases) section of the tools githubpage.  
 Make sure you read the [Firmware manual](doc/USBSID-Pico-firmware-manual.adoc) for more information on how to set up your board!  
 
 #### Testing your board
@@ -279,6 +269,7 @@ After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py
 
 
 # Hardware
+
 ## Where to buy
 #### My SmallRun store
 You can purchase/pre-order (semi) assembled boards with or without Pico via my [SmallRun store](https://smallrun.net/shop/loud)!  
@@ -287,7 +278,7 @@ You can purchase/pre-order (semi) assembled boards with or without Pico via my [
 #### PCBWay
 At a minimum of 5 bare or assembled boards it is also possible to purchase PCB's at PCBWay  
 No account yet at [PCBWay](https://pcbway.com/g/2458i7)? Please use [my referral link](https://pcbway.com/g/2458i7) to register, thanks!  
-[Volume daughterboard (soon!)](#)  
+[Volume daughterboard](https://www.pcbway.com/project/shareproject/USBSID_Pico_Volume_daughterboard_5b782004.html)  
 [PCB revision v1.5 (soon!)](#)  
 [PCB revision v1.3](https://www.pcbway.com/project/shareproject/USBSID_Pico_v1_3_05f2b88e.html)  
 [PCB revision v1.0](https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html)  
@@ -297,7 +288,7 @@ PCB revision v1.3 [product page](https://www.retro8bitshop.com/product/usbsid-pi
 
 ## PCB usage information
 Your USBSID-Pico PCB has several hardware features like jumpers and pins that require your attention. Click on the viewing method
-### PCB revision v1.5 manual (soon!)
+### PCB revision v1.5 manual
 - [Open online PCB v1.5 manual](doc/USBSID-Pico-PCBv1.5-manual.adoc)
 - [Download PCB v1.5 PDF manual](doc/USBSID-Pico-PCBv1.5-manual.pdf)
 ### PCB revision v1.3 manual
@@ -306,6 +297,14 @@ Your USBSID-Pico PCB has several hardware features like jumpers and pins that re
 ### PCB revision v1.0 manual
 - [Open online PCB v1.0 manual](doc/USBSID-Pico-PCBv1.0-manual.adoc)
 - [Download PCB v1.0 PDF manual](doc/USBSID-Pico-PCBv1.0-manual.pdf)
+### Volume board
+An optional volume board to control left and right audio independently.  
+- Plug and play compatible with v1.5+ boards.  
+- Compatibale with v1.3 boards with a small modification to provide voltage.  
+Checkout the [manual](doc/USBSID-Volume-daughterboard.adoc) or [PDF](doc/USBSID-Volume-daughterboard.pdf)  
+![USBSID-Pico](images/volume_daughterboard_seated.jpg)  
+![USBSID-Pico](images/volume_daughterboard_bottom.jpg)  
+_Yes! I have cats ;-)_  
 
 ## Cases
 All USBSID-Pico community created cases are available in the [cases](cases/) directory, direct links below.  
@@ -321,6 +320,8 @@ _Cases for PCB revision v1.5:_
 * COMING SOON!  
 
 ## PCB Features
+### volume board
+- Control the volume of the left and right audio channel independently
 ### revision v1.5
 - Improved voltage and audio filtering
   - Input voltage filtering with π LC filter
@@ -401,6 +402,7 @@ the open source KiCad design files and gerbers documents below.
 - [USBSID-Pico v1.5 interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/hardware/v1.5c-ibom.html)
 #### volume-daughterboard v1.0
 - [USBSID-Volume-daughterboard schematic](hardware/volume-daughterboard-schematic.pdf)
+- [USBSID-Volume-daughterboard interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/hardwarevolume-daughterboard-ibom.html)
 - [USBSID-Volume-daughterboard KiCad project & gerber files](hardware/Volume-daughterboard/README.md) 
 #### Datasheets of parts used
 [Datasheets](resources/)
@@ -462,17 +464,17 @@ All code written by me in this repository is licensed under the terms of the GNU
 Any code in this repository that is not written by me automatically falls under the licensing conditions by the authors of said code as mentioned in the source code header.
 For for more information about this license please read the LICENSE document in the root of the USBSID-Pico repository.
 
-### USBSID-Pico v1.5 PCB Hardware License ~ Creative Commons
+### USBSID-Pico v1.5 PCB Hardware License ~ CC BY-NC-ND 4.0
 USBSID-Pico v1.5 PCB © 2026 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/">Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/nc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/nd.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;">
 
-### USBSID-Pico v1.3 PCB Hardware License ~ Creative Commons
+### USBSID-Pico v1.3 PCB Hardware License ~ CC BY-SA 4.0
 <a href="https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/USBSID-Pico-v1.3">USBSID-Pico v1.3 PCB</a> © 2025-2026 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;">  
 
-### USBSID-Pico v1.0 PCB Hardware License ~ Creative Commons
+### USBSID-Pico v1.0 PCB Hardware License ~ CC BY-SA 4.0
 <a href="https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/USBSID-Pico-v1.0">USBSID-Pico v1.0 PCB</a> © 2024-2026 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;">  
 
-### USBSID-Volume-daughterboard PCB Hardware License ~ Creative Commons
-<a href="https://github.com/LouDnl/USBSID-Pico/tree/master/hardware/Volume-daughterboard">Volume-daughterboard v1.0 PCB</a> © 2026 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;">  
+### USBSID-Volume-daughterboard PCB Hardware License ~ CC BY-SA 4.0
+Volume-daughterboard v1.0 PCB © 2026 by <a href="https://github.com/LouDnl">LouD</a> is licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" width="20em" style="max-width: 1em;max-height:1em;margin-left: .2em;">  
 
 # Certification
 ### USBSID-Pico v1.3 PCB OSHWA certification
