@@ -23947,7 +23947,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://lumberg.nl/media/a6/2b/58/1753500981/datenblaetter-en-1503_17.pdf"
 			(at 165.1 39.37 0)
 			(hide yes)
 			(show_name no)
@@ -23969,7 +23969,7 @@
 				)
 			)
 		)
-		(property "Manufacturer" ""
+		(property "Manufacturer" "Lumberg"
 			(at 165.1 34.29 0)
 			(hide yes)
 			(show_name no)
@@ -23980,7 +23980,7 @@
 				)
 			)
 		)
-		(property "Mfg Part #" ""
+		(property "Mfg Part #" "134382 1503-17 / SJ1-3525N"
 			(at 165.1 34.29 0)
 			(hide yes)
 			(show_name no)
@@ -23991,7 +23991,7 @@
 				)
 			)
 		)
-		(property "Mfg Part Desc" ""
+		(property "Mfg Part Desc" "Through Hole Audio Connectors RoHS"
 			(at 165.1 34.29 0)
 			(hide yes)
 			(show_name no)
@@ -24156,6 +24156,39 @@
 				)
 			)
 		)
+		(property "Manufacturer" "ALPSALPINE"
+			(at 111.76 43.18 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part #" "RK09K1130AAU"
+			(at 111.76 43.18 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "POT 10kΩ Through Hole"
+			(at 111.76 43.18 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "2"
 			(uuid "1c475f44-8d35-4278-9f4e-d7fd99bcdde4")
 		)
@@ -24271,6 +24304,39 @@
 				)
 			)
 		)
+		(property "Manufacturer" "ALPSALPINE"
+			(at 72.39 43.18 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part #" "RK09K1130AAU"
+			(at 72.39 43.18 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "POT 10kΩ Through Hole"
+			(at 72.39 43.18 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "2"
 			(uuid "d1f9b14f-8d0d-4911-b1bf-4de9d10ec887")
 		)
@@ -24346,6 +24412,28 @@
 		)
 		(property "Description" "Resistor, small symbol"
 			(at 125.73 31.75 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part #" "0805W8F4702T5E"
+			(at 125.73 31.75 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "RES 47kΩ ±1% 125mW 0805"
+			(at 125.73 31.75 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24541,6 +24629,39 @@
 				)
 			)
 		)
+		(property "Mfg Part #" "FCC0805X106K500FT"
+			(at 76.2 104.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "CAP CER 10uF 50V X5R 0805"
+			(at 76.2 104.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "FOJAN"
+			(at 76.2 104.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "cdabca3b-98bf-4545-8c09-02c443a35d62")
 		)
@@ -24613,6 +24734,28 @@
 		)
 		(property "Description" "Resistor, small symbol"
 			(at 125.73 36.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part #" "0805W8F4702T5E"
+			(at 125.73 36.83 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "RES 47kΩ ±1% 125mW 0805"
+			(at 125.73 36.83 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -24831,7 +24974,7 @@
 				)
 			)
 		)
-		(property "Mfg Part Desc" "Through Hole Pin Header 2.5mm 6mm 3P -40℃~+105℃ 3mm 2.54mm Black Brass 1 1x4P Plugin,P=2.54mm Pin Headers ROHS"
+		(property "Mfg Part Desc" "PH2.54-01-04PZD"
 			(at 39.37 38.1 0)
 			(hide yes)
 			(show_name no)
@@ -25090,7 +25233,7 @@
 				)
 			)
 		)
-		(property "Mfg Part Desc" "Through Hole Pin Header 2.5mm 6mm 3P -40℃~+105℃ 3mm 2.54mm Black Brass 1 1x4P Plugin,P=2.54mm Pin Headers ROHS"
+		(property "Mfg Part Desc" "PH2.54-01-04PZD"
 			(at 39.37 25.4 0)
 			(hide yes)
 			(show_name no)
@@ -25389,7 +25532,7 @@
 				)
 			)
 		)
-		(property "Mfg Part #" "OPA1688ID"
+		(property "Mfg Part #" "OPA1688IDR"
 			(at 152.4 90.17 0)
 			(hide yes)
 			(show_name no)
@@ -25400,7 +25543,7 @@
 				)
 			)
 		)
-		(property "Mfg Part Desc" "OPA1688 SOIC-8"
+		(property "Mfg Part Desc" "36-V, Single-Supply, 10-MHz, Rail-to-Rail Output Operational Amplifiers"
 			(at 152.4 90.17 0)
 			(hide yes)
 			(show_name no)
@@ -25517,6 +25660,39 @@
 				)
 			)
 		)
+		(property "Mfg Part #" "FCC0805X106K500FT"
+			(at 85.09 104.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "CAP CER 10uF 50V X5R 0805"
+			(at 85.09 104.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "FOJAN"
+			(at 85.09 104.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "645918e4-1999-477d-a5ed-e02acc1a1fea")
 		)
@@ -25620,6 +25796,17 @@
 				)
 			)
 		)
+		(property "Mfg Part Desc" "RES 10kΩ ±1% 125mW 0805"
+			(at 200.66 78.74 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "dc525046-81e6-49fc-820b-217ef32cce3a")
 		)
@@ -25690,6 +25877,39 @@
 		)
 		(property "Description" "Polarized capacitor, small symbol"
 			(at 195.58 83.82 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "FOSAN"
+			(at 195.58 83.82 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part #" "FVH016ADA470M0554"
+			(at 195.58 83.82 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "CAP ALUM 47uF ±20% 16V SMD"
+			(at 195.58 83.82 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -25771,6 +25991,28 @@
 			)
 		)
 		(property "Description" "Resistor, small symbol"
+			(at 184.15 90.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part #" "0805W8F100JT5E"
+			(at 184.15 90.17 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "RES 10Ω ±1% 125mW 0805"
 			(at 184.15 90.17 0)
 			(hide yes)
 			(show_name no)
@@ -25882,7 +26124,7 @@
 				)
 			)
 		)
-		(property "Mfg Part Desc" "125mW Thick Film Resistors 150V ±100ppm/℃ ±1% 10kΩ 0805 Chip Resistor - Surface Mount ROHS "
+		(property "Mfg Part Desc" "RES 10kΩ ±1% 125mW 0805"
 			(at 163.83 55.88 0)
 			(hide yes)
 			(show_name no)
@@ -26008,6 +26250,39 @@
 				)
 			)
 		)
+		(property "Manufacturer" "FOJAN"
+			(at 184.15 95.25 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part #" "FCC0805B104K500DT"
+			(at 184.15 95.25 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "CAP CER 100nF 50V X7R 0805"
+			(at 184.15 95.25 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "5710b223-dbf2-4c13-b072-0c12a7fcd834")
 		)
@@ -26080,6 +26355,28 @@
 		)
 		(property "Description" "Resistor, small symbol"
 			(at 86.36 36.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part #" "0805W8F4702T5E"
+			(at 86.36 36.83 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "RES 47kΩ ±1% 125mW 0805"
+			(at 86.36 36.83 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26192,7 +26489,7 @@
 				)
 			)
 		)
-		(property "Mfg Part Desc" "BAT54C SOT-23"
+		(property "Mfg Part Desc" "DIODE ARR SCHOTTKY 30V SOT-23"
 			(at 120.65 66.04 0)
 			(hide yes)
 			(show_name no)
@@ -26287,6 +26584,39 @@
 				)
 			)
 		)
+		(property "Mfg Part #" "FCC0805X106K500FT"
+			(at 93.98 104.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "CAP CER 10uF 50V X5R 0805"
+			(at 93.98 104.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "FOJAN"
+			(at 93.98 104.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "790a9f3d-4d50-4e25-983c-26e67da7017e")
 		)
@@ -26357,6 +26687,39 @@
 		)
 		(property "Description" "Polarized capacitor, small symbol"
 			(at 195.58 88.9 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "FOSAN"
+			(at 195.58 88.9 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part #" "FVH016ADA470M0554"
+			(at 195.58 88.9 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "CAP ALUM 47uF ±20% 16V SMD"
+			(at 195.58 88.9 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -26467,7 +26830,7 @@
 				)
 			)
 		)
-		(property "Mfg Part Desc" "125mW Thick Film Resistors 150V ±100ppm/℃ ±1% 10kΩ 0805 Chip Resistor - Surface Mount ROHS "
+		(property "Mfg Part Desc" "RES 10kΩ ±1% 125mW 0805"
 			(at 163.83 50.8 0)
 			(hide yes)
 			(show_name no)
@@ -26592,6 +26955,39 @@
 				)
 			)
 		)
+		(property "Mfg Part #" "FCC0805N101J500BT"
+			(at 88.9 77.47 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "CAP CER 100pF 50V C0G 0805"
+			(at 88.9 77.47 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "FOJAN"
+			(at 88.9 77.47 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "3a4b57e5-e354-4135-9605-3f2124aafe8c")
 		)
@@ -26663,6 +27059,39 @@
 			)
 		)
 		(property "Description" "Unpolarized capacitor, small symbol"
+			(at 72.39 36.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part #" "FCC0805B105K500FT"
+			(at 72.39 36.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "CAP CER 1uF 50V X7R 0805"
+			(at 72.39 36.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "FOJAN"
 			(at 72.39 36.83 0)
 			(hide yes)
 			(show_name no)
@@ -26754,6 +27183,39 @@
 				)
 			)
 		)
+		(property "Mfg Part #" "FCC0805B105K500FT"
+			(at 111.76 36.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "CAP CER 1uF 50V X7R 0805"
+			(at 111.76 36.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "FOJAN"
+			(at 111.76 36.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "ddfd9b3a-431f-4398-ac77-6dca6fa7af1e")
 		)
@@ -26825,6 +27287,39 @@
 			)
 		)
 		(property "Description" "Unpolarized capacitor, small symbol"
+			(at 184.15 77.47 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "FOJAN"
+			(at 184.15 77.47 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part #" "FCC0805B104K500DT"
+			(at 184.15 77.47 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "CAP CER 100nF 50V X7R 0805"
 			(at 184.15 77.47 0)
 			(hide yes)
 			(show_name no)
@@ -26916,6 +27411,28 @@
 				)
 			)
 		)
+		(property "Mfg Part #" "0805W8F4702T5E"
+			(at 86.36 31.75 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "RES 47kΩ ±1% 125mW 0805"
+			(at 86.36 31.75 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "0fce5bc6-70ab-452d-a9ac-4ffc8ad85056")
 		)
@@ -26997,6 +27514,39 @@
 				)
 			)
 		)
+		(property "Mfg Part #" "FCC0805N101J500BT"
+			(at 80.01 77.47 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "CAP CER 100pF 50V C0G 0805"
+			(at 80.01 77.47 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "FOJAN"
+			(at 80.01 77.47 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "d2801bef-86ec-490d-9f03-5507e6dab4b1")
 		)
@@ -27068,6 +27618,28 @@
 			)
 		)
 		(property "Description" "Resistor, small symbol"
+			(at 184.15 82.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part #" "0805W8F100JT5E"
+			(at 184.15 82.55 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "RES 10Ω ±1% 125mW 0805"
 			(at 184.15 82.55 0)
 			(hide yes)
 			(show_name no)
@@ -27171,6 +27743,17 @@
 			)
 		)
 		(property "Mfg Part #" "0805W8F1002T5E"
+			(at 200.66 95.25 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Mfg Part Desc" "RES 10kΩ ±1% 125mW 0805"
 			(at 200.66 95.25 90)
 			(hide yes)
 			(show_name no)
