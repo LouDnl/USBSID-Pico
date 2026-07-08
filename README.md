@@ -82,7 +82,7 @@ See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for more informa
 
 ## USBSID-Configtool
 The [USBSID-Configtool](https://github.com/LouDnl/USBSID-Configtool) is a _must have_ tool to configure your board!  
-Checkout the [Configtool manual](doc/USBSID-Pico-software-manual.adoc) or [PDF](doc/USBSID-Pico-software-manual.pdf)  
+Checkout the [Configtool manual](doc/USBSID-Configtool-manual.adoc) or [PDF](doc/USBSID-Configtool-manual.pdf)  
 [<img src="images/screenshot-linux.png" width="500em">](https://github.com/LouDnl/USBSID-Configtool)  
 
 ## SID files
@@ -402,7 +402,7 @@ the open source KiCad design files and gerbers documents below.
 - [USBSID-Pico v1.5 interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/hardware/v1.5c-ibom.html)
 #### volume-daughterboard v1.0
 - [USBSID-Volume-daughterboard schematic](hardware/volume-daughterboard-schematic.pdf)
-- [USBSID-Volume-daughterboard interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/hardwarevolume-daughterboard-ibom.html)
+- [USBSID-Volume-daughterboard interactive BOM](https://htmlpreview.github.io/?https://github.com/LouDnl/USBSID-Pico/blob/master/hardware/volume-daughterboard-ibom.html)
 - [USBSID-Volume-daughterboard KiCad project & gerber files](hardware/Volume-daughterboard/README.md) 
 #### Datasheets of parts used
 [Datasheets](resources/)
