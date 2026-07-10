@@ -478,7 +478,8 @@ Volume-daughterboard v1.0 PCB © 2026 by <a href="https://github.com/LouDnl">Lou
 
 # Certification
 ### USBSID-Pico v1.3 PCB OSHWA certification
-(soon!)
+[<img src="hardware/USBSID-Pico-v1.3/logos/certification-mark-NL000045-stacked.png" width="20%">](https://certification.oshwa.org/nl000045.html)  
+[OSHW] NL000045 | Certified open source hardware | [oshwa.org/cert](https://certification.oshwa.org/nl000045.html)
 
 ### USBSID-Pico v1.0 PCB OSHWA certification
 [<img src="hardware/USBSID-Pico-v1.0/logos/certification-mark-NL000035-stacked.png" width="20%">](https://certification.oshwa.org/nl000035.html)  
