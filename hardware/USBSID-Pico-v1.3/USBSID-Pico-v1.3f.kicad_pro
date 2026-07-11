@@ -39,9 +39,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 0.0,
-          "height": 1.0,
-          "width": 1.0
+          "drill": 1.02,
+          "height": 1.7,
+          "width": 1.7
         },
         "silk_line_width": 0.15,
         "silk_text_italic": false,
@@ -60,7 +60,7 @@
           "hatch_smoothing_level": 0,
           "hatch_smoothing_value": 0.1,
           "hatch_thickness": 1.0,
-          "min_clearance": 0.0,
+          "min_clearance": 0.5,
           "min_island_area": 10.0,
           "min_thickness": 0.25,
           "pad_connection": 1,
@@ -120,7 +120,7 @@
         "npth_inside_courtyard": "ignore",
         "padstack": "warning",
         "pth_inside_courtyard": "ignore",
-        "shorting_items": "ignore",
+        "shorting_items": "warning",
         "silk_edge_clearance": "warning",
         "silk_over_copper": "warning",
         "silk_overlap": "warning",
@@ -264,7 +264,7 @@
       "internal_id": "",
       "mfg": "",
       "mpn": "",
-      "sch_revision": ""
+      "sch_revision": "1.3f"
     },
     "layer_pairs": [],
     "layer_presets": [],
@@ -492,7 +492,7 @@
       "no_connect_dangling": "warning",
       "pin_not_connected": "error",
       "pin_not_driven": "error",
-      "pin_to_pin": "warning",
+      "pin_to_pin": "error",
       "power_pin_not_driven": "error",
       "same_local_global_label": "warning",
       "similar_label_and_power": "warning",
@@ -517,7 +517,7 @@
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "USBSID-Pico-v1.0.kicad_pro",
+    "filename": "USBSID-Pico-v1.3f.kicad_pro",
     "version": 3
   },
   "net_settings": {
@@ -545,7 +545,6 @@
         "bus_width": 12,
         "clearance": 0.15,
         "diff_pair_gap": 0.25,
-        "diff_pair_via_gap": 0.25,
         "diff_pair_width": 0.2,
         "line_style": 0,
         "microvia_diameter": 0.3,
@@ -554,7 +553,7 @@
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": 0,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
-        "track_width": 0.4,
+        "track_width": 0.3,
         "tuning_profile": "",
         "via_diameter": 0.8,
         "via_drill": 0.4,
@@ -564,7 +563,6 @@
         "bus_width": 0,
         "clearance": 0.15,
         "diff_pair_gap": 0.25,
-        "diff_pair_via_gap": 0.25,
         "diff_pair_width": 0.2,
         "line_style": 0,
         "microvia_diameter": 0.3,
@@ -583,7 +581,6 @@
         "bus_width": 8,
         "clearance": 0.15,
         "diff_pair_gap": 0.25,
-        "diff_pair_via_gap": 0.25,
         "diff_pair_width": 0.2,
         "line_style": 0,
         "microvia_diameter": 0.3,
@@ -681,13 +678,13 @@
   },
   "pcbnew": {
     "last_paths": {
-      "gencad": "",
+      "gencad": "PicoUSBSIDv1.3.cad",
       "idf": "",
       "netlist": "PicoUSBSID.net",
       "plot": "gerber/",
       "pos_files": "",
       "specctra_dsn": "",
-      "step": "USBSID-Pico-v1.0.step",
+      "step": "PicoUSBSIDv1.3.step",
       "svg": "",
       "vrml": ""
     },
@@ -699,7 +696,7 @@
       "method": 0,
       "sort_order": 0
     },
-    "bom_export_filename": "/home/loud/Development/pi/USBSID-Pico-dev/pcb/PicoUSBSIDv1.0/PicoUSBSIDv1.0-new.csv",
+    "bom_export_filename": "/home/loud/Development/pi/USBSID-Pico-dev/pcb/PicoUSBSIDv1.2/PicoUSBSIDv1.2-new.csv",
     "bom_fmt_presets": [],
     "bom_fmt_settings": {
       "field_delimiter": ",",
@@ -882,18 +879,27 @@
     "subpart_id_separator": 0,
     "top_level_sheets": [
       {
-        "filename": "USBSID-Pico-v1.0.kicad_sch",
-        "name": "USBSID-Pico-v1.0",
-        "uuid": "00000000-0000-0000-0000-000000000000"
+        "filename": "USBSID-Pico-v1.3.kicad_sch",
+        "name": "USBSID-Pico-v1.3",
+        "uuid": "f639dbf8-eb43-4301-9a54-898621165136"
       }
     ],
-    "used_designators": "",
-    "variants": []
+    "used_designators": "LOGO1-2",
+    "variants": [
+      {
+        "description": "GND plane fix",
+        "name": "v1.3e"
+      },
+      {
+        "description": "OSHWA Certified",
+        "name": "v1.3f"
+      }
+    ]
   },
   "sheets": [
     [
       "f639dbf8-eb43-4301-9a54-898621165136",
-      "Root"
+      "USBSID-Pico-v1.3"
     ],
     [
       "c9a14a99-dfb1-4bad-b2ea-e0147bbc5de2",

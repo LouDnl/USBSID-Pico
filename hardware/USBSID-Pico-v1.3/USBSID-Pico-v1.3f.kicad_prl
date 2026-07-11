@@ -2,7 +2,7 @@
   "board": {
     "active_layer": 0,
     "active_layer_preset": "",
-    "auto_track_width": false,
+    "auto_track_width": true,
     "hidden_netclasses": [],
     "hidden_nets": [],
     "high_contrast_mode": 0,
@@ -50,18 +50,17 @@
       "conflict_shadows",
       "shapes"
     ],
-    "visible_layers": "00000000_00000000_55555555_5755fdfd",
+    "visible_layers": "00000000_00000000_55555555_5755ffff",
     "zone_display_mode": 0
   },
   "git": {
     "integration_disabled": false,
-    "repo_password": "",
     "repo_type": "",
     "repo_username": "",
     "ssh_key": ""
   },
   "meta": {
-    "filename": "USBSID-Pico-v1.0.kicad_prl",
+    "filename": "USBSID-Pico-v1.3f.kicad_prl",
     "version": 5
   },
   "net_inspector_panel": {
@@ -99,7 +98,7 @@
       95,
       87,
       47,
-      630
+      783
     ],
     "custom_group_rules": [],
     "expanded_rows": [],
