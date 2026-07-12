@@ -344,6 +344,7 @@ enum
 
   USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
   US_PCB_VERSION   = 0x81,  /* Read PCB version */
+  US_FEATURES      = 0x82,  /* Read USBSID compiled features */
 
   RESTART_BUS      = 0x85,  /* Restart DMA & PIO */
   RESTART_BUS_CLK  = 0x86,  /* Restart PIO clocks */
@@ -447,6 +448,43 @@ enum {
   BOARD_FLIPPED   = 13,
   BOARD_MIXED     = 14,
 };
+
+/**
+ * @brief USBSID-Pico PCB and Firmware features packed in a single byte
+ * 1 Byte == 8 bits == 8 features to define
+ *   76543210
+ * 0b00000000
+ * 0 = Pico type: 0 Pico1, 1 Pico2
+ * 1 = Wifi / Bluetooth onboard: 0 No, 1 Yes
+ * 2 = RGB LED onboard: 0 No, 1 Yes
+ * 3 = PIO Uart
+ * 4 = Unused
+ * 5 = Unused
+ * 6 = Embedded Cynthcart: 0 No, 1 Yes
+ * 7 = Embedded SID player: 0 No, 1 Yes
+ */
+static const uint8_t us_features = (
+#if defined(PICO_RP2350)
+  (1 << 0) |
+#endif
+#if defined(USE_BLUETOOTH) || defined(USE_WIFI)
+  (1 << 1) |
+#endif
+#if defined(USE_RGB)
+  (1 << 2) |
+#endif
+#if defined(USE_PIO_UART)
+  (1 << 3) |
+#endif
+  /* 4 Unused */
+  /* 5 Unused */
+#if defined(ONBOARD_EMULATOR)
+  (1 << 6) |
+#endif
+#if defined(ONBOARD_SIDPLAYER)
+  (1 << 7)
+#endif
+);
 
 /* Global variables from config.c */
 extern Config      usbsid_config;
