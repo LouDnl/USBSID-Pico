@@ -473,24 +473,24 @@ enum {
  */
 static const uint8_t us_features = (
 #if defined(PICO_RP2350)
-  (1 << 0) |
+  (1 << 0)
 #endif
 #if defined(USE_BLUETOOTH) || defined(USE_WIFI)
-  (1 << 1) |
+  | (1 << 1)
 #endif
 #if defined(USE_RGB)
-  (1 << 2) |
+  | (1 << 2)
 #endif
 #if defined(USE_PIO_UART)
-  (1 << 3) |
+  | (1 << 3)
 #endif
   /* 4 Unused */
   /* 5 Unused */
 #if defined(ONBOARD_EMULATOR)
-  (1 << 6) |
+  | (1 << 6)
 #endif
 #if defined(ONBOARD_SIDPLAYER)
-  (1 << 7)
+  | (1 << 7)
 #endif
 );
 
