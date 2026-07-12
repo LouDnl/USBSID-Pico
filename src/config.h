@@ -472,8 +472,9 @@ enum {
  * 7 = Embedded SID player: 0 No, 1 Yes
  */
 static const uint8_t us_features = (
+  0
 #if defined(PICO_RP2350)
-  (1 << 0)
+  | (1 << 0)
 #endif
 #if defined(USE_BLUETOOTH) || defined(USE_WIFI)
   | (1 << 1)
