@@ -365,19 +365,27 @@ enum
 
 #if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
   /* Internal SID player */
-  UPLOAD_SID_START = 0xD0,  /* Start command for USBSID to go into receiving mode */
-  UPLOAD_SID_DATA  = 0xD1,  /* Init byte for each packet containing data */
-  UPLOAD_SID_END   = 0xD2,  /* End command for USBSID to exit receiving mode */
-  UPLOAD_SID_SIZE  = 0xD3,  /* Packet containing the actual file size */
+  UPLOAD_SID_START   = 0xD0,  /* Start command for USBSID to go into receiving mode */
+  UPLOAD_SID_DATA    = 0xD1,  /* Init byte for each packet containing data */
+  UPLOAD_SID_END     = 0xD2,  /* End command for USBSID to exit receiving mode */
+  UPLOAD_SID_SIZE    = 0xD3,  /* Packet containing the actual file size */
+  UPLOAD_SID_LENGTH  = 0xD4,  /* Supply the play with the length of the current trakc played */
 
   /* Internal SID player */
-  SID_PLAYER_TUNE  = 0xE0,  /* Load SID file into SID player memory and initialise internal SID player */
-  SID_PLAYER_START = 0xE1,  /* Start SID file play */
-  SID_PLAYER_STOP  = 0xE2,  /* Stop SID file play */
-  SID_PLAYER_PAUSE = 0xE3,  /* Pause/Unpause SID file play */
-  SID_PLAYER_NEXT  = 0xE4,  /* Next SID subtune play */
-  SID_PLAYER_PREV  = 0xE5,  /* Previous SID subtune play */
-  SID_PLAYER_TWO   = 0xE6,  /* Force play to play on socket two or sid two */
+  SID_PLAYER_TUNE    = 0xE0,  /* Load SID file into SID player memory and initialise internal SID player */
+  SID_PLAYER_START   = 0xE1,  /* Start SID file play */
+  SID_PLAYER_STOP    = 0xE2,  /* Stop SID file play */
+  SID_PLAYER_PAUSE   = 0xE3,  /* Pause/Unpause SID file play */
+  SID_PLAYER_NEXT    = 0xE4,  /* Next SID subtune play */
+  SID_PLAYER_PREV    = 0xE5,  /* Previous SID subtune play */
+  SID_PLAYER_TWO     = 0xE6,  /* Force play to play on socket two or sid two */
+  SID_PLAYER_FFWD    = 0xE7, /* Tune fast forward */
+  SID_PLAYER_RWND    = 0xE8, /* Tune rewind */
+  SID_PLAYER_MUTE    = 0xE9, /* Full mute, mutes all SID's */
+  SID_PLAYER_MUTE_V1 = 0xEA, /* Mute voice 1, supply sid number in second byte where 0 is SID 1 */
+  SID_PLAYER_MUTE_V2 = 0xEB, /* Mute voice 2, supply sid number in second byte where 0 is SID 1 */
+  SID_PLAYER_MUTE_V3 = 0xEC, /* Mute voice 3, supply sid number in second byte where 0 is SID 1 */
+  SID_PLAYER_TIME    = 0xED, /* Read play time of current track */
 
   /* Filetypes we can receive and process */
   SID_FILE         = 0x01,
