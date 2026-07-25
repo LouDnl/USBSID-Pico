@@ -392,8 +392,8 @@ enum
   PRG_FILE         = 0x02,
 #endif
 
-  CONFIG_ACK       = 0xFA,  /* Acknowledge the current configuration and switch on regulators (v1.5+ boards only) */
-  SOCKET_DETECT    = 0xFD,  /* Disable/enable automatic socket change detection on boot (v1.5+ boards only) */
+  CONFIG_ACK       = 0xFA,  /* Acknowledge and save the current configuration and switch on regulators (v1.5+ boards only) */
+  SOCKET_DETECT    = 0xFD,  /* Disable/enable and save automatic socket change detection on boot (v1.5+ boards only) */
 };
 
 /* Config read/write bytes */
@@ -455,6 +455,7 @@ enum {
   BOARD_MIRRORED  = 12,
   BOARD_FLIPPED   = 13,
   BOARD_MIXED     = 14,
+  BOARD_SDETECT   = 15, /* Automatic socket change detection v1.4+ */
 };
 
 /**
@@ -496,13 +497,13 @@ static const uint8_t us_features = (
 );
 
 /* Global variables from config.c */
-extern Config      usbsid_config;
-extern RuntimeCFG  cfg;
-extern ConfigError err;
+extern Config        usbsid_config;
+extern RuntimeCFG    cfg;
+extern ConfigError   err;
 extern volatile bool first_boot;
-extern const char *us_product;
-extern const char *project_version;
-extern const char *pcb_version;
+extern const char    *us_product;
+extern const char    *project_version;
+extern const char    *pcb_version;
 
 /* Functions from config.c */
 bool        config_unacknowledged(void);

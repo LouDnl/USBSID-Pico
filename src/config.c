@@ -673,6 +673,12 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
             usbsid_config.mixed = (bool)buffer[2];
           };
           break;
+        case BOARD_SDETECT:   /* Socket change autodetection */
+          usbsid_config.disable_changedetect =
+          (buffer[2] == 0 || buffer[2] == 1)
+          ? (bool)buffer[2]
+          : true;  /* Default to 0 ~ not disabled, always autodetect */
+          break;
         default:
           break;
       };
