@@ -344,6 +344,7 @@ enum
 
   USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
   US_PCB_VERSION   = 0x81,  /* Read PCB version */
+  US_FEATURES      = 0x82,  /* Read USBSID compiled features */
 
   RESTART_BUS      = 0x85,  /* Restart DMA & PIO */
   RESTART_BUS_CLK  = 0x86,  /* Restart PIO clocks */
@@ -364,27 +365,35 @@ enum
 
 #if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
   /* Internal SID player */
-  UPLOAD_SID_START = 0xD0,  /* Start command for USBSID to go into receiving mode */
-  UPLOAD_SID_DATA  = 0xD1,  /* Init byte for each packet containing data */
-  UPLOAD_SID_END   = 0xD2,  /* End command for USBSID to exit receiving mode */
-  UPLOAD_SID_SIZE  = 0xD3,  /* Packet containing the actual file size */
+  UPLOAD_SID_START   = 0xD0,  /* Start command for USBSID to go into receiving mode */
+  UPLOAD_SID_DATA    = 0xD1,  /* Init byte for each packet containing data */
+  UPLOAD_SID_END     = 0xD2,  /* End command for USBSID to exit receiving mode */
+  UPLOAD_SID_SIZE    = 0xD3,  /* Packet containing the actual file size */
+  UPLOAD_SID_LENGTH  = 0xD4,  /* Supply the play with the length of the current trakc played */
 
   /* Internal SID player */
-  SID_PLAYER_TUNE  = 0xE0,  /* Load SID file into SID player memory and initialise internal SID player */
-  SID_PLAYER_START = 0xE1,  /* Start SID file play */
-  SID_PLAYER_STOP  = 0xE2,  /* Stop SID file play */
-  SID_PLAYER_PAUSE = 0xE3,  /* Pause/Unpause SID file play */
-  SID_PLAYER_NEXT  = 0xE4,  /* Next SID subtune play */
-  SID_PLAYER_PREV  = 0xE5,  /* Previous SID subtune play */
-  SID_PLAYER_TWO   = 0xE6,  /* Force play to play on socket two or sid two */
+  SID_PLAYER_TUNE    = 0xE0,  /* Load SID file into SID player memory and initialise internal SID player */
+  SID_PLAYER_START   = 0xE1,  /* Start SID file play */
+  SID_PLAYER_STOP    = 0xE2,  /* Stop SID file play */
+  SID_PLAYER_PAUSE   = 0xE3,  /* Pause/Unpause SID file play */
+  SID_PLAYER_NEXT    = 0xE4,  /* Next SID subtune play */
+  SID_PLAYER_PREV    = 0xE5,  /* Previous SID subtune play */
+  SID_PLAYER_TWO     = 0xE6,  /* Force play to play on socket two or sid two */
+  SID_PLAYER_FFWD    = 0xE7, /* Tune fast forward */
+  SID_PLAYER_RWND    = 0xE8, /* Tune rewind */
+  SID_PLAYER_MUTE    = 0xE9, /* Full mute, mutes all SID's */
+  SID_PLAYER_MUTE_V1 = 0xEA, /* Mute voice 1, supply sid number in second byte where 0 is SID 1 */
+  SID_PLAYER_MUTE_V2 = 0xEB, /* Mute voice 2, supply sid number in second byte where 0 is SID 1 */
+  SID_PLAYER_MUTE_V3 = 0xEC, /* Mute voice 3, supply sid number in second byte where 0 is SID 1 */
+  SID_PLAYER_TIME    = 0xED, /* Read play time of current track */
 
   /* Filetypes we can receive and process */
   SID_FILE         = 0x01,
   PRG_FILE         = 0x02,
 #endif
 
-  CONFIG_ACK       = 0xFA,  /* Acknowledge the current configuration and switch on regulators (v1.5+ boards only) */
-  SOCKET_DETECT    = 0xFD,  /* Disable/enable automatic socket change detection on boot (v1.5+ boards only) */
+  CONFIG_ACK       = 0xFA,  /* Acknowledge and save the current configuration and switch on regulators (v1.5+ boards only) */
+  SOCKET_DETECT    = 0xFD,  /* Disable/enable and save automatic socket change detection on boot (v1.5+ boards only) */
 };
 
 /* Config read/write bytes */
@@ -446,16 +455,55 @@ enum {
   BOARD_MIRRORED  = 12,
   BOARD_FLIPPED   = 13,
   BOARD_MIXED     = 14,
+  BOARD_SDETECT   = 15, /* Automatic socket change detection v1.4+ */
 };
 
+/**
+ * @brief USBSID-Pico PCB and Firmware features packed in a single byte
+ * 1 Byte == 8 bits == 8 features to define
+ *   76543210
+ * 0b00000000
+ * 0 = Pico type: 0 Pico1, 1 Pico2
+ * 1 = Wifi / Bluetooth onboard: 0 No, 1 Yes
+ * 2 = RGB LED onboard: 0 No, 1 Yes
+ * 3 = PIO Uart
+ * 4 = Unused
+ * 5 = Unused
+ * 6 = Embedded Cynthcart: 0 No, 1 Yes
+ * 7 = Embedded SID player: 0 No, 1 Yes
+ */
+static const uint8_t us_features = (
+  0
+#if defined(PICO_RP2350)
+  | (1 << 0)
+#endif
+#if defined(USE_BLUETOOTH) || defined(USE_WIFI)
+  | (1 << 1)
+#endif
+#if defined(USE_RGB)
+  | (1 << 2)
+#endif
+#if defined(USE_PIO_UART)
+  | (1 << 3)
+#endif
+  /* 4 Unused */
+  /* 5 Unused */
+#if defined(ONBOARD_EMULATOR)
+  | (1 << 6)
+#endif
+#if defined(ONBOARD_SIDPLAYER)
+  | (1 << 7)
+#endif
+);
+
 /* Global variables from config.c */
-extern Config      usbsid_config;
-extern RuntimeCFG  cfg;
-extern ConfigError err;
+extern Config        usbsid_config;
+extern RuntimeCFG    cfg;
+extern ConfigError   err;
 extern volatile bool first_boot;
-extern const char *us_product;
-extern const char *project_version;
-extern const char *pcb_version;
+extern const char    *us_product;
+extern const char    *project_version;
+extern const char    *pcb_version;
 
 /* Functions from config.c */
 bool        config_unacknowledged(void);

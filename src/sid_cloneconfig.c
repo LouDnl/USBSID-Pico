@@ -69,7 +69,7 @@ static void print_fpgasid_sidconfig(int slot, int sidno, uint8_t * configarray)
   int addr1 = (((configarray[1] & 0b100) >> 2) == 1 ? 1 : 4);
   int addr2 = (((configarray[1] & 0b10) >> 1) == 1 ? 2 : 4);
   int addr3 = ((configarray[1] & 0b1) == 1 ? 3 : 4);
-  int addr = ((addr1 + addr2 + addr3) == 0 ? 12 : 4);
+  int addr = ((addr1 + addr2 + addr3) == 12 ? 0 : 4);
 
   usCFG("\n");
   usCFG("FPGASID configuration of slot %s and SID %d\n", slots[slot], sidno);

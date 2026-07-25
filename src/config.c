@@ -673,6 +673,12 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
             usbsid_config.mixed = (bool)buffer[2];
           };
           break;
+        case BOARD_SDETECT:   /* Socket change autodetection */
+          usbsid_config.disable_changedetect =
+          (buffer[2] == 0 || buffer[2] == 1)
+          ? (bool)buffer[2]
+          : true;  /* Default to 0 ~ not disabled, always autodetect */
+          break;
         default:
           break;
       };
@@ -969,11 +975,18 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       break;
     case USBSID_VERSION:
       usCFG("READ_FIRMWARE_VERSION\n");
-      memset(p_version_array, 0, count_of(p_version_array));
-      read_firmware_version();
-      memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
-      memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
-      write_back_data(MAX_BUFFER_SIZE);
+      if (buffer[1] == 0) {  /* Large write 64 bytes */
+        memset(p_version_array, 0, count_of(p_version_array));
+        read_firmware_version();
+        memset(write_buffer_p, 0, MAX_BUFFER_SIZE);
+        memcpy(write_buffer_p, p_version_array, MAX_BUFFER_SIZE);
+        write_back_data(MAX_BUFFER_SIZE);
+      } else {  /* Small write single byte */
+        memset(write_buffer_p, 0, 64);
+        int fwver = FW_VERSION_INT; // ISSUE: Not yet working correct
+        write_buffer_p[0] = fwver;
+        write_back_data(1);
+      }
       break;
     case US_PCB_VERSION:
       usCFG("READ_PCB_VERSION\n");
@@ -990,6 +1003,12 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         write_buffer_p[0] = pcbver;
         write_back_data(1);
       }
+      break;
+    case US_FEATURES:
+      usCFG("READ_FEATURES\n");
+      memset(write_buffer_p, 0, 64);
+      write_buffer_p[0] = us_features;
+      write_back_data(1);
       break;
     case RESTART_BUS:
       usCFG("RESTART_BUS\n");
