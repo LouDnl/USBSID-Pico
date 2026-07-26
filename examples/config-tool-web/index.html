@@ -101,9 +101,21 @@
           No file loaded
         </span>
       </div>
+      <div id="sid-url-presets" style="margin-top:6px">
+        <span class="c64-text-gray" style="font-size:0.8rem">URL:</span>
+        <button type="button" class="c64-btn c64-btn-sm sid-url-preset"
+                data-url="https://csdb.dk/getinternalfile.php/"
+                title="https://csdb.dk/getinternalfile.php/277825/TheRingBearer.sid">CSDB FILE</button>
+        <button type="button" class="c64-btn c64-btn-sm sid-url-preset"
+                data-url="https://csdb.dk/release/download.php?id="
+                title="https://csdb.dk/release/download.php?id=319737">CSDB RELEASE</button>
+        <button type="button" class="c64-btn c64-btn-sm sid-url-preset"
+                data-url="https://deepsid.chordian.net/music/_SID%20Happens/"
+                title="https://deepsid.chordian.net/music/_SID%20Happens/Transfluid_Tut-Tut.sid">DEEPSID</button>
+      </div>
       <div id="sid-url-row" style="margin-top:6px">
         <input type="text" id="sid-url-input" class="c64-input"
-               placeholder="e.g. https://csdb.dk/getinternalfile.php/277825/TheRingBearer.sid or https://csdb.dk/release/download.php?id=319737"
+               placeholder="e.g. https://csdb.dk/getinternalfile.php/277825/TheRingBearer.sid, https://csdb.dk/release/download.php?id=319737 or https://deepsid.chordian.net/music/_SID%20Happens/Transfluid_Tut-Tut.sid"
                style="flex:1;min-width:120px">
         <button id="btn-load-url" class="c64-btn c64-btn-sm" style="margin-left:6px">LOAD URL</button>
       </div>
