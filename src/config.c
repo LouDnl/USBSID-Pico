@@ -137,7 +137,7 @@ void read_config(Config* config)
 
   config_array[2] = (int)config_unacknowledged();      /* Need configuration confirmation v1.5+ only */
   config_array[3] = (int)config->disable_changedetect; /* Disable socket change detection v1.5+ only */
-  config_array[4] = 0x00; /* Unused */
+  config_array[4] = (int)config->last_preset;          /* The last applied preset */
 
   /* Clockworx */
   config_array[5] = (int)config->lock_clockrate;
