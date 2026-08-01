@@ -37,7 +37,7 @@ set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
 string(TIMESTAMP MAGIC_SMOKE "%Y%m%d")  # Auto generate dated version
-set(FWVERSION "0.7.2")
+set(FWVERSION "0.7.3")
 set(PROJECT_VERSION "${FWVERSION}-${MAGIC_SMOKE}")  # Generate compile version
 
 ### Want a cookie?
