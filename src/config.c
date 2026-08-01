@@ -1389,6 +1389,9 @@ void save_load_apply_config(bool at_boot)
 {
   save_load_config();
   apply_config(at_boot);
+#if PCB_VERSION_INT >= 15
+  verify_socket_config(); /* This will apply the correct voltages if needed */
+#endif
   return;
 }
 
