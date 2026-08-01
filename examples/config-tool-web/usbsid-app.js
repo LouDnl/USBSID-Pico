@@ -611,6 +611,7 @@ function setLoadButtons(enabled) {
   if (fileInput)   fileInput.disabled = !enabled;
   if (urlInput)    urlInput.disabled  = !enabled;
   if (urlBtn)      urlBtn.disabled    = !enabled;
+  document.querySelectorAll('.sid-url-preset').forEach(b => b.disabled = !enabled);
   if (browseLabel) browseLabel.style.opacity = enabled ? '' : '0.4';
   if (browseLabel) browseLabel.style.pointerEvents = enabled ? '' : 'none';
 }
@@ -900,6 +901,18 @@ function initFileLoading() {
 
   const urlInput  = document.getElementById('sid-url-input');
   const urlButton = document.getElementById('btn-load-url');
+
+  /* Prefill buttons: drop the example base url in the input and park the
+   * caret at the end so the file name can be typed/pasted straight after. */
+  document.querySelectorAll('.sid-url-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!urlInput || urlInput.disabled) return;
+      urlInput.value = btn.dataset.url || '';
+      urlInput.focus();
+      urlInput.setSelectionRange(urlInput.value.length, urlInput.value.length);
+    });
+  });
+
   if (urlInput && urlButton) {
     urlButton.addEventListener('click', async () => {
       const url = urlInput.value.trim();

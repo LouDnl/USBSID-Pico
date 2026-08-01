@@ -785,6 +785,9 @@ void verify_socket_config(void)
   }
   /* Clear DMA channels and PIO bus afterwards */
   clear_dma_channels();
+
+  /* Set current matching preset in config */
+  usbsid_config.last_preset = detect_current_preset();
 #endif
   return;
 }

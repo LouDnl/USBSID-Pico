@@ -926,6 +926,7 @@ int main()
   /* Init PIO */
   usBOOT("Setup PIO bus\n");
   setup_piobus();
+
   /* Sync PIOS */
   usBOOT("Synchronise PIO's\n");
   sync_pios(true);

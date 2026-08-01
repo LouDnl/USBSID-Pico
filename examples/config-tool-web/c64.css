@@ -290,6 +290,15 @@ body::before {
 }
 #sid-file-select { flex: 1; min-width: 200px; max-width: 400px; }
 
+/* Prefill buttons above the URL input */
+#sid-url-presets {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.c64-btn.sid-url-preset { font-size: 0.75rem; padding: 1px 6px; }
+
 .subtune-info {
   color: var(--c64-yellow);
   font-size: 1rem;
