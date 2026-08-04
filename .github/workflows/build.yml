@@ -248,7 +248,7 @@ jobs:
       - name: 📇 Set USBSID-Player EMUDIR
         if: ${{matrix.withsidplayer == 1 }}
         run: |
-          echo "EMUDIR=master/lib/usbsid-player" >> $GITHUB_ENV
+          echo "EMUDIR=${{github.workspace}}/master/lib/usbsid-player" >> $GITHUB_ENV
 
       - name: 🏭 Create build directory
         run: |

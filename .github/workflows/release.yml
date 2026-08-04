@@ -311,6 +311,11 @@ jobs:
           repository: loudnl/usbsid-player
           path: master/lib/usbsid-player
 
+      - name: 📇 Set USBSID-Player EMUDIR
+        if: ${{matrix.withsidplayer == 1 }}
+        run: |
+          echo "EMUDIR=${{github.workspace}}/master/lib/usbsid-player" >> $GITHUB_ENV
+
       - name: 🏭 Create build directory
         run: |
           mkdir -p ${{github.workspace}}/master/build_${{matrix.directory}}
@@ -327,6 +332,7 @@ jobs:
             -Dpicotool_DIR=${{github.workspace}}/picotool/picotool \
             -DONBOARD_EMULATOR=${{matrix.withemulator}} \
             -DONBOARD_SIDPLAYER=${{matrix.withsidplayer}} \
+            -DEMUDIR=${{env.EMUDIR}} \
             $extra_arg
 
       - name: 🏭 Build ${{matrix.buildname}}
