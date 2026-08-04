@@ -379,16 +379,29 @@ set(TARGET_INCLUDE_DIRS PRIVATE
 
 ### Embedded player stuffs
 if(ONBOARD_SIDPLAYER EQUAL 1)
+  set(EMUDIR ${CMAKE_CURRENT_LIST_DIR}/../player-repo)
   # NOTICE: SIDPLAYER REQUIRES FULL OPTIMIZATIONS!!
   # NOTE TO SELF: -O3 is already set in COMPILE_OPTS and applied via target_compile_options()
   # NOTE TO SELF: Do NOT use set(CMAKE_CXX_FLAGS ...) here as it strips Pico SDK architecture flags!
   ## Set sidplayer list directory
+  ## USBSID-Player lives in player-repo, next to this one in the workspace.
+  ## EMUDIR still wins, then lib/usbsid-player if it has been linked in, then
+  ## the sibling checkout.
   if(NOT ${EMUDIR} STREQUAL "")
     set(USPLAYER_LIST_DIR ${EMUDIR})
-  else()
+  elseif(EXISTS ${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player/cmake/usbsid-player.cmake)
     set(USPLAYER_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player)
+  else()
+    get_filename_component(USPLAYER_LIST_DIR
+      ${CMAKE_CURRENT_LIST_DIR}/../player-repo ABSOLUTE)
   endif()
-  message(DEBUG "USPLAYER_LIST_DIR is set to ${USPLAYER_LIST_DIR}")
+  message(STATUS "USPLAYER_LIST_DIR is set to ${USPLAYER_LIST_DIR}")
+
+  if(NOT EXISTS ${USPLAYER_LIST_DIR}/cmake/usbsid-player.cmake)
+    message(FATAL_ERROR
+      "ONBOARD_SIDPLAYER is on but no USBSID-Player at ${USPLAYER_LIST_DIR}. "
+      "Point EMUDIR at it, or link it as lib/usbsid-player.")
+  endif()
 
   ### Adjust filenames for user interpretation
   foreach(FILENAME ${FILENAMES})
@@ -396,56 +409,29 @@ if(ONBOARD_SIDPLAYER EQUAL 1)
   endforeach()
   set(FILENAMES ${FILENAMES_tmp})
 
-  ### Build psiddrv header
-  add_custom_command(
-    # Use absolute paths
-    OUTPUT ${USPLAYER_LIST_DIR}/src/psiddrv/psiddrv.h
-    COMMAND $(MAKE) all
-    # Remove built .o65 to ensure the linker does not accidentally pick it up
-    COMMAND ${CMAKE_COMMAND} -E rm -f ${USPLAYER_LIST_DIR}/src/psiddrv/psiddrv.o65
-    WORKING_DIRECTORY ${USPLAYER_LIST_DIR}/src/psiddrv/
-  )
-  add_custom_target(
-    RSIDDriver ALL
-    DEPENDS ${USPLAYER_LIST_DIR}/src/psiddrv/psiddrv.h
-  )
+  ### The player brings its own file list, include paths and psiddrv target.
+  ### firmware is expected to call at runtime.
+  ###
+  ### Two things the old player needed and this one does not:
+  ###   PICO_CXX_ENABLE_EXCEPTIONS  it is built -fno-exceptions -fno-rtti and
+  ###                               never throws, so the unwind tables would be
+  ###                               flash spent on nothing
+  ###   RCUTILS_NO_64_ATOMIC        nothing in it uses atomics
+  include(${USPLAYER_LIST_DIR}/cmake/usbsid-player.cmake)
 
-  ### Add some fancy shmancy necromancy
-  set(PICO_CXX_ENABLE_EXCEPTIONS 1)
   set(COMPILE_OPTS ${COMPILE_OPTS} -DEMBEDDED=1)
   add_compile_definitions(ONBOARD_SIDPLAYER=1)
-  add_compile_definitions(RCUTILS_NO_64_ATOMIC=OFF)
+  add_compile_definitions(${USPLAYER_DEFINITIONS})
 
   ### Where it's at
   set(SOURCEFILES
     ${SOURCEFILES}
-    ${USPLAYER_LIST_DIR}/src/c64/mmu.cpp
-    ${USPLAYER_LIST_DIR}/src/c64/mos6510_cpu.cpp
-    ${USPLAYER_LIST_DIR}/src/c64/mos6526_cia.cpp
-    ${USPLAYER_LIST_DIR}/src/c64/mos6560_6561_vic.cpp
-    ${USPLAYER_LIST_DIR}/src/c64/mos6581_8580_sid.cpp
-    ${USPLAYER_LIST_DIR}/src/c64/mos906114_pla.cpp
-    ${USPLAYER_LIST_DIR}/src/psid/sidfile.cpp
-    ${USPLAYER_LIST_DIR}/src/psiddrv/psid.cpp
-    ${USPLAYER_LIST_DIR}/src/psiddrv/reloc65.c
-    ${USPLAYER_LIST_DIR}/src/util/timer.cpp
-    ${USPLAYER_LIST_DIR}/src/util/wrappers.cpp
-    ${USPLAYER_LIST_DIR}/src/emulation.cpp
-    ${USPLAYER_LIST_DIR}/src/microsid.cpp
-    ${USPLAYER_LIST_DIR}/src/prgrunner.cpp
-    ${USPLAYER_LIST_DIR}/src/usplayer.cpp
-    ${USPLAYER_LIST_DIR}/src/vsidpsid.cpp
+    ${USPLAYER_SOURCES}
   )
   ### What it wants
   set(TARGET_INCLUDE_DIRS
     ${TARGET_INCLUDE_DIRS}
-    ${USPLAYER_LIST_DIR}/src/
-    ${USPLAYER_LIST_DIR}/src/c64
-    ${USPLAYER_LIST_DIR}/src/psid
-    ${USPLAYER_LIST_DIR}/src/psiddrv
-    ${USPLAYER_LIST_DIR}/src/roms
-    ${USPLAYER_LIST_DIR}/src/util
-    ${USPLAYER_LIST_DIR}/src/tunes
+    ${USPLAYER_INCLUDE_DIRS}
   )
 endif()
 
