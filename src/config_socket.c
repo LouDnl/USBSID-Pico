@@ -25,6 +25,7 @@
 
 #include <globals.h>
 #include <gpio.h>
+#include <bus.h>
 #include <dma.h>
 #include <usbsid_constants.h>
 #include <config.h>
@@ -678,6 +679,14 @@ ConfigError detect_socket_change(void)
 
   /* Reset SID registers afterwards */
   reset_sid_registers();
+
+  /* Detection mixes fire and forget writes with cpu side irq handling,
+     which can leave the bus pipeline one word out of step. Nothing else
+     in the boot path re-initialises the bus statemachines after this
+     point, so realign them here or every cycled write from now on gets
+     paired with the wrong delay value */
+  bus_drain();   /* Let the last register writes land */
+  bus_resync();  /* Then put the pipeline back in a known state */
 
   if (change_detected != CFG_OK) {
 #if PCB_VERSION_INT >= 15

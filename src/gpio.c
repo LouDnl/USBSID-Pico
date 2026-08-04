@@ -354,8 +354,14 @@ uint8_t get_pin_states(void)
 void voltage_state_on(void)
 {
 #if PCB_VERSION_INT >= 15
+  cPIN(RES);  /* Hold the SID's in reset _before_ enabling voltage */
   set_SID5v_state(true);
   set_SIDhv_state(true);
+  /* Releasing RES on a rail that has not settled yet causes desync like
+     behaviour, wait for the regulator and for the FPGASID FPGA config to
+     finish, same wait as the one in `init_vccvdd_control` */
+  sleep_ms(200);
+  sPIN(RES);
 #endif
   return;
 }
@@ -367,6 +373,7 @@ void voltage_state_on(void)
 void voltage_state_off(void)
 {
 #if PCB_VERSION_INT >= 15
+  cPIN(RES);  /* Hold the SID's in reset before dropping the rails */
   set_SID5v_state(false);
   set_SIDhv_state(false);
 #endif

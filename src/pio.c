@@ -30,6 +30,7 @@
 #include <gpio.h>
 #include <dma.h>
 #include <pio.h>
+#include <bus.h>
 #include <sid.h>
 
 
@@ -185,17 +186,25 @@ void clear_bus_fifos(void)
   pio_sm_clear_fifos(bus_pio, sm_control);
   pio_sm_clear_fifos(bus_pio, sm_data);
   pio_sm_clear_fifos(bus_pio, sm_delay);
-  pio_sm_clear_fifos(bus_pio, sm_clkcnt);
+  /* NOTE: sm_clkcnt lives on clkcnt_pio (pio1), passing bus_pio here
+     cleared bus_pio SM3 (sm_delay) a second time and never touched the
+     cycle counter fifo at all */
+  pio_sm_clear_fifos(clkcnt_pio, sm_clkcnt);
   return;
 }
 
 void sync_pios(bool at_boot)
 { /* Sync PIO's */
   usNFO("\n");
-  #if PICO_PIO_VERSION == 0
+#if PICO_PIO_VERSION == 0
   usDBG("Restarting PIO's (Pico & Pico_w)\n");
-  pio_sm_restart(bus_pio, 0b1111);
-  #elif PICO_PIO_VERSION > 0  /* NOTE: rp2350 only */
+  /* NOTE: `pio_sm_restart` takes a statemachine number and not a mask,
+     the previous `pio_sm_restart(bus_pio, 0b1111)` wrote CTRL bit 19,
+     which is reserved, so nothing was ever restarted here.
+     The PHI1 clock statemachine (SM0) is left out on purpose, restarting
+     it glitches the SID clock */
+  pio_restart_sm_mask(bus_pio, 0b1110);
+#elif PICO_PIO_VERSION > 0  /* NOTE: rp2350 only */
   usDBG("Synchronise PIO's (Pico2 & Pico2_w)\n");
   /* stdio_flush is required here because pio_clkdiv_restart_sm_multi_mask
      (RP2350-only) briefly disrupts UART interrupt handling mid-transmission.
@@ -204,9 +213,18 @@ void sync_pios(bool at_boot)
   pio_clkdiv_restart_sm_multi_mask(bus_pio, 0, 0b1111, 0);
   // pio_clkdiv_restart_sm_multi_mask(clkcnt_pio, 0, 0b0011, 0); /* TODO: SYNC COUNTER PIO WITH BUS PIO */
   pio_clkdiv_restart_sm_multi_mask(clkcnt_pio, 0, 0b1000, 0);
-  #endif
+  /* A clock divider restart does not clear the waiting-on-irq or stall
+     state of a statemachine, so do that seperately (bus SM's only) */
+  pio_restart_sm_mask(bus_pio, 0b1110);
+#endif
+  /* A statemachine restart leaves the irq flags untouched, clear both
+     bus handshake flags so no stale token survives the sync */
+  bus_pio->irq = ((1u << PIO_IRQ0) | (1u << PIO_IRQ1));
   if __us_likely(!at_boot) {
     clear_bus_fifos();
+    /* A restart does not reset the program counters either, so put the
+       bus statemachines back at the start of their programs */
+    bus_resync();
   };
   return;
 }

@@ -27,6 +27,7 @@
 #include <logging.h>
 #include <config.h>
 #include <pio.h>
+#include <bus.h>
 #include <sid.h>
 
 
@@ -209,6 +210,12 @@ void setup_vu_dma(void)
  */
 void clear_dma_channels(void)
 { /* Abort the 4 bus DMA channels and flush the backing PIO FIFOs */
+  /* Let any operation that is still travelling through the bus pipeline
+     finish first, flushing the fifos underneath it leaves the delay
+     statemachine stuck on `irq wait DATABUS` with both handshake flags
+     set, which desyncs every write that follows */
+  bool drained = bus_drain();
+
   uint32_t abort_mask = (1u << dma_tx_control) | (1u << dma_tx_data)
                       | (1u << dma_rx_data)    | (1u << dma_tx_delay)
 #if PICO_RP2350
@@ -229,6 +236,9 @@ void clear_dma_channels(void)
   hw_set_bits(&dma_hw->inte0, saved_inte0);
   /* Flush PIO FIFOs so no stale data remains for the next transfer */
   clear_bus_fifos();
+  /* The pipeline never ran empty, so the flush above may have truncated
+     an operation halfway, put the bus statemachines back in step */
+  if __us_unlikely(!drained) bus_resync();
   dma_hw->multi_channel_trigger =
 #if PICO_RP2350
     (1u << dma_counter);
