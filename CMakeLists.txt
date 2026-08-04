@@ -77,7 +77,7 @@ set(ENABLE_BLUETOOTH 0 CACHE STRING "ENABLE_BLUETOOTH")
 
 ### Information on the use of Vendor buffer
 ## This is turned on/off by setting both vendor buffer size
-## defines in tusb_config.h and by changing USE_VENDOR_BUFFER in globals.h
+## defines in tusb_config.h
 # CFG_TUD_VENDOR_TX_BUFSIZE
 # CFG_TUD_VENDOR_RX_BUFSIZE
 

@@ -109,6 +109,10 @@
 #define USE_CDC_CALLBACK 1  /* Force CDC callback use over cdc_task */
 #endif
 
+#ifndef USE_VENDOR_CALLBACK
+#define USE_VENDOR_CALLBACK 1  /* Force Vendor callback use over vendor_task */
+#endif
+
 /* Global USB definitions */
 #define CDC_ITF 0
 #define MIDI_ITF 0
