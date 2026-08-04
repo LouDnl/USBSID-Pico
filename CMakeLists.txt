@@ -37,7 +37,7 @@ set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
 string(TIMESTAMP MAGIC_SMOKE "%Y%m%d")  # Auto generate dated version
-set(FWVERSION "0.7.3")
+set(FWVERSION "0.7.4")
 set(PROJECT_VERSION "${FWVERSION}-${MAGIC_SMOKE}")  # Generate compile version
 
 ### Want a cookie?
@@ -55,11 +55,12 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(USBIO_DEBUGGING 0)      # Enable debugging in usbsid.c
   set(GPIOBUS_DEBUGGING 0)    # Enable debugging in gpio.c
   set(MIDI_DEBUGGING 0)       # Enable debugging in midi.c
-  set(MIDIVOICE_DEBUGGING 0)  # Enable debugging in midi.c
-  set(ASID_DEBUGGING 0)       # Enable debugging in acid.c and asid_buffer.c
+  set(MIDIVOICE_DEBUGGING 1)  # Enable debugging in midi.c
+  set(ASID_DEBUGGING 1)       # Enable debugging in acid.c and asid_buffer.c
   set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
   set(SIDWRITES_DEBUGGING 0)  # Enable logging of SID writes one core 2
-  set(EMULATOR_DEBUGGING 0)   # Enable debugging in emulator
+  set(EMULATOR_DEBUGGING 1)   # Enable debugging in emulator
+  set(ENABLE_PROFILING 0)     # Experimental!
 endif()
 
 ### Enable / Disable build with embedded emulator for Midi
@@ -71,6 +72,9 @@ set(USE_PIO_UART 0)
 
 ### Enable/ Disable build with Bluetooth on rp2350_w
 set(ENABLE_BLUETOOTH 0 CACHE STRING "ENABLE_BLUETOOTH")
+
+### Enable/ Disable build with CDC telemetry port (pico2 with sidplayer only!)
+set(ENABLE_TELEMETRY 0 CACHE STRING "ENABLE_TELEMETRY")
 
 ### Information on the use of CDC callback
 ## This is turned on/off by changing USE_CDC_CALLBACK in globals.h
@@ -343,6 +347,18 @@ if(${PICO_BOARD} STREQUAL "pico" OR ${PICO_BOARD} STREQUAL "pico2")
   )
 endif()
 
+### Target override for Pro version
+if(${PICO_BOARD} STREQUAL "weact_studio_rp2350b_core")
+  set(PROJECT_PRODUCT "${PRODUCT_STRING}Pro_rp2350b")
+  set(PROJECT_FILENAME "${PROJECT_NAME}pro_rp2350b")
+  set(FILENAMES)
+  set(PICOTYPES)
+  set(PCBVERSIONS)
+  list(APPEND FILENAMES ${PROJECT_FILENAME}-v1.0)
+  list(APPEND PICOTYPES "PRO")
+  list(APPEND PCBVERSIONS "1.0")
+endif()
+
 ### Source files to compile
 set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/usbsid.c
@@ -379,28 +395,58 @@ set(TARGET_INCLUDE_DIRS PRIVATE
 
 ### Embedded player stuffs
 if(ONBOARD_SIDPLAYER EQUAL 1)
-  set(EMUDIR ${CMAKE_CURRENT_LIST_DIR}/../player-repo CACHE STRING "EMUDIR")
+  ## Empty by default, deliberately. Giving this a default value makes it never
+  ## empty, which silently kills the lib/usbsid-player branch below, and that
+  ## is the branch CI actually wants: it checks the player out to exactly that
+  ## path, so the build should work without EMUDIR being passed at all.
+  set(EMUDIR "" CACHE STRING "Path to the USBSID-Player checkout")
   # NOTICE: SIDPLAYER REQUIRES FULL OPTIMIZATIONS!!
   # NOTE TO SELF: -O3 is already set in COMPILE_OPTS and applied via target_compile_options()
   # NOTE TO SELF: Do NOT use set(CMAKE_CXX_FLAGS ...) here as it strips Pico SDK architecture flags!
   ## Set sidplayer list directory
   ## USBSID-Player lives in player-repo, next to this one in the workspace.
-  ## EMUDIR still wins, then lib/usbsid-player if it has been linked in, then
+  ## EMUDIR wins, then lib/usbsid-player if it has been checked out there, then
   ## the sibling checkout.
-  if(NOT ${EMUDIR} STREQUAL "")
-    set(USPLAYER_LIST_DIR ${EMUDIR})
-  elseif(EXISTS ${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player/cmake/usbsid-player.cmake)
-    set(USPLAYER_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player)
+  if(NOT EMUDIR STREQUAL "")
+    ## A relative EMUDIR is ambiguous, and it fails in a way that reads like a
+    ## different fault. `if(EXISTS)` resolves a relative path against the
+    ## working directory while `include()` resolves it against the including
+    ## file's directory, so `cmake -S master -DEMUDIR=master/lib/usbsid-player`
+    ## passes the existence check below and then fails the include with
+    ## "could not find requested file", having looked in master/master/lib.
+    ## Resolve it here and carry an absolute path from this point on.
+    if(IS_ABSOLUTE "${EMUDIR}")
+      set(USPLAYER_LIST_DIR "${EMUDIR}")
+    else()
+      set(USPLAYER_LIST_DIR "")
+      foreach(BASE "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/.." "${CMAKE_BINARY_DIR}")
+        get_filename_component(EMUDIR_TRY "${BASE}/${EMUDIR}" ABSOLUTE)
+        if(EXISTS "${EMUDIR_TRY}/cmake/usbsid-player.cmake")
+          set(USPLAYER_LIST_DIR "${EMUDIR_TRY}")
+          message(STATUS "EMUDIR '${EMUDIR}' is relative, resolved to ${USPLAYER_LIST_DIR}")
+          break()
+        endif()
+      endforeach()
+      ## Nothing matched. Keep the most likely reading so the error below names
+      ## a real path instead of an empty one.
+      if(USPLAYER_LIST_DIR STREQUAL "")
+        get_filename_component(USPLAYER_LIST_DIR "${CMAKE_SOURCE_DIR}/${EMUDIR}" ABSOLUTE)
+      endif()
+    endif()
+  elseif(EXISTS "${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player/cmake/usbsid-player.cmake")
+    set(USPLAYER_LIST_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player")
   else()
     get_filename_component(USPLAYER_LIST_DIR
-      ${CMAKE_CURRENT_LIST_DIR}/../player-repo ABSOLUTE)
+      "${CMAKE_CURRENT_LIST_DIR}/../player-repo" ABSOLUTE)
   endif()
   message(STATUS "USPLAYER_LIST_DIR is set to ${USPLAYER_LIST_DIR}")
 
-  if(NOT EXISTS ${USPLAYER_LIST_DIR}/cmake/usbsid-player.cmake)
+  if(NOT EXISTS "${USPLAYER_LIST_DIR}/cmake/usbsid-player.cmake")
     message(FATAL_ERROR
-      "ONBOARD_SIDPLAYER is on but no USBSID-Player at ${USPLAYER_LIST_DIR}. "
-      "Point EMUDIR at it, or link it as lib/usbsid-player.")
+      "ONBOARD_SIDPLAYER is on but no USBSID-Player at ${USPLAYER_LIST_DIR}.\n"
+      "  EMUDIR was '${EMUDIR}'\n"
+      "  Pass an absolute -DEMUDIR=/path/to/usbsid-player, or check the player "
+      "out as lib/usbsid-player, or put it beside this repo as ../player-repo.")
   endif()
 
   ### Adjust filenames for user interpretation
@@ -410,6 +456,7 @@ if(ONBOARD_SIDPLAYER EQUAL 1)
   set(FILENAMES ${FILENAMES_tmp})
 
   ### The player brings its own file list, include paths and psiddrv target.
+  ### See player-repo/docs/EMBEDDED.md for what it exports and what the
   ### firmware is expected to call at runtime.
   ###
   ### Two things the old player needed and this one does not:
@@ -541,6 +588,32 @@ if(ENABLE_BLUETOOTH EQUAL 1)
   endif()
 endif()
 
+if(ENABLE_PROFILING EQUAL 1)
+  add_compile_definitions(ENABLE_PROFILING=1)
+  # set(COMPILE_OPTS
+  #   ${COMPILE_OPTS}
+  #   -pg
+  #   -mgeneral-regs-only
+  #   )
+  # set(TARGET_LL
+  #   ${TARGET_LL}
+  #   pico_stdio_semihosting
+  # )
+  # set(TARGET_INCLUDE_DIRS
+  #     ${TARGET_INCLUDE_DIRS}
+  #     ${CMAKE_CURRENT_LIST_DIR}/lib/McuLib/config
+  #     ${CMAKE_CURRENT_LIST_DIR}/lib/McuLib/src
+  #     ${CMAKE_CURRENT_LIST_DIR}/lib/CrashCourseC/Content/lib
+  # )
+  # add_link_options(-pg --specs=rdimon.specs)
+  # pico_enable_stdio_semihosting(${CMAKE_PROJECT_NAME} ENABLED)
+endif()
+
+if(ENABLE_TELEMETRY EQUAL 1)
+  if(${PICO_BOARD} STREQUAL "pico2" OR ${PICO_BOARD} STREQUAL "pico2_w")
+    add_compile_definitions(USE_TELEMETRY=1)
+  endif()
+endif()
 
 ### Pio files
 set(PIO_BUS     ${CMAKE_CURRENT_LIST_DIR}/src/pio/bus_control.pio)
@@ -683,9 +756,15 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   target_link_options(${BUILD} PRIVATE -Xlinker --print-memory-usage)
   # memory map linkers
   if(${PICO_PLATFORM} MATCHES rp2350)
-    message(TRACE "Memmap linker, platform ${PICO_PLATFORM} MATCHES rp2350")
-    target_compile_definitions(${BUILD} PRIVATE USBSID PICO_EMBED_XIP_SETUP=1)
-    set_target_properties(${BUILD} PROPERTIES PICO_TARGET_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/src/usbsidpico-rp2350.ld)
+    if(${PICO_BOARD} STREQUAL "weact_studio_rp2350b_core")
+      message(TRACE "Memmap linker, platform ${PICO_PLATFORM} MATCHES rp2350b")
+      target_compile_definitions(${BUILD} PRIVATE USBSID PICO_EMBED_XIP_SETUP=1)
+      set_target_properties(${BUILD} PROPERTIES PICO_TARGET_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/src/usbsidpico-rp2350b.ld)
+    else()
+      message(TRACE "Memmap linker, platform ${PICO_PLATFORM} MATCHES rp2350")
+      target_compile_definitions(${BUILD} PRIVATE USBSID PICO_EMBED_XIP_SETUP=1)
+      set_target_properties(${BUILD} PROPERTIES PICO_TARGET_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/src/usbsidpico-rp2350.ld)
+    endif()
   else()
     message(TRACE "Memmap linker, platform ${PICO_PLATFORM} EQUALS rp2040")
     set_target_properties(${BUILD} PROPERTIES PICO_TARGET_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/src/usbsidpico-rp2040.ld)
