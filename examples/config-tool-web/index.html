@@ -20,6 +20,9 @@
 
 <script type="text/javascript" src="websid/player.js"></script>
 <script type="text/javascript" src="websid/usbsid_adapter.js"></script>
+<!-- USBSID-Player (WASM) backend: factory (classic global) + adapter (module) -->
+<script type="text/javascript" src="usplayer/usbsid.js"></script>
+<script type="module" src="usplayer/usplayer-adapter.js"></script>
 </head>
 <body>
 
@@ -68,10 +71,12 @@
       <div id="emulator-row">
         <label for="sel-emulator">Mode:</label>
         <select id="sel-emulator" class="c64-select">
-          <option value="webusb">WebUSB (hardware SID)</option>
+          <option value="usplayer" selected>WebUSB (USBSID-Player)</option>
+          <option value="usplayer-asid">ASID (USBSID-Player)</option>
+          <option value="webusb">WebUSB (Hermit jsSID)</option>
           <option value="sendsid">SendSID (onboard player)</option>
-          <option value="asid">ASID (MIDI sysex)</option>
-          <option value="hermit" selected>Hermit jsSID (software)</option>
+          <option value="asid">ASID (Hermit jsSID)</option>
+          <option value="hermit">Hermit jsSID (software)</option>
           <option value="websid">WebSID Alpha (Jürgen Wothke)</option>
         </select>
         &nbsp;

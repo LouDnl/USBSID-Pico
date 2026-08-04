@@ -27,7 +27,7 @@ function setClock(rateId) {
 var _browser        = null;
 var _player         = null;
 var _pcbver         = '';        /* PCB version string from device descriptor */
-var _emulator       = 'hermit';  /* matches the default selected option in index.html */
+var _emulator       = 'usplayer';  /* matches the default selected option in index.html */
 var _hasSIDPlayer   = false;     /* true when connected device productName contains 'Pico2' */
 var _loadedBytes    = null;      /* Uint8Array of the currently loaded SID file */
 var _sendsidPlaying = false;     /* playback state for SendSID onboard player mode */
@@ -95,7 +95,15 @@ function initTabs() {
 }
 
 /* Device connection */
+var _connecting = false;   /* guards manual connect vs the load-time autoconnect */
 async function connectDevice() {
+  if (_connecting || usbsidDevice.isOpen) return;   /* autoconnect may be in flight / already done */
+  _connecting = true;
+  try {
+    await _connectDeviceInner();
+  } finally { _connecting = false; }
+}
+async function _connectDeviceInner() {
   if (!navigator.usb) {
     usbsidSetStatus('WebUSB not available - use HTTPS or localhost', 'red');
     usbsidLog('ERROR: navigator.usb is undefined. WebUSB requires a secure context (HTTPS or localhost).');
@@ -105,6 +113,9 @@ async function connectDevice() {
   try {
     const ok = await usbsidDevice.connect();
     if (ok) {
+      await onDeviceConnected();
+    } else if (usbsidDevice.isOpen) {
+      /* autoconnect won the race - reflect the real (connected) state */
       await onDeviceConnected();
     } else {
       usbsidSetStatus('Connection failed or cancelled', 'red');
@@ -118,9 +129,12 @@ async function connectDevice() {
 }
 
 async function reconnectDevice() {
-  if (usbsidDevice.isOpen) return;
-  const ok = await usbsidDevice.reconnect();
-  if (ok) await onDeviceConnected();
+  if (_connecting || usbsidDevice.isOpen) return;
+  _connecting = true;
+  try {
+    const ok = await usbsidDevice.reconnect();
+    if (ok) await onDeviceConnected();
+  } finally { _connecting = false; }
 }
 
 async function disconnectDevice() {
@@ -308,6 +322,15 @@ function onDeviceDisconnected() {
 
 /* Player integration */
 function createPlayer(emulator) {
+  /* USBSID-Player (WASM) backend for the usplayer / usplayer-asid modes.
+   * Reuses the app's already-connected usbsidDevice for the WebUSB variant. */
+  if (emulator === 'usplayer' || emulator === 'usplayer-asid') {
+    if (typeof window.USPlayerAdapter !== 'undefined') {
+      return new window.USPlayerAdapter(emulator, usbsidDevice);
+    }
+    usbsidLog('USPlayerAdapter not loaded yet (usplayer/usplayer-adapter.js)');
+    return null;
+  }
   if (typeof SIDPlayer !== 'undefined') {
     return new SIDPlayer(emulator);
   }
@@ -620,7 +643,7 @@ function setLoadButtons(enabled) {
 function updateConnectButtonVisibility() {
   const btn = document.getElementById('btn-connect');
   if (!btn) return;
-  const show = (_emulator === 'webusb' || _emulator === 'sendsid'/* || _emulator === 'websid' */);
+  const show = (_emulator === 'webusb' || _emulator === 'usplayer' || _emulator === 'sendsid'/* || _emulator === 'websid' */);
   btn.style.display = show ? '' : 'none';
 }
 
@@ -629,7 +652,7 @@ function updateConfTabVisibility() {
    * Needs an open device, which avoids auto-connect timing races. */
   const tab = document.querySelector('.c64-tab[data-tab="config"]');
   const panel = document.getElementById('panel-regs');
-  const show = (_emulator === 'webusb' || _emulator === 'sendsid');
+  const show = (_emulator === 'webusb' || _emulator === 'usplayer' || _emulator === 'sendsid');
   if (tab)   tab.style.display   = show ? '' : 'none';
   if (panel && !show) {
     /* If config panel is active and we're hiding it, switch to player tab */
@@ -646,7 +669,7 @@ function updateRegsTabVisibility() {
    * for device open, which avoids auto-connect timing races. */
   const tab = document.querySelector('.c64-tab[data-tab="regs"]');
   const panel = document.getElementById('panel-regs');
-  const show = (_emulator === 'webusb');
+  const show = (_emulator === 'webusb' || _emulator === 'usplayer');
   if (tab)   tab.style.display   = show ? '' : 'none';
   if (panel && !show) {
     /* If registers panel is active and we're hiding it, switch to player tab */
@@ -679,9 +702,9 @@ function switchEmulator(em) {
   webusb_enabled = (em === 'webusb');
   localStorage.setItem('usbsid_emulator', em);
   usbsidLog('Emulator switched to:', em);
-  /* Show MIDI selector only for ASID mode */
+  /* Show MIDI selector for any ASID mode (jsSID or USBSID-Player) */
   const midiRow = document.getElementById('asid-midi-row');
-  if (midiRow) midiRow.style.display = (em === 'asid') ? '' : 'none';
+  if (midiRow) midiRow.style.display = (em === 'asid' || em === 'usplayer-asid') ? '' : 'none';
   /* Show force-socket-2 checkbox only for SendSID mode */
   const socketRow = document.getElementById('sendsid-socket-row');
   if (socketRow) socketRow.style.display = (em === 'sendsid') ? 'inline-flex' : 'none';
@@ -691,7 +714,7 @@ function switchEmulator(em) {
   setPlayerButtons(false);
   setLoadButtons(true);  /* always restore load buttons on emulator switch; incompatible path re-disables if needed */
   /* Mode-specific prompts and button state */
-  if ((em === 'webusb' || em === 'sendsid') && !usbsidDevice.isOpen) {
+  if ((em === 'webusb' || em === 'usplayer' || em === 'sendsid') && !usbsidDevice.isOpen) {
     usbsidSetStatus('Connect device for ' + (em === 'sendsid' ? 'SendSID' : 'WebUSB') + ' playback', 'yellow');
   }
   /* Enable all transport buttons immediately in sendsid mode when already connected */
@@ -790,16 +813,64 @@ function detectSIDCountFromName(name) {
   return m ? parseInt(m[1], 10) : 1;
 }
 
-function updateSIDReg(sid, reg, val) {
+/* Register grid, made cheap enough to drive from a player.
+ *
+ * This used to do a getElementById, a querySelector, a string format and a
+ * setTimeout on every call. Driven by the USBSID-Player adapter that is one
+ * per SID write, about thirty thousand a second on a digi, and it held the tab
+ * at 102% of a core with twelve thousand timers pending at any moment. The
+ * adapter now coalesces its writes, but the per call cost was worth removing
+ * anyway: jsSID drives this too.
+ *
+ * The cells are static in index.html, so their elements are looked up once.
+ * The highlight is swept by one shared timer instead of a timer per call. */
+const _REG_HEX = Array.from({ length: 256 },
+  (_, i) => i.toString(16).padStart(2, '0').toUpperCase());
+const _regCells = new Map();
+const _regFlash = new Map();   /* cell -> when the highlight expires */
+let   _regSweep = 0;
+
+/* Short enough to read as a flash rather than a light that is always on. At
+ * twenty updates a second a 400 ms highlight never goes out on a busy tune. */
+const _REG_FLASH_MS = 180;
+
+function _regEls(sid, reg) {
+  const key = (sid << 5) | reg;
+  let e = _regCells.get(key);
+  if (e !== undefined) return e;
   const cell = document.getElementById('sreg-' + sid + '-' + reg);
-  if (!cell) return;
-  const valEl = cell.querySelector('.reg-val');
-  if (valEl) {
-    valEl.textContent = val.toString(16).padStart(2, '0').toUpperCase();
-    cell.classList.add('reg-written');
-    setTimeout(() => cell.classList.remove('reg-written'), 400);
-  }
+  e = cell ? { cell, valEl: cell.querySelector('.reg-val') } : null;
+  _regCells.set(key, e);
+  return e;
 }
+
+function _regSweepTick() {
+  const now = performance.now();
+  for (const [cell, until] of _regFlash) {
+    if (until > now) continue;
+    cell.classList.remove('reg-written');
+    _regFlash.delete(cell);
+  }
+  if (_regFlash.size === 0) { clearInterval(_regSweep); _regSweep = 0; }
+}
+
+function updateSIDReg(sid, reg, val) {
+  const e = _regEls(sid, reg);
+  if (!e || !e.valEl) return;
+
+  const txt = _REG_HEX[val & 0xff];
+  if (e.valEl.textContent !== txt) e.valEl.textContent = txt;
+
+  if (!_regFlash.has(e.cell)) e.cell.classList.add('reg-written');
+  _regFlash.set(e.cell, performance.now() + _REG_FLASH_MS);
+  if (!_regSweep) _regSweep = setInterval(_regSweepTick, 60);
+}
+
+/* Exposed for the USBSID-Player adapter (usplayer/usplayer-adapter.js), whose
+ * writes bypass the webusb.writeReg path used by jsSID. It taps every player
+ * write to keep the live register grid in sync. */
+window.updateSIDReg = updateSIDReg;
+window.updateRegGridSIDCount = updateRegGridSIDCount;
 
 
 /* SID library list (SID/sidfilelist.txt) */
@@ -1044,14 +1115,9 @@ function initEmulatorSelect() {
   usbsidLog('Saved emulator:', saved);
   if (saved && sel.querySelector('option[value="' + saved + '"]')) {
     sel.value = saved;
-    switchEmulator(saved);
-  } else {
-    /* Apply initial row visibility based on default selection */
-    const midiRow = document.getElementById('asid-midi-row');
-    if (midiRow) midiRow.style.display = (sel.value === 'asid') ? '' : 'none';
-    const socketRow = document.getElementById('sendsid-socket-row');
-    if (socketRow) socketRow.style.display = (sel.value === 'sendsid') ? 'inline-flex' : 'none';
   }
+  /* Sync app state to the (restored or default) selection. */
+  switchEmulator(sel.value);
   sel.addEventListener('change', () => {
     switchEmulator(sel.value);
   });
