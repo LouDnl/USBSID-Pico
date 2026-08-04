@@ -379,7 +379,7 @@ set(TARGET_INCLUDE_DIRS PRIVATE
 
 ### Embedded player stuffs
 if(ONBOARD_SIDPLAYER EQUAL 1)
-  set(EMUDIR ${CMAKE_CURRENT_LIST_DIR}/../player-repo)
+  set(EMUDIR ${CMAKE_CURRENT_LIST_DIR}/../player-repo CACHE STRING "EMUDIR")
   # NOTICE: SIDPLAYER REQUIRES FULL OPTIMIZATIONS!!
   # NOTE TO SELF: -O3 is already set in COMPILE_OPTS and applied via target_compile_options()
   # NOTE TO SELF: Do NOT use set(CMAKE_CXX_FLAGS ...) here as it strips Pico SDK architecture flags!
