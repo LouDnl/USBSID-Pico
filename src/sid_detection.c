@@ -867,6 +867,10 @@ ConfigError sid_auto_detect(bool at_boot)
   /* Run detection */
   DetectionResult det = detect_all();
 
+  /* Realign the bus pipeline, also covers the error returns below */
+  bus_drain();
+  bus_resync();
+
   /* Apply results */
   err = apply_detection_results(&det);
   if (err != CFG_OK) {
@@ -889,6 +893,10 @@ ConfigError sid_auto_detect(bool at_boot)
 
   /* Reset SID registers after detection */
   reset_sid_registers();
+
+  /* Realign the bus pipeline after all detection writes and reads */
+  bus_drain();
+  bus_resync();
 
   usNFO("\n");
   if(detection_logging) usSID("Auto detection completed\n");
@@ -913,6 +921,10 @@ ConfigError sid_auto_detect_silent(void)
   /* Run detection */
   DetectionResult det = detect_all();
 
+  /* Realign the bus pipeline, also covers the error returns below */
+  bus_drain();
+  bus_resync();
+
   /* Apply results */
   err = apply_detection_results(&det);
   if (err != CFG_OK) {
@@ -925,6 +937,10 @@ ConfigError sid_auto_detect_silent(void)
 
   /* Reset SID registers after detection */
   reset_sid_registers();
+
+  /* Realign the bus pipeline after all detection writes and reads */
+  bus_drain();
+  bus_resync();
 
 #if PCB_VERSION_INT >= 15
   if (!voltage_state) { voltage_state_off(); }; /* Turn off regulators if they were off before */

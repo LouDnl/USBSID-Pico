@@ -37,6 +37,15 @@
 /* Direct Pio IRQ access */
 #define IRQState (pio0_hw->irq)
 
+/* Both bus handshake flags in one write (write 1 to clear) */
+#define BUS_IRQ_MASK ((1u << PIO_IRQ0) | (1u << PIO_IRQ1))
+
+/* Bounded spin for `bus_drain`
+ * A single in flight operation can hold the pipeline for up to
+ * 65535 PHI1 cycles (~66ms @1MHz), so the bound needs to exceed that
+ * by a good margin before we call the pipeline stuck */
+#define BUS_DRAIN_TIMEOUT 2000000u
+
 /* DMA bus data variables */
 volatile static uint8_t control_word, read_data;
 volatile static uint16_t delay_word;
@@ -155,6 +164,85 @@ uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t ad
 }
 
 /**
+ * @brief Wait until no cycled operation is in flight anymore
+ *
+ * The bus is a three statemachine pipeline that hands over work with
+ * the CONTROL and DATABUS irq flags. A cycled operation is _not_
+ * finished when its DMA reports done, that only means the word reached
+ * the PIO fifo. Touching the irq flags or clearing the fifos while an
+ * operation is still travelling through the pipeline steals a handover
+ * token and leaves the delay word paired with the wrong write, which is
+ * a permanent desync that only an MCU reset or `bus_resync` repairs.
+ *
+ * All three programs start with a blocking `pull`, so once every one of
+ * them reports TXSTALL the pipeline is empty and parked at its wrap
+ * target.
+ *
+ * @note bounded spin, a stuck pipeline returns 0 instead of hanging
+ *
+ * @return int 1 when drained, 0 on timeout (caller should `bus_resync`)
+ */
+int __no_inline_not_in_flash_func(bus_drain)(void)
+{
+  const uint32_t stall_mask =
+    (((1u << sm_control) | (1u << sm_data) | (1u << sm_delay))
+      << PIO_FDEBUG_TXSTALL_LSB) & PIO_FDEBUG_TXSTALL_BITS;
+
+  /* The stall flags are sticky and report history, clear them first */
+  bus_pio->fdebug = stall_mask;
+  for (uint32_t spin = 0; spin < BUS_DRAIN_TIMEOUT; spin++) {
+    if ((bus_pio->fdebug & stall_mask) == stall_mask) return 1;
+    tight_loop_contents();
+  }
+
+  return 0;
+}
+
+/**
+ * @brief Realign the bus PIO pipeline
+ *
+ * Puts the control, data and delay statemachines back at the start of
+ * their programs with empty fifos and both handshake flags cleared, so
+ * the next cycled operation starts from a known state.
+ *
+ * Required after anything that can leave the pipeline skewed, for
+ * example the SID detection routines, which mix fire and forget writes
+ * with cpu side irq manipulation and fifo flushes.
+ *
+ * @note the PHI1 clock statemachine is deliberately left alone, a
+ *       restart of that one glitches the SID clock
+ * @note `pio_restart_sm_mask` clears the waiting-on-irq state, stalls,
+ *       shift counters and any latched exec instruction, but it does
+ *       _not_ reset the program counter or the irq flags, both of which
+ *       are handled explicitly below
+ */
+void __no_inline_not_in_flash_func(bus_resync)(void)
+{
+  const uint32_t sm_mask = (1u << sm_control) | (1u << sm_data) | (1u << sm_delay);
+
+  /* Stop the bus statemachines */
+  pio_set_sm_mask_enabled(bus_pio, sm_mask, false);
+  /* Drop anything still queued */
+  pio_sm_clear_fifos(bus_pio, sm_control);
+  pio_sm_clear_fifos(bus_pio, sm_data);
+  pio_sm_clear_fifos(bus_pio, sm_delay);
+  /* Clear internal statemachine state */
+  pio_restart_sm_mask(bus_pio, sm_mask);
+  /* Clear both handshake flags */
+  bus_pio->irq = BUS_IRQ_MASK;
+  /* Send each statemachine back to its wrap target */
+  pio_sm_exec(bus_pio, sm_control, pio_encode_jmp(offset_control + bus_control_wrap_target));
+  pio_sm_exec(bus_pio, sm_data, pio_encode_jmp(offset_data + data_bus_wrap_target));
+  pio_sm_exec(bus_pio, sm_delay, pio_encode_jmp(offset_delay + delay_timer_wrap_target));
+  /* Clear the sticky stall flags so the next `bus_drain` starts clean */
+  bus_pio->fdebug = ((sm_mask << PIO_FDEBUG_TXSTALL_LSB) & PIO_FDEBUG_TXSTALL_BITS);
+  /* Restart all three in lockstep */
+  pio_enable_sm_mask_in_sync(bus_pio, sm_mask);
+
+  return;
+}
+
+/**
  * @brief Cycle delay function
  *        blocks for supplied number of cycles (65535 max)
  * @note uses DMA & PIO0 SM0 & SM3
@@ -164,6 +252,12 @@ uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t ad
 uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles)
 { /* This is a blocking function! */
   if __us_unlikely(cycles == 0) return 0; /* No point in waiting zero cycles */
+  /* This function drives the handshake flags from the cpu side, so the
+     pipeline has to be empty first. Clearing or write-1-to-clearing the
+     flags while a cycled write is still in flight steals the handover
+     from the control and data statemachines and desyncs the bus for
+     good, see `bus_drain` */
+  if __us_unlikely(!bus_drain()) bus_resync();
   delay_word = cycles;
   pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ0));  /* Clear the statemachine IRQ before starting */
   pio_sm_exec(bus_pio, sm_delay, pio_encode_irq_clear(false, PIO_IRQ1));  /* Clear the statemachine IRQ before starting */

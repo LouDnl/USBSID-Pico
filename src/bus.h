@@ -45,6 +45,8 @@ uint8_t  cycled_read_operation(uint8_t address, uint16_t cycles);
 
 /* Functions from bus.c */
 void     restart_bus(void);
+int      bus_drain(void);
+void     bus_resync(void);
 uint32_t clockcycles(void);
 void     clockcycle_delay(uint32_t n_cycles);
 

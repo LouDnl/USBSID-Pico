@@ -421,7 +421,7 @@ void tud_midi_rx_cb(uint8_t itf)
 }
 
 
-/* USB CDC CLASS TASK & CALLBACKS */
+/* USB CDC CLASS TASKS & CALLBACKS */
 
 /* Read from host to device */
 #ifndef USE_CDC_CALLBACK
@@ -508,9 +508,9 @@ void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 }
 
 
-/* USB VENDOR CLASS CALLBACKS */
+/* USB VENDOR CLASS TASKS & CALLBACKS */
 
-#ifdef USE_VENDOR_BUFFER
+#ifndef USE_VENDOR_CALLBACK
 void vendor_task(void)
 { /* Same as the callback routine */
   /* If the fifo buffer is disabled, this function has no use */
@@ -533,16 +533,21 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
   /* With the fifo buffer disabled the buffer contains the newest incoming data */
   /* If the fifo buffer is enabled the buffer contains data from the previous read */
 
-  /* vendor class has no connect check, thus use this */
-  if (web_serial_connected && itf == WUSB_ITF) {
+  /* vendor class has no connect check, so we use a makeshift check */
+#ifdef USE_VENDOR_CALLBACK
+  if __us_likely(itf == WUSB_ITF && web_serial_connected) {
       wusb_itf = &itf; /* Since there's only 1 vendor interface, we know it's 0 */
       usbdata = 1, dtype = wusb, rtype = wusb;
       webread = bufsize;
+      // /* No need to flush since we have no fifo */
+      tud_vendor_n_read_flush(*wusb_itf);
       memcpy(sid_buffer, buffer, bufsize);
-      /* No need to flush since we have no fifo */
       process_buffer(wusb_itf, &webread);
     return;
   }
+#else
+  (void)itf;
+#endif
   return;
 }
 
@@ -551,9 +556,6 @@ void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
   (void)itf;
   usNFO("[VDR] TX %lu\n", sent_bytes);
 }
-
-
-/* WEBUSB VENDOR CLASS CALLBACKS */
 
 /* Handle incoming vendor and webusb data */
 bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const * request)
@@ -569,30 +571,6 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
     case TUSB_REQ_TYPE_STANDARD:  /* 0 */
       break;
     case TUSB_REQ_TYPE_CLASS:     /* 1 */
-      if (request->bRequest == WEBUSB_COMMAND) {
-        usDBG("request->bRequest == WEBUSB_COMMAND\n");
-        if (request->wValue == WEBUSB_RESET) {
-          usDBG("request->wValue == WEBUSB_RESET\n");
-          // BUG: NO WURKY CURKY
-          /* reset_sid_registers(); */ // BUG: Temporary disabled
-          reset_sid();  // NOTICE: Temporary until fixed!
-          /* unmute_sid(); */
-        }
-        if (request->wValue == RESET_SID) {
-          usDBG("request->wValue == RESET_SID\n");
-          reset_sid();
-        }
-        if (request->wValue == PAUSE) {
-          usDBG("request->wValue == PAUSE\n");
-          pause_sid();
-          mute_sid();
-        }
-        if (request->wValue == WEBUSB_CONTINUE) {
-          usDBG("request->wValue == WEBUSB_CONTINUE\n");
-          pause_sid();
-          unmute_sid();
-        }
-      }
       if (request->bRequest == 0x22) { /* On connection */
         /* Webserial simulates the CDC_REQUEST_SET_CONTROL_LINE_STATE (0x22) to connect and disconnect */
         web_serial_connected = (request->wValue != 0);
@@ -1002,7 +980,7 @@ int main()
 #ifndef USE_CDC_CALLBACK
     cdc_task();  /* Only use this if no callbacks */
 #endif
-#ifdef USE_VENDOR_BUFFER
+#ifndef USE_VENDOR_CALLBACK
     vendor_task();  /* Only use this if buffering and fifo are enabled */
 #endif
 

@@ -127,9 +127,9 @@
 
 // Vendor FIFO size of TX and RX
 // If not configured vendor endpoints will not be buffered
-// If configured, make sure to define USE_VENDOR_BUFFER 1 in globals.h
-#define CFG_TUD_VENDOR_RX_BUFSIZE 0  /* Set to 0 to disable buffering (the fifo is not used) */
-#define CFG_TUD_VENDOR_TX_BUFSIZE 0  /* Set to 0 to disable buffering (the fifo is not used) */
+// For buffering it's better to to define USE_VENDOR_CALLBACK 1 in globals.h
+#define CFG_TUD_VENDOR_RX_BUFSIZE 64  /* Set to 0 to disable buffering (the fifo is not used) */
+#define CFG_TUD_VENDOR_TX_BUFSIZE 64  /* Set to 0 to disable buffering (the fifo is not used) */
 
 
 #ifdef __cplusplus

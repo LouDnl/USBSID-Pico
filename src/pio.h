@@ -94,6 +94,7 @@
 extern const PIO bus_pio;
 extern const PIO clkcnt_pio;
 extern volatile uint sm_control, sm_data, sm_clock, sm_delay, sm_clkcnt;
+extern volatile uint offset_control, offset_data, offset_clock, offset_delay, offset_clkcnt;
 extern volatile float sidclock_frequency, busclock_frequency;
 
 /* LED PIO (non-WiFi boards only) */

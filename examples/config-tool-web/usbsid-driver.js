@@ -40,7 +40,7 @@ const RESET_SID    = 14;  /* 0x0E */
 const DISABLE_SID  = 15;  /* 0x0F */
 const ENABLE_SID   = 16;  /* 0x10 */
 const CLEAR_BUS    = 17;  /* 0x11 */
-const CONFIG       = 18;  /* 0x12 – used as sub-command prefix */
+const CONFIG       = 18;  /* 0x12 - used as sub-command prefix */
 const RESET_MCU    = 19;  /* 0x13 */
 const BOOTLOADER   = 20;  /* 0x14 */
 
@@ -418,7 +418,7 @@ class USBSIDDevice {
        *   - wrong magic bytes  → skip (stale response from another command)
        * fw >= 0.7.0: full config fits in one 64-byte packet (terminator at [62..63]).
        * fw < 0.7.0:  may have sent additional packets; we break at CONFIG_SIZE so
-       *              only the first valid packet is consumed — any extra packets left
+       *              only the first valid packet is consumed - any extra packets left
        *              in the buffer are stale and skipped by magic checks in later reads.
        * WebUSB rejects all pending transferIn on disconnect, so no infinite hang. */
       await this._device.transferOut(this._epOut, cmdBuf);
@@ -634,6 +634,21 @@ class USBSIDDevice {
   /* Raw array write - used by player integration */
   async writeArray(arr) {
     await this.write(arr);
+  }
+
+  /* Raw array write that AWAITS transfer completion (device accepted the
+   * packet). Unlike write()/writeArray() (fire-and-forget), the returned promise
+   * resolves only once transferOut settles, giving the caller real USB
+   * backpressure. Used by the USBSID-Player transport to serialize cycled
+   * packets so a whole-frame burst cannot overflow the device buffer. */
+  async writeArrayAwait(arr) {
+    if (!this._isOpen) return;
+    const buf = arr instanceof Uint8Array ? arr : new Uint8Array(arr);
+    try {
+      await this._device.transferOut(this._epOut, buf);
+    } catch (e) {
+      this._log('writeArrayAwait error:', e);
+    }
   }
 
   /* Pause / unpause SID output */

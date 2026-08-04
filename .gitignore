@@ -74,6 +74,8 @@
 !examples/config-tool-web/images
 !examples/config-tool-web/lib
 !examples/config-tool-web/SID
+!examples/config-tool-web/usplayer
+!examples/config-tool-web/usplayer/**
 !examples/config-tool-web/websid
 !examples/config-tool-web_old
 !examples/send_sid
