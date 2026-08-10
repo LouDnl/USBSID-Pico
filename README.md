@@ -317,7 +317,7 @@ _Cases for PCB revision v1.3:_
 * [Dual USBSID-Pico Commodore 64 Case](cases/v1.3/Dual_USBSID-Pico_Commodore_64_Case) by [@OlefinMakes](https://github.com/OlefinMakes/)
 
 _Cases for PCB revision v1.5:_  
-* COMING SOON!  
+* [spotUp Cartridge case, LouD v1.5 remix](cases/v1.5/spotUp-LouD_remix) by [@LouD](https://github.com/LouDnl/)
 
 ## PCB Features
 ### volume board
