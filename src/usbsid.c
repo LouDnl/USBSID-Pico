@@ -510,7 +510,7 @@ void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 }
 
 
-/* USB VENDOR CLASS TASKS & CALLBACKS */
+/* WEBUSB VENDOR CLASS TASKS & CALLBACKS */
 
 #ifndef USE_VENDOR_CALLBACK
 void vendor_task(void)
@@ -698,7 +698,7 @@ void core1_main(void)
 
   while (1) {
 
-    if (get_reset_state()) continue;
+    if __us_unlikely(get_reset_state()) continue;
 
     /* Blinky blinky? */
     if (!offload_ledrunner) {
@@ -709,11 +709,11 @@ void core1_main(void)
     }
 
 #if PCB_VERSION_INT >= 15
-    if (detected_sid_change) continue;
+    if __us_unlikely(detected_sid_change) continue;
 #endif
 
     /* Check SID test queue */
-    if (running_tests) {
+    if __us_unlikely(running_tests) {
       sidtest_queue_entry_t s_entry;
       if (queue_try_remove(&sidtest_queue, &s_entry)) {
         s_entry.func(s_entry.s, s_entry.t, s_entry.wf);
@@ -740,7 +740,8 @@ void core1_main(void)
       sidplayer_start = false;
       sidplayer_playing = true;
       if (!is_prg) {
-        init_sidplayer(); // WARNING: rp2040 insufficient memory!
+        init_sidplayer(); /* WARNING: Does not work on rp2040, insufficient memory! */
+        usplayer_set_sid_config(cfg.numsids,cfg.sids_one,cfg.sids_two,cfg.fmopl_sid);
         start_sidplayer(false); /* No auto loop */
       }
     }
@@ -761,9 +762,9 @@ void core1_main(void)
       sidplayer_prev = false;
       sidplayer_playing = true;
     }
-    if (sidplayer_playing) {
+    if __us_likely(sidplayer_playing) {
       loop_sidplayer();
-      if __us_unlikely (sidplayer_next || sidplayer_prev) {
+      if __us_unlikely(sidplayer_next || sidplayer_prev) {
         sidplayer_playing = false;
       }
     }
@@ -824,7 +825,7 @@ int main()
     .speed = TUSB_SPEED_FULL
   };
   tusb_init(BOARD_TUD_RHPORT, &dev_init);
-  tud_disconnect();  /* Keep USB invisible to host during boot — set_base_voltages sleeps up to 4.5s */
+  tud_disconnect();  /* Keep USB invisible to host during boot - set_base_voltages can take some time */
   /* Init logging */
   init_logging();
   /* Log reset reason */
