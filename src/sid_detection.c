@@ -815,10 +815,12 @@ DetectionResult detect_all(void)
   memcpy(&cfg, &probe_rt, sizeof(RuntimeCFG));  /* copy probe cfg to running cfg */
   restore_interrupts(irq);
   /* Give clones time to finish whatever it's doing */
-  sleep_ms(500);
+  sleep_ms(250);
 
   /* Detect SocketOne Chip */
   result = detect_socket_chip(result, &probe, SOCK_ONE);
+  /* Let clones settle their panties */
+  sleep_ms(100);
   /* Update probe config (for dual or single sid detection) */
   update_probe_config_from_detection(result, &probe, SOCK_ONE);
 
@@ -834,9 +836,13 @@ DetectionResult detect_all(void)
   result = detect_socket_sid(result, probe.socketOne.sid1.addr, probe.socketOne.sid2.addr, SOCK_ONE);
   /* Verify SocketOne results */
   result = verify_socket_chip(result, SOCK_ONE);
+  /* Let clones settle their panties */
+  sleep_ms(100);
 
   /* Detect SocketTwo Chip */
   result = detect_socket_chip(result, &probe, SOCK_TWO);
+  /* Let clones settle their panties */
+  sleep_ms(100);
   /* Update probe config (for dual or single sid detection) */
   update_probe_config_from_detection(result, &probe, SOCK_TWO);
 
@@ -852,15 +858,19 @@ DetectionResult detect_all(void)
   result = detect_socket_sid(result, probe.socketTwo.sid1.addr, probe.socketTwo.sid2.addr, SOCK_TWO);
   /* Verify SocketTwo results */
   result = verify_socket_chip(result, SOCK_TWO);
+  /* Let clones settle their panties */
+  sleep_ms(100);
 
   /* Restore original runtime config */
   irq = save_and_disable_interrupts();
   memcpy(&cfg, &saved_cfg, sizeof(RuntimeCFG));
   restore_interrupts(irq);
+  /* Give clones time to finish whatever it's doing */
+  sleep_ms(250);
 
   result.success = true;
 
-  set_busconfig_logging(false);
+  set_busconfig_logging(true);
   if(detection_logging) {
     usNFO("\n");
     usSID("Chip & SID detection complete: S1(%d,%d,%d) S2(%d,%d,%d)\n",
