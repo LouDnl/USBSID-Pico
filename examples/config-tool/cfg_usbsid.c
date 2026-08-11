@@ -642,7 +642,10 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
         usbsid_config.need_confirmation = (bool)buff[i];
         break;
       case 3:
-        usbsid_config.disable_changedetect = (bool)buff[i];
+        usbsid_config.socket_change_detect = (bool)buff[i];
+        break;
+      case 4:
+        usbsid_config.preset_auto_detect = (bool)(buff[i] & 0x80);  /* 0bn000000 ~ n == 1 or 0 */
         break;
       case 5:
         usbsid_config.lock_clockrate = buff[i];
@@ -843,6 +846,8 @@ void print_config(void)
       usbsid_config.socketTwo.sid2.addr,
       usbsid_config.socketTwo.sid2.id);
   }
+  printf("\n");
+  printf("  Preset silent auto detection = %s\n", enabled[usbsid_config.preset_auto_detect]);
   printf("  Mirror Socket Two to Socket One = %s\n", enabled[usbsid_config.mirrored]);
   printf("  Flip Socket One and Socket One  = %s\n", enabled[usbsid_config.flipped]);
   printf("  Mix socket addresses (Quad SID) = %s\n", enabled[usbsid_config.mixed]);
@@ -879,7 +884,7 @@ void print_config(void)
     enabled[(int)usbsid_config.Asid.enabled]);
   printf("\n");
   printf("Verification of socket change detection on boot = %s\n",
-    enabled[(int)!usbsid_config.disable_changedetect]);
+    enabled[(int)usbsid_config.socket_change_detect]);
 
   if (usbsid_config.need_confirmation) {
     printf("\n!! CURRENT CONFIGURATION NEEDS TO BE VERIFIED AND ACKNOWLEDGED !!\n\n");
@@ -1606,6 +1611,8 @@ void print_help(void)
   printf("  -lau N,   --lock-audio N      : Lock and the audio switch in it's current state until reboot: True (1) False (0)\n");
   printf("  -sad N,   --sock-autodetect N : Disable/enable and save the automatic socket change detection on boot (PCB v1.5+ only!)\n");
   printf("                                  0: %s, 1:%s\n", enabled[0], enabled[1]);
+  printf("  -pad N,   --preset-detect N   : Disable/enable and save the silent automatic socket detection on preset selection\n");
+  printf("                                  0: %s, 1:%s\n", enabled[0], enabled[1]);
   printf("--[PRESETS]-------------------------------------------------------------------------------------------------------------\n");
   printf("  -single,  --single-sid        : Socket 1 enabled @ single SID, Socket 2 disabled\n");
   printf("  -single2, --single-sid-s2     : Socket 1 disabled, Socket 2 enabled @ single SID\n");
@@ -1913,6 +1920,17 @@ void config_usbsidpico(int argc, char **argv)
         goto exit;
       }
       printf("Disable automatic socket change detection on boot set to '%s'\n", enabled[det]);
+      write_config_command(SOCKET_DETECT, det, 0x0, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-pad") || !strcmp(argv[param_count], "--preset-detect")) {
+      param_count++;
+      int det = atoi(argv[param_count]);
+      if(det > 1) {
+        printf("%d is not a correct preset autodetect option!\n", det);
+        goto exit;
+      }
+      printf("Disable silent automatic detection on preset select set to '%s'\n", enabled[det]);
       write_config_command(SOCKET_DETECT, det, 0x0, 0x0, 0x0);
       break;
     }
