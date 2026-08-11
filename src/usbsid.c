@@ -51,14 +51,14 @@ uint8_t __not_in_flash("usbsid_buffer") config_buffer[MAX_BUFFER_SIZE] __aligned
 uint8_t __not_in_flash("usbsid_buffer") uart_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);   /* 64 Bytes, 128 bytes aligned */
 uint8_t *write_buffer_p = write_buffer; /* Init pointer for external use */
 
-#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
-/* Use full 64KB memory for C64 emulator and SID player */
+#if defined(ONBOARD_EMULATOR)
+/* Use full 64KB memory for C64 emulator */
 uint8_t __not_in_flash("c64_memory") c64memory[C64_MEMORY_SIZE] __aligned(128) = {0}; /* 64 Kilo Bytes, 128 bytes aligned */
 /* Pointer to SID address range in memory */
 uint8_t * sid_memory = &c64memory[0xd400]; /* Pointer to $d400 of 128 Bytes total */
 #else
 /* 128 Bytes 'Memory' storage for SID registers */
-uint8_t __not_in_flash("usbsid_buffer") sid_memory[SID_MEMORY_SIZE] __aligned(SID_MEMORY_SIZE); /* 128 Bytes, 128 bytes aligned */
+uint8_t __not_in_flash("usbsid_buffer") sid_memory[SID_MEMORY_SIZE] __aligned(SID_MEMORY_SIZE) = {0}; /* 128 Bytes, 128 bytes aligned */
 #endif
 
 volatile int usb_connected = 0, usbdata = 0;

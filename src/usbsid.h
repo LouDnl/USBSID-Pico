@@ -38,7 +38,7 @@ extern uint8_t uart_buffer[];
 extern uint8_t *write_buffer_p;
 
 /* SID register shadow memory from usbsid.c */
-#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
+#if defined(ONBOARD_EMULATOR)
 extern uint8_t c64memory[];
 extern uint8_t *sid_memory;
 #else
