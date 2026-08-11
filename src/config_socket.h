@@ -40,9 +40,12 @@
 void        set_socketconfig_logging(bool enabled);
 ConfigError validate_config(void);
 void        socket_config_fallback(void);
-void        apply_fmopl_config(void);
+int         verify_fmopl_sidno(void);
+bool        set_fmopl_sidno(int sidno);
+void        apply_fmopl_config(RuntimeCFG *rt);
 void        apply_preset_wrapper(SocketPreset preset);
 void        flip_sockets(void);
+void        apply_sid_addresses(void);
 ConfigError apply_detection_results(const DetectionResult *det);
 ConfigError verify_socket_detection_results(const DetectionResult *det);
 Socket      default_socket(int id);
