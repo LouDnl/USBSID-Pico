@@ -446,14 +446,16 @@ void cdc_task(void)
 void tud_cdc_rx_cb(uint8_t itf)
 { /* No need to check available bytes for reading */
 #ifdef USE_CDC_CALLBACK
-  if (itf == CDC_ITF) {
-    cdc_itf = &itf;
-    usbdata = 1, dtype = cdc, rtype = cdc;
-    cdcread = tud_cdc_n_read(*cdc_itf, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
-    tud_cdc_n_read_flush(*cdc_itf);
-    memcpy(sid_buffer, read_buffer, cdcread);
-    process_buffer(cdc_itf, &cdcread);
-    return;
+  if __us_likely(itf == CDC_ITF) {
+    if (tud_cdc_n_available(CDC_ITF)) {
+      cdc_itf = &itf;
+      usbdata = 1, dtype = cdc, rtype = cdc;
+      cdcread = tud_cdc_n_read(*cdc_itf, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
+      tud_cdc_n_read_flush(*cdc_itf);
+      memcpy(sid_buffer, read_buffer, cdcread);
+      process_buffer(cdc_itf, &cdcread);
+      return;
+    }
   }
 #else
   (void)itf;
