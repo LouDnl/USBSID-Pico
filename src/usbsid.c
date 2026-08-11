@@ -104,6 +104,8 @@ uint8_t * sidfile = NULL; /* Temporary buffer to store incoming data */
 volatile int sidfile_size = 0;
 volatile char tuneno = 0;
 volatile bool is_prg = false; /* Default to SID file */
+#else
+volatile bool is_sidplayerplaying(void) { return false; };
 #endif /* ONBOARD_SIDPLAYER */
 
 /* Queues */
@@ -218,9 +220,7 @@ void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
 {
   int state = 0;
   do {
-    set_receivedata(true);
-    set_sidwriting(true); /* Will fall back to false after a write finished */
-    vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+    set_vu_action(); /* Keep that shiny Vu blinking! */
     state = do_buffer_tick(n_bytes, step);
   } while (state != 1);
 }
@@ -228,8 +228,7 @@ void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
 /* Process received usb data */
 void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volatile uint32_t * n)
 {
-  set_receivedata(true);
-  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+  set_vu_action(); /* Keep that shiny Vu blinking! */
   uint8_t command = ((sid_buffer[0] & PACKET_TYPE) >> 6);
   uint8_t subcommand = (sid_buffer[0] & COMMAND_MASK);
   uint8_t n_bytes = (sid_buffer[0] & BYTE_MASK);
@@ -277,7 +276,6 @@ void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volat
         usIO("[WRITE ERROR]%c\n", rtype);
         break;
     };
-    vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
     return;
   };
 SIDCHANGEDETECTED:;
@@ -299,7 +297,6 @@ SIDCHANGEDETECTED:;
             usERR("While writing to '%c'\n", rtype);
             break;
         };
-        vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
         return;
       case DELAY_CYCLES:
         cycled_delay_operation((sid_buffer[1] << 8 | sid_buffer[2]));
@@ -749,7 +746,6 @@ void core1_main(void)
         usplayer_set_sid_config(cfg.numsids,cfg.sids_one,cfg.sids_two,cfg.fmopl_sid);
         start_sidplayer(false); /* No auto loop */
       }
-      set_sidwriting(true); /* Will fall back to false after a write finished */
     }
     if (sidplayer_stop) {
       stop_sidplayer();
@@ -769,7 +765,6 @@ void core1_main(void)
       sidplayer_playing = true;
     }
     if __us_likely(sidplayer_playing) {
-      set_sidwriting(true); /* Will fall back to false after a write finished */
       loop_sidplayer();
       if __us_unlikely(sidplayer_next || sidplayer_prev) {
         sidplayer_playing = false;

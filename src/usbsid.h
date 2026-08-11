@@ -74,14 +74,12 @@ extern volatile bool
   sidplayer_stop,
   sidplayer_next,
   sidplayer_prev;
-extern volatile bool is_sidplayerplaying(void);
 extern uint8_t * sidfile; /* Temporary buffer to store incoming data */
 extern volatile int sidfile_size;
 extern volatile char tuneno;
 extern volatile bool is_prg;
-#else
-extern volatile bool is_sidplayerplaying(void) { return false; };
 #endif /* ONBOARD_SIDPLAYER */
+extern volatile bool is_sidplayerplaying(void); /* Always returns false if no sidplayer available */
 
 /* Runtime flags intercore changeable */
 extern volatile bool offload_ledrunner;

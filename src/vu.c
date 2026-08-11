@@ -54,6 +54,30 @@ volatile static int _rgb = 0;
 
 
 /**
+ * @brief Makes sure the vu keeps working between operations
+ *        by setting a minimum Vu value and setting
+ *        receivedata and sidwriting to true
+ *
+ */
+void set_vu_action(void)
+{
+  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Fix for core1 setting dtype to 0 in `led_runner` */
+  set_receivedata(true);
+  set_sidwriting(true);
+  return;
+}
+
+/**
+ * @brief Get the Vu value
+ *
+ * @return uint16_t
+ */
+uint16_t get_vu_value(void)
+{
+  return vu;
+}
+
+/**
  * @brief Assign supplied value to global variable and trigger
  *
  * @param uint32_t _rgb_value

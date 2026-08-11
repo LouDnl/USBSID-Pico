@@ -61,8 +61,6 @@ volatile static uint32_t data_word, dir_mask;
 inline static int __not_in_flash_func(set_bus_bits)(uint8_t address, bool write)
 {
   /* usCFG("[BUS BITS]$%02X:%02X ", address, data); */
-  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
-  set_sidwriting(true);
   if __us_likely(write) {
     control_word = 0b111000;
     dir_mask = 0b1111111111111111;  /* Always OUT never IN */
@@ -125,7 +123,7 @@ uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t ad
   control_word = 0b110000;
   dir_mask |= (is_read ? 0b1111111100000000 : 0b1111111111111111);
   control_word |= (is_read ? 1 : 0);
-  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+  set_vu_action(); /* Keep that shiny Vu blinking! */
   if __us_unlikely(set_bus_bits(address, true) != 1) {
     return 0;
   }
@@ -353,7 +351,7 @@ void __no_inline_not_in_flash_func(cycled_write_operation_nondma)(uint8_t addres
 uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t address, uint8_t data, uint16_t cycles)
 { /* This is a blocking function! */
   sid_memory[(address & 0x7F)] = data;
-  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+  set_vu_action(); /* Keep that shiny Vu blinking! */
   if __us_unlikely(set_bus_bits(address, true) != 1) {
     return 0;
   }

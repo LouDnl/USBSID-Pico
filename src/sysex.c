@@ -81,11 +81,11 @@ void process_sysex(uint8_t* buffer, int size)
   switch(buffer[1]) {
     case 0x2D:  /* 0x2D = ASID sysex message */
       dtype = asid;  /* Set data type to ASID */
-      vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+      set_vu_action(); /* Keep that shiny Vu blinking! */
       decode_asid_message(buffer, size);
       break;
     case 0x50:  /* The 80's baby */
-      dtype = sysex;  /* Set data type to ASID */
+      dtype = sysex;  /* Set data type to SysEx */
       decode_sysex_command(buffer, size);
       break;
     default:

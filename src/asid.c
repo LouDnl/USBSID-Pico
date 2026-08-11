@@ -254,7 +254,7 @@ void handle_writeordered_asid_message(uint8_t sid, uint8_t* buffer)
     uint8_t wait_us;
   };
   static struct asid_regpair_local_t writeOrder[USBSID_MAX_SIDS][NO_SID_REGISTERS_ASID];
-  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+  set_vu_action(); /* Keep that shiny Vu blinking! */
   unsigned int reg = 0;
   for (uint8_t mask = 0; mask < 4; mask++) {  /* no more then 4 masks */
     for (uint8_t bit = 0; bit < 7; bit++) {  /* each packet has 7 bits ~ stoopid midi */

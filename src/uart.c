@@ -101,7 +101,7 @@ static void pio_irq_func(void)
 
 static void async_worker_func(__unused async_context_t *async_context, __unused async_when_pending_worker_t *worker)
 { /* TODO: Finish */
-  set_receivedata(true);
+  set_vu_action(); /* Keep that shiny Vu blinking! */
   dtype = uart;
   if (offload_ledrunner == false) bytes_rxed = 0;
   offload_ledrunner = true;

@@ -50,8 +50,10 @@ enum
   HZ_MAX       = 40       /* No clue where I got this from 😅 but hey it works! */
 };
 
-/* VU meter value (written by Core 1 bus operations, read by LED runner) */
-extern volatile uint16_t vu;
+/* Vu meter value (only used in sid.c:log_memory()) */
+extern uint16_t get_vu_value(void);
+/* Sets the Vu meter value to a minimum and sets sidwriting and receivedata to true */
+extern void set_vu_action(void);
 
 /* Functions from vu.c */
 void init_vu(void);
