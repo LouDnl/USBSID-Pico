@@ -415,16 +415,14 @@ bool detect_fpgasid(uint8_t base_address)
   if(detection_logging) usSID("  Check for FPGASID @ $%02x\n", base_address);
   clear_sid_registers_at_addr(base_address);
   uint8_t idHi, idLo;
-  /* Enable configuration mode (if available) */
-  cycled_write_operation((0x19 + base_address), 0x80, 6);      /* Write magic cookie Hi */
-  cycled_write_operation((0x1A + base_address), 0x65, 6);      /* Write magic cookie Lo */
+  /* Enter diag mode (if available) */
+  cycled_write_operation((0x19 + base_address), 0xEE, 6);      /* Write magic cookie Hi */
+  cycled_write_operation((0x1A + base_address), 0xAB, 6);      /* Write magic cookie Lo */
   /* Start identification routine */
-  cycled_write_operation((0x1E + base_address), (1 << 7), 6);  /* Set identify bit to 1 */
-  idLo = cycled_read_operation((0x19 + base_address), 4);      /* Read identify Hi */
-  idHi = cycled_read_operation((0x1A + base_address), 4);      /* Read identify Lo */
-  /* Exit configuration mode */
-  cycled_write_operation((0x19 + base_address), 0x0, 6);       /* Clear magic cookie Hi */
-  cycled_write_operation((0x1A + base_address), 0x0, 6);       /* Clear magic cookie Lo */
+  idLo = cycled_read_operation((0x00 + base_address), 4);      /* Read identify Hi */
+  idHi = cycled_read_operation((0x01 + base_address), 4);      /* Read identify Lo */
+  /* Exit diag mode */
+  cycled_write_operation((0x19 + base_address), 0, 6);
   uint16_t fpgasid_id = (idHi << 8 | idLo);
   if(detection_logging) usSID("  Read Identify 0x%04X ($%02x,$%02x) @ $%02x\n", fpgasid_id, idHi, idLo, base_address);
   if (fpgasid_id == FPGASID_ID) {
