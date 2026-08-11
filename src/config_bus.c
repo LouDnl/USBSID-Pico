@@ -112,7 +112,7 @@ static void apply_bus_masks(RuntimeCFG *rt)
     return;
   }
 
-  /* Non-mirrored: compute per-SID masks based on ID→slot mapping */
+  /* Non-mirrored: compute per-SID masks based on ID->slot mapping */
   for (int id = 0; id < 4; id++) {
     int slot = rt->ids[id];
 
@@ -220,10 +220,19 @@ void apply_runtime_config(const Config *config, RuntimeCFG *rt)
     rt->sidtype[slot] = slots[slot]->type;
   }
 
-  /* Build reverse mapping: ID → slot */
+  /* Build reverse mapping: ID -> slot
+   * First slot wins on a duplicate ID, a later slot would silently reroute the
+   * complete address range of that ID to the other socket */
   for (int slot = 0; slot < 4; slot++) {
     uint8_t id = rt->sidid[slot];
     if (id < 4) {
+      if (rt->ids[id] != 4) {
+        if (bus_logging) {
+          usBUS("Duplicate SID id %d in slot %d, keeping slot %d\n",
+            id, slot, rt->ids[id]);
+        }
+        continue;
+      }
       rt->ids[id] = slot;
     }
   }
