@@ -661,13 +661,13 @@ static void handle_velocity(uint8_t velocity)
   if (velocity > 0) {
     if (msid.channel[current_channel].velocity_mode) {
       /* High velocity = short decay (punchy); low velocity = long decay (soft) */
-      uint8_t vel_dec = MAP(velocity, 1, 127, 14, 0); /* invert: high vel → low nibble (fast decay) */
+      uint8_t vel_dec = MAP(velocity, 1, 127, 14, 0); /* invert: high vel -> low nibble (fast decay) */
       int nib = R_NIBBLE; /* preserve attack nibble */
       uint8_t reg = (voicebase() + ATTDEC);
       set_nibble(reg, vel_dec, nib);
       midi_bus_operation((sidbase()+reg), sid_memory[(sidbase()+reg)]);
     } else {
-      /* Velocity → volume */
+      /* Velocity -> volume */
       uint8_t vel_vol = MAP(velocity, 1, 127, 0, 15);
       set_nibble(MODVOL, vel_vol, L_NIBBLE);
       midi_bus_operation((sidbase()+MODVOL), sid_memory[(sidbase()+MODVOL)]);
