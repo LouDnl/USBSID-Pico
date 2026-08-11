@@ -39,6 +39,8 @@
 (def quadsid (sort (filter #(.contains % "4SID") psid)))
 (def singlesid (sort (remove (set (concat dualsid triplesid quadsid)) psid)))
 (def filename "sidfilelist.txt")
+(if (fs/exists? (str filename ".old"))
+  (fs/delete (str filename ".old")))
 (if (fs/exists? filename)
   (fs/move filename (str filename ".old")))
 (with-open [wr (io/writer filename)]

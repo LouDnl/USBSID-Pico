@@ -16,13 +16,15 @@ const VA_CLONETYPES = ['Disabled', 'Other', 'SKPico', 'ARMSID', 'FPGASID', 'Redi
 const VA_RGBSIDNO   = ['Off', '1', '2', '3', '4'];
 const VA_CLOCKS     = ['1000000 (Default)', '985248 (PAL)', '1022727 (NTSC)', '1023440 (Drean)', '1022730 (NTSC2)'];
 
-/* Clock speed Hz → array index */
+/* Clock speed Hz -> array index */
 const clkspeed_id = { 1000000: 0, 985248: 1, 1022727: 2, 1023440: 3, 1022730: 4 };
 
 /* Config byte-offset map (for reading) */
 const cfgmap = {
   CFG_NEED_CONFIRM:         2,   /* need_confirmation (v1.5+) */
-  CFG_DISABLE_CHANGEDETECT: 3,   /* disable_changedetect (v1.5+) */
+  CFG_SOCKET_CHANGE_DETECT: 3,   /* disable_changedetect (v1.5+) */
+  CFG_LAST_PRESET:          4,   /* value & 0x7f, byte 7 = auto detect */
+  CFG_PRESET_AUTO_DETECT:   4,   /* value & 0x80, byte 0-6 = last preset */
   CFG_CLOCKLOCK:            5,
   CFG_EXT_CLOCK:            6,   /* external_clock boolean */
   CFG_CLKRATE_H:            7,

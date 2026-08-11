@@ -47,6 +47,63 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * Is this a .sid file rather than a program?
+ *
+ * @param {Uint8Array} bytes
+ * @returns {boolean}
+ */
+export function isSidHeader(bytes) {
+  if (!bytes || bytes.length < 4) return false;
+  const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+  return magic === 'PSID' || magic === 'RSID';
+}
+
+/**
+ * How many SID chips a .sid header asks for, 1 to 3.
+ *
+ * The second and third chips live at $7a and $7b and only exist from header
+ * version 3 and 4, so the version has to be checked before the bytes are
+ * believed: a v2 file has something else there.
+ *
+ * Lives here rather than in a frontend because more than one of them needs it
+ * and they must agree. ASID in particular only emits the chips it is told
+ * about, so a transport left at one chip plays a three SID tune as one.
+ *
+ * @param {Uint8Array} bytes
+ * @returns {number} 1, 2 or 3
+ */
+export function countSids(bytes) {
+  if (!bytes || bytes.length < 0x7c) return 1;
+  const version = (bytes[0x04] << 8) | bytes[0x05];
+  let n = 1;
+  if (version >= 3 && bytes[0x7a] !== 0) n++;
+  if (version >= 4 && bytes[0x7b] !== 0) n++;
+  return n;
+}
+
+/**
+ * Which chip a tune was written for, from the header's flags word.
+ *
+ * Bits 4 and 5 of the big endian word at $76: 0 unknown, 1 is a 6581, 2 is an
+ * 8580, 3 is either. Unknown and either both fall to 6581, which is what a
+ * player with no opinion should do and what the command line player does.
+ *
+ * Only meaningful for software audio, where the model decides which filter is
+ * emulated and is plainly audible. A board plays whatever chip is fitted and
+ * does not care what the file says.
+ *
+ * @param {Uint8Array} bytes
+ * @returns {number} 0 for a 6581, 1 for an 8580
+ */
+export function sidModel(bytes) {
+  if (!bytes || bytes.length < 0x78) return 0;
+  const version = (bytes[0x04] << 8) | bytes[0x05];
+  if (version < 2) return 0;   /* v1 has no flags word */
+  const flags = (bytes[0x76] << 8) | bytes[0x77];
+  return (((flags >> 4) & 0x03) === 2) ? 1 : 0;
+}
+
 /** Discards everything. The default, so a player without a device is inert. */
 export class NullTransport {
   writeCycled(_reg, _val, _cycles) {}
@@ -81,8 +138,10 @@ export class USBSIDPlayerWeb {
     this._acc = 0;           // wall clock accumulator, ms
     this._lastT = 0;
     this._speed = 1;         // fast forward multiplier
+    this._seeking = false;   // true while fast forwarding: step, send nothing
     this._paused = false;
     this.resetStats();
+    this._boardConfig = null;
 
     const M = module;
     /* control */
@@ -99,6 +158,8 @@ export class USBSIDPlayerWeb {
     this._pause          = M.cwrap('usp_pause', null, ['number']);
     this._runStop        = M.cwrap('usp_key_runstop', 'number', []);
     this._forceSocketTwo = M.cwrap('usp_force_socket_two', null, []);
+    this._setSidConfig   = M.cwrap('usp_set_sid_config', null,
+                                   ['number', 'number', 'number', 'number']);
     /* state */
     this._isPlaying   = M.cwrap('usp_is_playing', 'number', []);
     this._isPrg       = M.cwrap('usp_is_prg', 'number', []);
@@ -193,6 +254,31 @@ export class USBSIDPlayerWeb {
   _drain() {
     const head = this._ringHead();
     let tail = this._ringTail();
+
+    /* Seeking: step the emulation but send nothing.
+     *
+     * This is not an optimisation, it is the only way fast forward can work
+     * against hardware. The writes carry cycle deltas and the board honours
+     * them, so four frames of emulation per real frame means four frames of
+     * writes the board will take four frames to play. The queue grows without
+     * bound, the audio arrives seconds late and distorted, and anything queued
+     * behind it (a mono/stereo command, a stop) waits for the backlog. All three
+     * were reported and all three are this.
+     *
+     * The command line player has always done it this way: `f` swaps in a
+     * NullSidBackend for the duration (main_cli.cpp, `ff_null`). Same idea, one
+     * level up, because the page is where the ring is drained.
+     *
+     * The chip keeps whatever registers it had while this runs. Almost every
+     * tune rewrites its voices each frame, so it catches up immediately on
+     * release. The CLI can do better, pushing the register file back on arrival,
+     * because it can read the emulation's mirror; there is no export for that
+     * here yet. */
+    if (this._seeking) {
+      if (tail !== head) this._ringSetTail(head >>> 0);
+      return;
+    }
+
     if (tail !== head) {
       const heap = this.M.HEAPU8;
       const base = this._ringBase;
@@ -389,7 +475,14 @@ export class USBSIDPlayerWeb {
     const node = new AudioWorkletNode(ctx, 'usp-clock');
     node.port.onmessage = () => this._tick();
     node.connect(ctx.destination);   // something has to pull it or it never runs
-    await ctx.resume();
+    /* Not a bare await: resume() on a context the browser will not let start
+     * stays pending rather than rejecting, which shows up as playback that
+     * silently never begins. */
+    await Promise.race([ctx.resume(), new Promise((r) => setTimeout(r, 2000))]);
+    if (ctx.state !== 'running') {
+      console.warn('[usplayer] the AudioContext is', ctx.state +
+        '. The browser needs a click on the page before audio may start.');
+    }
     this._audio = { ctx, node };
   }
 
@@ -424,11 +517,80 @@ export class USBSIDPlayerWeb {
   }
   get paused() { return this._paused; }
 
+  /** The fast forward multiplier in force. Read by whatever is clocking us. */
+  get speed() { return this._speed; }
+
   /** Playback speed. 1 is normal, 4 is four times as fast. */
   setSpeed(mult) { this._speed = Math.max(0.1, Math.min(8, mult || 1)); }
-  fastForward(on, mult = 4) { this.setSpeed(on ? mult : 1); }
+
+  /**
+   * Seek: run the emulation fast with nothing reaching the device.
+   *
+   * Silent by design, see _drain(). On release the accumulator is dropped so the
+   * frames that went by while seeking are not then chased at 1x, which would
+   * play the seek a second time into the queue this exists to protect.
+   */
+  fastForward(on, mult = 4) {
+    this.setSpeed(on ? mult : 1);
+    this._seeking = !!on;
+    if (!on) {
+      this._acc = 0;
+      this._lastT = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+    }
+  }
 
   setClock(rateId) { if (this.transport.setClock) this.transport.setClock(rateId); }
+
+  /**
+   * Tell the emulation what the board is carrying.
+   *
+   * `fmopl` is which chip answers $df40/$df50, one based, -1 for none. Without
+   * it those writes reach nothing and an FM/OPL tune plays its SID voices and
+   * none of its OPL. `numsids` is accepted and ignored, as everywhere else:
+   * how many chips the emulation decodes is the tune's business.
+   */
+  setSidConfig(numsids, socketOne, socketTwo, fmopl) {
+    let fm = (fmopl === undefined || fmopl === null) ? -1 : (fmopl | 0);
+    /* A transport that carries FM in a message of its own needs $df40/$df50 to
+     * stay unclaimed, so they arrive as $80/$90 instead of being folded into a
+     * chip's registers. ASID is the case: it decodes FM from its 0x60 command,
+     * and FM sent as SID data inside a 0x4E snapshot is not FM to any receiver.
+     * Forced here rather than trusted to the caller, because the value comes
+     * from a board read and the board is right about its own hardware and wrong
+     * about this transport. */
+    if (this.transport && this.transport.fmAsOwnMessage) fm = -1;
+    this._setSidConfig(numsids | 0, socketOne | 0, socketTwo | 0, fm);
+    /* `fmoplSid` is what the board says it has; `fmoplApplied` is what the
+     * emulation was actually given, which differs over ASID. Reporting only the
+     * first would have a page saying "FM/OPL on SID 2" while the player has it
+     * unclaimed, which is true of the hardware and false of the playback. */
+    this._boardConfig = { sidsSocketOne: socketOne | 0,
+                          sidsSocketTwo: socketTwo | 0,
+                          fmoplSid: (fmopl === undefined) ? -1 : (fmopl | 0),
+                          fmoplApplied: fm };
+  }
+
+  /**
+   * Read the board's own configuration and apply it.
+   *
+   * This is what the command line player does at connect, and the browser had
+   * no equivalent, which is why FM/OPL tunes did not work in it. Call it once
+   * after the transport is open and before loading anything: the tune's init
+   * writes go out under whatever is set at that moment.
+   *
+   * Returns what was applied, or null when the transport cannot say, in which
+   * case the emulation keeps its defaults and the caller can set them by hand.
+   */
+  async applyBoardConfig() {
+    if (!this.transport.readBoardConfig) return null;
+    const cfg = await this.transport.readBoardConfig();
+    if (!cfg) return null;
+    this.setSidConfig(0, cfg.sidsSocketOne, cfg.sidsSocketTwo, cfg.fmoplSid);
+    return cfg;
+  }
+
+  /** The last configuration applied, for a page that wants to show it. */
+  boardConfig() { return this._boardConfig || null; }
   nextSubtune() { this._nextSubtune(); }
   prevSubtune() { this._prevSubtune(); }
   /** RUN/STOP on the keyboard matrix, which is how a program is interrupted. */

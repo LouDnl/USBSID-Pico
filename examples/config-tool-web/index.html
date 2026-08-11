@@ -7,19 +7,18 @@
   <link rel="stylesheet" href="c64.css">
   <!-- <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script> -->
 <!-- Scripts -->
-<!-- Load player + jsSID from the existing webconfig-tool directory -->
-<script src="jsSID-webusb.js"></script>
-<script src="player.js"></script>
+<!-- The MIDI sysex helper and the globals usbsid-app.js assigns to, all that
+     was still in use when Hermit jsSID was replaced by USBSID-Player (ResidFp).
+     Must load before usbsid-app.js, which runs under 'use strict'. -->
+<script src="asid-sysex.js"></script>
 
-<!-- New driver + config + app (override webusb.writeReg after jsSID-webusb.js loads) -->
+<!-- New driver + config + app -->
 <script src="usbsid-driver.js"></script>
 <script src="usbsid-config.js"></script>
 <script src="usbsid-app.js"></script>
 <script type="text/javascript" src="lib/opl.js"></script>
 <script type="text/javascript" src="opljs-if.js"></script>
 
-<script type="text/javascript" src="websid/player.js"></script>
-<script type="text/javascript" src="websid/usbsid_adapter.js"></script>
 <!-- USBSID-Player (WASM) backend: factory (classic global) + adapter (module) -->
 <script type="text/javascript" src="usplayer/usbsid.js"></script>
 <script type="module" src="usplayer/usplayer-adapter.js"></script>
@@ -72,12 +71,10 @@
         <label for="sel-emulator">Mode:</label>
         <select id="sel-emulator" class="c64-select">
           <option value="usplayer" selected>WebUSB (USBSID-Player)</option>
+          <option value="usplayer-serial">Web Serial (USBSID-Player)</option>
           <option value="usplayer-asid">ASID (USBSID-Player)</option>
-          <option value="webusb">WebUSB (Hermit jsSID)</option>
-          <option value="sendsid">SendSID (onboard player)</option>
-          <option value="asid">ASID (Hermit jsSID)</option>
-          <option value="hermit">Hermit jsSID (software)</option>
-          <option value="websid">WebSID Alpha (Jürgen Wothke)</option>
+          <option value="sendsid">SendSID (onboard USBSID-Player)</option>
+          <option value="usplayer-audio">USBSID-Player (ResidFp)</option>
         </select>
         &nbsp;
         <span id="asid-midi-row" style="display:none">
@@ -149,6 +146,16 @@
           <button id="btn-play"      class="c64-btn c64-btn-play" disabled>PLAY</button>
           <button id="btn-stop"      class="c64-btn c64-btn-stop c64-btn-sm" disabled>STOP</button>
           <button id="btn-next-tune" class="c64-btn c64-btn-sm" disabled>NEXT &#187;</button>
+          <!-- Hold to seek. The player has had fastForward() all along; the
+               transport row simply never offered it. -->
+          <button id="btn-ffwd" class="c64-btn c64-btn-sm" disabled
+                  title="Hold to fast forward">&#187;&#187; FFWD</button>
+          <!-- The board's mono/stereo audio switch, v1.3+ PCBs. Shown only for
+               the transports that can carry the command, and only when the
+               board says it has the switch. -->
+          <button id="btn-audio-switch" class="c64-btn c64-btn-sm" disabled
+                  style="display:none"
+                  title="Board audio switch: mono or stereo">MONO</button>
         </div>
         <span class="subtune-info" id="subtune-display">Tune 1/1</span>
         <div id="volume-row">
@@ -159,7 +166,6 @@
       </div>
       <!-- WebUSB-only controls: shown when connected via WebUSB -->
       <div id="webusb-player-btns" style="display:none;margin-top:6px;flex-wrap:wrap;gap:6px">
-        <button id="btn-player-toggle-audio" class="c64-btn c64-btn-sm">TOGGLE AUDIO</button>
         <button id="btn-player-hotflip"      class="c64-btn c64-btn-sm">HOTFLIP</button>
         <button id="btn-player-mute"         class="c64-btn c64-btn-sm">MUTE SID</button>
         <button id="btn-player-retrieve-numsids" class="c64-btn c64-btn-sm">RETRIEVE # SIDS</button>
@@ -515,10 +521,10 @@
       <hr class="c64-hr">
       <p style="color:var(--c64-text);font-size:0.9rem">
         Firmware &amp; web config: <span class="c64-text-cyan">LouD</span><br>
-        jsSID player: <span class="c64-text-cyan">Hermit / Mihaly Horvath</span><br>
+        USBSID-Player (WebUSB &amp; ASID): <span class="c64-text-cyan">LouD</span><br>
+        SID emulation: <span class="c64-text-cyan">reSIDfp / libsidplayfp</span><br>
+        ASID &amp; DeepSID modifications: <span class="c64-text-cyan">JCH &amp; Thomas Jansson</span><br>
         WebUSB modifications: <span class="c64-text-cyan">LouD</span><br>
-        DeepSID modifications: <span class="c64-text-cyan">JCH &amp; Thomas Jansson</span><br>
-        WebSID: <span class="c64-text-cyan">Jürgen Wothke</span><br>
         License: GPLv2
       </p>
       <hr class="c64-hr">
@@ -526,7 +532,7 @@
         <strong class="c64-text-yellow">Keyboard shortcuts (in player tab):</strong><br>
         Space - Play / Pause &nbsp;|&nbsp;
         S - Stop &nbsp;|&nbsp;
-        ← → - Prev / Next subtune
+        ← -> - Prev / Next subtune
       </p>
     </div>
 
@@ -549,20 +555,11 @@
 
 </div><!-- /#c64-frame -->
 
-<!-- Dummy element required by jsSID-webusb.js (it looks up #device-connect and #status-text) -->
+<!-- #device-connect and #status-text are looked up by name elsewhere -->
 <span id="device-connect" style="display:none"></span>
 
-<!-- Scripts -->
-<!-- Load player + jsSID from the existing webconfig-tool directory -->
-<!-- <script src="jsSID-webusb.js"></script> -->
-<!-- <script src="player.js"></script> -->
-<!-- <script type="text/javascript" src="lib/opl.js"></script> -->
-<!-- <script type="text/javascript" src="opljs-if.js"></script> -->
-
-<!-- New driver + config + app (override webusb.writeReg after jsSID-webusb.js loads) -->
-<!-- <script src="usbsid-driver.js"></script> -->
-<!-- <script src="usbsid-config.js"></script> -->
-<!-- <script src="usbsid-app.js"></script> -->
+<!-- The scripts are loaded in <head>, not here. This block was a stale copy of
+     that list and named files that no longer exist. -->
 
 <script>
 /* Keyboard shortcuts */

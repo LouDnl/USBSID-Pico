@@ -42,9 +42,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { USBSIDPlayerWeb } from './usplayer-web.js';
+import { USBSIDPlayerWeb, NullTransport, isSidHeader, countSids, sidModel }
+  from './usplayer-web.js';
 import { USBSIDWebUSBTransport } from './usbsid-webusb.js';
+import { USBSIDWebSerialTransport } from './usbsid-webserial.js';
 import { ASIDMIDITransport } from './asid-midi.js';
+import { UsPlayerAudio } from './usplayer-audio.js';
 
 /* Where the host page put the two build artefacts. */
 const WASM_DIR = 'usplayer/';
@@ -74,21 +77,6 @@ function getModule() {
 /* How many chips a tune wants, from its header. Version 3 puts a second SID
  * address at 0x7a and version 4 a third at 0x7b; a non zero byte means that
  * chip is there. Anything older, or too short to say, is a single SID. */
-function countSids(bytes) {
-  if (!bytes || bytes.length < 0x7c) return 1;
-  const version = (bytes[0x04] << 8) | bytes[0x05];
-  let n = 1;
-  if (version >= 3 && bytes[0x7a] !== 0) n++;
-  if (version >= 4 && bytes[0x7b] !== 0) n++;
-  return n;
-}
-
-function isSidHeader(bytes) {
-  if (!bytes || bytes.length < 4) return false;
-  const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
-  return magic === 'PSID' || magic === 'RSID';
-}
-
 export class USPlayerAdapter {
   /**
    * @param {string} emulator  'usplayer' (WebUSB) or 'usplayer-asid'
@@ -98,6 +86,16 @@ export class USPlayerAdapter {
     this.emulator = emulator;
     this._device = device || null;
     this._isAsid = (emulator === 'usplayer-asid');
+    /* Web Serial talks to the board's CDC interface, which the host app's own
+     * driver knows nothing about: the app owns a WebUSB device on the vendor
+     * interface. So this mode opens its own port rather than sharing, and it is
+     * the only mode here that works in a browser with no WebUSB at all. */
+    this._isSerial = (emulator === 'usplayer-serial');
+    /* No board at all: reSIDfp inside the same wasm, out through an
+     * AudioWorklet. The one mode here that needs nothing plugged in, which is
+     * what it replaced Hermit jsSID for. */
+    this._isAudio = (emulator === 'usplayer-audio');
+    this._audio = null;
     this._player = null;
     this._transport = null;
     this._bytes = null;
@@ -168,6 +166,22 @@ export class USPlayerAdapter {
 
     let line = `${this._prefix} | ${p.refreshHz().toFixed(2)} fps` +
                ` | ${p.frames()} frames`;
+
+    /* Software audio has no transport, so the board numbers below are all zero
+     * and meaningless. These are the ones that matter instead: ms/frame against
+     * a 20 ms budget says whether the machine can keep up at all, and starve is
+     * silence the worklet had to invent, heard as crackle rather than as a gap.
+     * Both stay flat when it is working. */
+    if (this._isAudio && this._audio) {
+      const a = this._audio.stats();
+      line += ` | ${a.msPerFrame.toFixed(1)}/20 ms per frame` +
+              ` | buffer ${a.queuedMs} ms`;
+      if (a.starvedMs) line += ` | STARVED ${a.starvedMs} ms`;
+      if (a.clipped > 0) line += ` | CLIPPED ${a.clipped}`;
+      if (line !== this._lastStatus) { this._lastStatus = line; el.textContent = line; }
+      return;
+    }
+
     if (s) {
       line += ` | drain ${s.meanDrainGap.toFixed(1)}/${s.maxDrainGap.toFixed(0)} ms` +
               ` | queue ${s.maxQueue}` +
@@ -228,12 +242,25 @@ export class USPlayerAdapter {
     if (this._ready) return this._ready;
     this._ready = (async () => {
       const M = await getModule();
-      if (this._isAsid) {
+      if (this._isAudio) {
+        /* Nothing to connect to, and nothing for a transport to carry:
+         * usp_audio_configure() takes the emulation's backend over, so no write
+         * ever reaches the write ring. The AudioContext is not opened here but
+         * in load(), because it needs the tune's clock and chip count and
+         * because a context created outside a user gesture stays suspended. */
+        this._transport = new NullTransport();
+      } else if (this._isAsid) {
         this._transport = new ASIDMIDITransport();
         try {
           await this._transport.connect(null);
           this._wireMidiPicker();
         } catch (e) { console.warn('ASID connect:', e); }
+      } else if (this._isSerial) {
+        this._transport = new USBSIDWebSerialTransport();
+        try {
+          const ok = await this._transport.connect();
+          if (!ok) this._log(this._transport.lastError || 'could not open a port');
+        } catch (e) { this._log('Web Serial connect: ' + e.message); }
       } else {
         this._transport = new USBSIDWebUSBTransport({ device: this._device });
         try { await this._transport.connect(); } catch (_) {}
@@ -252,6 +279,20 @@ export class USPlayerAdapter {
        * if it did. So the values are kept here and only the ones that actually
        * changed are pushed, twenty times a second, which is faster than the eye
        * and a thousandth of the work. */
+      /* What the board is carrying. The app hands us its own connected
+       * device, so the read goes through that rather than opening a second
+       * conversation with the same board. Without this $df40/$df50 reach
+       * nothing and an FM/OPL tune plays no OPL. */
+      try {
+        /* No board to ask, and asking would time out. */
+        const board = this._isAudio ? null : await this._player.applyBoardConfig();
+        if (board) {
+          this._log(`board: socket one ${board.sidsSocketOne} SID(s), ` +
+                    `socket two ${board.sidsSocketTwo}, FM/OPL on ` +
+                    (board.fmoplSid > 0 ? `SID ${board.fmoplSid}` : 'nothing'));
+        }
+      } catch (e) { this._log('could not read the board config: ' + e); }
+
       this._transport.onWrite = (reg, val) => {
         const i = reg & 0x7f;
         if (this._shadow[i] === val) return;
@@ -292,6 +333,35 @@ export class USPlayerAdapter {
    * The app's entry point: load(subtune, timeout, url, callback), subtune
    * counted from zero with zero meaning the file's own default.
    */
+  /**
+   * Bring the transport up now, rather than when the first tune loads.
+   *
+   * Web Serial's `requestPort()` needs a user gesture, and `_ensure()` used to
+   * run on the first `load()`, which meant the port picker appeared long after
+   * the host's connect button had already gone green. Whoever owns that button
+   * calls this from the click instead.
+   *
+   * @returns true when the transport is open and ready to be written to.
+   */
+  async connect() {
+    await this._ensure();
+    return this.isConnected();
+  }
+
+  /** Is the transport actually open? Not "could it be". */
+  isConnected() {
+    /* Software audio has nothing to open, so it is always ready. Reporting
+     * otherwise leaves the host's connect button and transport controls greyed
+     * out for ever, since nothing will ever make it true. */
+    if (this._isAudio) return true;
+    return !!(this._transport && this._transport.isOpen);
+  }
+
+  /** Why the last connect failed, when the transport can say. */
+  get lastError() {
+    return (this._transport && this._transport.lastError) || null;
+  }
+
   async load(subtune, timeout, url, callback) {
     await this._ensure();
     try {
@@ -323,7 +393,30 @@ export class USPlayerAdapter {
       };
 
       this._subtune = subtune || 0;
-      await this._player.start();
+
+      if (this._isAudio) {
+        /* Started here and not in _ensure(): the synthesis has to be
+         * configured for this tune's clock, chip count and model, all of which
+         * are only known once it is loaded. */
+        if (!this._audio) this._audio = new UsPlayerAudio(this._player);
+        const started = await this._audio.start({
+          chips: nsids,
+          quality: 1,
+          model: sid ? sidModel(bytes) : 0,
+        });
+        if (!started) throw new Error('reSIDfp would not take this rate');
+        /* The ring is the clock in this mode, so the player's own wall clock
+         * pump is not started: two clocks would fight, and the wall clock one
+         * drops frames when it falls behind, which here is a hole in the audio
+         * rather than a frame played late. See UsPlayerAudio.run(). */
+        await this._player.start({ externalClock: true });
+        this._audio.run(this._player);
+        this._log(`software audio: ${this._audio.ctx.sampleRate} Hz, ` +
+                  `${nsids} chip${nsids === 1 ? '' : 's'}, ` +
+                  `${sid && sidModel(bytes) ? '8580' : '6581'}, sinc`);
+      } else {
+        await this._player.start();
+      }
       this._paused = false;
 
       this._log(`${sid ? 'SID' : 'program'} loaded: ${i.name || '(untitled)'}` +
@@ -355,6 +448,10 @@ export class USPlayerAdapter {
 
   stop() {
     this._stopReporting();
+    /* Let go of the player before stopping it, so nothing is stepped after the
+     * tune has been torn down, and drop what was rendered but not yet played:
+     * otherwise the last fifth of a second is heard after the stop. */
+    if (this._audio) { this._audio.unrun(); this._audio.discard(); }
     if (this._player) this._player.stop();
     this._paused = false;
     this._lastStatus = '';
@@ -367,6 +464,34 @@ export class USPlayerAdapter {
 
   /* extras the app may not call, but which cost nothing to offer */
   fastForward(on) { if (this._player) this._player.fastForward(on); }
+
+  /**
+   * The board's mono/stereo audio switch, v1.3+ PCBs.
+   *
+   * Only the board transports carry it: ASID has no such concept and a software
+   * receiver has its own mixing. Returns false when the active transport cannot
+   * do it, so a caller can grey the control rather than pretend.
+   *
+   * @param {boolean|undefined} stereo true or false to set it, undefined to flip
+   */
+  setAudioSwitch(stereo) {
+    const t = this._transport;
+    if (!t) return false;
+    if (stereo === undefined) {
+      if (typeof t.toggleAudioSwitch !== 'function') return false;
+      t.toggleAudioSwitch();
+      return true;
+    }
+    if (typeof t.setAudioSwitch !== 'function') return false;
+    t.setAudioSwitch(!!stereo);
+    return true;
+  }
+
+  /** Can the active transport switch the board between mono and stereo? */
+  hasAudioSwitch() {
+    return !!(this._transport &&
+              typeof this._transport.setAudioSwitch === 'function');
+  }
   nextSubtune() {
     if (!this._player) return;
     this._player.nextSubtune();
