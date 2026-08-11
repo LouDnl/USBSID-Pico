@@ -197,6 +197,7 @@ int __no_inline_not_in_flash_func(do_buffer_tick)(int top, int step)
 {
   static int i = 1;
   if (i < 1) i = 1;  /* Guard: static init unreliable with -O3 */
+  if ((i + step) > MAX_BUFFER_SIZE) { i = 1; return i; } /* Guard: Cannot step outside of the maximum buffer range */
   cycled_write_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   WRITEDBG(dtype, i, top, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   usIO("[I %d] [%c] $%02X:%02X (%u)\n", i, dtype, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
