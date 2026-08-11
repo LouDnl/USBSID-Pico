@@ -61,7 +61,11 @@ uint8_t * sid_memory = &c64memory[0xd400]; /* Pointer to $d400 of 128 Bytes tota
 uint8_t __not_in_flash("usbsid_buffer") sid_memory[SID_MEMORY_SIZE] __aligned(SID_MEMORY_SIZE) = {0}; /* 128 Bytes, 128 bytes aligned */
 #endif
 
-volatile int usb_connected = 0, usbdata = 0;
+volatile static bool receivedata = false, sidwriting = false;
+volatile bool is_receivedata(void) { return receivedata; };
+volatile void set_receivedata(bool state) { receivedata = state; };
+volatile bool is_sidwriting(void) { return sidwriting; };
+volatile void set_sidwriting(bool state) { sidwriting = state; };;
 volatile uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
 volatile uint8_t *cdc_itf = 0, *wusb_itf = 0;
 /* nonetype, datatype, returntype */
@@ -92,6 +96,7 @@ volatile bool stopping_emulator = false;
 volatile bool sidplayer_init = false;
 volatile bool sidplayer_start = false;
 volatile bool sidplayer_playing = false;
+volatile bool is_sidplayerplaying(void) { return sidplayer_playing; };
 volatile bool sidplayer_stop = false;
 volatile bool sidplayer_next = false;
 volatile bool sidplayer_prev = false;
@@ -213,7 +218,8 @@ void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
 {
   int state = 0;
   do {
-    usbdata = 1;
+    set_receivedata(true);
+    set_sidwriting(true); /* Will fall back to false after a write finished */
     vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
     state = do_buffer_tick(n_bytes, step);
   } while (state != 1);
@@ -222,7 +228,7 @@ void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
 /* Process received usb data */
 void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volatile uint32_t * n)
 {
-  usbdata = 1;
+  set_receivedata(true);
   vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
   uint8_t command = ((sid_buffer[0] & PACKET_TYPE) >> 6);
   uint8_t subcommand = (sid_buffer[0] & COMMAND_MASK);
@@ -363,12 +369,11 @@ void tud_mount_cb(void)
 {
   /* usDBG("[%s]\n", __func__); */
   usNFO("[CDC] Mount\n");
-  usb_connected = 1;
 }
 
 void tud_umount_cb(void)
 {
-  usb_connected = 0, usbdata = 0, dtype = rtype = ntype;
+  set_receivedata(false), dtype = rtype = ntype;
   /* usDBG("[%s]\n", __func__); */
   usNFO("[CDC] Unmount\n");
   disable_sid();  /* NOTICE: Testing if this is causing the random lockups */
@@ -379,13 +384,12 @@ void tud_suspend_cb(bool remote_wakeup_en)
   /* (void) remote_wakeup_en; */
   /* usDBG("[%s] remote_wakeup_en:%d\n", __func__, remote_wakeup_en); */
   usNFO("[CDC] remote_wakeup_en:%d\n", remote_wakeup_en);
-  usb_connected = 0, usbdata = 0, dtype = rtype = ntype;
+  set_receivedata(false), dtype = rtype = ntype;
 }
 
 void tud_resume_cb(void)
 {
   /* usDBG("[%s]\n", __func__); */
-  usb_connected = 1;
 }
 
 
@@ -395,7 +399,7 @@ void midi_task(void) /* Disabled in loop ~ keeping for optional later use */
 { /* Same as the callback routine */
   if (tud_midi_n_mounted(MIDI_ITF)) {
     while (tud_midi_n_available(MIDI_ITF, MIDI_CABLE)) {  /* Loop as long as there is data available */
-      usbdata = 1;
+      set_receivedata(true);
       uint32_t available = tud_midi_n_stream_read(MIDI_ITF, MIDI_CABLE, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
       process_stream(midimachine.usbstreambuffer, available);
     }
@@ -410,7 +414,7 @@ void tud_midi_rx_cb(uint8_t itf)
 {
   if (tud_midi_n_mounted(itf)) {
     while (tud_midi_n_available(itf, MIDI_CABLE)) {  /* Loop as long as there is data available */
-      usbdata = 1;
+      set_receivedata(true);
       uint32_t available = tud_midi_n_stream_read(itf, MIDI_CABLE, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
       process_stream(midimachine.usbstreambuffer, available);
     }
@@ -431,7 +435,7 @@ void cdc_task(void)
   if (tud_cdc_n_connected(CDC_ITF)) {
     if (tud_cdc_n_available(CDC_ITF) > 0) {
       cdc_itf = CDC_ITF;
-      usbdata = 1, dtype = cdc, rtype = cdc;
+      set_receivedata(true), dtype = cdc, rtype = cdc;
       cdcread = tud_cdc_n_read(CDC_ITF, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
       tud_cdc_n_read_flush(CDC_ITF);
       memcpy(sid_buffer, read_buffer, cdcread);
@@ -450,7 +454,7 @@ void tud_cdc_rx_cb(uint8_t itf)
   if __us_likely(itf == CDC_ITF) {
     if (tud_cdc_n_available(CDC_ITF)) {
       cdc_itf = &itf;
-      usbdata = 1, dtype = cdc, rtype = cdc;
+      set_receivedata(true), dtype = cdc, rtype = cdc;
       cdcread = tud_cdc_n_read(*cdc_itf, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
       tud_cdc_n_read_flush(*cdc_itf);
       memcpy(sid_buffer, read_buffer, cdcread);
@@ -486,12 +490,12 @@ void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
 
   if ( dtr ) {
     /* Terminal connected */
-    usbdata = 1;
+    set_receivedata(true);
   }
   else
   {
     /* Terminal disconnected */
-    usbdata = 0;
+    set_receivedata(false);
   }
 }
 
@@ -519,7 +523,7 @@ void vendor_task(void)
   /* If the fifo buffer is disabled, this function has no use */
   if (web_serial_connected) {
       wusb_itf = WUSB_ITF;
-      usbdata = 1, dtype = wusb, rtype = wusb;
+      set_receivedata(true), dtype = wusb, rtype = wusb;
       webread = tud_vendor_n_read(WUSB_ITF, &read_buffer, MAX_BUFFER_SIZE);
       tud_vendor_n_read_flush(*wusb_itf);
       memcpy(sid_buffer, read_buffer, webread);
@@ -540,7 +544,7 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
 #ifdef USE_VENDOR_CALLBACK
   if __us_likely(itf == WUSB_ITF && web_serial_connected) {
       wusb_itf = &itf; /* Since there's only 1 vendor interface, we know it's 0 */
-      usbdata = 1, dtype = wusb, rtype = wusb;
+      set_receivedata(true), dtype = wusb, rtype = wusb;
       webread = bufsize;
       // /* No need to flush since we have no fifo */
       tud_vendor_n_read_flush(*wusb_itf);
@@ -745,6 +749,7 @@ void core1_main(void)
         usplayer_set_sid_config(cfg.numsids,cfg.sids_one,cfg.sids_two,cfg.fmopl_sid);
         start_sidplayer(false); /* No auto loop */
       }
+      set_sidwriting(true); /* Will fall back to false after a write finished */
     }
     if (sidplayer_stop) {
       stop_sidplayer();
@@ -764,6 +769,7 @@ void core1_main(void)
       sidplayer_playing = true;
     }
     if __us_likely(sidplayer_playing) {
+      set_sidwriting(true); /* Will fall back to false after a write finished */
       loop_sidplayer();
       if __us_unlikely(sidplayer_next || sidplayer_prev) {
         sidplayer_playing = false;
@@ -783,7 +789,7 @@ void core1_main(void)
 #endif /* ONBOARD_EMULATOR */
 
 #ifdef WRITE_DEBUG  /* Only run this queue when needed */
-    if (usbdata == 1) {
+    if (is_receivedata()) {
       writelogging_queue_entry_t l_entry;
       if (queue_try_remove(&logging_queue, &l_entry)) {
         usDBG("[CORE2 %5u] [WRITE %c:%02d/%02d] $%02X:%02X %u\n",

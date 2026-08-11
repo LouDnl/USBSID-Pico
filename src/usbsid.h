@@ -46,7 +46,11 @@ extern uint8_t sid_memory[];
 #endif
 
 /* USB connection state */
-extern volatile int usb_connected, usbdata;
+/* extern volatile bool receivedata, sidwriting; */
+extern volatile bool is_receivedata(void);
+extern volatile void set_receivedata(bool state);
+extern volatile bool is_sidwriting(void);
+extern volatile void set_sidwriting(bool state);
 extern volatile uint32_t cdcread, cdcwrite, webread, webwrite;
 extern volatile uint8_t *cdc_itf, *wusb_itf;
 
@@ -70,10 +74,13 @@ extern volatile bool
   sidplayer_stop,
   sidplayer_next,
   sidplayer_prev;
+extern volatile bool is_sidplayerplaying(void);
 extern uint8_t * sidfile; /* Temporary buffer to store incoming data */
 extern volatile int sidfile_size;
 extern volatile char tuneno;
 extern volatile bool is_prg;
+#else
+extern volatile bool is_sidplayerplaying(void) { return false; };
 #endif /* ONBOARD_SIDPLAYER */
 
 /* Runtime flags intercore changeable */

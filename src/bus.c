@@ -62,6 +62,7 @@ inline static int __not_in_flash_func(set_bus_bits)(uint8_t address, bool write)
 {
   /* usCFG("[BUS BITS]$%02X:%02X ", address, data); */
   vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+  set_sidwriting(true);
   if __us_likely(write) {
     control_word = 0b111000;
     dir_mask = 0b1111111111111111;  /* Always OUT never IN */
@@ -155,11 +156,15 @@ uint8_t __no_inline_not_in_flash_func(bus_operation)(uint8_t command, uint8_t ad
         control_word, control_word,
         read_data, read_data);
       sid_memory[(address & 0x7F)] = read_data & 0xFF;
+
+      set_sidwriting(false);
       return read_data & 0xFF;
   }
   /* WRITE, G_PAUSE & G_CLEAR_BUS*/
   dma_channel_wait_for_finish_blocking(dma_tx_control);
   usGPIO("[W]$%08x 0b%032b $%04x 0b%016b\n", data_word, data_word, control_word, control_word);
+
+  set_sidwriting(false);
   return 0;
 }
 
@@ -239,6 +244,7 @@ void __no_inline_not_in_flash_func(bus_resync)(void)
   /* Restart all three in lockstep */
   pio_enable_sm_mask_in_sync(bus_pio, sm_mask);
 
+  set_sidwriting(false);
   return;
 }
 
@@ -299,6 +305,7 @@ void __no_inline_not_in_flash_func(write_operation)(uint8_t address, uint8_t dat
   pio_sm_put_blocking(bus_pio, sm_control, control_word);
   pio_sm_put_blocking(bus_pio, sm_data, data_word);
 
+  set_sidwriting(false);
   return;
 }
 
@@ -327,6 +334,8 @@ void __no_inline_not_in_flash_func(cycled_write_operation_nondma)(uint8_t addres
   usGPIO("[WC]$%04x 0b%032b $%04x 0b%016b $%02X:%02X(%u %u)\n",
     data_word, data_word, control_word, control_word,
     address, data, cycles, delay_word);
+
+  set_sidwriting(false);
   return;
 }
 
@@ -364,6 +373,7 @@ uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t a
   );
   dma_channel_wait_for_finish_blocking(dma_tx_control);
 
+  set_sidwriting(false);
   return cycles;
 }
 
@@ -407,6 +417,8 @@ void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint
   usGPIO("[WC]$%04x 0b%032b $%04x 0b%016b $%02X:%02X(%u %u)\n",
     data_word, data_word, control_word, control_word,
     address, data, cycles, delay_word);
+
+  set_sidwriting(false);
   return;
 }
 
@@ -441,6 +453,8 @@ uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, ui
   );
   dma_channel_wait_for_finish_blocking(dma_rx_data);  /* Wait for data */
   sid_memory[(address & 0x7F)] = (read_data & 0xFF);
+
+  set_sidwriting(false);
   return sid_memory[(address & 0x7F)];
 }
 
