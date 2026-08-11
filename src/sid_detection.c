@@ -739,9 +739,9 @@ static void update_probe_config_from_detection(DetectionResult result, Config * 
       config_socket_num(socket),
     (dualsid ? "dualsid" : "single sid"));
   }
-  /* socket 2, 3 or 4 only */
+  /* socket 2, 3 or 4 only ~ socket 1 has no previous socket */
   uint8_t base =
-    result.socket[((socket > 0 || socket <= 4) ? (socket - 1) : socket)].supports_dual
+    result.socket[(socket > 0 ? (socket - 1) : socket)].supports_dual
     /* SocketTwo/Three/Four base address based on previous socket dual support */
     ? 0x40 : 0x20;
   switch (socket) {
@@ -752,6 +752,17 @@ static void update_probe_config_from_detection(DetectionResult result, Config * 
       probe->socketOne.sid1.id   = 0;    /* was 0x00 */
       probe->socketOne.sid2.addr = (dualsid ? 0x20 : 0xff); /* was 0xff */
       probe->socketOne.sid2.id   = (dualsid ? 1 : 255);     /* was 0xff */
+      /* Shift SocketTwo along with it, it still holds the default id 1 @ $20
+       * from `default_socket(2)` and is only updated after SocketOne SID
+       * detection has finished. Leaving it there gives two slots id 1, and the
+       * ID -> slot map in `apply_runtime_config` is last write wins, so the
+       * whole $20-$3F range would decode to SocketTwo (CS2, no A5) instead of
+       * SocketOne's second SID (CS1, A5 set) for the entire SocketOne SID
+       * detection run ~ every read returns 0x00 */
+      probe->socketTwo.sid1.addr = (dualsid ? 0x40 : 0x20);
+      probe->socketTwo.sid1.id   = (dualsid ? 2 : 1);
+      probe->socketTwo.sid2.addr = 0xff;
+      probe->socketTwo.sid2.id   = 255;
       break;
     case 1:
       probe->socketTwo.dualsid   = dualsid;
