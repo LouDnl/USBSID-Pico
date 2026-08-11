@@ -44,6 +44,9 @@
 /* Local volatile variable to stop any logging when detecting socket changes */
 static volatile bool detection_logging = true;
 
+/* Local volatile variable to state SIDKICK-pico firmware type */
+static volatile bool skpico_is_u64fw = false;
+
 
 /**
  * @brief Set the detection logging object
@@ -316,9 +319,12 @@ SIDType detect_sidtype_at(uint8_t base_address, uint8_t chiptype)
   }
 
   /* If unknown, check for FMOpl */
-  if (chiptype == CHIP_SKPICO && sidtype == SID_UNKNOWN && detect_fmopl(base_address)) {
-    if(detection_logging) usSID("Detected SIDType %d @ $%02x = %s\n", sidtype, base_address, sid_type_name(sidtype));
-    return SID_FMOPL;
+  /* NOTICE: Advise users to _not_ use the u64 skpico fw version for usbsid */
+  if ((chiptype == CHIP_SKPICO && sidtype == SID_UNKNOWN)) { /* WARNING: Detecting anything with the SKPico socket 2 u64 adapter doesn't work! */
+    if (detect_fmopl(base_address)) {
+      if(detection_logging) usSID("Detected SIDType %d @ $%02x = %s\n", sidtype, base_address, sid_type_name(sidtype));
+      return SID_FMOPL;
+    }
   }
 
   if(detection_logging) usSID("Detected SIDType %d @ $%02x = %s\n", sidtype, base_address, sid_type_name(sidtype));
@@ -379,11 +385,19 @@ bool detect_skpico(uint8_t base_address)
    * is needed for Real SID's to recover for SID detection
    * but breaks SKPico SID detection */
   cycled_write_operation((0x1D + base_address), 0xFB, 0); /* Exit config mode */
+  skpico_is_u64fw = ( /* Verify if the found SKPico is running on u64 firmware */
+    !skpico_is_u64fw
+    ? (skpico_version[11] == 0x55)
+    : skpico_is_u64fw); /* Keep it on true if already true */
   if (skpico_version[2] == 0x70
       && skpico_version[3] == 0x69
       && skpico_version[4] == 0x63
       && skpico_version[5] == 0x6F) {
-    if(detection_logging) usSID("  Found SIDKick-pico @ $%02x version is: %.36s\n", base_address, skpico_version);
+    if(detection_logging) usSID("  Found SIDKick-pico @ $%02x version is: %.36s (skpico_v: %d is_u64fw: %s)\n",
+      base_address,
+      skpico_version,
+      (((skpico_version[8] - '0') * 10) + (skpico_version[9] - '0')),
+      boolean_str(skpico_is_u64fw));
     return true;
   }
   return false;
@@ -662,11 +676,12 @@ static DetectionResult detect_socket_chip(DetectionResult result, Config * probe
   result.socket[socket].present = (result.socket[socket].chiptype != CHIP_UNKNOWN);
   result.socket[socket].supports_dual = (
     /* DualSID supporting clones */
-    result.socket[socket].chiptype == CHIP_SKPICO ||
+    (result.socket[socket].chiptype == CHIP_SKPICO &&
+    !skpico_is_u64fw) || /* Cannot have dualSID in a single socket with u64 firmware */
     result.socket[socket].chiptype == CHIP_FPGASID ||
     result.socket[socket].chiptype == CHIP_ARM2SID
   );
-  if (socket > 0 || socket <= 4) { /* socket 2, 3 or 4 only */
+  if (socket > 0) { /* socket 2, 3 or 4 only ~ socket 1 has no previous socket */
     /* Fallback to false if arm2sid (3x SID max) */
     result.socket[socket].supports_dual = (
       /* If socket before this contains ARM2SID */
