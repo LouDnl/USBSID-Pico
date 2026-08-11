@@ -149,7 +149,8 @@ void handle_asid_fmoplmessage(uint8_t* buffer)
       field <<= 1;
     }
   }
-  uint8_t addr = ((cfg.fmopl_sid << 5) - 0x20);
+  if (cfg.fmopl_sid < 1 || cfg.fmopl_sid > 4) return;  /* 0 = no FMOpl configured */
+  uint8_t addr = ((cfg.fmopl_sid - 1) << 5);  /* SID number 1~4 to base address */
   for (uint8_t reg = 0; reg < asid_fm_register_index; reg++) {
     dtype = asid;  /* Set data type to asid */
     /* Pico 2 requires at least 10 cycles between writes
@@ -421,7 +422,7 @@ void decode_asid_message(uint8_t* buffer, int size)
       usASID("Play stop\n");
       reset_sid_registers();
       if (!default_order) reset_asid_to_writeorder();
-      set_buffer_rate(usbsid_config.refresh_rate);
+      if (buffer_started) set_buffer_rate(usbsid_config.refresh_rate);
       ring_buffer_reset_size();  /* Reset buffer to default size */
       if (buffer_started) deinit_asid_buffer(); /* Stop buffer on play stop */
       midimachine.bus = FREE;
