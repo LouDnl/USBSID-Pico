@@ -811,8 +811,8 @@ int main()
 #elif PICO_RP2350 /* #endif PICO_RP2040 */
   /* Onboard SID player requires atleast 200MHz! */
 #if ONBOARD_SIDPLAYER
-  /* System clock @ 200MHz */
-  set_sys_clock_khz(200000, true);
+  /* System clock @ 250MHz */
+  set_sys_clock_khz(250000, true);
 #else
   /* System clock @ 150MHz */
   set_sys_clock_pll(1500000000, 5, 2);
