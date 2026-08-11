@@ -149,16 +149,17 @@ typedef struct Config { // TODO: Add overrides for detect_default_config and add
   } FMOpl;                       /* 9 */
   bool external_clock : 1;       /* enable / disable external oscillator */
   bool lock_clockrate : 1;       /* lock the set clockspeed from being changed */
-  bool stereo_en : 1;            /* audio switch is off (mono) or on (stereo) ~ (PCB v1.3+ only) */
-  bool lock_audio_sw : 1;        /* lock the audio switch into it's current stateand prevent it from being changed ~ (PCB v1.3+ only) */
+  bool stereo_en : 1;            /* (PCB v1.3+) audio switch is off (mono) or on (stereo) */
+  bool lock_audio_sw : 1;        /* (PCB v1.3+) lock the audio switch into it's current stateand prevent it from being changed */
   bool mirrored : 1;             /* act as socket 1 */
   bool flipped : 1;              /* socket 1 is socket 2 and vice versa */
   bool mixed : 1;                /* addresses are mixed up (quad SID only!) */
-  /* PCB v1.5+ only */
-  bool need_confirmation : 1;    /* current configuration needs confirmation, SID's are disabled until confirmed! */
-  bool disable_changedetect : 1; /* disables socket change detection on boot */
+  bool need_confirmation : 1;    /* (PCB v1.5+) current configuration needs confirmation, SID's are disabled until confirmed! */
+  bool socket_change_detect : 1; /* (PCB v1.5+) disables socket change detection on boot */
+  bool preset_auto_detect : 1;   /* disables silent auto detection before present change, default disabled on v1.0~v1.3, default enabled on v1.5+ */
 } Config;
 
+/* Fixed defaults that differ between Pico1 and Pico2 */
 #if PICO_RP2350
 #define USBSID_CLOCK_RATE_DEFAULT    PAL
 #define USBSID_REFRESH_RATE_DEFAULT  HZ50
@@ -167,6 +168,13 @@ typedef struct Config { // TODO: Add overrides for detect_default_config and add
 #define USBSID_CLOCK_RATE_DEFAULT    DEFAULT
 #define USBSID_REFRESH_RATE_DEFAULT  HZ_DEFAULT
 #define USBSID_RASTER_RATE_DEFAULT   R_DEFAULT
+#endif
+
+/* Fixed defaults that differ between PCB versions */
+#if PCB_VERSION_INT >= 15
+#define PRESET_AUTO_DETECT_DEFAULT true
+#else
+#define PRESET_AUTO_DETECT_DEFAULT false
 #endif
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
@@ -242,7 +250,8 @@ typedef struct Config { // TODO: Add overrides for detect_default_config and add
   .flipped = false, \
   .mixed = false, \
   .need_confirmation = false, \
-  .disable_changedetect = false, /* WARNING: This setting _can_ and _will_ fry your 9v SID if config is set to 6581 (12v) */ \
+  .socket_change_detect = true, /* WARNING: This setting _can_ and _will_ fry your 9v SID if config is set to 6581 (12v) */ \
+  .preset_auto_detect = PRESET_AUTO_DETECT_DEFAULT, /* Default disabled on v1.0~v1.3, default enabled on v1.5+ */ \
 } \
 
 typedef struct RuntimeCFG {
@@ -355,7 +364,6 @@ enum
   GET_AUDIO        = 0x91,  /* Get current audio switch setting */
 
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
-  TEST_FN2         = 0x9A,  /* TODO: Remove before v1 release */
 
   /* Hardware SID clone configuration related */
   READ_CLONECHIP   = 0xA0,  /* Chip config read initiator byte */
@@ -379,21 +387,24 @@ enum
   SID_PLAYER_NEXT    = 0xE4,  /* Next SID subtune play */
   SID_PLAYER_PREV    = 0xE5,  /* Previous SID subtune play */
   SID_PLAYER_TWO     = 0xE6,  /* Force play to play on socket two or sid two */
-  SID_PLAYER_FFWD    = 0xE7, /* Tune fast forward */
-  SID_PLAYER_RWND    = 0xE8, /* Tune rewind */
-  SID_PLAYER_MUTE    = 0xE9, /* Full mute, mutes all SID's */
-  SID_PLAYER_MUTE_V1 = 0xEA, /* Mute voice 1, supply sid number in second byte where 0 is SID 1 */
-  SID_PLAYER_MUTE_V2 = 0xEB, /* Mute voice 2, supply sid number in second byte where 0 is SID 1 */
-  SID_PLAYER_MUTE_V3 = 0xEC, /* Mute voice 3, supply sid number in second byte where 0 is SID 1 */
-  SID_PLAYER_TIME    = 0xED, /* Read play time of current track */
+  SID_PLAYER_FFWD    = 0xE7,  /* Tune fast forward */
+  SID_PLAYER_RWND    = 0xE8,  /* Tune rewind */
+  SID_PLAYER_MUTE    = 0xE9,  /* Full mute, mutes all SID's */
+  SID_PLAYER_MUTE_V1 = 0xEA,  /* Mute voice 1, supply sid number in second byte where 0 is SID 1 */
+  SID_PLAYER_MUTE_V2 = 0xEB,  /* Mute voice 2, supply sid number in second byte where 0 is SID 1 */
+  SID_PLAYER_MUTE_V3 = 0xEC,  /* Mute voice 3, supply sid number in second byte where 0 is SID 1 */
+  SID_PLAYER_MUTED   = 0xED,  /* Read a SID's muted state */
+  SID_PLAYER_TIME    = 0xEE,  /* Read play time of current track */
+  TEST_FN2           = 0xEF,  /* TODO: Remove before v1 release */
 
   /* Filetypes we can receive and process */
   SID_FILE         = 0x01,
   PRG_FILE         = 0x02,
 #endif
 
-  CONFIG_ACK       = 0xFA,  /* Acknowledge and save the current configuration and switch on regulators (v1.5+ boards only) */
-  SOCKET_DETECT    = 0xFD,  /* Disable/enable and save automatic socket change detection on boot (v1.5+ boards only) */
+  CONFIG_ACK       = 0xFA,  /* (v1.5+ PCB) Acknowledge and save the current configuration and switch on regulators */
+  SOCKET_DETECT    = 0xFD,  /* (v1.5+ PCB) Enable/disable and save automatic socket change detection on boot */
+  PRESET_DETECT    = 0xFE,  /* Enable/disable and save automatic detection on preset change */
 };
 
 /* Config read/write bytes */
@@ -455,7 +466,8 @@ enum {
   BOARD_MIRRORED  = 12,
   BOARD_FLIPPED   = 13,
   BOARD_MIXED     = 14,
-  BOARD_SDETECT   = 15, /* Automatic socket change detection v1.4+ */
+  BOARD_SDETECT   = 15, /* (PCB v1.5+) Automatic socket change detection */
+  BOARD_PADETECT  = 16, /* (PCB v1.5+) Preset automatic detection */
 };
 
 /**

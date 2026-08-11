@@ -130,14 +130,17 @@ void read_config(Config* config)
 {
   memset(config_array, 0, sizeof config_array);  /* Make sure we don't send garbled old data */
 
-  usCFG("Reading configuration from 0x%x to 0x%x with size %u\n", (uint)config, &config_array, sizeof(Config));
+  usCFG("Reading configuration from 0x%x to 0x%x with size %u\n",
+    (uint)config, &config_array, sizeof(Config));
 
-  config_array[0] = READ_CONFIG;  /* Initiator byte */
-  config_array[1] = 0x7F;  /* Verification byte */
+  config_array[0] = READ_CONFIG; /* Initiator byte */
+  config_array[1] = 0x7F;        /* Verification byte */
 
-  config_array[2] = (int)config_unacknowledged();      /* Need configuration confirmation v1.5+ only */
-  config_array[3] = (int)config->disable_changedetect; /* Disable socket change detection v1.5+ only */
-  config_array[4] = (int)config->last_preset;          /* The last applied preset */
+  config_array[2] = (int)config_unacknowledged();      /* (PCB v1.5+) Need configuration confirmation */
+  config_array[3] = (int)config->socket_change_detect; /* (PCB v1.5+) Socket change detection */
+  config_array[4] = (int)(config->last_preset & 0x7f); /* The last applied preset */
+  config_array[4] |=
+    (int)((int)(config->preset_auto_detect << 7) & 0x80);   /* Socket auto detection during preset applying */
 
   /* Clockworx */
   config_array[5] = (int)config->lock_clockrate;
@@ -522,13 +525,15 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
             case SOCKET_UNUSED:   /* UNUSED */
               break;
             case SOCKET_SID1TYPE: /* sid1.type */
-              if (buffer[3] <= 4) {
+              if (buffer[3] < SID_COUNT) {
                 usbsid_config.socketOne.sid1.type = buffer[3];
+                apply_fmopl_config(&cfg);  /* Keep FMOpl state in sync */
               }
               break;
             case SOCKET_SID2TYPE: /* sid2.type */
-                if (buffer[3] <= 4) {
+                if (buffer[3] < SID_COUNT) {
                   usbsid_config.socketOne.sid2.type = buffer[3];
+                  apply_fmopl_config(&cfg);  /* Keep FMOpl state in sync */
                 }
               break;
           };
@@ -553,13 +558,15 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
             case SOCKET_UNUSED:   /* UNUSED */
               break;
             case SOCKET_SID1TYPE: /* sid1.type */
-              if (buffer[3] <= 4) {
+              if (buffer[3] < SID_COUNT) {
                 usbsid_config.socketTwo.sid1.type = buffer[3];
+                apply_fmopl_config(&cfg);  /* Keep FMOpl state in sync */
               }
               break;
             case SOCKET_SID2TYPE: /* sid2.type */
-              if (buffer[3] <= 4) {
+              if (buffer[3] < SID_COUNT) {
                 usbsid_config.socketTwo.sid2.type = buffer[3];
+                apply_fmopl_config(&cfg);  /* Keep FMOpl state in sync */
               }
               break;
             case OLD_S2_MIRRORED: /* mirrored */ /* NOTE: Pre v0.7.0 fw backwards compatibility */
@@ -643,8 +650,15 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
           usbsid_config.Midi.enabled = (bool)buffer[2];
           break;
         case BOARD_FMOPL:     /* FMOpl */
-          usbsid_config.FMOpl.enabled = (bool)buffer[2];
-          apply_fmopl_config();
+          /* buffer[2] = enabled, buffer[3] = sidno 1~4 (optional when disabling)
+           * Assigning the SID type is what enables FMOpl, the enabled flag on
+           * its own is derived state and cannot be set independently */
+          if (buffer[2] == 0) {
+            set_fmopl_sidno(0);  /* Clear any assigned FMOpl SID */
+          } else {
+            set_fmopl_sidno((int)buffer[3]);
+          }
+          apply_fmopl_config(&cfg);
           break;
         case BOARD_AUSWITCH:  /* Audio switch */
           usbsid_config.stereo_en =
@@ -674,10 +688,16 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
           };
           break;
         case BOARD_SDETECT:   /* Socket change autodetection */
-          usbsid_config.disable_changedetect =
-          (buffer[2] == 0 || buffer[2] == 1)
-          ? (bool)buffer[2]
-          : true;  /* Default to 0 ~ not disabled, always autodetect */
+          usbsid_config.socket_change_detect =
+            (buffer[2] == 0 || buffer[2] == 1)
+            ? (bool)buffer[2]
+            : true;  /* Default to 1 ~ enabled, always autodetect */
+          break;
+        case BOARD_PADETECT:   /* Preset silent autodetection */
+          usbsid_config.preset_auto_detect =
+            (buffer[2] == 0 || buffer[2] == 1)
+            ? (bool)buffer[2]
+            : true;  /* Default to 1 ~ enabled, always autodetect */
           break;
         default:
           break;
@@ -857,18 +877,34 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       if (ack_state) {
         save_config(&usbsid_config);
         apply_socket_config_voltages();
+        bus_drain();
+        bus_resync();
         clear_dma_channels();
+        reset_sid();
       }
 #endif
       break;
     case SOCKET_DETECT: /* Enable/disable automatic socket change detection on v1.5+ */
       usCFG("SOCKET_DETECT\n");
 #if PCB_VERSION_INT >= 15
-      usbsid_config.disable_changedetect = (bool)buffer[1];
+      usbsid_config.socket_change_detect =
+        (buffer[1] == 0 || buffer[1] == 1)
+        ? (bool)buffer[1]
+        : true;  /* Default to 1 ~ enabled, always autodetect */
       usCFG("Automatic socket change detection is now '%s'\n",
-        switch_str((int)!usbsid_config.disable_changedetect));
+        switch_str((int)usbsid_config.socket_change_detect));
       save_config(&usbsid_config);
 #endif
+      break;
+    case PRESET_DETECT: /* Enable/disable automatic socket change detection on v1.5+ */
+      usCFG("PRESET_DETECT\n");
+      usbsid_config.preset_auto_detect =
+        (buffer[2] == 0 || buffer[2] == 1)
+        ? (bool)buffer[2]
+        : true;  /* Default to 1 ~ enabled, always autodetect */
+      usCFG("Silent autodetection during preset change is now '%s'\n",
+        switch_str((int)usbsid_config.preset_auto_detect));
+      save_config(&usbsid_config);
       break;
     case DETECT_SIDS:       /* Detect SID types per socket */
       if (buffer[1] == 0) {
@@ -1134,14 +1170,17 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         uint8_t pinstates = get_pin_states();
         usNFO("PINSTATES: 0b%04b\n",pinstates);
       }
-      break;
-    case TEST_FN2:
-      usNFO("Printing SID memory\n");
-      for (uint i = 0; i < SID_MEMORY_SIZE; i++) {
-        if (i!=0 && i%0x20 == 0) { usNFO("\n");};
-        usNFO("$%02X ", sid_memory[i]);
+      if (buffer[1] == 0x0e) {
+        apply_sid_addresses();
       }
-      usNFO("\n");
+      if (buffer[1] == 0x0f) {
+        usNFO("Printing SID memory\n");
+        for (uint i = 0; i < SID_MEMORY_SIZE; i++) {
+          if (i!=0 && i%0x20 == 0) { usNFO("\n");};
+          usNFO("$%02X ", sid_memory[i]);
+        }
+        usNFO("\n");
+      }
       break;
     case READ_CLONECHIP: /* Read configuration / data from clone Chips */
       usCFG("READ_CLONECHIP: $%02x @ $%02x\n", buffer[1], buffer[2]);
@@ -1252,6 +1291,27 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       usCFG("SID_PLAYER_TWO\n");
       force_socktwo();
       break;
+    case SID_PLAYER_FFWD: break;
+    case SID_PLAYER_RWND: break;
+    case SID_PLAYER_MUTE:
+      break;
+    case SID_PLAYER_MUTE_V1: break;
+    case SID_PLAYER_MUTE_V2: break;
+    case SID_PLAYER_MUTE_V3: break;
+    case SID_PLAYER_MUTED: break;
+    case SID_PLAYER_TIME: break;
+    case TEST_FN2:
+      if (buffer[1] == 0x00) {
+        usCFG("[USPLAYER @ 1000000] %u kcycles/s\n", usplayer_benchmark(1000000));
+        uint32_t kc = usplayer_benchmark(985248);
+        usCFG("[USPLAYER @ 985248] Emulation: %lu cycles/ms (realtime needs 986)\n", kc);
+      }
+      if (buffer[1] == 0x01) {
+        usCFG("frames %lu  writes %lu  paced %llu  waited %llu\n",
+          usplayer_frames(), usplayer_sid_writes(),
+          usplayer_cycles_paced(), usplayer_cycles_waited());
+      }
+      break;
 #endif
     default:
       break;
@@ -1317,8 +1377,8 @@ ConfigError apply_new_presetconfig(void)
   RuntimeCFG new_cfg;
   apply_runtime_config(&usbsid_config, &new_cfg);
 
-  /* Find configured FMOpl */
-  apply_fmopl_config();
+  /* Find configured FMOpl ~ must apply to new_cfg, the swap below overwrites cfg */
+  apply_fmopl_config(&new_cfg);
 
   /* Atomically swap runtime config IRQ safe */
   uint32_t irq = save_and_disable_interrupts();
@@ -1347,8 +1407,8 @@ ConfigError apply_config(bool at_boot)
   RuntimeCFG new_cfg;
   apply_runtime_config(&usbsid_config, &new_cfg);
 
-  /* Find configured FMOpl */
-  apply_fmopl_config();
+  /* Find configured FMOpl ~ must apply to new_cfg, the swap below overwrites cfg */
+  apply_fmopl_config(&new_cfg);
 
   /* Atomically swap runtime config IRQ safe */
   uint32_t irq = save_and_disable_interrupts();
