@@ -78,6 +78,19 @@ enum {
   PRG_FILE         = 0x02,  /* File is PRG */
 };
 
+void teardown_wait(void)
+{
+  #include <time.h>
+
+  /* 100 milliseconds setup */
+  struct timespec delay = {
+      .tv_sec = 0,
+      .tv_nsec = 100000000 /* 100 million nanoseconds = 100ms */
+  };
+  nanosleep(&delay, NULL);
+  return;
+}
+
 /**
  * @brief Initialize a connection with USBSID-Pico
  *
@@ -104,15 +117,24 @@ int usbsid_init(void)
   }
 
   for (int if_num = 0; if_num < 2; if_num++) {
+    /* If the kernel driver is holding the interface, manually detach it */
     if (libusb_kernel_driver_active(devh, if_num) == 1) {
       libusb_detach_kernel_driver(devh, if_num);
     }
-    rc = libusb_claim_interface(devh, if_num);
-    if (rc < 0) {
-      fprintf(stderr, "Error claiming interface: %d, %s: %s\n",
-      rc, libusb_error_name(rc), libusb_strerror(rc));
-      goto out;
-    }
+  }
+
+  rc = libusb_claim_interface(devh, 0);
+  if (rc < 0) {
+    fprintf(stderr, "Error claiming interface: %d, %s: %s\n",
+    rc, libusb_error_name(rc), libusb_strerror(rc));
+    goto out;
+  }
+
+  rc = libusb_claim_interface(devh, 1);
+  if (rc < 0) {
+    fprintf(stderr, "Error claiming interface: %d, %s: %s\n",
+    rc, libusb_error_name(rc), libusb_strerror(rc));
+    goto out;
   }
 
   rc = libusb_control_transfer(devh, 0x21, 0x22, ACM_CTRL_DTR | ACM_CTRL_RTS, 0, NULL, 0, 0);
@@ -136,11 +158,18 @@ int usbsid_init(void)
     goto out;
   }
 
+  /* zero length read to clear any lingering data */
+  unsigned char buffer[1];
+  libusb_bulk_transfer(devh, ep_out_addr, buffer, 0, &transferred, 1);
+  libusb_bulk_transfer(devh, ep_in_addr, buffer, 0, &transferred, 1);
+
   return usid_dev;
 out:
   if (devh != NULL)
-  libusb_close(devh);
+    libusb_close(devh);
   libusb_exit(NULL);
+  devh = NULL;
+  usid_dev = -1;
   rc = -1;
   return rc;
 }
@@ -151,14 +180,21 @@ out:
  */
 void usbsid_close(void)
 {
-  for (int if_num = 0; if_num < 2; if_num++) {
-    libusb_release_interface(devh, if_num);
-    if (libusb_kernel_driver_active(devh, if_num)) {
-      libusb_detach_kernel_driver(devh, if_num);
-    }
+  libusb_release_interface(devh, 0);
+  libusb_release_interface(devh, 1);
+
+  rc = libusb_attach_kernel_driver(devh, 0);
+  if (rc < 0 && rc != LIBUSB_ERROR_NOT_FOUND) {
+    fprintf(stderr, "Attach error on interface 0: %s\n", libusb_error_name(rc));
   }
-  libusb_close(devh);
+
+  teardown_wait();
+
+  if (devh != NULL)
+    libusb_close(devh);
   libusb_exit(NULL);
+  devh = NULL;
+  usid_dev = -1;
   return;
 }
 
