@@ -38,7 +38,7 @@ extern uint8_t uart_buffer[];
 extern uint8_t *write_buffer_p;
 
 /* SID register shadow memory from usbsid.c */
-#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
+#if defined(ONBOARD_EMULATOR)
 extern uint8_t c64memory[];
 extern uint8_t *sid_memory;
 #else
@@ -46,7 +46,11 @@ extern uint8_t sid_memory[];
 #endif
 
 /* USB connection state */
-extern volatile int usb_connected, usbdata;
+/* extern volatile bool receivedata, sidwriting; */
+extern volatile bool is_receivedata(void);
+extern volatile void set_receivedata(bool state);
+extern volatile bool is_sidwriting(void);
+extern volatile void set_sidwriting(bool state);
 extern volatile uint32_t cdcread, cdcwrite, webread, webwrite;
 extern volatile uint8_t *cdc_itf, *wusb_itf;
 
@@ -75,6 +79,7 @@ extern volatile int sidfile_size;
 extern volatile char tuneno;
 extern volatile bool is_prg;
 #endif /* ONBOARD_SIDPLAYER */
+extern volatile bool is_sidplayerplaying(void); /* Always returns false if no sidplayer available */
 
 /* Runtime flags intercore changeable */
 extern volatile bool offload_ledrunner;

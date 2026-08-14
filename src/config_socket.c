@@ -69,9 +69,11 @@ uint8_t get_numsids(void)
 #endif /* ONBOARD_EMULATOR */
 
 /**
- * @brief Returns the FMOpl socket SID id
+ * @brief Returns the FMOpl SID number
+ * @note Returns the configured SID id (not the socket slot index), since the
+ * slot to id relation changes with disabled sockets and flipped/mixed presets
  *
- * @return int id
+ * @return int 1~4 the SID number, 0 when no FMOpl is configured
  */
 int verify_fmopl_sidno(void)
 {
@@ -83,26 +85,77 @@ int verify_fmopl_sidno(void)
   };
 
   for (int i = 0; i < 4; i++) {
-    if (sids[i]->type == SID_FMOPL && sids[i]->addr != 0xFF) {
-      return i + 1;  /* Return 1-based SID number */
+    if (sids[i]->type == SID_FMOPL
+      && sids[i]->addr != 0xFF
+      && sids[i]->id < 4) {
+      return sids[i]->id + 1;  /* Return 1-based SID number */
     }
   }
 
-  return -1;
+  return 0;  /* 0 = disabled */
+}
+
+/**
+ * @brief Assign or clear the FMOpl SID type by SID number
+ * @note The requested SID must have an address assigned, else the FMOpl type
+ * would be reset to SID_NA by apply_sid_addresses() on the next apply
+ *
+ * @param int sidno 1~4 the SID number to set as FMOpl, 0 to clear
+ * @return bool true when applied, false when the SID number is not addressable
+ */
+bool set_fmopl_sidno(int sidno)
+{
+  SIDChip *sids[4] = {
+    &usbsid_config.socketOne.sid1,
+    &usbsid_config.socketOne.sid2,
+    &usbsid_config.socketTwo.sid1,
+    &usbsid_config.socketTwo.sid2,
+  };
+
+  int slot = -1;
+  if (sidno >= 1 && sidno <= 4) {
+    for (int i = 0; i < 4; i++) {
+      if (sids[i]->id == (sidno - 1) && sids[i]->addr != 0xFF) {
+        slot = i;
+        break;
+      }
+    }
+    if (slot == -1) {
+      usSOCK("FMOpl SID %d has no address assigned, not applied\n", sidno);
+      return false;  /* Requested SID is not addressable, leave config untouched */
+    }
+  } else if (sidno != 0) {
+    return false;  /* Out of range */
+  }
+
+  /* Clear any previously assigned FMOpl */
+  for (int i = 0; i < 4; i++) {
+    if (sids[i]->type == SID_FMOPL) {
+      sids[i]->type = SID_UNKNOWN;
+    }
+  }
+  if (slot != -1) {
+    sids[slot]->type = SID_FMOPL;
+  }
+
+  return true;
 }
 
 /**
  * @brief Apply FMOpl configuration
- * @note changes both Config and RuntimeCFG
+ * @note changes both Config and the supplied RuntimeCFG
  *
+ * @param RuntimeCFG *rt the runtime config to apply to
  */
-void apply_fmopl_config(void)
+void apply_fmopl_config(RuntimeCFG *rt)
 {
   int fmopl_sid = verify_fmopl_sidno();
-  cfg.fmopl_sid = fmopl_sid;
-  cfg.fmopl_enabled = (fmopl_sid != -1);
   usbsid_config.FMOpl.sidno = fmopl_sid;
-  usbsid_config.FMOpl.enabled = cfg.fmopl_enabled;
+  usbsid_config.FMOpl.enabled = (fmopl_sid != 0);
+  if (rt != NULL) {
+    rt->fmopl_sid = (uint8_t)fmopl_sid;
+    rt->fmopl_enabled = usbsid_config.FMOpl.enabled;
+  }
   return;
 }
 
@@ -155,8 +208,8 @@ void apply_sid_addresses(void)
     idx = 16;  /* Dual Stereo Flipped */
   } else if (idx == 15 && (usbsid_config.flipped || usbsid_config.mixed)) {
     idx = 16
-      | (usbsid_config.flipped ? 1 : 0)  /* +1 → 17: Quad Flipped */
-      | (usbsid_config.mixed   ? 2 : 0); /* +2 → 18: Quad Mixed, +3 → 19: Both */
+      | (usbsid_config.flipped ? 1 : 0)  /* +1 -> 17: Quad Flipped */
+      | (usbsid_config.mixed   ? 2 : 0); /* +2 -> 18: Quad Mixed, +3 -> 19: Both */
   }
 
   /* Lookup addresses from table */
@@ -528,9 +581,11 @@ static ConfigError apply_preset(SocketPreset preset)
     return CFG_ERR_EQUAL_PRESET;
   }
 
-  /* Run autodetection before applying preset,
+  /* Run autodetection before applying preset if enabled,
      this will ensure supporting chips and sids, etc */
-  sid_auto_detect_silent();
+  if (usbsid_config.preset_auto_detect) {
+    sid_auto_detect_silent();
+  }
 
   apply_socket_preset(preset);
 
@@ -657,8 +712,6 @@ ConfigError detect_socket_change(void)
 #if PCB_VERSION_INT >= 15
   /* Set base voltages, only does anything if PCB version is >= v1.5 */
   set_base_voltages(500); /* Logically also resets the SID */
-#else
-  reset_sid();
 #endif
 
   /* Run detection */
@@ -677,9 +730,6 @@ ConfigError detect_socket_change(void)
   set_busconfig_logging(true);
   set_detection_logging(true);
 
-  /* Reset SID registers afterwards */
-  reset_sid_registers();
-
   /* Detection mixes fire and forget writes with cpu side irq handling,
      which can leave the bus pipeline one word out of step. Nothing else
      in the boot path re-initialises the bus statemachines after this
@@ -689,10 +739,10 @@ ConfigError detect_socket_change(void)
   bus_resync();  /* Then put the pipeline back in a known state */
 
   if (change_detected != CFG_OK) {
+    usWRN("SID Protection: %s\n", config_error_str(change_detected));
 #if PCB_VERSION_INT >= 15
     voltage_state_off(); /* Turn off regulators if change detected */
 #endif
-    usWRN("SID Protection: %s\n", config_error_str(change_detected));
     return change_detected;
   }
 
@@ -760,7 +810,7 @@ void verify_socket_config(void)
 {
 #if PCB_VERSION_INT >= 15
   /* Detect changes in socket configuration */
-  if (!usbsid_config.disable_changedetect) { /* If in config disabled then skip and apply voltages from config! */
+  if (usbsid_config.socket_change_detect) { /* Only continue if enabled, else skip and apply voltages from config! */
     if (!first_boot /* Set by detect default config */
         && !usbsid_config.need_confirmation /* Not already waiting for confirmation */
         && (detect_socket_change() != CFG_OK)) {

@@ -54,6 +54,30 @@ volatile static int _rgb = 0;
 
 
 /**
+ * @brief Makes sure the vu keeps working between operations
+ *        by setting a minimum Vu value and setting
+ *        receivedata and sidwriting to true
+ *
+ */
+void set_vu_action(void)
+{
+  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Fix for core1 setting dtype to 0 in `led_runner` */
+  set_receivedata(true);
+  set_sidwriting(true);
+  return;
+}
+
+/**
+ * @brief Get the Vu value
+ *
+ * @return uint16_t
+ */
+uint16_t get_vu_value(void)
+{
+  return vu;
+}
+
+/**
  * @brief Assign supplied value to global variable and trigger
  *
  * @param uint32_t _rgb_value
@@ -112,7 +136,7 @@ void __no_inline_not_in_flash_func(led_vumeter_task)(void)
     return;  /* not enough time, not complete a raster */
   }
   start_us = to_us_since_boot(get_absolute_time());
-  if (usbdata == 1/*  && dtype != ntype */) {
+  if (is_sidwriting() || is_sidplayerplaying() || is_receivedata()) {
     /* LED always uses SID 1 */
     double osc1, osc2, osc3;
     osc1 = (sid_memory[0x00] * 0.596f);  /* Frequency in Hz of SID1 @ $D400 Oscillator 1 */
@@ -139,12 +163,11 @@ void __no_inline_not_in_flash_func(led_vumeter_task)(void)
 #endif
 
     usMEM("[%c:%d][PWM]$%04x[V1]$%02X%02X$%02X%02X$%02X$%02X$%02X[V2]$%02X%02X$%02X%02X$%02X$%02X$%02X[V3]$%02X%02X$%02X%02X$%02X$%02X$%02X[FC]$%02x%02x$%02x[VOL]$%02x\n",
-      dtype, usbdata, vu,
+      dtype, is_receivedata(), vu,
       sid_memory[0x01], sid_memory[0x00], sid_memory[0x03], sid_memory[0x02], sid_memory[0x04], sid_memory[0x05], sid_memory[0x06],
       sid_memory[0x08], sid_memory[0x07], sid_memory[0x0A], sid_memory[0x09], sid_memory[0x0B], sid_memory[0x0C], sid_memory[0x0D],
       sid_memory[0x0F], sid_memory[0x0E], sid_memory[0x11], sid_memory[0x10], sid_memory[0x12], sid_memory[0x13], sid_memory[0x14],
       sid_memory[0x16], sid_memory[0x15], sid_memory[0x17], sid_memory[0x18]);
-
   }
   return;
 #endif
@@ -157,47 +180,45 @@ void __no_inline_not_in_flash_func(led_vumeter_task)(void)
 void __no_inline_not_in_flash_func(led_breathe_task)(void)
 {
 #if LED_PWM
-  if (usbdata == 0/*  && dtype == ntype */) {
-    if (to_us_since_boot(get_absolute_time()) - start_us < (uint32_t)BREATHE_INTV) {
-      return;  /* not enough time since last check */
-    }
-    start_us = to_us_since_boot(get_absolute_time());
+  if (to_us_since_boot(get_absolute_time()) - start_us < (uint32_t)BREATHE_INTV) {
+    return;  /* not enough time since last check */
+  }
+  start_us = to_us_since_boot(get_absolute_time());
 
-    if (pwm_value >= VU_MAX) {
-      updown = 0;
-    }
-    if (pwm_value <= 0) {
-      updown = 1;
+  if (pwm_value >= VU_MAX) {
+    updown = 0;
+  }
+  if (pwm_value <= 0) {
+    updown = 1;
 #ifdef USE_RGB
-      _rgb = RANDVAL(0, 5);  /* Select random color when at 0 brightness */
-#endif
-    }
-
-    if (updown == 1 && pwm_value <= VU_MAX)
-      pwm_value += BREATHE_STEP;
-
-    if (updown == 0 && pwm_value >= 0)
-      pwm_value -= BREATHE_STEP;
-    if (usbsid_config.LED.enabled && usbsid_config.LED.idle_breathe) {
-      dma_hw->multi_channel_trigger = (1u << dma_pwmled);
-    }
-#if defined(USE_RGB)
-    if (usbsid_config.RGBLED.enabled && usbsid_config.RGBLED.idle_breathe) {
-      int rgb_ = MAP(pwm_value, 0, VU_MAX, 0, 31);
-      r_ = (_rgb == 0 || _rgb == 3 || _rgb == 5) ? (rgb_ * 8) : 0;
-      g_ = (_rgb == 1 || _rgb == 3 || _rgb == 4) ? (rgb_ * 8) : 0;
-      b_ = (_rgb == 2 || _rgb == 4 || _rgb == 5) ? (rgb_ * 8) : 0;
-      fill_and_trigger_rgb(
-        (UGRB_U32(
-          RGBB(r_,usbsid_config.RGBLED.brightness),
-          RGBB(g_,usbsid_config.RGBLED.brightness),
-          RGBB(b_,usbsid_config.RGBLED.brightness))
-        ) << 8u);
-    } else {
-      fill_and_trigger_rgb((UGRB_U32(0,0,0)) << 8u);
-    }
+    _rgb = RANDVAL(0, 5);  /* Select random color when at 0 brightness */
 #endif
   }
+
+  if (updown == 1 && pwm_value <= VU_MAX)
+    pwm_value += BREATHE_STEP;
+
+  if (updown == 0 && pwm_value >= 0)
+    pwm_value -= BREATHE_STEP;
+  if (usbsid_config.LED.enabled && usbsid_config.LED.idle_breathe) {
+    dma_hw->multi_channel_trigger = (1u << dma_pwmled);
+  }
+#if defined(USE_RGB)
+  if (usbsid_config.RGBLED.enabled && usbsid_config.RGBLED.idle_breathe) {
+    int rgb_ = MAP(pwm_value, 0, VU_MAX, 0, 31);
+    r_ = (_rgb == 0 || _rgb == 3 || _rgb == 5) ? (rgb_ * 8) : 0;
+    g_ = (_rgb == 1 || _rgb == 3 || _rgb == 4) ? (rgb_ * 8) : 0;
+    b_ = (_rgb == 2 || _rgb == 4 || _rgb == 5) ? (rgb_ * 8) : 0;
+    fill_and_trigger_rgb(
+      (UGRB_U32(
+        RGBB(r_,usbsid_config.RGBLED.brightness),
+        RGBB(g_,usbsid_config.RGBLED.brightness),
+        RGBB(b_,usbsid_config.RGBLED.brightness))
+      ) << 8u);
+  } else {
+    fill_and_trigger_rgb((UGRB_U32(0,0,0)) << 8u);
+  }
+#endif
   return;
 #endif
 }
@@ -242,17 +263,16 @@ void __no_inline_not_in_flash_func(led_runner)(void)
     return;
   }
 #endif
-  usbdata == 1 ? led_vumeter_task() : led_breathe_task();
-  if (to_us_since_boot(get_absolute_time()) - us_now < CHECK_INTV) { /* 0.1 second */
-    /* NOTICE: Testfix for core1 setting dtype to 0 */
+  (is_sidwriting() || is_sidplayerplaying() || is_receivedata()) ? led_vumeter_task() : led_breathe_task();
+  if ((to_us_since_boot(get_absolute_time()) - us_now) < CHECK_INTV) { /* 0.1 second */
     /* do nothing */
     return;
   } else {  /* Check if we need to reset the Vu to breathing */
     us_now = to_us_since_boot(get_absolute_time());
-    if (vu == 0 && usbdata == 1) {
+    if (!is_sidwriting() && !is_sidplayerplaying() && vu == 0 && is_receivedata()) {
       n_checks++;
       if (n_checks >= MAX_CHECKS) { /* 100 checks */
-        n_checks = 0, usbdata = 0, dtype = ntype;  /* NOTE: This sets dtype to 0 which causes buffertask write to go to default and error out with many consecutive reads from the bus */
+        n_checks = 0, set_receivedata(false), dtype = ntype;  /* NOTE: This sets dtype to 0 which causes buffertask write to go to default and error out with many consecutive reads from the bus */
         offload_ledrunner = false;
         /**
          * @brief Let's make sure we always reset the write order

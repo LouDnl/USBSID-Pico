@@ -51,17 +51,21 @@ uint8_t __not_in_flash("usbsid_buffer") config_buffer[MAX_BUFFER_SIZE] __aligned
 uint8_t __not_in_flash("usbsid_buffer") uart_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);   /* 64 Bytes, 128 bytes aligned */
 uint8_t *write_buffer_p = write_buffer; /* Init pointer for external use */
 
-#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
-/* Use full 64KB memory for C64 emulator and SID player */
+#if defined(ONBOARD_EMULATOR)
+/* Use full 64KB memory for C64 emulator */
 uint8_t __not_in_flash("c64_memory") c64memory[C64_MEMORY_SIZE] __aligned(128) = {0}; /* 64 Kilo Bytes, 128 bytes aligned */
 /* Pointer to SID address range in memory */
 uint8_t * sid_memory = &c64memory[0xd400]; /* Pointer to $d400 of 128 Bytes total */
 #else
 /* 128 Bytes 'Memory' storage for SID registers */
-uint8_t __not_in_flash("usbsid_buffer") sid_memory[SID_MEMORY_SIZE] __aligned(SID_MEMORY_SIZE); /* 128 Bytes, 128 bytes aligned */
+uint8_t __not_in_flash("usbsid_buffer") sid_memory[SID_MEMORY_SIZE] __aligned(SID_MEMORY_SIZE) = {0}; /* 128 Bytes, 128 bytes aligned */
 #endif
 
-volatile int usb_connected = 0, usbdata = 0;
+volatile static bool receivedata = false, sidwriting = false;
+volatile bool is_receivedata(void) { return receivedata; };
+volatile void set_receivedata(bool state) { receivedata = state; };
+volatile bool is_sidwriting(void) { return sidwriting; };
+volatile void set_sidwriting(bool state) { sidwriting = state; };;
 volatile uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
 volatile uint8_t *cdc_itf = 0, *wusb_itf = 0;
 /* nonetype, datatype, returntype */
@@ -92,6 +96,7 @@ volatile bool stopping_emulator = false;
 volatile bool sidplayer_init = false;
 volatile bool sidplayer_start = false;
 volatile bool sidplayer_playing = false;
+volatile bool is_sidplayerplaying(void) { return sidplayer_playing; };
 volatile bool sidplayer_stop = false;
 volatile bool sidplayer_next = false;
 volatile bool sidplayer_prev = false;
@@ -99,6 +104,8 @@ uint8_t * sidfile = NULL; /* Temporary buffer to store incoming data */
 volatile int sidfile_size = 0;
 volatile char tuneno = 0;
 volatile bool is_prg = false; /* Default to SID file */
+#else
+volatile bool is_sidplayerplaying(void) { return false; };
 #endif /* ONBOARD_SIDPLAYER */
 
 /* Queues */
@@ -197,6 +204,7 @@ int __no_inline_not_in_flash_func(do_buffer_tick)(int top, int step)
 {
   static int i = 1;
   if (i < 1) i = 1;  /* Guard: static init unreliable with -O3 */
+  if ((i + step) > MAX_BUFFER_SIZE) { i = 1; return i; } /* Guard: Cannot step outside of the maximum buffer range */
   cycled_write_operation(sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   WRITEDBG(dtype, i, top, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
   usIO("[I %d] [%c] $%02X:%02X (%u)\n", i, dtype, sid_buffer[i], sid_buffer[i + 1], (step == 4 ? (sid_buffer[i + 2] << 8 | sid_buffer[i + 3]) : MIN_CYCLES));
@@ -212,8 +220,7 @@ void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
 {
   int state = 0;
   do {
-    usbdata = 1;
-    vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+    set_vu_action(); /* Keep that shiny Vu blinking! */
     state = do_buffer_tick(n_bytes, step);
   } while (state != 1);
 }
@@ -221,8 +228,7 @@ void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
 /* Process received usb data */
 void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volatile uint32_t * n)
 {
-  usbdata = 1;
-  vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
+  set_vu_action(); /* Keep that shiny Vu blinking! */
   uint8_t command = ((sid_buffer[0] & PACKET_TYPE) >> 6);
   uint8_t subcommand = (sid_buffer[0] & COMMAND_MASK);
   uint8_t n_bytes = (sid_buffer[0] & BYTE_MASK);
@@ -270,7 +276,6 @@ void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volat
         usIO("[WRITE ERROR]%c\n", rtype);
         break;
     };
-    vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
     return;
   };
 SIDCHANGEDETECTED:;
@@ -292,7 +297,6 @@ SIDCHANGEDETECTED:;
             usERR("While writing to '%c'\n", rtype);
             break;
         };
-        vu = (vu == 0 ? 100 : vu);  /* NOTICE: Testfix for core1 setting dtype to 0 */
         return;
       case DELAY_CYCLES:
         cycled_delay_operation((sid_buffer[1] << 8 | sid_buffer[2]));
@@ -362,12 +366,11 @@ void tud_mount_cb(void)
 {
   /* usDBG("[%s]\n", __func__); */
   usNFO("[CDC] Mount\n");
-  usb_connected = 1;
 }
 
 void tud_umount_cb(void)
 {
-  usb_connected = 0, usbdata = 0, dtype = rtype = ntype;
+  set_receivedata(false), dtype = rtype = ntype;
   /* usDBG("[%s]\n", __func__); */
   usNFO("[CDC] Unmount\n");
   disable_sid();  /* NOTICE: Testing if this is causing the random lockups */
@@ -378,13 +381,12 @@ void tud_suspend_cb(bool remote_wakeup_en)
   /* (void) remote_wakeup_en; */
   /* usDBG("[%s] remote_wakeup_en:%d\n", __func__, remote_wakeup_en); */
   usNFO("[CDC] remote_wakeup_en:%d\n", remote_wakeup_en);
-  usb_connected = 0, usbdata = 0, dtype = rtype = ntype;
+  set_receivedata(false), dtype = rtype = ntype;
 }
 
 void tud_resume_cb(void)
 {
   /* usDBG("[%s]\n", __func__); */
-  usb_connected = 1;
 }
 
 
@@ -394,7 +396,7 @@ void midi_task(void) /* Disabled in loop ~ keeping for optional later use */
 { /* Same as the callback routine */
   if (tud_midi_n_mounted(MIDI_ITF)) {
     while (tud_midi_n_available(MIDI_ITF, MIDI_CABLE)) {  /* Loop as long as there is data available */
-      usbdata = 1;
+      set_receivedata(true);
       uint32_t available = tud_midi_n_stream_read(MIDI_ITF, MIDI_CABLE, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
       process_stream(midimachine.usbstreambuffer, available);
     }
@@ -409,7 +411,7 @@ void tud_midi_rx_cb(uint8_t itf)
 {
   if (tud_midi_n_mounted(itf)) {
     while (tud_midi_n_available(itf, MIDI_CABLE)) {  /* Loop as long as there is data available */
-      usbdata = 1;
+      set_receivedata(true);
       uint32_t available = tud_midi_n_stream_read(itf, MIDI_CABLE, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
       process_stream(midimachine.usbstreambuffer, available);
     }
@@ -430,7 +432,7 @@ void cdc_task(void)
   if (tud_cdc_n_connected(CDC_ITF)) {
     if (tud_cdc_n_available(CDC_ITF) > 0) {
       cdc_itf = CDC_ITF;
-      usbdata = 1, dtype = cdc, rtype = cdc;
+      set_receivedata(true), dtype = cdc, rtype = cdc;
       cdcread = tud_cdc_n_read(CDC_ITF, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
       tud_cdc_n_read_flush(CDC_ITF);
       memcpy(sid_buffer, read_buffer, cdcread);
@@ -446,14 +448,16 @@ void cdc_task(void)
 void tud_cdc_rx_cb(uint8_t itf)
 { /* No need to check available bytes for reading */
 #ifdef USE_CDC_CALLBACK
-  if (itf == CDC_ITF) {
-    cdc_itf = &itf;
-    usbdata = 1, dtype = cdc, rtype = cdc;
-    cdcread = tud_cdc_n_read(*cdc_itf, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
-    tud_cdc_n_read_flush(*cdc_itf);
-    memcpy(sid_buffer, read_buffer, cdcread);
-    process_buffer(cdc_itf, &cdcread);
-    return;
+  if __us_likely(itf == CDC_ITF) {
+    if (tud_cdc_n_available(CDC_ITF)) {
+      cdc_itf = &itf;
+      set_receivedata(true), dtype = cdc, rtype = cdc;
+      cdcread = tud_cdc_n_read(*cdc_itf, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
+      tud_cdc_n_read_flush(*cdc_itf);
+      memcpy(sid_buffer, read_buffer, cdcread);
+      process_buffer(cdc_itf, &cdcread);
+      return;
+    }
   }
 #else
   (void)itf;
@@ -483,12 +487,12 @@ void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
 
   if ( dtr ) {
     /* Terminal connected */
-    usbdata = 1;
+    set_receivedata(true);
   }
   else
   {
     /* Terminal disconnected */
-    usbdata = 0;
+    set_receivedata(false);
   }
 }
 
@@ -508,7 +512,7 @@ void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 }
 
 
-/* USB VENDOR CLASS TASKS & CALLBACKS */
+/* WEBUSB VENDOR CLASS TASKS & CALLBACKS */
 
 #ifndef USE_VENDOR_CALLBACK
 void vendor_task(void)
@@ -516,7 +520,7 @@ void vendor_task(void)
   /* If the fifo buffer is disabled, this function has no use */
   if (web_serial_connected) {
       wusb_itf = WUSB_ITF;
-      usbdata = 1, dtype = wusb, rtype = wusb;
+      set_receivedata(true), dtype = wusb, rtype = wusb;
       webread = tud_vendor_n_read(WUSB_ITF, &read_buffer, MAX_BUFFER_SIZE);
       tud_vendor_n_read_flush(*wusb_itf);
       memcpy(sid_buffer, read_buffer, webread);
@@ -537,7 +541,7 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
 #ifdef USE_VENDOR_CALLBACK
   if __us_likely(itf == WUSB_ITF && web_serial_connected) {
       wusb_itf = &itf; /* Since there's only 1 vendor interface, we know it's 0 */
-      usbdata = 1, dtype = wusb, rtype = wusb;
+      set_receivedata(true), dtype = wusb, rtype = wusb;
       webread = bufsize;
       // /* No need to flush since we have no fifo */
       tud_vendor_n_read_flush(*wusb_itf);
@@ -696,7 +700,7 @@ void core1_main(void)
 
   while (1) {
 
-    if (get_reset_state()) continue;
+    if __us_unlikely(get_reset_state()) continue;
 
     /* Blinky blinky? */
     if (!offload_ledrunner) {
@@ -707,11 +711,11 @@ void core1_main(void)
     }
 
 #if PCB_VERSION_INT >= 15
-    if (detected_sid_change) continue;
+    if __us_unlikely(detected_sid_change) continue;
 #endif
 
     /* Check SID test queue */
-    if (running_tests) {
+    if __us_unlikely(running_tests) {
       sidtest_queue_entry_t s_entry;
       if (queue_try_remove(&sidtest_queue, &s_entry)) {
         s_entry.func(s_entry.s, s_entry.t, s_entry.wf);
@@ -738,7 +742,8 @@ void core1_main(void)
       sidplayer_start = false;
       sidplayer_playing = true;
       if (!is_prg) {
-        init_sidplayer(); // WARNING: rp2040 insufficient memory!
+        init_sidplayer(); /* WARNING: Does not work on rp2040, insufficient memory! */
+        usplayer_set_sid_config(cfg.numsids,cfg.sids_one,cfg.sids_two,cfg.fmopl_sid);
         start_sidplayer(false); /* No auto loop */
       }
     }
@@ -759,9 +764,9 @@ void core1_main(void)
       sidplayer_prev = false;
       sidplayer_playing = true;
     }
-    if (sidplayer_playing) {
+    if __us_likely(sidplayer_playing) {
       loop_sidplayer();
-      if __us_unlikely (sidplayer_next || sidplayer_prev) {
+      if __us_unlikely(sidplayer_next || sidplayer_prev) {
         sidplayer_playing = false;
       }
     }
@@ -779,7 +784,7 @@ void core1_main(void)
 #endif /* ONBOARD_EMULATOR */
 
 #ifdef WRITE_DEBUG  /* Only run this queue when needed */
-    if (usbdata == 1) {
+    if (is_receivedata()) {
       writelogging_queue_entry_t l_entry;
       if (queue_try_remove(&logging_queue, &l_entry)) {
         usDBG("[CORE2 %5u] [WRITE %c:%02d/%02d] $%02X:%02X %u\n",
@@ -808,8 +813,8 @@ int main()
 #elif PICO_RP2350 /* #endif PICO_RP2040 */
   /* Onboard SID player requires atleast 200MHz! */
 #if ONBOARD_SIDPLAYER
-  /* System clock @ 200MHz */
-  set_sys_clock_khz(200000, true);
+  /* System clock @ 250MHz */
+  set_sys_clock_khz(250000, true);
 #else
   /* System clock @ 150MHz */
   set_sys_clock_pll(1500000000, 5, 2);
@@ -822,7 +827,7 @@ int main()
     .speed = TUSB_SPEED_FULL
   };
   tusb_init(BOARD_TUD_RHPORT, &dev_init);
-  tud_disconnect();  /* Keep USB invisible to host during boot — set_base_voltages sleeps up to 4.5s */
+  tud_disconnect();  /* Keep USB invisible to host during boot - set_base_voltages can take some time */
   /* Init logging */
   init_logging();
   /* Log reset reason */

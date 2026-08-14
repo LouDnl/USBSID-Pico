@@ -90,8 +90,22 @@ static int sid_socket = 1;
 static int skpico_v = 0;
 static bool is_u64fw = false;
 
-/* Mommy's little helper */
-bool startsWith(const char *str, const char *prefix) {
+/* Mommy's little helpers */
+void teardown_wait(void)
+{
+  #include <time.h>
+
+  /* 100 milliseconds setup */
+  struct timespec delay = {
+      .tv_sec = 0,
+      .tv_nsec = 100000000 /* 100 million nanoseconds = 100ms */
+  };
+  nanosleep(&delay, NULL);
+  return;
+}
+
+bool startsWith(const char *str, const char *prefix)
+{
   return (strncmp(str, prefix, strlen(prefix)) == 0);
 }
 
@@ -341,85 +355,101 @@ void write_config_ini(Config * config, char * filename)
 void usbsid_close(void)
 {
   printf("Closing USBSID-Pico\n");
-  for (int if_num = 0; if_num < 2; if_num++) {
-    if (libusb_kernel_driver_active(devh, if_num)) {
-        libusb_detach_kernel_driver(devh, if_num);
-    }
-    libusb_release_interface(devh, if_num);
+  libusb_release_interface(devh, 0);
+  libusb_release_interface(devh, 1);
+
+  rc = libusb_attach_kernel_driver(devh, 0);
+  if (rc < 0 && rc != LIBUSB_ERROR_NOT_FOUND) {
+    fprintf(stderr, "Attach error on interface 0: %s\n", libusb_error_name(rc));
   }
+
+  teardown_wait();
+
   if (devh != NULL)
     libusb_close(devh);
   libusb_exit(ctx);
   devh = NULL;
   usid_dev = -1;
+  return;
 }
 
 int usbsid_init(void)
 {
-    if (devh != NULL) {
-        libusb_close(devh);
+  if (devh != NULL) {
+    libusb_close(devh);
+  }
+
+  rc = libusb_init(&ctx);
+  if (rc != 0) {
+    fprintf(stderr, "Error initializing libusb: %s: %s\n",
+    libusb_error_name(rc), libusb_strerror(rc));
+    goto out;
+  }
+
+  libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, 3);
+
+  devh = libusb_open_device_with_vid_pid(ctx, VENDOR_ID, PRODUCT_ID);
+  if (!devh) {
+    fprintf(stderr, "Error finding USB device\n");
+    rc = -1;
+    goto out;
+  }
+
+
+  for (int if_num = 0; if_num < 2; if_num++) {
+    /* If the kernel driver is holding the interface, manually detach it */
+    if (libusb_kernel_driver_active(devh, if_num) == 1) {
+      libusb_detach_kernel_driver(devh, if_num);
     }
+  }
 
-    rc = libusb_init(&ctx);
-    if (rc != 0) {
-        fprintf(stderr, "Error initializing libusb: %s: %s\n",
-        libusb_error_name(rc), libusb_strerror(rc));
-        goto out;
-    }
+  rc = libusb_claim_interface(devh, 0);
+  if (rc < 0) {
+    fprintf(stderr, "Error claiming interface 0: %d, %s: %s\n",
+    rc, libusb_error_name(rc), libusb_strerror(rc));
+    goto out;
+  }
 
-    libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, 3);
+  rc = libusb_claim_interface(devh, 1);
+  if (rc < 0) {
+    fprintf(stderr, "Error claiming interface: %d, %s: %s\n",
+    rc, libusb_error_name(rc), libusb_strerror(rc));
+    goto out;
+  }
 
-    devh = libusb_open_device_with_vid_pid(ctx, VENDOR_ID, PRODUCT_ID);
-    if (!devh) {
-        fprintf(stderr, "Error finding USB device\n");
-        rc = -1;
-        goto out;
-    }
+  rc = libusb_control_transfer(devh, 0x21, 0x22, ACM_CTRL_DTR | ACM_CTRL_RTS, 0, NULL, 0, 0);
+  if (rc != 0 && rc != 7) {
+    fprintf(stderr, "Error configuring line state during control transfer: %d, %s: %s\n",
+      rc, libusb_error_name(rc), libusb_strerror(rc));
+    goto out;
+  }
 
-    for (int if_num = 0; if_num < 2; if_num++) {
-        if (libusb_kernel_driver_active(devh, if_num) == 1) {
-            libusb_detach_kernel_driver(devh, if_num);
-        }
-        rc = libusb_claim_interface(devh, if_num);
-        if (rc < 0) {
-            fprintf(stderr, "Error claiming interface: %d, %s: %s\n",
-            rc, libusb_error_name(rc), libusb_strerror(rc));
-            goto out;
-        }
-    }
+  rc = libusb_control_transfer(devh, 0x21, 0x20, 0, 0, encoding, count_of(encoding), 0);
+  if (rc != 0 && rc != 7) {
+    fprintf(stderr, "Error configuring line encoding during control transfer: %d, %s: %s\n",
+      rc, libusb_error_name(rc), libusb_strerror(rc));
+    goto out;
+  }
 
-    rc = libusb_control_transfer(devh, 0x21, 0x22, ACM_CTRL_DTR | ACM_CTRL_RTS, 0, NULL, 0, 0);
-    if (rc != 0 && rc != 7) {
-        fprintf(stderr, "Error configuring line state during control transfer: %d, %s: %s\n",
-            rc, libusb_error_name(rc), libusb_strerror(rc));
-        goto out;
-    }
+  usid_dev = (rc == 0 || rc == 7) ? 0 : -1;
 
-    rc = libusb_control_transfer(devh, 0x21, 0x20, 0, 0, encoding, count_of(encoding), 0);
-    if (rc != 0 && rc != 7) {
-        fprintf(stderr, "Error configuring line encoding during control transfer: %d, %s: %s\n",
-            rc, libusb_error_name(rc), libusb_strerror(rc));
-        goto out;
-    }
+  if (usid_dev < 0)
+  {
+    fprintf(stderr, "Could not open SID device USBSID.\n");
+    goto out;
+  }
 
-    usid_dev = (rc == 0 || rc == 7) ? 0 : -1;
-
-    if (usid_dev < 0)
-    {
-        fprintf(stderr, "Could not open SID device USBSID.\n");
-        goto out;
-    }
-
-    /* zero length read to clear any lingering data */
-    unsigned char buffer[1];
-    libusb_bulk_transfer(devh, ep_out_addr, buffer, 0, &transferred, 1);
-    libusb_bulk_transfer(devh, ep_in_addr, buffer, 0, &transferred, 1);
-    /* fprintf(stdout, "usbsid_init: detected [rc]%d [usid_dev]%d\n", rc, usid_dev); */
+  /* zero length read to clear any lingering data */
+  unsigned char buffer[1];
+  libusb_bulk_transfer(devh, ep_out_addr, buffer, 0, &transferred, 1);
+  libusb_bulk_transfer(devh, ep_in_addr, buffer, 0, &transferred, 1);
+  /* fprintf(stdout, "usbsid_init: detected [rc]%d [usid_dev]%d\n", rc, usid_dev); */
 
   return usid_dev;
 out:;
   if (devh != NULL)
     usbsid_close();
+  libusb_exit(NULL);
   rc = -1;
   return rc;
 }
@@ -612,7 +642,10 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
         usbsid_config.need_confirmation = (bool)buff[i];
         break;
       case 3:
-        usbsid_config.disable_changedetect = (bool)buff[i];
+        usbsid_config.socket_change_detect = (bool)buff[i];
+        break;
+      case 4:
+        usbsid_config.preset_auto_detect = (bool)(buff[i] & 0x80);  /* 0bn000000 ~ n == 1 or 0 */
         break;
       case 5:
         usbsid_config.lock_clockrate = buff[i];
@@ -813,6 +846,8 @@ void print_config(void)
       usbsid_config.socketTwo.sid2.addr,
       usbsid_config.socketTwo.sid2.id);
   }
+  printf("\n");
+  printf("  Preset silent auto detection = %s\n", enabled[usbsid_config.preset_auto_detect]);
   printf("  Mirror Socket Two to Socket One = %s\n", enabled[usbsid_config.mirrored]);
   printf("  Flip Socket One and Socket One  = %s\n", enabled[usbsid_config.flipped]);
   printf("  Mix socket addresses (Quad SID) = %s\n", enabled[usbsid_config.mixed]);
@@ -849,7 +884,7 @@ void print_config(void)
     enabled[(int)usbsid_config.Asid.enabled]);
   printf("\n");
   printf("Verification of socket change detection on boot = %s\n",
-    enabled[(int)!usbsid_config.disable_changedetect]);
+    enabled[(int)usbsid_config.socket_change_detect]);
 
   if (usbsid_config.need_confirmation) {
     printf("\n!! CURRENT CONFIGURATION NEEDS TO BE VERIFIED AND ACKNOWLEDGED !!\n\n");
@@ -1576,6 +1611,8 @@ void print_help(void)
   printf("  -lau N,   --lock-audio N      : Lock and the audio switch in it's current state until reboot: True (1) False (0)\n");
   printf("  -sad N,   --sock-autodetect N : Disable/enable and save the automatic socket change detection on boot (PCB v1.5+ only!)\n");
   printf("                                  0: %s, 1:%s\n", enabled[0], enabled[1]);
+  printf("  -pad N,   --preset-detect N   : Disable/enable and save the silent automatic socket detection on preset selection\n");
+  printf("                                  0: %s, 1:%s\n", enabled[0], enabled[1]);
   printf("--[PRESETS]-------------------------------------------------------------------------------------------------------------\n");
   printf("  -single,  --single-sid        : Socket 1 enabled @ single SID, Socket 2 disabled\n");
   printf("  -single2, --single-sid-s2     : Socket 1 disabled, Socket 2 enabled @ single SID\n");
@@ -1883,6 +1920,17 @@ void config_usbsidpico(int argc, char **argv)
         goto exit;
       }
       printf("Disable automatic socket change detection on boot set to '%s'\n", enabled[det]);
+      write_config_command(SOCKET_DETECT, det, 0x0, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-pad") || !strcmp(argv[param_count], "--preset-detect")) {
+      param_count++;
+      int det = atoi(argv[param_count]);
+      if(det > 1) {
+        printf("%d is not a correct preset autodetect option!\n", det);
+        goto exit;
+      }
+      printf("Disable silent automatic detection on preset select set to '%s'\n", enabled[det]);
       write_config_command(SOCKET_DETECT, det, 0x0, 0x0, 0x0);
       break;
     }

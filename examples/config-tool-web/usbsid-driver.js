@@ -413,9 +413,9 @@ class USBSIDDevice {
       /* Send READ_CONFIG and collect response without Promise.race (which leaks
        * pending transferIn calls and causes the next read to consume the wrong packet).
        * Skip stale packets inline instead:
-       *   - zero-length packets → skip (ZLP residue)
-       *   - all-zero packets   → skip (stale empty response)
-       *   - wrong magic bytes  → skip (stale response from another command)
+       *   - zero-length packets -> skip (ZLP residue)
+       *   - all-zero packets   -> skip (stale empty response)
+       *   - wrong magic bytes  -> skip (stale response from another command)
        * fw >= 0.7.0: full config fits in one 64-byte packet (terminator at [62..63]).
        * fw < 0.7.0:  may have sent additional packets; we break at CONFIG_SIZE so
        *              only the first valid packet is consumed - any extra packets left

@@ -216,6 +216,15 @@ body::before {
   border-radius: 2px;
   transition: background 0.12s, transform 0.08s;
   user-select: none;
+  /* A <button> centres its own label; a <label class="c64-btn"> does not, and
+     BROWSE and LOCAL FILES are labels wrapping a hidden file input. Stretched
+     by the flex row they sat left of centre while every real button beside
+     them was centred. Said here rather than on label.c64-btn so the two kinds
+     of control cannot drift apart again. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 .c64-btn:hover { background: var(--c64-btn-hover); }
 .c64-btn:active { background: var(--c64-btn-active); transform: translateY(1px); }
@@ -319,17 +328,87 @@ body::before {
   gap: 8px;
   margin-bottom: 6px;
   font-size: 0.95rem;
+  flex-wrap: wrap;
 }
 #emulator-row label { color: var(--c64-cyan); text-transform: uppercase; }
 
-/* Volume slider */
-#volume-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+/* Mode radios.
+ *
+ * A fieldset because that is what a set of radios is, and because the legend
+ * gives the group a name without a floating <label for> pointing at one of
+ * them. Its default border and padding are dropped: the c64-box around it is
+ * the frame here. */
+#emulator-modes {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  flex: 1;
 }
-#volume-row label { color: var(--c64-cyan); text-transform: uppercase; font-size: 0.9rem; }
+#emulator-modes legend {
+  padding: 0 0 2px;
+  color: var(--c64-cyan);
+  text-transform: uppercase;
+  font-size: 0.9rem;
+}
+/* Columns rather than a wrapping row. The labels are very different lengths
+   and one of them grows a "no WebUSB here" note, so a flex row wrapped into
+   four on one line and a lone fifth underneath.
+   Two columns exactly, not auto-fit: with five modes, auto-fit found room for
+   three on a wide screen and left two on the second row, which is the same
+   ragged look in a different shape. Two gives 2/2/1 down the panel. */
+#emulator-mode-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px 12px;
+  align-items: center;
+}
+@media (min-width: 620px) {
+  #emulator-mode-grid { grid-template-columns: 1fr 1fr; }
+}
+.c64-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  color: var(--c64-text);
+  /* 32px of vertical target. A radio's own 13px box is far too small to hit
+   * with a thumb, and this box is the label as well as the control. */
+  padding: 6px 8px;
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  user-select: none;
+  line-height: 1.15;
+}
+.c64-radio:hover { border-color: var(--c64-border); }
+.c64-radio input[type=radio] {
+  accent-color: var(--c64-cyan);
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+  flex: none;
+}
+/* The chosen mode has to be readable at a glance, and a 16px dot on a dark
+ * background is not enough on a phone. The class is set from JavaScript rather
+ * than with :has(input:checked), which Firefox only got in 121: the page still
+ * has to be usable on an older phone browser. */
+.c64-radio.c64-radio-on {
+  border-color: var(--c64-cyan);
+  background: rgba(0, 180, 255, 0.08);
+}
+.c64-radio.c64-radio-on .c64-radio-text { color: var(--c64-white); }
+/* Unavailable here: dimmed, not hidden, and it keeps its reason suffix. */
+.c64-radio.c64-radio-off,
+.c64-radio.c64-radio-off input[type=radio] { cursor: not-allowed; }
+.c64-radio.c64-radio-off .c64-radio-text { color: var(--c64-gray); }
+.c64-radio-why {
+  color: var(--c64-orange);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
 input[type=range].c64-range {
   -webkit-appearance: none;
   appearance: none;
@@ -563,3 +642,295 @@ input[type=range].c64-range::-moz-range-thumb {
   line-height: 1.5;
 }
 #warn-confirmation.c64-hidden { display: none !important; }
+
+/* ────────────────────────────────────────────────────────────────────────
+   SID library browser (usbsid-sidbrowser.js)
+
+   Two panes: directories left as a tree, the open directory's tunes right.
+   Under 700px they stack; the directory list stays a list rather than becoming
+   a dropdown, since a tree is walked a level at a time and each level is short.
+
+   Every row is a <button>, not a <div> with a click handler. A button is
+   focusable, reachable by keyboard and understood by a screen reader, and on
+   touch it does not need the 300ms tap resolution a div sometimes gets.
+   ──────────────────────────────────────────────────────────────────────── */
+#sid-browser-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+#sid-search-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+#sid-search {
+  flex: 1;
+  min-width: 0;         /* or the input refuses to shrink inside the flex row */
+  font-size: 0.9rem;
+}
+/* Chrome's own clear button on a type=search, which duplicates ours and is
+   invisible against this background. */
+#sid-search::-webkit-search-cancel-button { display: none; }
+#sid-search-clear { flex: none; padding: 2px 10px; }
+
+#sid-group-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.c64-btn.sid-chip { font-size: 0.75rem; padding: 3px 8px; }
+/* The filter in force. These select a subset rather than scrolling to one, so
+   which is active has to be visible: without it the list looks arbitrarily
+   short with nothing saying why. */
+.c64-btn.sid-chip.sid-chip-on {
+  background: var(--c64-cyan);
+  border-color: var(--c64-cyan);
+  color: var(--c64-inset);
+}
+
+#sid-browser-panes {
+  display: grid;
+  grid-template-columns: minmax(110px, 26%) 1fr;
+  gap: 6px;
+  align-items: stretch;
+}
+#sid-dir-list,
+#sid-file-list {
+  background: var(--c64-inset);
+  border: 2px solid var(--c64-border);
+  border-radius: 3px;
+  overflow-y: auto;
+  overscroll-behavior: contain;   /* scrolling the list must not scroll the page */
+  -webkit-overflow-scrolling: touch;
+  height: 260px;
+  position: relative;
+}
+#sid-dir-list { padding: 2px; }
+
+.sid-dir {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 34px;              /* a thumb sized target */
+  padding: 6px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  color: var(--c64-text);
+  font-family: var(--font-main);
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+.sid-dir:hover { border-color: var(--c64-border); }
+.sid-dir.sid-dir-open {
+  background: rgba(0, 180, 255, 0.12);
+  border-color: var(--c64-cyan);
+  color: var(--c64-white);
+}
+.sid-dir-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sid-dir-count { color: var(--c64-gray); font-size: 0.75rem; flex: none; }
+
+.sid-group-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--c64-darkgray);
+  color: var(--c64-yellow);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--c64-border);
+}
+
+.sid-file {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  min-height: 40px;
+  padding: 5px 8px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--c64-text);
+  font-family: var(--font-main);
+  text-align: left;
+  cursor: pointer;
+}
+.sid-file:hover { background: rgba(255, 255, 255, 0.05); }
+.sid-file.sid-file-on { background: rgba(0, 180, 255, 0.15); }
+.sid-file.sid-file-on .sid-file-title { color: var(--c64-white); }
+.sid-file-title {
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sid-file-sub {
+  font-size: 0.72rem;
+  color: var(--c64-gray);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sid-empty {
+  padding: 12px 10px;
+  color: var(--c64-gray);
+  font-size: 0.85rem;
+}
+
+#sid-browser-nav {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+#sid-browser-nav .c64-btn { flex: 1; min-height: 34px; }
+
+@media (max-width: 700px) {
+  /* One column, directories above the files, and **the same clickable list**.
+     It was a native <select> here at first, from when the pane held every
+     directory flat and a picker was the lesser evil. Now that it is a tree
+     walked one level at a time the list is a handful of rows, and having to
+     open a dropdown to go into a folder, on the device where tapping a row is
+     the obvious thing to do, was the wrong way round. */
+  #sid-browser-panes { grid-template-columns: 1fr; }
+  #sid-dir-list { display: block; height: auto; max-height: 34vh; }
+  #sid-file-list { height: 44vh; }
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   Now playing, in TRANSPORT
+   ──────────────────────────────────────────────────────────────────────── */
+#now-playing {
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--c64-darkgray);
+}
+#np-name {
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#np-meta {
+  font-size: 0.85rem;
+  /* Was --c64-gray, which is the colour for text nobody needs to read. This is
+     the tune's title, author and year: the most interesting line in the box. */
+  color: var(--c64-text);
+  min-height: 1.2em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#np-time-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+.np-time {
+  font-size: 1.05rem;
+  color: var(--c64-green);
+  /* Tabular figures, or the whole row jiggles once a second as the digits
+     change width. */
+  font-variant-numeric: tabular-nums;
+}
+#np-badges { display: flex; gap: 4px; flex-wrap: wrap; }
+.np-badge {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--c64-yellow);
+  border: 1px solid var(--c64-yellow);
+  border-radius: 2px;
+  padding: 0 5px;
+  line-height: 1.5;
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   Touch sizing
+
+   Everything above is sized for a mouse. A 22px tall transport button is
+   under half of what a thumb can reliably hit, which is most of why the page
+   "does not work" on a phone: the taps were landing between the buttons.
+
+   Keyed on the pointer rather than on the width. A narrow desktop window is
+   still a mouse and does not need 44px buttons, and a tablet in landscape is
+   wide and still a thumb. `pointer: coarse` is the question actually being
+   asked.
+   ──────────────────────────────────────────────────────────────────────── */
+@media (pointer: coarse) {
+  .c64-btn,
+  .c64-btn.c64-btn-sm {
+    min-height: 40px;
+    padding: 6px 12px;
+    font-size: 0.95rem;
+  }
+  .c64-tab { min-height: 40px; padding: 6px 12px; }
+  .c64-select { min-height: 40px; }
+  .c64-input { min-height: 40px; }
+  /* Named again: the rules that size these are ID scoped or set their own
+     min-height, and win on specificity over the .c64-btn rule above. */
+  .c64-radio { min-height: 40px; }
+  .sid-dir { min-height: 40px; }
+  #sid-browser-nav .c64-btn { min-height: 40px; }
+
+  /* The transport is the row that is pressed most, so it gets the whole
+     width and shares it out rather than crowding into one line. */
+  #player-transport {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+    gap: 6px;
+    width: 100%;
+  }
+  #player-transport .c64-btn { width: 100%; }
+  #player-controls { gap: 10px; }
+  /* A range slider's thumb is a 12px dot by default. */
+  input[type=range].c64-range { height: 12px; }
+  input[type=range].c64-range::-webkit-slider-thumb { width: 22px; height: 22px; }
+  input[type=range].c64-range::-moz-range-thumb { width: 22px; height: 22px; }
+
+  /* Rows of small buttons: let them wrap into full width targets instead of
+     shrinking to fit. */
+  #sid-file-row .c64-btn,
+  #sid-url-presets .c64-btn { flex: 1 1 auto; }
+}
+
+/* The one place a phone still needs a width rule: the player panel's boxes
+   have desktop padding that eats a quarter of a 390px screen. */
+@media (max-width: 480px) {
+  #c64-frame { padding: 6px 6px 14px; }
+  .c64-box { padding: 6px 8px; }
+  #c64-header h1 { font-size: 1.8rem; }
+  #c64-header .subtitle { font-size: 0.8rem; letter-spacing: 0.1em; }
+}
+
+/* Where we are in the directory tree. The tree is walked one level at a time,
+   so without this there is nothing on screen saying which level that is. */
+#sid-crumb {
+  font-size: 0.78rem;
+  color: var(--c64-cyan);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;          /* keep the deepest part visible when it overflows */
+  text-align: left;
+}
+.sid-dir.sid-dir-up { color: var(--c64-yellow); }
+
+/* The end of what has been rendered.
+   The file list puts a screenful in the DOM and appends as you scroll: a full
+   HVSC is 65 000 tunes, and rendering them all came to 194 380 DOM nodes and
+   seconds of layout. This says why the list stops where it does. */
+.sid-more {
+  padding: 8px 10px;
+  color: var(--c64-gray);
+  font-size: 0.75rem;
+  text-align: center;
+}

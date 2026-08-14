@@ -207,55 +207,55 @@ typedef struct SIDChip {
 } SIDChip;
 
 typedef struct Socket {
-  uint8_t chiptype;     /* 0 = real, 1 = unknown, 2...etc see config_logging.c */
+  uint8_t chiptype;              /* 0 = real, 1 = unknown, 2...etc see config_logging.c */
   SIDChip sid1;
   SIDChip sid2;
-  bool    enabled : 1;  /* enable / disable this socket */
-  bool    dualsid : 1;  /* enable / disable dual SID support for this socket (requires clone) */
+  bool    enabled : 1;           /* enable / disable this socket */
+  bool    dualsid : 1;           /* enable / disable dual SID support for this socket (requires clone) */
 } Socket;
 
 typedef struct Config {
   /* Don't care from here */
-  uint32_t clock_rate;          /* clock speed identifier */
-  Socket   socketOne;           /* 1 */
-  Socket   socketTwo;           /* 2 */
+  uint32_t clock_rate;           /* clock speed identifier */
+  Socket   socketOne;            /* 1 */
+  Socket   socketTwo;            /* 2 */
   struct {
     bool enabled : 1;
     bool idle_breathe : 1;
-  } LED;                        /* 3 */
+  } LED;                         /* 3 */
   struct {
     uint8_t brightness;
-    int     sid_to_use;         /* 0/-1 = off, 1...4 = sid 1 ... sid 4 */
+    int     sid_to_use;          /* 0/-1 = off, 1...4 = sid 1 ... sid 4 */
     bool    enabled : 1;
     bool    idle_breathe : 1;
-  } RGBLED;                     /* 4 */
+  } RGBLED;                      /* 4 */
   struct {
-    bool enabled : 1;           /* Cannot be disabled */
-  } Cdc;                        /* 5 */
+    bool enabled : 1;            /* Cannot be disabled */
+  } Cdc;                         /* 5 */
   struct {
-    bool enabled : 1;           /* Cannot be disabled */
-  } WebUSB;                     /* 6 */
-  struct {
-    bool enabled : 1;
-    /* bool buffered : 1; */          /* Enable/Disable ASID buffering by default (protocal can enable this) */
-  } Asid;                       /* 7 */
+    bool enabled : 1;            /* Cannot be disabled */
+  } WebUSB;                      /* 6 */
   struct {
     bool enabled : 1;
-  } Midi;                       /* 8 */
+    /* bool buffered : 1; */           /* Enable/Disable ASID buffering by default (protocal can enable this) */
+  } Asid;                        /* 7 */
   struct {
-    int sidno;                  /* 0 = disabled, saves the sidno of the sid set to FMOpl */
-    bool enabled : 1;           /* Requires a clone SID! */
-  } FMOpl;                      /* 9 */
-  bool external_clock : 1;      /* enable / disable external oscillator */
-  bool lock_clockrate : 1;      /* lock the set clockspeed from being changed */
-  bool stereo_en : 1;           /* audio switch is off (mono) or on (stereo) ~ (PCB v1.3+ only) */
-  bool lock_audio_sw : 1;       /* lock the audio switch into it's current stateand prevent it from being changed ~ (PCB v1.3+ only) */
-  bool mirrored : 1;            /* act as socket 1 */
-  bool flipped : 1;             /* socket 1 is socket 2 and vice versa */
-  bool mixed : 1;               /* addresses are mixed up (quad SID only!) */
-  /* PCB v1.5+ only */
-  bool need_confirmation : 1;    /* current configuration needs confirmation, SID's are disabled until confirmed! */
-  bool disable_changedetect : 1; /* disables socket change detection on boot */
+    bool enabled : 1;
+  } Midi;                        /* 8 */
+  struct {
+    int sidno;                   /* 0 = disabled, saves the sidno of the sid set to FMOpl */
+    bool enabled : 1;            /* Requires a clone SID! */
+  } FMOpl;                       /* 9 */
+  bool external_clock : 1;       /* enable / disable external oscillator */
+  bool lock_clockrate : 1;       /* lock the set clockspeed from being changed */
+  bool stereo_en : 1;            /* audio switch is off (mono) or on (stereo) ~ (PCB v1.3+ only) */
+  bool lock_audio_sw : 1;        /* lock the audio switch into it's current stateand prevent it from being changed ~ (PCB v1.3+ only) */
+  bool mirrored : 1;             /* act as socket 1 */
+  bool flipped : 1;              /* socket 1 is socket 2 and vice versa */
+  bool mixed : 1;                /* addresses are mixed up (quad SID only!) */
+  bool need_confirmation : 1;    /* (PCB v1.5+) current configuration needs confirmation, SID's are disabled until confirmed! */
+  bool socket_change_detect : 1; /* (PCB v1.5+) disables socket change detection on boot */
+  bool preset_auto_detect : 1;   /* disables silent auto detection before present change */
 } Config;
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
@@ -325,8 +325,9 @@ typedef struct Config {
   .flipped = false, \
   .mixed = false, \
   .need_confirmation = false, \
-  .disable_changedetect = false, /* WARNING: This setting _can_ and _will_ fry your 9v SID if config is set to 6581 (12v) */ \
-}
+  .socket_change_detect = true, /* WARNING: This setting _can_ and _will_ fry your 9v SID if config is set to 6581 (12v) */ \
+  .preset_auto_detect = true, \
+} \
 
 
 #ifdef __cplusplus

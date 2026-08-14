@@ -163,6 +163,7 @@ void print_config_overview(void)
       usbsid_config.socketTwo.sid2.id);
   }
   usCFG("\n");
+  usCFG("  Preset silent auto detection = %s\n", switch_str(usbsid_config.preset_auto_detect));
   usCFG("  Mirror Socket Two to Socket One = %s\n", switch_str(usbsid_config.mirrored));
   usCFG("  Flip Socket One and Socket Two  = %s\n", switch_str(usbsid_config.flipped));
   usCFG("  Mix socket addresses (Quad SID) = %s\n", switch_str(usbsid_config.mixed));
@@ -206,7 +207,7 @@ void print_config_overview(void)
 #if PCB_VERSION_INT >= 14
   usCFG("\n");
   usCFG("Verification of socket change detection on boot = %s\n",
-    switch_str((int)!usbsid_config.disable_changedetect));
+    switch_str((int)usbsid_config.socket_change_detect));
   if (config_unacknowledged()) {
     usCFG("\n!! CURRENT CONFIGURATION NEEDS TO BE VERIFIED AND ACKNOWLEDGED !!\n\n");
   }

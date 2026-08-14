@@ -376,6 +376,9 @@ void voltage_state_off(void)
   cPIN(RES);  /* Hold the SID's in reset before dropping the rails */
   set_SID5v_state(false);
   set_SIDhv_state(false);
+  /* Hold state for 200ms so a quick `voltage_state_on` doesn't desync
+     clone chips */
+  sleep_ms(200);
 #endif
   return;
 }
