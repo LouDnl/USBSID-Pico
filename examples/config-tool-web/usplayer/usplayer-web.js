@@ -142,6 +142,10 @@ export class USBSIDPlayerWeb {
     this._paused = false;
     this.resetStats();
     this._boardConfig = null;
+    /* The Songlengths database, once a page hands it over. See
+     * loadSonglengths(): it stays in the heap because every lookup walks it. */
+    this._slPtr = 0;
+    this._slLen = 0;
 
     const M = module;
     /* control */
@@ -168,10 +172,25 @@ export class USBSIDPlayerWeb {
     this._song        = M.cwrap('usp_song', 'number', []);
     this._songs       = M.cwrap('usp_songs', 'number', []);
     this._frames      = M.cwrap('usp_frames', 'number', []);
+    this._playtimeMs  = M.cwrap('usp_playtime_ms', 'number', []);
+    this._irqSources  = M.cwrap('usp_irq_sources', 'number', []);
+    this._startMode   = M.cwrap('usp_start_mode', 'number', []);
+    this._driverAddr  = M.cwrap('usp_driver_address', 'number', []);
+    this._songMd5     = M.cwrap('usp_song_md5', null, ['number', 'number', 'number']);
+    this._songlenMs   = M.cwrap('usp_songlength_ms', 'number',
+                                ['number', 'number', 'number', 'number']);
+    this._songlenCount = M.cwrap('usp_songlength_count', 'number',
+                                 ['number', 'number', 'number']);
     this._sidWrites   = M.cwrap('usp_sid_writes', 'number', []);
     this._tuneName    = M.cwrap('usp_tune_name', 'number', []);
     this._tuneAuthor  = M.cwrap('usp_tune_author', 'number', []);
     this._tuneReleased = M.cwrap('usp_tune_released', 'number', []);
+    this._readMemory  = M.cwrap('usp_read_memory', 'number', ['number']);
+    this._ciaLatch    = M.cwrap('usp_cia_latch', 'number', ['number', 'number']);
+    this._sidRegister = M.cwrap('usp_sid_register', 'number', ['number', 'number']);
+    this._setVoiceMute = M.cwrap('usp_set_voice_mute', null,
+                                 ['number', 'number', 'number']);
+    this._voiceMuteBits = M.cwrap('usp_voice_mute', 'number', ['number']);
     /* the ring */
     this._ringPtr     = M.cwrap('usbsid_web_ring_ptr', 'number', []);
     this._ringEntries = M.cwrap('usbsid_web_ring_entries', 'number', []);
@@ -603,6 +622,195 @@ export class USBSIDPlayerWeb {
   sidWrites() { return this._sidWrites(); }
   frames() { return this._frames(); }
   refreshHz() { return this._hz; }
+
+  /**
+   * How far into the tune the emulation is, in milliseconds.
+   *
+   * Emulated time and not wall clock time, which is the point: it does not
+   * advance while paused, it jumps when a seek does, and it is the same figure
+   * whatever the transport is doing. A page showing wall clock time would drift
+   * away from the tune the first time the board made the player wait.
+   */
+  playtimeMs() { return this._playtimeMs(); }
+
+  /**
+   * One byte of the emulated machine's RAM.
+   *
+   * The RAM itself, with no banking and no side effects, so an address under
+   * I/O answers with what is beneath the chip rather than asking the chip. That
+   * is deliberate: reading a CIA's interrupt register acknowledges its pending
+   * interrupts, so a page redrawing a memory view every frame would break the
+   * tune it is showing. See usp_read_memory() in src/host/web_api.cpp.
+   *
+   * @param {number} address 0 to 65535
+   */
+  readMemory(address) { return this._readMemory(address & 0xffff); }
+
+  /**
+   * The last value written to a SID register, from the emulation's own mirror.
+   *
+   * Works in every mode, which watching the writes go past does not: in software
+   * audio the reSIDfp backend takes them inside the emulation and none of them
+   * reach the page. See usp_sid_register() in src/host/web_api.cpp.
+   *
+   * @param {number} chip 1 to 4
+   * @param {number} reg  0 to 31
+   */
+  sidRegister(chip, reg) { return this._sidRegister(chip, reg); }
+
+  /**
+   * A CIA timer's latch, which is how often a CIA driven tune is called.
+   *
+   * A frame's cycles divided by this is the number of calls a frame, so about
+   * 19654 is once and half of it is twice. `timing()` says which timer, if any,
+   * is the one driving.
+   *
+   * @param {number} cia   1 or 2
+   * @param {number} timer 0 for A, 1 for B
+   */
+  ciaLatch(cia = 1, timer = 0) { return this._ciaLatch(cia, timer); }
+
+  /**
+   * Hold one voice silent while the tune plays on.
+   *
+   * Masked inside the emulation, upstream of everything: it works the same in
+   * software audio and over every board transport, and it costs the tune
+   * nothing, because the writes still happen and only the gate is held down.
+   *
+   * @param {number} chip  1 to 4
+   * @param {number} voice 1 to 3
+   * @param {boolean} muted
+   */
+  setVoiceMute(chip, voice, muted) {
+    this._setVoiceMute(chip, voice, muted ? 1 : 0);
+  }
+
+  /** The mute bits of one chip, bit 0 being voice 1. Chip counts from 1. */
+  voiceMute(chip = 1) { return this._voiceMuteBits(chip); }
+
+  /**
+   * What is driving the tune, and how it was started.
+   *
+   * Read from the chips as they stand, so it is the truth for the subtune
+   * playing now rather than a guess from the file: a tune's init routine is
+   * what decides whether a CIA timer, a raster compare or a TOD alarm calls the
+   * play routine, and a later subtune can choose differently.
+   *
+   * @returns {{irq: string[], start: string, driver: number}}
+   */
+  timing() {
+    const bits = this._irqSources();
+    const irq = [];
+    /* Kept in step with the USP_IRQ_* defines in src/api/usplayer.h. */
+    if (bits & 0x01) irq.push('CIA1 TA');
+    if (bits & 0x02) irq.push('CIA1 TB');
+    if (bits & 0x04) irq.push('CIA1 TOD');
+    if (bits & 0x08) irq.push('CIA2 TA');
+    if (bits & 0x10) irq.push('CIA2 TB');
+    if (bits & 0x20) irq.push('CIA2 TOD');
+    if (bits & 0x40) irq.push('VIC raster');
+    const START = ['PSIDdrv', 'BASIC', 'PRG'];
+    return {
+      irq,
+      start: START[this._startMode()] || '?',
+      driver: this._driverAddr(),
+    };
+  }
+
+  /**
+   * The Songlengths key for a tune: the MD5 of the whole file, as 32 hex
+   * characters.
+   *
+   * **The plain MD5 of every byte of the .sid**, not the PSID MD5 that older
+   * players use and that libsidplayfp carries two variants of. Getting it wrong
+   * misses every entry in the database silently.
+   *
+   * Done in the wasm because there is no MD5 in a browser: WebCrypto leaves it
+   * out deliberately, and this is the one place a page can get one without
+   * shipping an implementation of its own.
+   *
+   * @param {Uint8Array} bytes the file, as loaded
+   * @returns {string} 32 hex characters, or '' when it could not be computed
+   */
+  md5(bytes) {
+    if (!bytes || !bytes.length) return '';
+    const inp = this._alloc(bytes.length);
+    const out = this._alloc(33);
+    if (!inp || !out) {
+      if (inp) this._freeBuf(inp);
+      if (out) this._freeBuf(out);
+      return '';
+    }
+    try {
+      this.M.HEAPU8.set(bytes, inp);
+      this._songMd5(inp, bytes.length, out);
+      return this.M.UTF8ToString(out);
+    } finally {
+      this._freeBuf(inp);
+      this._freeBuf(out);
+    }
+  }
+
+  /**
+   * Hand over the Songlengths database, once, and keep it in the heap.
+   *
+   * It is four to five megabytes of text and every lookup walks it, so it is
+   * copied in once and the pointer kept: a page that re-uploaded it per tune
+   * would spend more time on memcpy than on emulation. `releaseSonglengths()`
+   * gives it back if a page ever wants the memory.
+   *
+   * @param {string} text the file as fetched
+   * @returns {boolean} false when it could not be allocated
+   */
+  loadSonglengths(text) {
+    this.releaseSonglengths();
+    if (!text) return false;
+    /* Latin-1 rather than UTF-8: the file is ASCII apart from the comment lines
+     * naming each tune, and the parser only ever looks at hex, '=' and digits.
+     * One byte per character also means the length is known before encoding. */
+    const n = text.length;
+    const p = this._alloc(n + 1);
+    if (!p) return false;
+    const heap = this.M.HEAPU8;
+    for (let i = 0; i < n; i++) heap[p + i] = text.charCodeAt(i) & 0xff;
+    heap[p + n] = 0;
+    this._slPtr = p;
+    this._slLen = n;
+    return true;
+  }
+
+  releaseSonglengths() {
+    if (this._slPtr) { this._freeBuf(this._slPtr); this._slPtr = 0; this._slLen = 0; }
+  }
+
+  get hasSonglengths() { return !!this._slPtr; }
+
+  /**
+   * Every song's length for one key, in milliseconds.
+   *
+   * @param {string} key 32 hex characters from `md5()`
+   * @returns {number[]|null} one entry per song, or null when the key is absent
+   */
+  songLengths(key) {
+    if (!this._slPtr || !key || key.length !== 32) return null;
+    const kp = this._alloc(33);
+    if (!kp) return null;
+    try {
+      for (let i = 0; i < 32; i++) this.M.HEAPU8[kp + i] = key.charCodeAt(i) & 0xff;
+      this.M.HEAPU8[kp + 32] = 0;
+      const count = this._songlenCount(this._slPtr, this._slLen, kp);
+      if (count <= 0) return null;
+      const out = [];
+      /* The database counts songs from one, as the file's own subtune numbers
+       * do. The array is zero based, so out[0] is song 1. */
+      for (let s = 1; s <= count; s++) {
+        out.push(this._songlenMs(this._slPtr, this._slLen, kp, s));
+      }
+      return out;
+    } finally {
+      this._freeBuf(kp);
+    }
+  }
 
   /** Title, author and release, as the file's own header spells them. */
   info() {

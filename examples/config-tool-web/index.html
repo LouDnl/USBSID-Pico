@@ -15,9 +15,12 @@
 <!-- New driver + config + app -->
 <script src="usbsid-driver.js"></script>
 <script src="usbsid-config.js"></script>
+<!-- The library browser. Before the app, which calls SidBrowser.init(). -->
+<script src="usbsid-sidbrowser.js"></script>
 <script src="usbsid-app.js"></script>
-<script type="text/javascript" src="lib/opl.js"></script>
-<script type="text/javascript" src="opljs-if.js"></script>
+<!-- The OPL engine used to be loaded here, for Hermit's jsSID. jsSID is gone and
+     USBSID-Player carries its own copy in usplayer/lib/, loaded only when a tune
+     actually writes $df40/$df50: see web/opl-fm.js in player-repo. -->
 
 <!-- USBSID-Player (WASM) backend: factory (classic global) + adapter (module) -->
 <script type="text/javascript" src="usplayer/usbsid.js"></script>
@@ -68,15 +71,45 @@
     <div class="c64-box">
       <div class="c64-box-title">Emulator</div>
       <div id="emulator-row">
-        <label for="sel-emulator">Mode:</label>
-        <select id="sel-emulator" class="c64-select">
-          <option value="usplayer" selected>WebUSB (USBSID-Player)</option>
-          <option value="usplayer-serial">Web Serial (USBSID-Player)</option>
-          <option value="usplayer-asid">ASID (USBSID-Player)</option>
-          <option value="sendsid">SendSID (onboard USBSID-Player)</option>
-          <option value="usplayer-audio">USBSID-Player (ResidFp)</option>
-        </select>
-        &nbsp;
+        <!-- Radio buttons rather than a dropdown, on purpose.
+             Whether a mode can run at all is something the user needs to see
+             *before* choosing, and a <select> can only show it once the list is
+             open. A mode this browser cannot run is disabled and says why, and
+             is not hidden: a silently short list looks like a broken page.
+             usbsid-app.js owns the state, see applyBrowserSupportToModes(). -->
+        <fieldset id="emulator-modes">
+          <legend>Mode</legend>
+          <!-- The radios are a grid inside the fieldset rather than the
+               fieldset itself: a <legend> in a grid container is laid out
+               specially and inconsistently between browsers. Two columns on a
+               desktop, one on a phone, so the ragged wrap that a flex row gave
+               (four on one line, one alone below) cannot happen. -->
+          <div id="emulator-mode-grid">
+          <!-- First and the markup default: it is the only mode that needs no
+               hardware and no browser API, so it is the one that always works
+               and the right thing to land on. -->
+          <label class="c64-radio">
+            <input type="radio" name="emulator-mode" value="usplayer-audio" checked>
+            <span class="c64-radio-text">USBSID-Player (ResidFp)</span>
+          </label>
+          <label class="c64-radio">
+            <input type="radio" name="emulator-mode" value="usplayer">
+            <span class="c64-radio-text">WebUSB (USBSID-Player)</span>
+          </label>
+          <label class="c64-radio">
+            <input type="radio" name="emulator-mode" value="usplayer-serial">
+            <span class="c64-radio-text">Web Serial (USBSID-Player)</span>
+          </label>
+          <label class="c64-radio">
+            <input type="radio" name="emulator-mode" value="usplayer-asid">
+            <span class="c64-radio-text">ASID (USBSID-Player)</span>
+          </label>
+          <label class="c64-radio">
+            <input type="radio" name="emulator-mode" value="sendsid">
+            <span class="c64-radio-text">SendSID (onboard USBSID-Player)</span>
+          </label>
+          </div>
+        </fieldset>
         <span id="asid-midi-row" style="display:none">
           <label for="asid-midi-outputs" style="margin-left:12px">ASID MIDI:</label>
           <select id="asid-midi-outputs" class="c64-select">
@@ -99,9 +132,23 @@
           <input type="file" id="sid-file-input" accept=".sid,.SID,.mus,.MUS,.prg,.PRG"
                  style="display:none">
         </label>
-        <span id="sid-file-name" class="c64-text-cyan" style="font-size:0.95rem;flex:1;min-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-          No file loaded
-        </span>
+        <!-- Local playlist: a folder of the user's own tunes, listed in the
+             browser below beside the served library.
+             Two controls because there are two APIs and no one browser has
+             both worth using. showDirectoryPicker() gives a real folder that
+             can be remembered between visits and is Chromium only; the file
+             input is the everywhere fallback, iOS Safari included, and lasts
+             only for the visit. usbsid-app.js hides whichever is not usable. -->
+        <button id="btn-local-folder" class="c64-btn c64-btn-sm"
+                title="Play from a folder on this device">LOCAL FOLDER</button>
+        <label id="lbl-local-files" class="c64-btn c64-btn-sm" style="cursor:pointer;display:none"
+               title="Pick SID files from this device">
+          LOCAL FILES
+          <input type="file" id="local-files-input" accept=".sid,.SID,.prg,.PRG"
+                 multiple style="display:none">
+        </label>
+        <button id="btn-local-clear" class="c64-btn c64-btn-sm" style="display:none"
+                title="Forget the local playlist">CLEAR LOCAL</button>
       </div>
       <div id="sid-url-presets" style="margin-top:6px">
         <span class="c64-text-gray" style="font-size:0.8rem">URL:</span>
@@ -121,25 +168,65 @@
                style="flex:1;min-width:120px">
         <button id="btn-load-url" class="c64-btn c64-btn-sm" style="margin-left:6px">LOAD URL</button>
       </div>
-      <div id="sid-meta" class="sid-meta" style="margin-top:4px"></div>
+      <div id="sid-local-status" class="c64-text-gray" style="font-size:0.8rem;margin-top:4px"></div>
     </div>
 
-    <!-- SID library list -->
+    <!-- SID library browser.
+         Two panes: directories on the left as a tree you walk into, the open
+         directory's tunes on the right grouped by SID type. Under 700px the
+         two stack and the directory list stays a list: it is a handful of rows
+         at any one level, and tapping a row is the obvious thing to do on the
+         device where it matters. See usbsid-sidbrowser.js. -->
     <div class="c64-box" id="sid-list-box">
       <div class="c64-box-title">SID Library
         <span id="sid-list-count" style="font-size:0.8rem;color:var(--c64-text);margin-left:6px"></span>
       </div>
-      <div style="display:flex;gap:6px;margin-bottom:6px">
-        <button id="btn-prev-sid" class="c64-btn c64-btn-sm" disabled>&#171; PREV SID</button>
-        <button id="btn-next-sid" class="c64-btn c64-btn-sm" disabled>NEXT SID &#187;</button>
+      <div id="sid-browser">
+        <div id="sid-browser-tools">
+          <div id="sid-search-row">
+            <input type="search" id="sid-search" class="c64-input"
+                   placeholder="Search title, author or file name"
+                   autocomplete="off" autocorrect="off" spellcheck="false">
+            <button id="sid-search-clear" class="c64-btn c64-btn-sm"
+                    title="Clear the search">&#215;</button>
+          </div>
+          <!-- Where we are in the directory tree. Hidden at the top level. -->
+          <div id="sid-crumb" style="display:none"></div>
+          <div id="sid-group-chips"></div>
+        </div>
+        <div id="sid-browser-panes">
+          <div id="sid-dir-list"></div>
+          <div id="sid-file-list"></div>
+        </div>
+        <div id="sid-browser-nav">
+          <button id="btn-prev-sid" class="c64-btn c64-btn-sm" disabled>&#171; PREV SID</button>
+          <!-- Shuffles whatever the list is showing: one directory, a search,
+               or all of them. Every tune once per pass, see ensureOrder(). -->
+          <button id="btn-shuffle" class="c64-btn c64-btn-sm" aria-pressed="false"
+                  title="Shuffle is off: the list plays in order">&#8646; SHUFFLE</button>
+          <button id="btn-next-sid" class="c64-btn c64-btn-sm" disabled>NEXT SID &#187;</button>
+        </div>
       </div>
-      <select id="sid-list-select" class="c64-select"
-              style="width:100%;font-size:0.85rem;height:140px" size="6"></select>
     </div>
 
     <!-- Transport controls -->
     <div class="c64-box">
       <div class="c64-box-title">Transport</div>
+      <!-- What is loaded, and how far into it we are.
+           This used to be a file name in the SID FILE box, which is where the
+           file is chosen and not where it is played. Everything about the tune
+           in flight belongs here, together with the transport that acts on it.
+           #playtime is a dash in modes that cannot report it: SendSID plays on
+           the board, so the page is not emulating anything and has no figure
+           until the firmware can send one back. -->
+      <div id="now-playing">
+        <div id="np-name" class="c64-text-cyan">No file loaded</div>
+        <div id="np-meta" class="sid-meta"></div>
+        <div id="np-time-row">
+          <span id="np-time" class="np-time">&#8212;:&#8212;&#8212;</span>
+          <span id="np-badges"></span>
+        </div>
+      </div>
       <div id="player-controls">
         <div id="player-transport">
           <button id="btn-prev-tune" class="c64-btn c64-btn-sm" disabled>&#171; PREV</button>
@@ -158,11 +245,6 @@
                   title="Board audio switch: mono or stereo">MONO</button>
         </div>
         <span class="subtune-info" id="subtune-display">Tune 1/1</span>
-        <div id="volume-row">
-          <label for="volume-slider">VOL:</label>
-          <input type="range" id="volume-slider" class="c64-range"
-                 min="0" max="100" value="100" style="width:100px">
-        </div>
       </div>
       <!-- WebUSB-only controls: shown when connected via WebUSB -->
       <div id="webusb-player-btns" style="display:none;margin-top:6px;flex-wrap:wrap;gap:6px">

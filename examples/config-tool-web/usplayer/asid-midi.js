@@ -268,7 +268,20 @@ export class ASIDMIDITransport {
     /* Before the SID snapshots, so an OPL note and the SID writes around it stay
      * in the order the tune made them. */
     this._flushFm();
-    for (let sid = 0; sid < this.nosids; sid++) {
+    /* Every chip that has something to say, not the first `nosids` of them.
+     *
+     * This used to stop at `nosids`, which the host set from its own reading of
+     * the file header, and a chip the emulation wrote to but the header count
+     * did not reach was **silently dropped**: measured on `Quad_Core_4SID.sid`,
+     * 4667 register writes to chip four and not one ASID message carrying them,
+     * while the same tune over WebUSB and over serial played correctly, because
+     * those transports send by address and never consult a count.
+     *
+     * Two parsers disagreeing about how many chips a file has is the sort of
+     * thing that stays wrong for a long time, so the stream now follows the
+     * writes instead: a chip that nothing wrote to has an empty mask and is
+     * skipped a line below, which is the same saving without the guess. */
+    for (let sid = 0; sid < this._chips.length; sid++) {
       const c = this._chips[sid];
       let mask = 0, msb = 0;
       for (let i = 0; i < 28; i++) {
