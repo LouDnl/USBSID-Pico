@@ -20,6 +20,30 @@ const USBSID_PID = 0x4011;
 /* Buffer / packet constants */
 const BUFFER_SIZE       = 64;
 const MAX_PACKET_SIZE   = 64;
+
+/**
+ * How long to wait for the board-information reads at connect.
+ *
+ * The socket configuration, the SID count and the FM/OPL slot were all failing on
+ * the 500 ms the other reads use, while the same commands answered every time from
+ * the console with no limit at all. The firmware receives them and replies either
+ * way, which the UART shows (`READ_SOCKETCFG` then `[VDR] TX 12`), so the reply was
+ * simply arriving after the race had given up.
+ *
+ * Only these three, and not the 500 ms default: they run once at connect, nothing
+ * waits on them, and a board whose firmware predates them still has to be allowed
+ * to say nothing rather than hang.
+ */
+/* No longer used for the board reads: see configReadNoRace(). Kept because
+ * configCmdRead() still takes a timeout for anything that genuinely may go
+ * unanswered.
+ *
+ * Anything still using the raced read carries a hazard worth knowing: one timeout
+ * abandons a transferIn that cannot be cancelled, and every read after it in the
+ * session gets the previous question's answer. Only GET_CLOCK and GET_AUDIO still
+ * do, both from the config panel rather than the connect path. If either ever
+ * misbehaves, unrace it too rather than lengthening its timeout. */
+const BOARD_READ_TIMEOUT_MS = 3000;
 const MAX_WRITE_BYTES   =  3;   /* 1 cmd, 1 reg, 1 val */
 const MAX_CYCLED_BYTES  =  5;   /* 1 cmd, 1 reg, 1 val, cycles_hi, cycles_lo */
 const MAX_WRITE_BUFFER  = 63;   /* 1 cmd byte, 62 / 2 writes */
@@ -115,6 +139,9 @@ const UPLOAD_SID_START = 0xD0;
 const UPLOAD_SID_DATA  = 0xD1;
 const UPLOAD_SID_END   = 0xD2;
 const UPLOAD_SID_SIZE  = 0xD3;
+/* Max playtime for the tune just uploaded, in milliseconds. Without it the
+   onboard player runs for five minutes. Send it after UPLOAD_SID_END. */
+const UPLOAD_SID_PLAYTIME = 0xD4;
 const SID_PLAYER_TUNE  = 0xE0;
 const SID_PLAYER_START = 0xE1;
 const SID_PLAYER_STOP  = 0xE2;
@@ -122,6 +149,10 @@ const SID_PLAYER_PAUSE = 0xE3;
 const SID_PLAYER_NEXT  = 0xE4;
 const SID_PLAYER_PREV  = 0xE5;
 const SID_PLAYER_TWO   = 0xE6;
+const SID_PLAYER_FFWD  = 0xE7;   /* non functional, see playerFfwd() */
+const SID_PLAYER_MUTE  = 0xE9;
+const SID_PLAYER_MUTED = 0xEA;
+const SID_PLAYER_TIME  = 0xEB;
 
 const CONFIG_ACK       = 0xFA;  /* Acknowledge the current configuration and switch on regulators (v1.5+ boards only) */
 const SOCKET_DETECT    = 0xFD;  /* Disable/enable automatic socket change detection on boot (v1.5+ boards only) */
@@ -371,14 +402,66 @@ class USBSIDDevice {
    *  On timeout a transferIn is leaked (WebUSB has no cancel API). We recover
    *  by closing and reopening the device (which aborts all pending transfers),
    *  then retrying the command once on a clean connection. */
-  async configCmdRead(sub, b2 = 0, b3 = 0, b4 = 0, b5 = 0, numBytes = MAX_PACKET_SIZE) {
+  /**
+   * @param timeoutMs how long to wait for the reply. 500 is enough for a board
+   *   doing nothing; the board-information reads at connect need more, see
+   *   BOARD_READ_TIMEOUT_MS.
+   */
+  async configCmdRead(sub, b2 = 0, b3 = 0, b4 = 0, b5 = 0, numBytes = MAX_PACKET_SIZE,
+                      timeoutMs = 500) {
+    /* One at a time, whoever asks.
+     *
+     * A config read is a write followed by a read, and the endpoint has no way of
+     * saying which reply belongs to which request. Two of these overlapping means
+     * either can take the other's answer. Reading the socket configuration, the
+     * SID count and the FM/OPL slot one after another produced three zeros and
+     * then a fourth read that returned one of *their* replies, which is how this
+     * was found. Serialised, so the pairing holds. */
+    const mine = this._cfgReadChain = (this._cfgReadChain || Promise.resolve())
+      .then(() => this._configCmdReadOnce(sub, b2, b3, b4, b5, numBytes, timeoutMs),
+            () => this._configCmdReadOnce(sub, b2, b3, b4, b5, numBytes, timeoutMs));
+    return await mine;
+  }
+
+  async _configCmdReadOnce(sub, b2, b3, b4, b5, numBytes, timeoutMs) {
     if (!this._isOpen) return [];
-    /* usbsidLog('configCmdRead: start ', sub); */
     const cmdBuf = new Uint8Array([this.cmd(COMMAND, CONFIG), sub, b2, b3, b4, b5]);
     const packets = [];
-    let timedOut = false;
+
+    /* Clear a skew left by an earlier timeout before asking anything.
+     *
+     * A raced read that times out abandons its transferIn rather than cancelling
+     * it, because WebUSB has no cancel. The board's reply still arrives and is
+     * handed to the next read, so from that moment every read is one reply behind
+     * and they all time out. It is not hypothetical and it is not even ours to
+     * begin with: readConfigAck() says its first attempt may time out on a freshly
+     * opened endpoint, and the log shows exactly that, followed by the socket
+     * configuration, the SID count and the FM/OPL slot all failing in turn.
+     *
+     * The late reply is genuinely in flight, so one read with nothing sent first
+     * consumes it. Raced, because the alternative is waiting for ever when the
+     * timeout was a command the firmware does not implement, and given a long
+     * enough limit that a board which is going to answer has answered. */
+    if (this._cfgReadSkew) {
+      this._cfgReadSkew = false;
+      try {
+        const stale = await Promise.race([
+          this._device.transferIn(this._epIn, MAX_PACKET_SIZE),
+          new Promise((res) => setTimeout(() => res(null), 1500)),
+        ]);
+        if (stale) {
+          usbsidLog('configCmdRead: resynchronised, discarded a late reply');
+        } else {
+          /* Nothing came, so the earlier timeout was a question this board does
+           * not answer. Say so once: the reads are in step, there is simply no
+           * answer to that one. */
+          usbsidLog('configCmdRead: no late reply, the board does not answer that command');
+        }
+      } catch (_) { /* closed under us; the next read will report it */ }
+    }
+
     try {
-      const r = await this._device.transferOut(this._epOut, cmdBuf);
+      await this._device.transferOut(this._epOut, cmdBuf);
     } catch (e) {
       usbsidLog('configCmdRead write error:', e.message || e);
       return packets;
@@ -387,14 +470,77 @@ class USBSIDDevice {
       const r = await Promise.race([
         this._device.transferIn(this._epIn, numBytes),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('configCmdRead timeout')), 500)
+          setTimeout(() => reject(new Error('configCmdRead timeout')), timeoutMs)
         ),
       ]);
       packets.push(new Uint8Array(r.data.buffer));
     } catch (e) {
+      /* Remember it: the next read clears up after this one. The abandoned
+       * transferIn cannot be cancelled, so its reply is still coming. */
+      this._cfgReadSkew = true;
       usbsidLog('configCmdRead error:', e.message || e);
     }
     return packets;
+  }
+
+  /**
+   * A config read that cannot leak, for commands the board is known to answer.
+   *
+   * `configCmdRead()` races the read against a timeout, which is unavoidable for
+   * a question some firmware does not implement: an unraced read would wait for
+   * ever. The cost is that a timeout **abandons** the transferIn rather than
+   * cancelling it, because WebUSB has no cancel, so the reply still arrives and is
+   * handed to the next read. One timeout therefore puts every later config read
+   * one reply behind, for the rest of the session.
+   *
+   * That is what broke the onboard player's clock. The firmware was answering
+   * every request (the UART showed five `[VDR] TX 4`, which TinyUSB logs after the
+   * bytes have gone to the host) while the browser timed out on all five, because
+   * each reply was going to the transfer abandoned by the one before it. The first
+   * abandonment is not even ours: readConfigAck() notes that its first attempt may
+   * time out on a freshly opened endpoint.
+   *
+   * So: no race here. Only call it for a command this board certainly implements,
+   * which for the onboard player's reads means only when the board has reported an
+   * onboard player. Then a reply is certain and nothing is ever abandoned.
+   *
+   * If a skew was inherited from an earlier raced read, the first call returns
+   * that stale packet and every call after it is aligned again: one wrong reading
+   * rather than a session that never recovers.
+   */
+  async configReadNoRace(sub, len = MAX_PACKET_SIZE, b2 = 0, b3 = 0, b4 = 0, b5 = 0) {
+    const mine = this._cfgReadChain = (this._cfgReadChain || Promise.resolve())
+      .then(() => this._configReadNoRaceOnce(sub, len, b2, b3, b4, b5),
+            () => this._configReadNoRaceOnce(sub, len, b2, b3, b4, b5));
+    return await mine;
+  }
+
+  async _configReadNoRaceOnce(sub, len, b2, b3, b4, b5) {
+    if (!this._isOpen) return null;
+    /* Says so if a read never comes back, without abandoning it.
+     *
+     * Abandoning is what broke this in the first place: WebUSB cannot cancel a
+     * transferIn, so every timed out read leaves a queued transfer behind and the
+     * next reply feeds the oldest one. The backlog only grows, which is why reads
+     * that work in isolation come back fifteen seconds late once a few have been
+     * given up on. So this reports and waits: the read is serialised, so a stuck
+     * one stops the others rather than burying them. */
+    const stuck = setTimeout(() => {
+      usbsidLog('config read 0x' + (sub & 0xff).toString(16) +
+                ' has not answered after 10s, still waiting (reads are serialised,'
+                + ' so nothing else will run until it does)');
+    }, 10000);
+    try {
+      await this._device.transferOut(this._epOut,
+        new Uint8Array([this.cmd(COMMAND, CONFIG), sub, b2, b3, b4, b5]));
+      const r = await this._device.transferIn(this._epIn, len);
+      return new Uint8Array(r.data.buffer);
+    } catch (e) {
+      usbsidLog('configReadNoRace error:', e.message || e);
+      return null;
+    } finally {
+      clearTimeout(stuck);
+    }
   }
 
   /* Config reading - returns flat Uint8Array of CONFIG_SIZE (64) bytes.
@@ -405,6 +551,17 @@ class USBSIDDevice {
    * without using Promise.race - that approach leaks pending transferIn calls
    * which then consume the real response on the next read, yielding 0 bytes. */
   async readConfig() {
+    /* Through the same chain as every other config read. It has its own
+     * transferOut/transferIn loop rather than going via configCmdRead(), so
+     * without this it can run at the same time as one of those and the two take
+     * each other's replies: one reader at a time is the only thing that keeps a
+     * reply paired with its question. */
+    const mine = this._cfgReadChain = (this._cfgReadChain || Promise.resolve())
+      .then(() => this._readConfigOnce(), () => this._readConfigOnce());
+    return await mine;
+  }
+
+  async _readConfigOnce() {
     const CONFIG_SIZE = 64;
     const CC = this.cmd(COMMAND, CONFIG);
     const cmdBuf = new Uint8Array([CC, READ_CONFIG, 0, 0, 0, 0]);
@@ -446,9 +603,13 @@ class USBSIDDevice {
   /* Read firmware version string */
   async readVersion() {
     usbsidLog("Reading USBSID-Pico Firmware version");
-    const r = await this.configCmdRead(USBSID_VERSION, 0, 0, 0, 0, MAX_PACKET_SIZE);
-    if (!r.length) return '';
-    const bytes = r[0];
+    /* Unraced: this runs at connect, and one abandoned transfer there puts
+     * every later read one reply behind. See readConfigAck(). */
+    const r = await this.configReadNoRace(USBSID_VERSION, MAX_PACKET_SIZE);
+    if (!r || !r.length) return '';
+    /* configReadNoRace() answers with the bytes themselves, not the array of
+     * packets configCmdRead() returns. */
+    const bytes = r;
     let s = '';
     for (let i = 0; i < bytes.length; i++) {
       if (bytes[i] === 0) break;
@@ -460,9 +621,13 @@ class USBSIDDevice {
   /* Read PCB version */
   async readPCBVersion() {
     usbsidLog("Reading USBSID-Pico PCB version");
-    const r = await this.configCmdRead(US_PCB_VERSION, 0, 0, 0, 0, MAX_PACKET_SIZE);
-    if (!r.length) return '';
-    const bytes = r[0];
+    /* Unraced: this runs at connect, and one abandoned transfer there puts
+     * every later read one reply behind. See readConfigAck(). */
+    const r = await this.configReadNoRace(US_PCB_VERSION, MAX_PACKET_SIZE);
+    if (!r || !r.length) return '';
+    /* configReadNoRace() answers with the bytes themselves, not the array of
+     * packets configCmdRead() returns. */
+    const bytes = r;
     let s = '';
     for (let i = 0; i < bytes.length; i++) {
       if (bytes[i] === 0) break;
@@ -567,15 +732,34 @@ class USBSIDDevice {
   /* Read number of SIDs */
   async readNumSIDs() {
     usbsidLog("Reading number of available SID's");
-    const r = await this.configCmdRead(READ_NUMSIDS, 0, 0, 0, 0, MAX_PACKET_SIZE);
-    return r.length ? r[0][0] : 0;
+    const r = await this.configReadNoRace(READ_NUMSIDS, MAX_PACKET_SIZE);
+    return (r && r.length) ? r[0] : 0;
+  }
+
+  /**
+   * What is actually in the two sockets.
+   *
+   * The board reports one byte per socket: the high nibble says whether the
+   * socket is enabled, the low nibble whether it holds two chips. So a socket can
+   * hold 0, 1 or 2. Byte 2 is socket one, byte 5 is socket two, which is the same
+   * layout USBSID-Player's transports parse.
+   *
+   * @returns {{one:number, two:number}|null} null when the board will not say
+   */
+  async readSocketConfig() {
+    const b = await this.configReadNoRace(READ_SOCKETCFG, MAX_PACKET_SIZE);
+    if (!b || b.length < 6) return null;
+    const chips = (byte) =>
+      (((byte & 0xf0) >> 4) === 1) ? (((byte & 0x0f) === 1) ? 2 : 1) : 0;
+    return { one: b.length > 2 ? chips(b[2]) : 0,
+             two: b.length > 5 ? chips(b[5]) : 0 };
   }
 
   /* Read FMOpl SID number */
   async readFMOplSID() {
     usbsidLog("Reading FMOpl SID number");
-    const r = await this.configCmdRead(READ_FMOPLSID, 0, 0, 0, 0, MAX_PACKET_SIZE);
-    return r.length ? r[0][0] : 0;
+    const r = await this.configReadNoRace(READ_FMOPLSID, MAX_PACKET_SIZE);
+    return (r && r.length) ? r[0] : 0;
   }
 
   /* Clone config commands */
@@ -595,15 +779,20 @@ class USBSIDDevice {
    * endpoint is fully initialised. */
   async readConfigAck() {
     if (!this._isOpen) return 0;
-    let timedOut = false;
-    try {
-      const r = await this.configCmdRead(READ_CONFIGACK, 0, 0, 0, 0, MAX_PACKET_SIZE);
-      return r.length ? r[0][0] : 0;
-    } catch (e) {
-      timedOut = (e.message === 'readConfigAck timeout');
-      if (!timedOut) { this._log('readConfigAck failed (non-fatal):', e.message, e); return 0; }
-    }
-    return 0;
+    /* Unraced, and this one matters more than the others.
+     *
+     * It is the first read after opening, and its own note says the first attempt
+     * may time out on an endpoint that has just been reset. A timeout abandons a
+     * transferIn that WebUSB cannot cancel, so the reply to the *next* question
+     * goes to it instead, and everything after that is one reply behind for the
+     * rest of the session. That is what left READ_SOCKETCFG waiting for ever while
+     * the UART showed its 12 bytes going out.
+     *
+     * Safe to wait: the firmware answers this on every board, write_back_data(1)
+     * sits outside the PCB version guard, so a v1.0 board says "not supported" by
+     * replying with a zero rather than by staying silent. */
+    const r = await this.configReadNoRace(READ_CONFIGACK, MAX_PACKET_SIZE);
+    return (r && r.length) ? r[0] : 0;
   }
 
   /* Acknowledge current config - enables socket power regulators (v1.5+).
@@ -652,6 +841,20 @@ class USBSIDDevice {
   }
 
   /* Pause / unpause SID output */
+  /**
+   * Silence the board outright, volume register included.
+   *
+   * Not the same thing as muting every voice. The player's voice mute writes the
+   * sustain/release and control registers of the voices it is given and never
+   * touches $18, so a tune playing samples through the volume register carries on
+   * regardless: muting all three voices leaves a digi audible.
+   *
+   * This is the firmware's own MUTE, which writes the volume nibble of $d418 to
+   * zero on every chip and remembers what was there, so UNMUTE puts it back.
+   */
+  async muteAll()   { await this.write([this.cmd(COMMAND, MUTE),   0, 0, 0, 0, 0]); }
+  async unmuteAll() { await this.write([this.cmd(COMMAND, UNMUTE), 0, 0, 0, 0, 0]); }
+
   async pause()   { await this.write([this.cmd(COMMAND, PAUSE),   0, 0, 0, 0, 0]); }
   async unpause() { await this.write([this.cmd(COMMAND, UNPAUSE), 0, 0, 0, 0, 0]); }
 
@@ -686,6 +889,119 @@ class USBSIDDevice {
   async playerSocketTwo() { await this.configCmd(SID_PLAYER_TWO); }
 
   /**
+   * How long the tune just uploaded should run, in milliseconds.
+   *
+   * Send after playerUploadEnd(). Without it the onboard player stops after five
+   * minutes, which is its own default and not the tune's length. A 32 bit count,
+   * most significant byte first, matching set_maxplaytime() in config.c.
+   *
+   * SID_PLAYER_STOP resets it back to five minutes, so it has to be sent again
+   * for every tune rather than once per session.
+   */
+  async playerSetPlaytime(ms) {
+    const v = Math.max(0, Math.round(ms)) >>> 0;
+    await this.configCmd(UPLOAD_SID_PLAYTIME,
+                         (v >>> 24) & 0xFF, (v >>> 16) & 0xFF,
+                         (v >>> 8) & 0xFF, v & 0xFF);
+  }
+
+  /**
+   * The onboard player's position, in milliseconds, or null.
+   *
+   * get_playtime() only samples the player while it is actually playing, so the
+   * value **freezes at the last live reading** once playback stops rather than
+   * dropping to zero. That is usually what you want, since a stopped tune keeps
+   * showing where it stopped, but it means a reading is not by itself evidence
+   * that anything is playing. UPLOAD_SID_START resets it to zero, so it cannot
+   * carry a stale position from the previous tune into a new one.
+   */
+  async playerTime() {
+    /* configReadNoRace(), not configCmdRead(): the board always answers this one,
+     * and a raced read that gives up abandons its transferIn, whose reply is then
+     * handed to whoever reads next.
+     *
+     * A whole packet, not the 4 bytes get_playtime() sends. The buffer has to be
+     * big enough for the largest reply that could land in it, not the one that
+     * should: with a 4 byte buffer a stray 12 byte socket configuration reply
+     * comes back as `babble` and zero bytes. Only the first four are read. */
+    const d = await this.configReadNoRace(SID_PLAYER_TIME, MAX_PACKET_SIZE);
+    if (!d || d.length < 4) return null;
+    return ((d[0] << 24) | (d[1] << 16) | (d[2] << 8) | d[3]) >>> 0;
+  }
+
+  /**
+   * Mute or unmute one voice, one whole chip, or everything.
+   *
+   *   chip 1..4, voice 1..3   that voice, masked on the way out
+   *   chip 1..4, voice 0      that whole chip, by dropping its writes
+   *   chip 0,    voice 0      every chip and every voice
+   *
+   * @param mute true to silence
+   *
+   * The two are different mechanisms and not degrees of the same one. A voice mute
+   * masks the gate and the sustain and lets every other write through, so the tune
+   * carries on driving the voice. A chip mute drops the chip's writes, which is the
+   * only one of the two that reaches $18: a tune playing samples through the volume
+   * register keeps sounding with all three of its voices muted.
+   */
+  async playerMute(chip, voice, mute) {
+    await this.configCmd(SID_PLAYER_MUTE, chip & 0xFF, voice & 0xFF, mute ? 1 : 0);
+  }
+
+  /** Every voice of every chip. */
+  async playerMuteAll(mute) {
+    await this.playerMute(0, 0, mute);
+  }
+
+  /**
+   * One whole chip, in one command.
+   *
+   * Sent as voice 0, which set_mutestate() routes to usplayer_set_chip_mute().
+   * This used to send the three voices instead, because the firmware had no chip
+   * form; it has one now, and unlike three voice mutes it silences the volume
+   * register as well.
+   */
+  async playerMuteChip(chip, mute) {
+    return await this.playerMute(chip, 0, mute);
+  }
+
+  /**
+   * The mute state, as one bitmask per chip, bit 0 to bit 2 for voices 1 to 3.
+   *
+   * Reads back zeros for every chip while nothing is playing: get_mutestate()
+   * only asks the player when it is running.
+   */
+  /**
+   * The board's mute state.
+   *
+   * Five bytes since chip mute arrived, not four: byte 0 is the chip mask, bit 0
+   * for chip one, and the per chip voice masks moved along to bytes 1 to 4. Reads
+   * zeros throughout while nothing is playing, because the firmware only asks the
+   * player when it is running.
+   *
+   * @returns {{chips:number, voices:number[]}|null}
+   */
+  async playerMuteState() {
+    const d = await this.configReadNoRace(SID_PLAYER_MUTED, MAX_PACKET_SIZE);
+    if (!d || d.length < 5) return null;
+    return { chips: d[0], voices: [d[1], d[2], d[3], d[4]] };
+  }
+
+  /**
+   * Fast forward on or off.
+   *
+   * **Does nothing.** The firmware marks the case `/* Non functional *\/` and the
+   * `emu_ffwd()` call is commented out, because emu_ffwd() was itself an empty
+   * stub: on the device the SID writes are the pacing, so there is nothing to
+   * skip until the embedded build has a pacer. Kept so the wiring is ready, and
+   * deliberately absent from the UI: a control that cannot work invites being
+   * pressed repeatedly.
+   */
+  async playerFfwd(on) {
+    await this.configCmd(SID_PLAYER_FFWD, on ? 1 : 0);
+  }
+
+  /**
    * Upload a SID/PRG file to the onboard player and start playback.
    * Matches the protocol in send_sid.c exactly - all upload packets are 64 bytes.
    * @param {Uint8Array} bytes   - raw file bytes
@@ -693,7 +1009,8 @@ class USBSIDDevice {
    * @param {number}     fileType - 0x01=SID, 0x02=PRG (default 0x01)
    * @param {function}   onProgress - optional callback(sent, total)
   */
-  async uploadSIDFile(bytes, subtune = 1, fileType = 0x01, onProgress = null) {
+  async uploadSIDFile(bytes, subtune = 1, fileType = 0x01, onProgress = null,
+                      playtimeMs = 0) {
     const CMD        = this.cmd(COMMAND, CONFIG);  /* 0xD2 */
     const CHUNK      = MAX_PACKET_SIZE - 2;         /* 62 bytes of file data per packet */
     const total      = bytes.length;
@@ -731,10 +1048,18 @@ class USBSIDDevice {
     pkt[3] =  total       & 0xFF;
     await this._device.transferOut(this._epOut, pkt);
 
-    /* 6. Load tune (file ID 0 = uploaded file, subtune is 0-based in firmware) */
+    /* 6. PLAYTIME, before anything starts.
+     *
+     * send_sid.c sends it here, between SIZE and the load, and the order matters:
+     * sent after playback has begun the tune is already running against the
+     * firmware's own five minute default, and the board only picks the real
+     * length up part way in. */
+    if (playtimeMs > 0) await this.playerSetPlaytime(playtimeMs);
+
+    /* 7. Load tune (file ID 0 = uploaded file, subtune is 0-based in firmware) */
     await this.playerLoadTune(subtune > 0 ? subtune - 1 : 0);
 
-    /* 7. Start playback */
+    /* 8. Start playback */
     await this.playerStart();
   }
 

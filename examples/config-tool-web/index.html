@@ -227,6 +227,17 @@
           <span id="np-badges"></span>
         </div>
       </div>
+      <!-- What HVSC's STIL has to say about this tune, when it says anything.
+           Hidden entirely when it does not: STIL covers about 30% of HVSC, so an
+           empty panel would be the common case and would only take up room.
+           Filled from SID/stil/<first two of the md5>.json by resolveStil(). -->
+      <div id="np-stil" style="display:none">
+        <div id="np-stil-head">
+          <span class="np-stil-label">STIL</span>
+          <span id="np-stil-path" title="Location in HVSC"></span>
+        </div>
+        <div id="np-stil-body"></div>
+      </div>
       <div id="player-controls">
         <div id="player-transport">
           <button id="btn-prev-tune" class="c64-btn c64-btn-sm" disabled>&#171; PREV</button>
@@ -266,6 +277,28 @@
         <button id="btn-upload-sid" class="c64-btn c64-btn-sm">UPLOAD TO DEVICE</button>
         <span id="sid-upload-status" style="font-size:0.85rem;color:var(--c64-cyan)"></span>
       </div>
+      <!-- Onboard player mute, per voice.
+           Rows are generated per chip by buildOnboardMuteGrid(), because how many
+           chips there are depends on the board. FFWD is deliberately absent: the
+           firmware marks SID_PLAYER_FFWD non functional and its emu_ffwd() call is
+           commented out, so a button for it could only mislead. -->
+      <div id="sendsid-mute-btns" style="display:none;margin-top:6px">
+        <div id="sendsid-mute-row1" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span class="np-stil-label">Mute</span>
+          <button id="btn-player-mute-all" class="c64-btn c64-btn-sm"
+                  title="Mute or unmute every voice of every chip">ALL</button>
+          <button id="btn-player-mute-refresh" class="c64-btn c64-btn-sm"
+                  title="Read the mute state back from the board">REFRESH</button>
+        </div>
+        <div id="sendsid-mute-grid" style="margin-top:4px"></div>
+      </div>
+      <hr class="c64-hr">
+      <p style="color:var(--c64-text);font-size:0.9rem">
+        <strong class="c64-text-yellow">Keyboard shortcuts:</strong><br>
+        Space - Play / Pause &nbsp;|&nbsp;
+        S - Stop &nbsp;|&nbsp;
+        <- -> - Prev / Next subtune
+      </p>
     </div>
 
     <!-- Log output -->
@@ -609,13 +642,13 @@
         WebUSB modifications: <span class="c64-text-cyan">LouD</span><br>
         License: GPLv2
       </p>
-      <hr class="c64-hr">
+      <!-- <hr class="c64-hr">
       <p style="color:var(--c64-text);font-size:0.9rem">
         <strong class="c64-text-yellow">Keyboard shortcuts (in player tab):</strong><br>
         Space - Play / Pause &nbsp;|&nbsp;
         S - Stop &nbsp;|&nbsp;
         ← -> - Prev / Next subtune
-      </p>
+      </p> -->
     </div>
 
     <div class="c64-box">

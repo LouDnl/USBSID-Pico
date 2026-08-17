@@ -853,6 +853,68 @@ input[type=range].c64-range::-moz-range-thumb {
   line-height: 1.5;
 }
 
+/* HVSC's STIL notes for the tune being played.
+   Inset like the other read-only panels, and capped in height: a handful of
+   entries run to a couple of thousand characters (Rob Hubbard on Commando is
+   one) and without a limit a single tune pushes the transport buttons off the
+   screen. */
+#np-stil {
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  background: var(--c64-inset);
+  border: 2px solid var(--c64-gray);
+  font-size: 0.85rem;
+  max-height: 11em;
+  overflow-y: auto;
+}
+#np-stil-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.np-stil-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--c64-yellow);
+  border: 1px solid var(--c64-yellow);
+  border-radius: 2px;
+  padding: 0 5px;
+  line-height: 1.5;
+  flex: none;
+}
+#np-stil-path {
+  color: var(--c64-gray);
+  font-size: 0.8rem;
+  /* Truncated rather than wrapped, and from the left: the path is here for
+     recognition and the interesting end of it is the file name. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+.np-stil-row { margin-top: 3px; line-height: 1.35; }
+.np-stil-key {
+  color: var(--c64-gray);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  margin-right: 4px;
+}
+.np-stil-val { color: var(--c64-text); }
+.np-stil-val.np-stil-title { color: var(--c64-cyan); }
+/* A subtune's own notes, marked as belonging to it and not to the file. */
+.np-stil-sub {
+  margin-top: 5px;
+  padding-left: 6px;
+  border-left: 2px solid var(--c64-darkgray);
+}
+.np-stil-subhead {
+  color: var(--c64-yellow);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
 /* ────────────────────────────────────────────────────────────────────────
    Touch sizing
 

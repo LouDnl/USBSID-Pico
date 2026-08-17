@@ -78,6 +78,11 @@ const VERSION = new URL(import.meta.url).search;
 /** `name` with the host's cache buster on it, if there is one. */
 function versioned(name) { return WASM_DIR + name + VERSION; }
 
+/** Milliseconds, monotonic where the browser offers it. */
+function _now() {
+  return (typeof performance !== 'undefined') ? performance.now() : Date.now();
+}
+
 /* How often the register grid is pushed, in milliseconds.
  *
  * Twenty a second. The eye reads a hex byte in well under that, and the app's
@@ -138,6 +143,22 @@ export class USPlayerAdapter {
      * AudioWorklet. The one mode here that needs nothing plugged in, which is
      * what it replaced Hermit jsSID for. */
     this._isAudio = (emulator === 'usplayer-audio');
+    /* The whole file goes to the board and the board's own player plays it.
+     * Nothing is emulated here, so this is the one mode where the page cannot
+     * say what the chip is doing: no register writes pass through it and there
+     * is no play position to read back. Same transport as `usplayer-serial`,
+     * a very different division of labour. */
+    this._isSendsid = (emulator === 'usplayer-sendsid');
+    /* Where the board's playback started, in `performance.now()` terms, and
+     * how much of it has been played. The board reports no position, so this
+     * is the only clock there is: see playtimeMs(). */
+    this._boardStart = 0;
+    this._boardPlayed = 0;
+    /* The board's own position, from the last successful poll, or null while it
+     * has not answered. See _pollBoardTime(). */
+    this._boardMs = null;
+    this._boardPoll = null;
+    this._boardPollFails = 0;
     this._audio = null;
     this._player = null;
     this._transport = null;
@@ -255,6 +276,18 @@ export class USPlayerAdapter {
          !document.getElementById('status-text'))) return;
 
     const p = this._player;
+
+    /* Nothing here is running in SendSID mode: the board has the file and is
+     * playing it on its own. Frames, fps and the transport counters would all
+     * read zero and say nothing, so this reports the one thing the page does
+     * know, which is how long ago it sent it. */
+    if (this._isSendsid) {
+      const secs = (this.playtimeMs() / 1000).toFixed(1);
+      this._status(`${this._prefix} | playing on the board` +
+                   `${this._paused ? ', paused' : ''} | ${secs}s in`);
+      return;
+    }
+
     const s = (typeof p.stats === 'function') ? p.stats() : null;
 
     let line = `${this._prefix} | ${p.refreshHz().toFixed(2)} fps` +
@@ -411,12 +444,44 @@ export class USPlayerAdapter {
           await this._transport.connect(null);
           this._wireMidiPicker();
         } catch (e) { console.warn('ASID connect:', e); }
+      } else if (this._isSendsid) {
+        /* Either interface can carry it: the firmware takes the same packets
+         * over the vendor interface and over CDC. WebUSB first, because a
+         * browser that has already granted the board for another mode needs no
+         * second dialog and no second picker, and because only the vendor
+         * interface can be probed for what the firmware was built with. Web
+         * Serial is the fallback, and the only route in a browser with no
+         * WebUSB at all: see TODO 35 and the note in config-tool-web. */
+        this._transport = new USBSIDWebUSBTransport({ device: this._device });
+        try {
+          if (this._device) await this._transport.connect();
+          else await this._transport.connectGranted();
+        } catch (e) { this._log('WebUSB: ' + e.message); }
+        if (!this._transport.isOpen) {
+          this._transport = new USBSIDWebSerialTransport();
+          try {
+            const ok = await this._transport.connectGranted();
+            if (!ok) this._log('no board granted yet, press Connect');
+          } catch (e) { this._log('Web Serial: ' + e.message); }
+        }
+        await this._checkSidPlayer();
       } else if (this._isSerial) {
+        /* Both talk to the board's CDC interface. The difference is what goes
+         * down it: a stream of register writes for `serial`, the whole file
+         * once for `sendsid`.
+         *
+         * Only what the origin has already been granted, exactly as the WebUSB
+         * branch below does. `connect()` calls `requestPort()`, which shows a
+         * picker and needs a user gesture; calling it from here threw a chooser
+         * at anyone who merely selected the mode, and when there was no gesture
+         * it threw an exception instead and left the port shut with a line in
+         * the log. The picker belongs to the host's Connect button, which
+         * reaches it through connect(). */
         this._transport = new USBSIDWebSerialTransport();
         try {
-          const ok = await this._transport.connect();
-          if (!ok) this._log(this._transport.lastError || 'could not open a port');
-        } catch (e) { this._log('Web Serial connect: ' + e.message); }
+          const ok = await this._transport.connectGranted();
+          if (!ok) this._log('no serial port granted yet, press Connect');
+        } catch (e) { this._log('Web Serial: ' + e.message); }
       } else {
         this._transport = new USBSIDWebUSBTransport({ device: this._device });
         try {
@@ -523,8 +588,126 @@ export class USPlayerAdapter {
         typeof this._transport.connect === 'function') {
       try { await this._transport.connect(); }
       catch (e) { this._log('connect: ' + (e && e.message ? e.message : e)); }
+      /* This is where a board is really chosen, so this is where it has to be
+       * asked whether it can do the job at all. */
+      await this._checkSidPlayer();
     }
     return this.isConnected();
+  }
+
+  /**
+   * Refuse a board that cannot play what SendSID sends it.
+   *
+   * The firmware says what it was compiled with, one byte of flags, and bit 7
+   * is the embedded SID player. Without it the board takes the whole upload,
+   * answers every packet and plays **nothing**, which from the outside is
+   * indistinguishable from a broken file or a wrong subtune. So it is asked
+   * once, at connect, and a board that says no is let go of again rather than
+   * left looking connected.
+   *
+   * A board that will not answer at all is left alone: older firmware predates
+   * the question, and refusing to talk to it would be worse than not knowing.
+   */
+  /**
+   * Ask the board where it has got to, on a timer of its own.
+   *
+   * Half a second, not the host's display rate: each poll is a write followed by
+   * a read with a timeout, and `_configRead()` leaves a timed out read pending so
+   * a late reply would satisfy the next one. The transport guards against
+   * overlapping reads, and this gives up after a few failures rather than asking a
+   * board that clearly will not answer twice a second for the rest of the session.
+   * Giving up leaves `_boardMs` null, which puts playtimeMs() back on the wall
+   * clock, so the display carries on either way.
+   */
+  _startBoardPoll() {
+    if (this._boardPoll || !this._isSendsid) return;
+    this._boardPollFails = 0;
+    this._boardPoll = setInterval(() => this._pollBoardTime(), 500);
+  }
+
+  _stopBoardPoll() {
+    if (this._boardPoll) { clearInterval(this._boardPoll); this._boardPoll = null; }
+  }
+
+  async _pollBoardTime() {
+    const t = this._transport;
+    if (!t || !t.isOpen || typeof t.playerTime !== 'function') return;
+    if (this._paused) return;
+    const ms = await t.playerTime();
+    if (ms == null) {
+      if (++this._boardPollFails >= 5) {
+        this._stopBoardPoll();
+        this._log('the board will not report its position, using the wall clock');
+      }
+      return;
+    }
+    this._boardPollFails = 0;
+    this._boardMs = ms;
+  }
+
+  /** The current subtune's length, to the board, when it is known. */
+  async _sendBoardPlaytime(subtune) {
+    const t = this._transport;
+    if (!t || typeof t.playerSetPlaytime !== 'function') return;
+    let ms = 0;
+    try {
+      const lens = this.songLengths(this.md5());
+      if (lens && lens.length) {
+        ms = lens[Math.min(lens.length, Math.max(1, subtune)) - 1] || 0;
+      }
+    } catch (_) { /* no lengths, the board keeps its own default */ }
+    if (!ms) return;
+    try {
+      await t.playerSetPlaytime(ms);
+      this._log(`board max playtime set to ${(ms / 1000).toFixed(1)}s`);
+    } catch (_) { /* not fatal: the board falls back to five minutes */ }
+  }
+
+  /* ---- the onboard player's mute controls ------------------------------- */
+
+  /** Mute or unmute one voice of one chip on the board. */
+  async playerMute(chip, voice, mute) {
+    const t = this._transport;
+    if (!t || typeof t.playerMute !== 'function') return false;
+    return await t.playerMute(chip, voice, mute);
+  }
+
+  /** Every voice of every chip on the board. */
+  async playerMuteAll(mute) {
+    const t = this._transport;
+    if (!t || typeof t.playerMuteAll !== 'function') return false;
+    return await t.playerMuteAll(mute);
+  }
+
+  /** One chip, as its three voices: the firmware has no chip form. */
+  async playerMuteChip(chip, mute) {
+    const t = this._transport;
+    if (!t || typeof t.playerMuteChip !== 'function') return false;
+    return await t.playerMuteChip(chip, mute);
+  }
+
+  /** The board's mute state, one bitmask per chip, or null. */
+  async playerMuteState() {
+    const t = this._transport;
+    if (!t || typeof t.playerMuteState !== 'function') return null;
+    return await t.playerMuteState();
+  }
+
+  async _checkSidPlayer() {
+    if (!this._isSendsid || !this._transport || !this._transport.isOpen) return;
+    if (typeof this._transport.hasSidPlayer !== 'function') return;
+    let has = null;
+    try { has = await this._transport.hasSidPlayer(); } catch (_) { return; }
+    if (has === null) {
+      this._log('this firmware does not say whether it has the onboard player');
+      return;
+    }
+    if (has) return;
+    this._log('this board has no onboard SID player: SendSID has nothing to ' +
+              'play the file. Disconnected. Build the firmware with ' +
+              'ONBOARD_SIDPLAYER=1, or use one of the other modes.');
+    this._status('no onboard player on this board, disconnected');
+    try { await this._transport.disconnect(); } catch (_) {}
   }
 
   /**
@@ -541,15 +724,18 @@ export class USPlayerAdapter {
   /**
    * Is the worker wanted?
    *
-   * Off by default for now. Moving the emulation off the main thread is the
-   * right fix for a hidden page stuttering, and it is a large change to the one
-   * path that makes sound: it cannot be exercised in a headless browser, since
-   * `audioWorklet.addModule` never completes there, so it has not been proven
-   * anywhere but on a device.
+   * **On by default, provisionally, so that it gets used and judged.** Moving
+   * the emulation off the main thread is the right fix for a hidden page
+   * stuttering, and it cannot be exercised in a headless browser at all:
+   * `audioWorklet.addModule` never completes there. It was off behind a switch
+   * for exactly that reason, which meant nobody ever ran it, which meant it
+   * stayed unproven. See TODO 29.
    *
-   * Turn it on with `?worker=1`, which is remembered, and off again with
-   * `?worker=0`. When it is proven on the phone that showed the problem, this
-   * becomes the default and the switch goes.
+   * `?worker=0` turns it off and is remembered, `?worker=1` turns it back on.
+   * What to weigh while it is on: the audio should survive a backgrounded tab,
+   * and a host's register grid, piano and memory view will show a still picture,
+   * because the player they read is the page's and the one that is stepping is
+   * the worker's.
    */
   _workerWanted() {
     try {
@@ -557,8 +743,9 @@ export class USPlayerAdapter {
       if (q === '1' || q === '0') {
         localStorage.setItem('usbsid_audio_worker', q);
       }
-      return localStorage.getItem('usbsid_audio_worker') === '1';
-    } catch (_) { return false; }
+      const stored = localStorage.getItem('usbsid_audio_worker');
+      return stored === null ? true : stored === '1';
+    } catch (_) { return true; }
   }
 
   _startWorker() {
@@ -777,6 +964,33 @@ export class USPlayerAdapter {
                   `${this._audio.ctx.sampleRate} Hz, ` +
                   `${nsids} chip${nsids === 1 ? '' : 's'}, ` +
                   `${sid && sidModel(bytes) ? '8580' : '6581'}, sinc`);
+      } else if (this._isSendsid) {
+        /* The board plays it, not us. The local player above has still read
+         * the file, because the host asks for the title, the song count and
+         * the Songlengths key synchronously, but it is never started and never
+         * steps: `loadSID()` only primes the emulation, and what clocks it in
+         * the other modes is the `start()` in the branch below.
+         *
+         * `uploadSIDFile()` is the whole sequence: stop, START, the file in 62
+         * byte pieces, END, SIZE, pick the subtune, start. It counts songs from
+         * one, the same as this method's argument. */
+        if (!this._transport || !this._transport.isOpen) {
+          throw new Error('no board on the serial port to send it to');
+        }
+        const sent = await this._transport.uploadSIDFile(bytes, subtune || 1);
+        if (!sent) {
+          throw new Error(this._transport.lastError || 'the board would not take the file');
+        }
+        this._boardStart = _now();
+        this._boardPlayed = 0;
+        this._boardMs = null;
+        /* Tell the board how long this subtune runs, so it stops there rather
+         * than at its own five minute default. The lengths come from the same
+         * database the host uses, and the local player has already read the file,
+         * so this is available without asking anyone. */
+        await this._sendBoardPlaytime(subtune || 1);
+        this._log(`sent to the board: ${bytes.length} bytes, ` +
+                  `song ${subtune || 1} of ${i.songs}, playing on its own player`);
       } else {
         await this._player.start();
       }
@@ -789,6 +1003,7 @@ export class USPlayerAdapter {
                 `${nsids === 1 ? '' : 's'}, ${bytes.length} bytes`);
       if (typeof this._player.resetStats === 'function') this._player.resetStats();
       this._startReporting();
+      if (this._isSendsid) this._startBoardPoll();
 
       if (typeof callback === 'function') callback();
     } catch (e) {
@@ -798,6 +1013,16 @@ export class USPlayerAdapter {
   }
 
   play() {
+    if (this._isSendsid) {
+      if (!this._paused) return;
+      /* The board's own transport. Nothing here is playing, so there is
+       * nothing here to resume. */
+      if (this._transport && this._transport.playerStart) this._transport.playerStart();
+      this._boardStart = _now();
+      this._paused = false;
+      this._startBoardPoll();
+      return;
+    }
     if (!this._player) return;
     if (this._paused) {
       this._player.pause(false);
@@ -807,6 +1032,15 @@ export class USPlayerAdapter {
   }
 
   pause() {
+    if (this._isSendsid) {
+      if (this._paused) return;
+      if (this._transport && this._transport.playerPause) this._transport.playerPause();
+      /* Bank what has played: the clock below only measures the running part. */
+      this._boardPlayed += _now() - this._boardStart;
+      this._paused = true;
+      this._log('paused on the board');
+      return;
+    }
     if (!this._player) return;
     this._player.pause(true);
     this._paused = true;
@@ -816,6 +1050,20 @@ export class USPlayerAdapter {
 
   stop() {
     this._stopReporting();
+    if (this._isSendsid) {
+      if (this._transport && this._transport.playerStop) this._transport.playerStop();
+      this._stopBoardPoll();
+      this._boardStart = 0;
+      this._boardPlayed = 0;
+      /* Back to zero rather than holding the last reading: a stop means the
+       * transport should read 0:00, and the board's own figure freezes instead of
+       * clearing, so leaving it set would show the position it stopped at. */
+      this._boardMs = null;
+      this._paused = false;
+      this._lastStatus = '';
+      this._log('stopped on the board');
+      return;
+    }
     /* Let go of the player before stopping it, so nothing is stepped after the
      * tune has been torn down, and drop what was rendered but not yet played:
      * otherwise the last fifth of a second is heard after the stop. */
@@ -919,6 +1167,23 @@ export class USPlayerAdapter {
      * knows where the tune has got to. `_snap` is its last report, three times
      * a second, which is more than a clock showing seconds needs. */
     if (this._isAudio && this._worker && this._snap) return this._snap.playtimeMs || 0;
+    /* Nothing is emulated here in SendSID mode and the board reports no
+     * position, so the wall clock is the only answer available. It is honest
+     * about what it is: time since the file was sent, less any pause. The board
+     * plays from its own crystal, so this drifts against the tune by whatever
+     * the two clocks disagree by, which is far below what a display showing
+     * seconds can show. What it cannot know is the board finishing early. */
+    if (this._isSendsid) {
+      /* The board reports its own position now (SID_PLAYER_TIME), which is the
+       * player's real clock rather than an estimate, and unlike the wall clock it
+       * knows when the board finished early. `_boardMs` is what the poll below
+       * last read; the wall clock stays as the fallback for a board or a firmware
+       * that will not answer. */
+      if (this._boardMs != null) return this._boardMs;
+      if (this._boardStart === 0) return 0;
+      return this._paused ? this._boardPlayed
+                          : this._boardPlayed + (_now() - this._boardStart);
+    }
     if (!this._player || typeof this._player.playtimeMs !== 'function') return null;
     try { return this._player.playtimeMs(); } catch (_) { return null; }
   }
@@ -1034,6 +1299,20 @@ export class USPlayerAdapter {
    * @param {boolean} muted
    */
   setVoiceMute(chip, voice, muted) {
+    /* In SendSID mode the board is playing, not the local emulation. The local
+     * player still exists here because it read the file for the title and the
+     * song count, so muting it would succeed and change nothing audible. The
+     * board takes SID_PLAYER_MUTE, so send it there and the host's existing voice
+     * controls work on the board without the host knowing anything about it. */
+    if (this._isSendsid) {
+      const t = this._transport;
+      if (t && typeof t.playerMute === 'function') {
+        /* Not awaited: the host calls this from a click handler and does not want
+         * a USB round trip in the way. A failure is the transport's to report. */
+        t.playerMute(chip, voice, muted);
+      }
+      return;
+    }
     if (!this._player || typeof this._player.setVoiceMute !== 'function') return;
     this._player.setVoiceMute(chip, voice, muted);
     /* The worker is what is playing in audio mode, so it needs telling too. */

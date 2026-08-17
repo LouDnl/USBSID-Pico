@@ -456,6 +456,12 @@ async function doLoadSID(url, displayName, subtune, lengths) {
    * an upload, a URL, cannot be known in advance and is looked up after the
    * load without holding it up. See resolveSongLengths(). */
   setSongLengths(lengths || null);
+  /* Drop the previous tune's notes now rather than when the new ones arrive:
+   * during the fetch the name above has already changed, and notes belonging to
+   * the tune before it sitting under it read as this tune's. */
+  _stilSeq++;
+  _stilEntry = null;
+  renderStil();
   const gen = ++_loadGen;
   _loading = true;
   updatePlaytimeDisplay();
@@ -513,6 +519,9 @@ async function doLoadSID(url, displayName, subtune, lengths) {
     /* Not awaited: see resolveSongLengths(). A tune out of the library arrived
      * with its lengths already and needs nothing here. */
     if (!_songLengths) resolveSongLengths();
+    /* Unconditional, unlike the lengths: nothing arrives with its STIL notes
+     * already, and the lookup needs only the MD5 the player just computed. */
+    resolveStil();
   }, 100);
 }
 
@@ -551,9 +560,12 @@ async function playPause() {
       if (_sendsidPlaying) {
         await sendsidDev().playerPause();
         _sendsidPlaying = false;
+        /* The poll is gated on _sendsidPlaying, so it stops by itself and the
+         * clock holds where it was. */
       } else {
         await sendsidDev().playerStart();
         _sendsidPlaying = true;
+        startSendsidTimeTimer();
       }
       updateSendSIDPlayButton();
     } catch (e) { usbsidLog('sendsid playPause error:', e); }
@@ -594,6 +606,9 @@ async function stopPlay() {
       try { await sendsidDev().playerStop(); } catch (e) { usbsidLog('sendsid stop error:', e); }
     }
     _sendsidPlaying = false;
+    /* Polling stops, the last position stays on screen. The firmware freezes its
+     * own figure the same way, so the two agree. */
+    stopSendsidTimeTimer();
     updateSendSIDPlayButton();
     usbsidSetStatus('Stopped');
     return;
@@ -617,6 +632,7 @@ async function prevSubtune() {
   if (_emulator === 'sendsid') {
     if (sendsidDev()) {
       try { await sendsidDev().playerPrev(); } catch (e) { usbsidLog('sendsid prev error:', e); }
+      await sendsidSubtuneChanged(-1);
     }
     return;
   }
@@ -644,6 +660,7 @@ async function nextSubtune() {
   if (_emulator === 'sendsid') {
     if (sendsidDev()) {
       try { await sendsidDev().playerNext(); } catch (e) { usbsidLog('sendsid next error:', e); }
+      await sendsidSubtuneChanged(1);
     }
     return;
   }
@@ -667,6 +684,309 @@ async function nextSubtune() {
   }
 }
 
+/* ── Onboard player mute ───────────────────────────────────────────────────
+ *
+ * SID_PLAYER_MUTE takes a chip and a voice. Two forms work: chip 0 with voice 0
+ * for everything, and chip 1 to 4 with voice 1 to 3 for one voice.
+ *
+ * There is no working whole-chip form. set_mutestate() rejects chip 2 to 4 with
+ * voice 0, and chip 1 with voice 0 passes validation only to reach
+ * Mos6581_8580::set_voice_mute(), which requires voice 1 to 3 and returns without
+ * doing anything. So a chip is muted by sending its three voices, which is what
+ * the driver's playerMuteChip() does and what the CHIP buttons here use.
+ *
+ * The board is the authority on what is muted: SID_PLAYER_MUTED reads it back as
+ * one bitmask per chip. The buttons show that state rather than a guess, because
+ * the two can part company easily enough (a new tune, a stop, another client).
+ */
+var _muteMask = [0, 0, 0, 0];   /* per chip, bits 0..2 = voices 1..3 */
+/* Whole chips held silent, bit 0 for chip one. Separate from the voice masks
+ * because it is a different mechanism: a muted chip has its writes dropped, which
+ * is what silences a tune playing samples through the volume register. Muting all
+ * three voices does not, because voice mute never touches $18. */
+var _muteChipMask = 0;
+var _muteChips = 1;             /* how many chip rows to offer */
+var _muteSockets = { one: 0, two: 0 };  /* chips per socket, for the row labels */
+var _muteFmopl = 0;             /* the slot the FM/OPL sits on, 0 for none */
+
+function onboardMuteSupported() {
+  const dev = sendsidDev();
+  return !!(dev && typeof dev.playerMute === 'function');
+}
+
+/**
+ * Ask the board how many SIDs it has, then build the rows.
+ *
+ * Two is the fallback, not a guess at the hardware: it is the common case and a
+ * row too few is better than four rows of buttons that address nothing. The
+ * count only matters for how many rows to draw, so a failed read costs nothing.
+ */
+/**
+ * Build the grid without asking the board anything.
+ *
+ * The socket configuration, the SID count and the FM/OPL slot would say exactly
+ * how many chips there are, and reading them at connect turned out to be a way to
+ * wedge the whole tool: a config read that never answers cannot be cancelled, and
+ * because reads are serialised it stops everything behind it. Connecting and
+ * playing must not depend on a convenience.
+ *
+ * So four rows by default, which is every chip the firmware can address, and the
+ * real layout is available on demand from the REFRESH button (see
+ * refreshOnboardLayout). Muting a chip that is not fitted does nothing, which is a
+ * far better failure than a tool that will not connect.
+ */
+function initOnboardMuteGridDefault() {
+  _muteChips = 4;
+  _muteSockets = { one: 0, two: 0 };
+  _muteFmopl = 0;
+  buildOnboardMuteGrid();
+}
+
+/** Ask the board what is actually fitted. On demand, never on the connect path. */
+async function refreshOnboardLayout() {
+  const dev = usbsidDevice;
+  if (!dev || !dev.isOpen) return;
+  let one = 0, two = 0, num = 0, fmopl = 0;
+  try {
+    if (typeof dev.readSocketConfig === 'function') {
+      const sc = await dev.readSocketConfig();
+      if (sc) { one = sc.one; two = sc.two; }
+    }
+    if (typeof dev.readNumSIDs === 'function') num = await dev.readNumSIDs();
+    if (typeof dev.readFMOplSID === 'function') fmopl = await dev.readFMOplSID();
+  } catch (e) {
+    usbsidLog('Could not read the socket configuration:', e && e.message ? e.message : e);
+  }
+
+  /* The sockets are the truth about what is fitted, and they say which chip is
+   * where: socket one's chips are numbered first, then socket two's, which is the
+   * order the player's chip 1 to 4 follow. numsids counts the slots and includes
+   * the FM/OPL one, so it is not the number of chips that have voices. */
+  _muteSockets = { one, two };
+  _muteFmopl = fmopl;
+  const fromSockets = one + two;
+  if (fromSockets >= 1 && fromSockets <= 4) {
+    _muteChips = fromSockets;
+  } else if (num >= 1 && num <= 4) {
+    /* No socket answer: fall back to the slot count, minus the FM/OPL slot when
+     * the board named one, since an OPL has no SID voices to mute. */
+    _muteChips = Math.max(1, num - (fmopl >= 1 && fmopl <= num ? 1 : 0));
+    usbsidLog('Socket configuration unavailable, using numsids:', num,
+              fmopl ? '(FM/OPL on slot ' + fmopl + ')' : '');
+  } else {
+    usbsidLog('The board reported neither a socket configuration nor a SID count,'
+              + ' showing one chip');
+    _muteChips = 1;
+  }
+  usbsidLog('Onboard mute: socket one', one, 'socket two', two,
+            '| numsids', num, '| FM/OPL slot', fmopl || 'none',
+            '=> ' + _muteChips + ' chip' + (_muteChips === 1 ? '' : 's'));
+  buildOnboardMuteGrid();
+}
+
+/** Build the per chip rows. Cheap, so it just rebuilds rather than diffing. */
+function buildOnboardMuteGrid() {
+  const grid = document.getElementById('sendsid-mute-grid');
+  if (!grid) return;
+  grid.textContent = '';
+  for (let chip = 1; chip <= _muteChips; chip++) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:4px;margin-top:3px;flex-wrap:wrap';
+    const label = document.createElement('button');
+    label.className = 'c64-btn c64-btn-sm';
+    /* Which socket this chip is in. Socket one's chips are numbered first, so a
+     * board with two in socket one and one in socket two reads 1 and 2 in socket
+     * one and 3 in socket two, which is what the player's chip numbers mean. */
+    const socket = (chip <= _muteSockets.one) ? 1
+                 : (_muteSockets.one + _muteSockets.two >= chip) ? 2 : 0;
+    label.textContent = 'CHIP ' + chip;
+    label.title = 'Mute or unmute all three voices of chip ' + chip
+                + (socket ? ' (socket ' + socket + ')' : '');
+    label.addEventListener('click', async () => {
+      /* The chip mask only, never the voice bits.
+       *
+       * Chip mute and voice mute are separate mechanisms and a chip can be held
+       * while its voices carry their own state underneath. Testing both made this
+       * button sticky: after a mute-all the voice bits stay set, so it read as
+       * muted for ever and every click sent another unmute. */
+      const muted = (_muteChipMask & (1 << (chip - 1))) !== 0;
+      await onboardMuteChip(chip, !muted);
+    });
+    row.appendChild(label);
+    for (let voice = 1; voice <= 3; voice++) {
+      const b = document.createElement('button');
+      b.className = 'c64-btn c64-btn-sm';
+      b.dataset.chip = chip;
+      b.dataset.voice = voice;
+      b.textContent = 'V' + voice;
+      b.title = 'Voice ' + voice + ' of chip ' + chip;
+      b.addEventListener('click', async () => {
+        const bit = 1 << (voice - 1);
+        await onboardMuteVoice(chip, voice, (_muteMask[chip - 1] & bit) === 0);
+      });
+      row.appendChild(b);
+    }
+    if (socket) {
+      const tag = document.createElement('span');
+      tag.className = 'np-stil-key';
+      tag.textContent = 'socket ' + socket;
+      row.appendChild(tag);
+    }
+    grid.appendChild(row);
+  }
+  renderOnboardMute();
+}
+
+/** Paint the buttons from `_muteMask`. */
+function renderOnboardMute() {
+  const grid = document.getElementById('sendsid-mute-grid');
+  if (!grid) return;
+  for (const b of grid.querySelectorAll('button[data-voice]')) {
+    const chip = Number(b.dataset.chip);
+    const voice = Number(b.dataset.voice);
+    const muted = (_muteChipMask & (1 << (chip - 1))) !== 0 ||
+                  (_muteMask[chip - 1] & (1 << (voice - 1))) !== 0;
+    b.classList.toggle('c64-btn-stop', muted);
+    b.setAttribute('aria-pressed', muted ? 'true' : 'false');
+  }
+  const all = document.getElementById('btn-player-mute-all');
+  if (all) {
+    /* Everything is muted when every chip in use is held. The voice masks are not
+     * part of this for the same reason the chip buttons do not use them. */
+    const chipBits = (1 << _muteChips) - 1;
+    const everything = (_muteChipMask & chipBits) === chipBits;
+    all.classList.toggle('c64-btn-stop', everything);
+    all.textContent = everything ? 'UNMUTE ALL' : 'ALL';
+  }
+}
+
+async function onboardMuteVoice(chip, voice, mute) {
+  if (!onboardMuteSupported()) return;
+  try {
+    await sendsidDev().playerMute(chip, voice, mute);
+    const bit = 1 << (voice - 1);
+    _muteMask[chip - 1] = mute ? (_muteMask[chip - 1] | bit)
+                               : (_muteMask[chip - 1] & ~bit);
+    renderOnboardMute();
+  } catch (e) {
+    usbsidLog('Onboard mute failed:', e && e.message ? e.message : e);
+  }
+}
+
+async function onboardMuteChip(chip, mute) {
+  if (!onboardMuteSupported()) return;
+  try {
+    /* One command: chip with voice 0 reaches usplayer_set_chip_mute(), which
+     * drops the chip's writes and so silences the volume register too. Muting the
+     * three voices, which is what this used to do, leaves a digi playing. */
+    await sendsidDev().playerMuteChip(chip, mute);
+    /* The chip mask is what changed, not the voice masks: a chip mute leaves the
+     * tune's own voice mutes alone underneath it, and unmuting the chip puts
+     * whatever they were back. */
+    _muteChipMask = mute ? (_muteChipMask | (1 << (chip - 1)))
+                         : (_muteChipMask & ~(1 << (chip - 1)));
+    renderOnboardMute();
+  } catch (e) {
+    usbsidLog('Onboard chip mute failed:', e && e.message ? e.message : e);
+  }
+}
+
+/**
+ * Silence everything, including whatever is going through the volume register.
+ *
+ * Both commands, on purpose. The player's voice mute writes each voice's
+ * sustain/release and control registers and never touches $18, so a tune playing
+ * samples through the volume register stays audible with all three voices muted.
+ * The board's own MUTE zeroes the volume nibble of $d418 on every chip and
+ * remembers what was there, which covers the digi; the voice mute keeps the per
+ * voice buttons showing the truth.
+ */
+async function onboardMuteAll(mute) {
+  if (!onboardMuteSupported()) return;
+  const dev = sendsidDev();
+  try {
+    await dev.playerMuteAll(mute);
+    if (typeof dev.muteAll === 'function') {
+      await (mute ? dev.muteAll() : dev.unmuteAll());
+    }
+    _muteMask = [0, 1, 2, 3].map(() => (mute ? 0x07 : 0x00));
+    _muteChipMask = mute ? 0x0f : 0x00;
+    renderOnboardMute();
+  } catch (e) {
+    usbsidLog('Onboard mute all failed:', e && e.message ? e.message : e);
+  }
+}
+
+/** Read the board's own view and show that. */
+async function refreshOnboardMute() {
+  const dev = sendsidDev();
+  if (!dev || typeof dev.playerMuteState !== 'function') return;
+  try {
+    const st = await dev.playerMuteState();
+    if (!st) return;
+    _muteMask = st.voices;
+    _muteChipMask = st.chips;
+    renderOnboardMute();
+    usbsidLog('Onboard mute state: chips',
+              (st.chips & 0x0f).toString(2).padStart(4, '0'), '| voices',
+              st.voices.map(m => (m & 7).toString(2).padStart(3, '0')).join(' '));
+  } catch (e) {
+    usbsidLog('Could not read onboard mute state:', e && e.message ? e.message : e);
+  }
+}
+
+/**
+ * Songs and start song out of a SID file's own header.
+ *
+ * Needed only on the SendSID path. The emulated path asks the player, which has
+ * parsed the file properly, but on the board path the page never loads the file
+ * into anything and so used to leave `_maxSubtunes` at whatever the previous tune
+ * had set: the transport read "Tune 1/1" over a six subtune tune, and with
+ * lengths now switched on it would also have taken the wrong subtune's length.
+ *
+ * Both fields are big endian 16 bit at fixed offsets, PSID and RSID alike, and
+ * `startSong` counts from one. See SID_file_format.txt in HVSC's DOCUMENTS.
+ */
+function sidHeaderSongs(bytes) {
+  if (!bytes || bytes.length < 0x16) return null;
+  const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+  if (magic !== 'PSID' && magic !== 'RSID') return null;
+  const songs = (bytes[0x0e] << 8) | bytes[0x0f];
+  const start = (bytes[0x10] << 8) | bytes[0x11];
+  if (songs < 1 || songs > 256) return null;
+  return { songs, start: (start >= 1 && start <= songs) ? start : 1 };
+}
+
+/**
+ * The board has moved to another subtune, so follow it.
+ *
+ * These branches used to return before touching `_currentSubtune`, which was
+ * harmless while the page could not show a position at all. It is not harmless
+ * now: the length shown, and the point at which a subtune is treated as
+ * finished, both come from `_currentSubtune`, and every subtune has its own
+ * length. The board also keeps the previous subtune's maximum playtime until it
+ * is told otherwise, so the new one has to be sent.
+ */
+async function sendsidSubtuneChanged(delta) {
+  const next = _currentSubtune + delta;
+  if (next < 1 || next > _maxSubtunes) return;
+  _currentSubtune = next;
+  updateSubtuneDisplay();
+  _sendsidTimeMs = 0;
+  _endArmed = false;
+  _advancedAt = -1;
+  _sendsidLastMs = -1;
+  _sendsidSame = 0;
+  const dev = sendsidDev();
+  const lenMs = _songLengths ? currentSongLengthMs() : 0;
+  if (dev && lenMs && typeof dev.playerSetPlaytime === 'function') {
+    try { await dev.playerSetPlaytime(lenMs); } catch (e) {
+      usbsidLog('Could not set onboard playtime:', e && e.message ? e.message : e);
+    }
+  }
+  updatePlaytimeDisplay();
+}
+
 /* Navigating the library is the browser's job now.
  *
  * It walks what is on screen: the open directory, or the search results when
@@ -679,6 +999,10 @@ async function nextSID() { await SidBrowser.next(); }
 function updateSubtuneDisplay() {
   const el = document.getElementById('subtune-display');
   if (el) el.textContent = 'Tune ' + _currentSubtune + '/' + _maxSubtunes;
+  /* STIL keeps per subtune titles and artists, so the panel follows the subtune.
+   * Nothing is refetched: the entry is already held, only the part of it that is
+   * shown changes. */
+  renderStil();
 }
 
 /* Now playing: the file, the tune and the clock.
@@ -758,13 +1082,22 @@ function hex16(v) {
  * subtune move on by itself instead of looping for ever.
  * ------------------------------------------------------------------------ */
 
-/* SendSID is written but switched off.
+/* SendSID reports its position now, so this is on.
  *
- * The tune plays on the board there and the page is not emulating it, so the
- * page cannot know where it has got to and cannot tell when a subtune has
- * ended. Everything below is ready for it; this stays false until the firmware
- * can report its position, which is the board side of the same feature. */
-const SENDSID_SONGLENGTHS = false;
+ * The tune plays on the board and the page is not emulating it, so the page used
+ * to have no idea where it had got to. The firmware answers SID_PLAYER_TIME with
+ * the player's position, and takes UPLOAD_SID_PLAYTIME so it stops at the tune's
+ * real length instead of its own five minute default. Between them the transport
+ * can show `0:07 / 3:24` on the board as well, and a finished subtune moves on. */
+const SENDSID_SONGLENGTHS = true;
+
+/* The board's position, in milliseconds, from the last poll. Null when it has
+ * not been asked yet.
+ *
+ * Polled rather than computed: reading it is a USB round trip, so it happens on
+ * its own slower timer while the display keeps repainting from this value. */
+var _sendsidTimeMs = null;
+var _sendsidTimer = null;
 
 var _songLengths   = null;   /* [ms per song], or null when unknown */
 var _lengthSeq     = 0;      /* guards a late answer for a tune we have left */
@@ -812,6 +1145,171 @@ function currentSongLengthMs() {
    * falls back to the last time rather than to nothing. */
   const i = Math.min(_songLengths.length, Math.max(1, _currentSubtune)) - 1;
   return _songLengths[i] || DEFAULT_SONG_MS;
+}
+
+/* How far before a whole-second length to move on. See songEndAtMs(). */
+const END_MARGIN_MS = 350;
+
+/**
+ * When to move on, which is not the same as the length that gets displayed.
+ *
+ * `Songlengths.faq` gives the format as `mm:ss[.SSS]` with the milliseconds
+ * **optional**, and in the database shipped here four out of five entries have
+ * none:
+ *
+ *     with milliseconds  16960
+ *     whole seconds      70114
+ *
+ * A whole-second figure is therefore only accurate to the second, and a SID tune
+ * has no end of its own: the play routine loops. So playing all the way to a
+ * whole-second length means playing past where the tune actually restarted, and
+ * what you hear is a second of the tune beginning again before the player moves
+ * on. That was reported as "plays one second too long", and a 2:26 tune audibly
+ * restarting at 2:25 is exactly this.
+ *
+ * Stopping a little short instead. A clipped final fraction of a second is far
+ * less noticeable than a restart, and entries that do carry milliseconds are
+ * precise, so those are left exactly alone.
+ *
+ * The five minute fallback for a tune with no entry is not a measurement at all,
+ * so it keeps its full value.
+ */
+function songEndAtMs() {
+  const total = currentSongLengthMs();
+  if (!_songLengths || !total) return total;
+  return (total % 1000 === 0) ? Math.max(0, total - END_MARGIN_MS) : total;
+}
+
+/* ── STIL ──────────────────────────────────────────────────────────────────
+ *
+ * HVSC's SID Tune Information List: what a tune is a cover of, who wrote the
+ * original, why a subtune sounds the way it does. `SID/stil.bb` turns
+ * DOCUMENTS/STIL.txt into JSON keyed by MD5 and splits it across 256 files named
+ * by the first two hex characters of that key.
+ *
+ * Keyed by MD5 rather than by path because the page never knows a tune's HVSC
+ * path: the served library has its own layout and an opened file has none. The
+ * MD5 the player already computes for song lengths is the one thing available
+ * for both, so a served tune and a file out of the user's own HVSC copy look up
+ * identically.
+ *
+ * Split into buckets because the whole database is 3.7 MB and no page should
+ * download that to show one tune's credits. The bucket name comes out of the
+ * key, so there is no index to fetch first: one request of about 15 kB, which
+ * the browser then caches for every other tune whose hash starts the same way.
+ */
+const STIL_PATH = SID_PATH + 'stil/';
+const STIL_BUCKET_CHARS = 2;
+
+var _stilBuckets = {};   /* prefix -> promise of the parsed bucket */
+var _stilEntry   = null; /* the current tune's entry, or null */
+var _stilSeq     = 0;    /* guards a late answer for a tune we have left */
+
+/** One bucket, fetched at most once. */
+function stilBucket(prefix) {
+  if (_stilBuckets[prefix]) return _stilBuckets[prefix];
+  _stilBuckets[prefix] = (async () => {
+    try {
+      const resp = await fetch(STIL_PATH + prefix + '.json');
+      /* Every prefix has a file, empty ones included, so anything but a 200 is
+       * a deploy without the STIL data rather than a tune without an entry. */
+      if (!resp.ok) return {};
+      return await resp.json();
+    } catch (e) {
+      usbsidLog('STIL bucket', prefix, 'unavailable:', e && e.message ? e.message : e);
+      return {};
+    }
+  })();
+  return _stilBuckets[prefix];
+}
+
+/**
+ * Look up the tune that has just loaded, and show what STIL says about it.
+ *
+ * Not awaited by the load path, exactly like resolveSongLengths(): a tune starts
+ * playing at once and the notes appear when they appear.
+ */
+function resolveStil() {
+  const p = _player;
+  const seq = ++_stilSeq;
+  _stilEntry = null;
+  renderStil();
+  if (!p || typeof p.md5 !== 'function') return;
+  const key = p.md5();
+  if (!key || key.length < STIL_BUCKET_CHARS) return;
+  stilBucket(key.slice(0, STIL_BUCKET_CHARS)).then((bucket) => {
+    /* Another tune was chosen while the bucket was on its way. */
+    if (seq !== _stilSeq) return;
+    _stilEntry = bucket[key] || null;
+    renderStil();
+  });
+}
+
+/**
+ * Draw the current entry, for the subtune being played.
+ *
+ * Called on every subtune change as well as on load, because STIL keeps per
+ * subtune titles and artists and the interesting one is the one you are hearing.
+ * No refetch is involved: the entry is already in hand, only the section of it
+ * that is shown changes.
+ */
+function renderStil() {
+  const box = document.getElementById('np-stil');
+  const body = document.getElementById('np-stil-body');
+  const pathEl = document.getElementById('np-stil-path');
+  if (!box || !body || !pathEl) return;
+
+  const e = _stilEntry;
+  if (!e) { box.style.display = 'none'; body.textContent = ''; return; }
+
+  pathEl.textContent = e.p || '';
+  body.textContent = '';
+
+  /* textContent throughout, never innerHTML: these strings are HVSC prose and
+   * contain angle brackets and ampersands as a matter of course ("<?>" is how
+   * STIL writes an unknown artist). */
+  const row = (into, label, value, cls) => {
+    if (!value) return;
+    const d = document.createElement('div');
+    d.className = 'np-stil-row';
+    const k = document.createElement('span');
+    k.className = 'np-stil-key';
+    k.textContent = label;
+    const v = document.createElement('span');
+    v.className = 'np-stil-val' + (cls ? ' ' + cls : '');
+    v.textContent = value;
+    d.appendChild(k);
+    d.appendChild(v);
+    into.appendChild(d);
+  };
+
+  const fields = (into, o) => {
+    row(into, 'Title', o.t, 'np-stil-title');
+    row(into, 'Artist', o.a);
+    row(into, 'Name', o.n);
+    row(into, 'Author', o.u);
+    row(into, 'Note', o.c);
+  };
+
+  /* File level first: fields written above any (#n) apply to the whole tune. */
+  fields(body, e);
+
+  /* Then this subtune's own, when it has any. Keyed by subtune number as a
+   * string, and STIL only lists the subtunes it has something to say about, so a
+   * miss here is ordinary rather than a problem. */
+  const sub = e.s && e.s[String(_currentSubtune)];
+  if (sub) {
+    const wrap = document.createElement('div');
+    wrap.className = 'np-stil-sub';
+    const head = document.createElement('div');
+    head.className = 'np-stil-subhead';
+    head.textContent = 'Tune ' + _currentSubtune;
+    wrap.appendChild(head);
+    fields(wrap, sub);
+    body.appendChild(wrap);
+  }
+
+  box.style.display = body.childNodes.length ? '' : 'none';
 }
 
 /**
@@ -889,9 +1387,19 @@ function songEnded() {
   if (_currentSubtune < _maxSubtunes) {
     usbsidLog('End of song', _currentSubtune + ', next subtune');
     nextSubtune();
-  } else {
+  } else if (SidBrowser.canStep()) {
     usbsidLog('End of tune, next in the list');
     nextSID();
+  } else {
+    /* Nowhere to go: the browser has no list, which is the case for a tune
+     * opened straight from a file or a URL. Stop, rather than leave it running.
+     *
+     * SidBrowser.next() returns silently when there is nothing to step through,
+     * and the guard above has already been consumed by the time it does, so
+     * nothing ever asked again: the tune played on indefinitely with the clock
+     * reading 5:24 against a length of 0:41. */
+    usbsidLog('End of tune, and no list to continue into: stopping');
+    stopPlay();
   }
 }
 
@@ -924,11 +1432,24 @@ function updatePlaytimeDisplay() {
   const el = document.getElementById('np-time');
   if (!el) return;
   const total = currentSongLengthMs();
-  if (_emulator === 'sendsid' && !SENDSID_SONGLENGTHS) {
-    /* The board is playing it, so the page has no position to show. The length
-     * is still worth showing when it is known: it says how long this will run. */
-    el.textContent = '\u2014:\u2014\u2014' + (total ? ' / ' + formatTime(total) : '');
-    el.title = 'The onboard player does not report its position yet';
+  if (_emulator === 'sendsid') {
+    /* The board is playing it, so the position comes from the board. Until the
+     * first poll answers there is nothing to show but the length. */
+    const ms = SENDSID_SONGLENGTHS ? _sendsidTimeMs : null;
+    setTimeText(el, (ms == null ? '\u2014:\u2014\u2014' : formatTime(ms))
+                    + (total ? ' / ' + formatTime(total) : ''));
+    el.title = SENDSID_SONGLENGTHS
+      ? 'Position read from the onboard player'
+      : 'The onboard player does not report its position yet';
+    if (!SENDSID_SONGLENGTHS) return;
+
+    /* Same two step guard as the emulated path: a subtune only counts as ended
+     * once it has been seen running before its end. */
+    const endAt = songEndAtMs();
+    if (endAt && ms != null && ms < endAt) _endArmed = true;
+    if (_endArmed && endAt && ms != null && ms >= endAt && _sendsidPlaying) {
+      songEnded();
+    }
     return;
   }
   /* While a tune is on its way, the emulation still holds the previous one and
@@ -936,37 +1457,158 @@ function updatePlaytimeDisplay() {
    * the old tune's position, which is what someone who has just clicked expects
    * to see, and do not test for the end of a song we are not playing yet. */
   if (_loading) {
-    el.textContent = formatTime(0) + (total ? ' / ' + formatTime(total) : '');
+    setTimeText(el, formatTime(0) + (total ? ' / ' + formatTime(total) : ''));
     el.title = '';
     return;
   }
 
   const p = _player;
   const ms = (p && typeof p.playtimeMs === 'function') ? p.playtimeMs() : null;
-  el.textContent = formatTime(ms) + (total ? ' / ' + formatTime(total) : '');
+  /* The listed length is what gets shown, so the display still agrees with
+   * HVSC even though songEndAtMs() may move on slightly earlier. */
+  setTimeText(el, formatTime(ms) + (total ? ' / ' + formatTime(total) : ''));
   el.title = _songLengths
     ? ''
     : 'Not in songlengths.md5, so playing the default ' +
       formatTime(DEFAULT_SONG_MS);
 
+  const endAt = songEndAtMs();
+
   /* The end of a song only counts once this song has been seen playing before
    * its end. A position inherited from the tune before it can be past the new
    * tune's length on the very first reading, and acting on that skips tunes. */
-  if (total && ms != null && ms < total) _endArmed = true;
+  if (endAt && ms != null && ms < endAt) _endArmed = true;
 
   /* A finished subtune moves on by itself. Only while actually playing: a
    * paused or stopped tune sitting past its end must stay where it is. */
-  if (_endArmed && total && ms != null && ms >= total &&
+  if (_endArmed && endAt && ms != null && ms >= endAt &&
       p && !p.stopped && !p.paused) {
     songEnded();
   }
 }
 
+/* Write the clock only when it reads differently.
+ *
+ * The tick runs at 100 ms so the end of a song is caught within a tenth of a
+ * second rather than within half of one, which matters now that it stops just
+ * short of the loop. Ten times the polling would have been ten times the DOM
+ * writes, hence this: the text changes at most once a second, so nine ticks in
+ * ten now touch nothing at all and this is cheaper than the old 500 ms tick was.
+ */
+var _lastTimeText = null;
+
+function setTimeText(el, text) {
+  if (text !== _lastTimeText) {
+    _lastTimeText = text;
+    el.textContent = text;
+  }
+}
+
+/* Ask the board where it has got to.
+ *
+ * On its own timer and not from updatePlaytimeDisplay(), which runs ten times a
+ * second: each of these is a USB write followed by a read with a timeout, and the
+ * recovery path for a timed out read closes and reopens the device. Twice a
+ * second is plenty for a display that only shows whole seconds.
+ *
+ * Reentrancy matters here. A slow or lost answer must not let a second request
+ * overlap the first, because the driver reads whatever packet arrives next and
+ * two outstanding reads can take each other's replies.
+ */
+var _sendsidPolling = false;
+var _sendsidPollFails = 0;
+/* The last position read, and how many times in a row it has come back the same.
+ *
+ * The board stops itself at the maximum playtime, and get_playtime() only samples
+ * the player while it is running, so the figure freezes at whatever the last live
+ * sample was. A reading that does not move is therefore the board saying it has
+ * finished, and it is the only reliable signal: the frozen value lands anywhere in
+ * the last poll interval, so it can easily be below any threshold we would test
+ * against, and once it is the tune never advances. */
+var _sendsidLastMs = -1;
+var _sendsidSame = 0;
+
+/* Give up after this many unanswered reads.
+ *
+ * Not just noise control. A timed out read leaves a transferIn pending that a
+ * late reply can satisfy instead of the *next* read, and this driver recovers
+ * from a timeout by closing and reopening the device. Asking twice a second
+ * through that is worse than not asking: the clock simply stops updating, which
+ * is the honest outcome when the board will not answer. */
+const SENDSID_POLL_GIVEUP = 5;
+
+async function pollSendsidTime() {
+  if (_sendsidPolling) return;
+  if (_emulator !== 'sendsid' || !SENDSID_SONGLENGTHS) return;
+  if (_sendsidPollFails >= SENDSID_POLL_GIVEUP) return;
+  const dev = sendsidDev();
+  if (!dev || typeof dev.playerTime !== 'function') return;
+  if (!_sendsidPlaying) return;
+  _sendsidPolling = true;
+  try {
+    const ms = await dev.playerTime();
+    if (ms == null) {
+      if (++_sendsidPollFails >= SENDSID_POLL_GIVEUP) {
+        usbsidLog('Onboard player is not reporting its position, stopped asking');
+      }
+    } else {
+      _sendsidPollFails = 0;
+      /* Once, so it is visible that readings are arriving and what they look
+       * like. Everything after this is just the clock ticking. */
+      if (_sendsidTimeMs === 0 && ms > 0) {
+        usbsidLog('Onboard player position:', formatTime(ms), '(' + ms + ' ms)');
+      }
+      _sendsidTimeMs = ms;
+
+      if (ms === _sendsidLastMs) {
+        _sendsidSame++;
+        /* Twice, not once: one repeat could be a poll that landed inside the same
+         * millisecond, though at half a second apart it should not. Only once the
+         * tune has been seen running, so a tune that has not started yet cannot
+         * look finished. */
+        if (_sendsidSame >= 2 && ms > 0 && _endArmed && _sendsidPlaying) {
+          usbsidLog('Onboard player finished at', formatTime(ms));
+          _sendsidSame = 0;
+          songEnded();
+        }
+      } else {
+        _sendsidSame = 0;
+        _sendsidLastMs = ms;
+      }
+    }
+  } catch (e) {
+    if (++_sendsidPollFails >= SENDSID_POLL_GIVEUP) {
+      usbsidLog('Onboard player time unavailable:', e && e.message ? e.message : e);
+    }
+  } finally {
+    _sendsidPolling = false;
+  }
+}
+
+function startSendsidTimeTimer() {
+  if (_sendsidTimer) return;
+  _sendsidTimer = setInterval(pollSendsidTime, 500);
+}
+
+/* The board may already be playing when this is reached: an upload starts the
+ * timer, but a mode switch or a reconnect does not, and the poll is gated on
+ * _sendsidPlaying anyway so a spare timer costs one comparison. */
+function ensureSendsidTimeTimer() {
+  if (_emulator === 'sendsid' && SENDSID_SONGLENGTHS) startSendsidTimeTimer();
+}
+
+function stopSendsidTimeTimer() {
+  if (_sendsidTimer) { clearInterval(_sendsidTimer); _sendsidTimer = null; }
+}
+
 function startPlaytimeTimer() {
   if (_playtimeTimer) return;
-  /* Twice a second. The figure only has second resolution on screen, and a
-   * 60 Hz repaint of two text nodes is work a phone should not be doing. */
-  _playtimeTimer = setInterval(updatePlaytimeDisplay, 500);
+  /* Ten times a second, but see setTimeText(): the DOM is only written when the
+   * clock reads differently, so nine of those ten ticks do nothing but compare
+   * two strings. The rate is set by the end-of-song test rather than by the
+   * display, because the advance now lands deliberately close to the tune's own
+   * loop point and half a second of slop there is audible. */
+  _playtimeTimer = setInterval(updatePlaytimeDisplay, 100);
 }
 
 function updatePlayButton(p) {
@@ -1189,7 +1831,20 @@ function updatePlayerSideButtons() {
   const sendsidBtns = document.getElementById('sendsid-player-btns');
   if (webusbBtns)  webusbBtns.style.display  = (_emulator === 'webusb')  ? 'flex' : 'none';
   if (asidBtns)    asidBtns.style.display    = (_emulator === 'asid')   ? 'flex' : 'none';
-  if (sendsidBtns) sendsidBtns.style.display = (_emulator === 'sendsid' && usbsidDevice.isOpen && _hasSIDPlayer) ? 'flex' : 'none';
+  const shown = (_emulator === 'sendsid' && usbsidDevice.isOpen && _hasSIDPlayer);
+  if (shown) ensureSendsidTimeTimer();
+  if (sendsidBtns) sendsidBtns.style.display = shown ? 'flex' : 'none';
+  /* The mute grid rides with them, but only when the transport in use can carry
+   * the command: the serial route to the onboard player has no playerMute(). */
+  const muteBtns = document.getElementById('sendsid-mute-btns');
+  if (muteBtns) {
+    const usable = shown && onboardMuteSupported();
+    muteBtns.style.display = usable ? 'block' : 'none';
+    if (usable && !muteBtns.dataset.built) {
+      muteBtns.dataset.built = '1';
+      initOnboardMuteGridDefault();
+    }
+  }
 }
 
 /* Emulator switching */
@@ -2156,6 +2811,14 @@ async function uploadCurrentSID() {
     usbsidSetStatus('Incompatible: SendSID requires Pico 2 firmware', 'red'); return;
   }
   if (!_loadedBytes) { usbsidSetStatus('No SID file loaded', 'yellow'); return; }
+  /* The board path never hands the file to a player, so the header is the only
+   * thing that knows how many subtunes there are and which one is the default. */
+  const hdr = sidHeaderSongs(_loadedBytes);
+  if (hdr) {
+    _maxSubtunes = hdr.songs;
+    if (_currentSubtune < 1 || _currentSubtune > hdr.songs) _currentSubtune = hdr.start;
+    updateSubtuneDisplay();
+  }
   const statusEl = document.getElementById('sid-upload-status');
   const btn      = document.getElementById('btn-upload-sid');
   if (btn) btn.disabled = true;
@@ -2167,12 +2830,24 @@ async function uploadCurrentSID() {
     if (forceTwo && forceTwo.checked) {
       await sendsidDev().playerSocketTwo();
     }
+    /* The length goes into the upload rather than after it. Sent afterwards the
+     * tune is already running against the board's five minute default, and the
+     * UART showed exactly that: SID_PLAYER_START, then UPLOAD_SID_PLAYTIME. */
+    const lenMs = _songLengths ? currentSongLengthMs() : 0;
     await sendsidDev().uploadSIDFile(_loadedBytes, _currentSubtune, 0x01, (sent, total) => {
       if (statusEl) statusEl.textContent = Math.round(sent / total * 100) + '%';
-    });
+    }, lenMs);
+    if (lenMs) usbsidLog('Onboard player: max playtime', formatTime(lenMs));
     if (statusEl) statusEl.textContent = 'Done';
     usbsidSetStatus('SID uploaded and playing on device', 'green');
+    _sendsidTimeMs = 0;
+    _endArmed = false;
+    _advancedAt = -1;
+    _sendsidLastMs = -1;
+    _sendsidSame = 0;
+    _sendsidPollFails = 0;   /* a new tune is a fresh chance to be answered */
     _sendsidPlaying = true;
+    startSendsidTimeTimer();
     updateSendSIDPlayButton();
     setPlayerButtons(true);
     usbsidLog('Onboard player: upload complete, playing subtune', _currentSubtune);
@@ -2196,6 +2871,18 @@ function initTransportButtons() {
     'btn-next-sid':  () => nextSID(),
     /* Onboard player upload */
     'btn-upload-sid': async () => { await uploadCurrentSID(); },
+    /* Onboard player mute. The ALL button clears when everything is already
+     * muted, so one control both mutes and restores. */
+    'btn-player-mute-all': async () => {
+      /* Same test the button paints itself with, so pressing it always does the
+       * opposite of what it shows. */
+      const chipBits = (1 << _muteChips) - 1;
+      await onboardMuteAll((_muteChipMask & chipBits) !== chipBits);
+    },
+    'btn-player-mute-refresh': async () => {
+      await refreshOnboardLayout();
+      await refreshOnboardMute();
+    },
     /* WebUSB player-area buttons.
      *
      * The old TOGGLE AUDIO button was here and is gone: the transport row's
