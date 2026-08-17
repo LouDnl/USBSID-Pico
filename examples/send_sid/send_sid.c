@@ -53,18 +53,24 @@ static int ep_in_addr  = 0x82;
 static int len, rc, actual_length, transferred;
 static int usid_dev = -1;
 
+int tune_no = 1;
+const char * songlengths_path = NULL;
+extern uint32_t find_songlenth_db(bool is_sid, int tune_no, const char * filename, const char * songlengths_path);
+
+
 enum {
   /* Command bytes */
   PACKET_TYPE      = 0xC0,  /* 0b11000000 ~ 192  */
   CONFIG           = 0x12,  /*    0b10010 ~ 0x12 */
 
-  /* Internal SID player */
-  UPLOAD_SID_START = 0xD0,  /* Start command for USBSID to go into receiving mode */
-  UPLOAD_SID_DATA  = 0xD1,  /* Init byte for each packet containing data */
-  UPLOAD_SID_END   = 0xD2,  /* End command for USBSID to exit receiving mode */
-  UPLOAD_SID_SIZE  = 0xD3,  /* Packet containing the actual file size */
+  /* Internal SID player upload */
+  UPLOAD_SID_START    = 0xD0,  /* Start command for USBSID to go into receiving mode */
+  UPLOAD_SID_DATA     = 0xD1,  /* Init byte for each packet containing data */
+  UPLOAD_SID_END      = 0xD2,  /* End command for USBSID to exit receiving mode */
+  UPLOAD_SID_SIZE     = 0xD3,  /* Packet containing the actual file size */
+  UPLOAD_SID_PLAYTIME = 0xD4,  /* Provide max playtime for current tune, will run 5 minutes otherwise */
 
-  /* Internal SID player */
+  /* Internal SID player control */
   SID_PLAYER_LOAD  = 0xE0,  /* Load SID file into SID player memory and initialize internal SID player */
   SID_PLAYER_START = 0xE1,  /* Start SID file play */
   SID_PLAYER_STOP  = 0xE2,  /* Stop SID file play */
@@ -72,6 +78,10 @@ enum {
   SID_PLAYER_NEXT  = 0xE4,  /* Next SID subtune play */
   SID_PLAYER_PREV  = 0xE5,  /* Previous SID subtune play */
   SID_PLAYER_TWO   = 0xE6,  /* Force play to play on socket two or sid two */
+
+  SID_PLAYER_MUTE  = 0xE9,  /* Full mute, mute a voice or just one chip/SID */
+  SID_PLAYER_MUTED = 0xEA,  /* Read a the muted state */
+  SID_PLAYER_TIME  = 0xEB,  /* Read play time of current track */
 
   FROM_STDIN       = 0x00,  /* Read data from stdin */
   SID_FILE         = 0x01,  /* File is SID */
@@ -319,16 +329,20 @@ void print_help(void)
   fprintf(stdout, "*** Usage ***\n");
   fprintf(stdout, "\n");
   fprintf(stdout, "-help / -h: Show this information\n");
+  fprintf(stdout, "\n");
   fprintf(stdout, "  sidfile.sid: send sidfile.sid to USBSID-Pico to start play\n");
   fprintf(stdout, "  sidtune.prg: send sidtune.prg to USBSID-Pico to start play (psid64 preferred!)\n");
   fprintf(stdout, "  -sid -: to read _SID_ file data from stdin instead of sidfile.sid (PRG not supported yet!)\n");
   fprintf(stdout, "  -t N: provide subtune number together with sid to set subtune (defaults to 1))\n");
   fprintf(stdout, "  -f: Force play on second SID / socket (depends on USBSID-Pico configuration)\n");
-  //  fprintf(stdout, "* -start: start play\n");
-  fprintf(stdout, "-stop: stop play\n");
+  fprintf(stdout, "  -stop: stop play\n");
   //  fprintf(stdout, "* -pause: pause play\n");
-  fprintf(stdout, "-next: play next subtune\n");
-  fprintf(stdout, "-prev: play previous subtune\n");
+  fprintf(stdout, "  -next: play next subtune\n");
+  fprintf(stdout, "  -prev: play previous subtune\n");
+  //  fprintf(stdout, "* -start: start play\n");
+  fprintf(stdout,    "  --songlengths F:  HVSC Songlengths database, to stop when the song ends.\n"
+    "                    Found by itself in $SONGLENGTHS, ~/Songlengths.md5,\n"
+    "                    HVSCROOT or $HVSC_BASE DOCUMENTS/Songlengths.md5, or $HVSCDB.\n");
   fprintf(stdout, "\n");
   fprintf(stdout, "Play SID file from local storage\n");
   fprintf(stdout, "./send_sid /path/to/sidfile.sid -t 1\n");
@@ -372,6 +386,7 @@ int main(int argc, char* argv[])
   bool forcetwo = false;
   bool sidfile = false;
   bool prgfile = false;
+  uint32_t songlenth = 0;
 
   if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help") || !strcmp(argv[1], "-") || !strcmp(argv[1], "--")) {
     print_help();
@@ -384,8 +399,12 @@ int main(int argc, char* argv[])
 
   /* Check if we have a request to force play on SID2 / Socket2 etc. */
   for(int a = 1; a < argc; a++) {
-    if(!strcmp(argv[a], "-f")) {
+    if (!strcmp(argv[a], "-f")) {
       forcetwo = true;
+    } else if (!strcmp(argv[a], "--songlengths") && a + 1 < argc) {
+      songlengths_path = argv[a+1];
+    } else if(!strcmp(argv[a], "-t") || !strcmp(argv[a], "t")) {
+      tune_no = atoi(argv[a+1]);
     }
   }
 
@@ -419,6 +438,9 @@ int main(int argc, char* argv[])
         }
       }
       {
+        songlenth = find_songlenth_db(sidfile, tune_no, filename, songlengths_path);
+      }
+      {
         fprintf(stdout, "Stopping current playback, if any!\n");
         configbuff[1] = SID_PLAYER_STOP;
         write_chars(configbuff, 5);
@@ -438,11 +460,22 @@ int main(int argc, char* argv[])
       sentfile = true;
     }
     if (sentfile) {
+      if (songlenth != 300000) {
+        fprintf(stdout, "Sending playtime\n");
+        configbuff[1] = UPLOAD_SID_PLAYTIME;
+        configbuff[2] = (uint8_t)((songlenth >> 24) & 0xFF);
+        configbuff[3] = (uint8_t)((songlenth >> 16) & 0xFF);
+        configbuff[4] = (uint8_t)((songlenth >> 8) & 0xFF);
+        configbuff[5] = (uint8_t)(songlenth & 0xFF);
+        write_chars(configbuff, 5);
+      }
       if (forcetwo) {
         fprintf(stdout, "Forcing SID/Socket 2\n");
         configbuff[1] = SID_PLAYER_TWO;
         configbuff[2] = 0;
         configbuff[3] = 0;
+        configbuff[4] = 0;
+        configbuff[5] = 0;
         write_chars(configbuff, 5);
       }
       {
@@ -450,6 +483,8 @@ int main(int argc, char* argv[])
         configbuff[1] = SID_PLAYER_LOAD;
         configbuff[2] = 0; //strtol(argv[arg+1], NULL, 16); /* Tune ID, 0 is uploaded SID file */
         configbuff[3] = 0; /* subtune */
+        configbuff[4] = 0;
+        configbuff[5] = 0;
         for(int arg_ = 1; arg_ < argc; arg_++) {
           if(!strcmp(argv[arg_], "-t") || !strcmp(argv[arg_], "t")) {
             configbuff[3] = atoi(argv[arg_+1]);
@@ -462,6 +497,10 @@ int main(int argc, char* argv[])
       {
         fprintf(stdout, "Starting playback\n");
         configbuff[1] = SID_PLAYER_START;
+        configbuff[2] = 0;
+        configbuff[3] = 0;
+        configbuff[4] = 0;
+        configbuff[5] = 0;
         write_chars(configbuff, 5);
       }
       goto done;
@@ -469,21 +508,37 @@ int main(int argc, char* argv[])
     if(!strcmp(argv[arg], "-stop") || !strcmp(argv[arg], "stop") || !strcmp(argv[arg], "s")) {
       fprintf(stdout, "Stopping playback\n");
       configbuff[1] = SID_PLAYER_STOP;
+      configbuff[2] = 0;
+      configbuff[3] = 0;
+      configbuff[4] = 0;
+      configbuff[5] = 0;
       write_chars(configbuff, 5);
     }
     if(!strcmp(argv[arg], "-pause") || !strcmp(argv[arg], "pause") || !strcmp(argv[arg], "p")) {
       fprintf(stdout, "(Un)Pausing playback\n");
       configbuff[1] = SID_PLAYER_PAUSE;
+      configbuff[2] = 0;
+      configbuff[3] = 0;
+      configbuff[4] = 0;
+      configbuff[5] = 0;
       write_chars(configbuff, 5);
     }
     if(!strcmp(argv[arg], "-next") || !strcmp(argv[arg], "next")|| !strcmp(argv[arg], "n")) {
       fprintf(stdout, "Playing next subtune\n");
       configbuff[1] = SID_PLAYER_NEXT;
+      configbuff[2] = 0;
+      configbuff[3] = 0;
+      configbuff[4] = 0;
+      configbuff[5] = 0;
       write_chars(configbuff, 5);
     }
     if(!strcmp(argv[arg], "-prev") || !strcmp(argv[arg], "prev") || !strcmp(argv[arg], "b")) {
       fprintf(stdout, "Playing previous subtune\n");
       configbuff[1] = SID_PLAYER_PREV;
+      configbuff[2] = 0;
+      configbuff[3] = 0;
+      configbuff[4] = 0;
+      configbuff[5] = 0;
       write_chars(configbuff, 5);
     }
   }
