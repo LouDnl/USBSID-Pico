@@ -3,6 +3,7 @@ name: USBSID-Pico Build Tools
 env:
   BUILD_THREADS: 4
   BUILD_TYPE: Release
+  EMUDIR:
 
 on:
   push:
@@ -71,6 +72,18 @@ jobs:
           submodules: true
           path: repo
 
+      - name: 📇 Checkout USBSID-Player
+        if: ${{ matrix.buildname == 'send_sid' }}
+        uses: actions/checkout@v4
+        with:
+          repository: loudnl/usbsid-player
+          path: repo/lib/usbsid-player
+
+      - name: 📇 Set USBSID-Player EMUDIR
+        if: ${{ matrix.buildname == 'send_sid' }}
+        run: |
+          echo "EMUDIR=${{github.workspace}}/master/lib/usbsid-player" >> $GITHUB_ENV
+
       - name: Install dependencies (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
         run: |
@@ -106,7 +119,7 @@ jobs:
       - name: Configure and build ${{ matrix.buildname }}
         run: |
           pushd repo/examples/${{ matrix.directory }}
-          cmake -S . -B build -DEXECUTABLE=${{ matrix.buildname }} && cmake --build build -j$(nproc)
+          cmake -S . -B build -DEXECUTABLE=${{ matrix.buildname }} -DEMUDIR=${{ env.EMUDIR }} && cmake --build build -j$(nproc)
           ls -lhai
           popd
 
