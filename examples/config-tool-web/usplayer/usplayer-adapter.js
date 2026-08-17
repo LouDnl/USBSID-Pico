@@ -1321,6 +1321,51 @@ export class USPlayerAdapter {
     }
   }
 
+  /**
+   * Hold a whole chip silent.
+   *
+   * The counterpart of setVoiceMute() and the same shape: the board's own command
+   * in SendSID mode, where the board is playing and the local player is not, and
+   * the emulation everywhere else. The worker is told as well when it is the thing
+   * sounding, exactly as for a voice.
+   *
+   * Not three voice mutes. A voice mute masks the gate and the sustain and lets
+   * every other write through; a chip mute drops the writes, which is the only one
+   * of the two that reaches $18, so it is the only one that silences a tune playing
+   * samples through the volume register.
+   *
+   * @param {number} chip 1 to 4
+   * @param {boolean} muted
+   */
+  setChipMute(chip, muted) {
+    if (this._isSendsid) {
+      const t = this._transport;
+      if (t && typeof t.playerMuteChip === 'function') {
+        /* Not awaited: the host calls this from a click and does not want a USB
+         * round trip in the way. */
+        t.playerMuteChip(chip, muted);
+      }
+      return;
+    }
+    if (!this._player || typeof this._player.setChipMute !== 'function') return;
+    this._player.setChipMute(chip, muted);
+    if (this._isAudio && this._worker) {
+      this._call('chipMute', { chip, muted: !!muted });
+    }
+  }
+
+  /** The muted chips as a bitmask, bit 0 being chip one, or 0 when unknown. */
+  chipMute() {
+    if (!this._player || typeof this._player.chipMute !== 'function') return 0;
+    try { return this._player.chipMute(); } catch (_) { return 0; }
+  }
+
+  /** The mute bits of one chip, bit 0 being voice 1, or 0 when unknown. */
+  voiceMute(chip = 1) {
+    if (!this._player || typeof this._player.voiceMute !== 'function') return 0;
+    try { return this._player.voiceMute(chip); } catch (_) { return 0; }
+  }
+
   /** The header of what is loaded, or null. For a host that wants to parse it. */
   bytes() { return this._bytes; }
 

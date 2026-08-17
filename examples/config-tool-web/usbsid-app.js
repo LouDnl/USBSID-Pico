@@ -481,6 +481,22 @@ async function doLoadSID(url, displayName, subtune, lengths) {
       return;
     }
     await uploadCurrentSID();
+    /* Done loading.
+     *
+     * The emulated path clears this in the setTimeout further down, which this
+     * branch returns long before reaching, so `_loading` stayed true for the whole
+     * SendSID session. Nothing showed it directly: songEnded() opens with
+     * `if (_loading) return;`, so the end of every tune was detected, logged, and
+     * then silently discarded, and the tune sat there repeating that it had
+     * finished.
+     *
+     * Guarded on the generation like the other one: a slower earlier load landing
+     * after a later one must not declare the later one finished. */
+    if (gen === _loadGen) _loading = false;
+    /* The emulated path resolves this in the setTimeout further down, which this
+     * branch never reaches, so the STIL panel was empty for every SendSID tune. */
+    resolveStil();
+    updatePlaytimeDisplay();
     return;
   }
 
@@ -708,10 +724,38 @@ var _muteChipMask = 0;
 var _muteChips = 1;             /* how many chip rows to offer */
 var _muteSockets = { one: 0, two: 0 };  /* chips per socket, for the row labels */
 var _muteFmopl = 0;             /* the slot the FM/OPL sits on, 0 for none */
+/* How many SIDs the loaded tune uses, for the emulated modes' grid. The board's
+ * grid counts what is fitted instead, which is a different question. */
+var _playerSidCount = 1;
+
+/**
+ * Which thing the mute buttons act on.
+ *
+ * Two answers, and they are genuinely different machines rather than two ways of
+ * reaching one. In SendSID the board is playing and the page is not emulating
+ * anything, so the mute is a command to the board. In the WebUSB and Web Serial
+ * modes the emulation runs here and writes to the board, so the mute belongs to the
+ * player and the board never hears about it at all.
+ *
+ * ASID is not on the list on purpose: its writes go to a receiver that owns its own
+ * chips, so a mute would have to be that receiver's and there is nothing to send it.
+ *
+ * @returns {'board'|'player'|null}
+ */
+function muteTarget() {
+  if (_emulator === 'sendsid') {
+    const dev = sendsidDev();
+    return (dev && typeof dev.playerMute === 'function') ? 'board' : null;
+  }
+  if (_emulator === 'usplayer' || _emulator === 'usplayer-serial' ||
+      _emulator === 'usplayer-audio') {
+    return (_player && typeof _player.setChipMute === 'function') ? 'player' : null;
+  }
+  return null;
+}
 
 function onboardMuteSupported() {
-  const dev = sendsidDev();
-  return !!(dev && typeof dev.playerMute === 'function');
+  return muteTarget() !== null;
 }
 
 /**
@@ -740,6 +784,21 @@ function initOnboardMuteGridDefault() {
   _muteSockets = { one: 0, two: 0 };
   _muteFmopl = 0;
   buildOnboardMuteGrid();
+}
+
+/**
+ * The grid for the emulated modes.
+ *
+ * The chip count is the tune's, which the emulation already knows, so there is
+ * nothing to ask anyone and nothing that can hang. One row until a tune is loaded,
+ * then as many as the tune has SIDs.
+ */
+function initPlayerMuteGrid() {
+  _muteSockets = { one: 0, two: 0 };   /* sockets are the board's business */
+  _muteFmopl = 0;
+  _muteChips = Math.min(4, Math.max(1, _playerSidCount || 1));
+  buildOnboardMuteGrid();
+  refreshOnboardMute();
 }
 
 /** Ask the board what is actually fitted. On demand, never on the connect path. */
@@ -861,9 +920,11 @@ function renderOnboardMute() {
 }
 
 async function onboardMuteVoice(chip, voice, mute) {
-  if (!onboardMuteSupported()) return;
+  const target = muteTarget();
+  if (!target) return;
   try {
-    await sendsidDev().playerMute(chip, voice, mute);
+    if (target === 'player') _player.setVoiceMute(chip, voice, mute);
+    else await sendsidDev().playerMute(chip, voice, mute);
     const bit = 1 << (voice - 1);
     _muteMask[chip - 1] = mute ? (_muteMask[chip - 1] | bit)
                                : (_muteMask[chip - 1] & ~bit);
@@ -874,12 +935,14 @@ async function onboardMuteVoice(chip, voice, mute) {
 }
 
 async function onboardMuteChip(chip, mute) {
-  if (!onboardMuteSupported()) return;
+  const target = muteTarget();
+  if (!target) return;
   try {
     /* One command: chip with voice 0 reaches usplayer_set_chip_mute(), which
      * drops the chip's writes and so silences the volume register too. Muting the
      * three voices, which is what this used to do, leaves a digi playing. */
-    await sendsidDev().playerMuteChip(chip, mute);
+    if (target === 'player') _player.setChipMute(chip, mute);
+    else await sendsidDev().playerMuteChip(chip, mute);
     /* The chip mask is what changed, not the voice masks: a chip mute leaves the
      * tune's own voice mutes alone underneath it, and unmuting the chip puts
      * whatever they were back. */
@@ -902,12 +965,20 @@ async function onboardMuteChip(chip, mute) {
  * voice buttons showing the truth.
  */
 async function onboardMuteAll(mute) {
-  if (!onboardMuteSupported()) return;
-  const dev = sendsidDev();
+  const target = muteTarget();
+  if (!target) return;
   try {
-    await dev.playerMuteAll(mute);
-    if (typeof dev.muteAll === 'function') {
-      await (mute ? dev.muteAll() : dev.unmuteAll());
+    if (target === 'player') {
+      /* Every chip, which covers the volume register too. The board path also
+       * sends the board's own MUTE, which has no counterpart here: there is no
+       * board level mute to reach when the emulation is what is playing. */
+      for (let chip = 1; chip <= 4; chip++) _player.setChipMute(chip, mute);
+    } else {
+      const dev = sendsidDev();
+      await dev.playerMuteAll(mute);
+      if (typeof dev.muteAll === 'function') {
+        await (mute ? dev.muteAll() : dev.unmuteAll());
+      }
     }
     _muteMask = [0, 1, 2, 3].map(() => (mute ? 0x07 : 0x00));
     _muteChipMask = mute ? 0x0f : 0x00;
@@ -919,6 +990,15 @@ async function onboardMuteAll(mute) {
 
 /** Read the board's own view and show that. */
 async function refreshOnboardMute() {
+  const target = muteTarget();
+  if (target === 'player') {
+    /* Straight out of the emulation, no round trip and nothing to fail. */
+    _muteChipMask = _player.chipMute();
+    _muteMask = [1, 2, 3, 4].map((c) => _player.voiceMute(c));
+    renderOnboardMute();
+    return;
+  }
+  if (target !== 'board') return;
   const dev = sendsidDev();
   if (!dev || typeof dev.playerMuteState !== 'function') return;
   try {
@@ -1041,6 +1121,13 @@ function updateMetaDisplay(info) {
     };
     const n = info && info.numSids ? info.numSids : 0;
     if (n > 1) add(n + 'SID');
+    /* The emulated modes' mute grid follows the tune, so a two SID tune gets two
+     * rows. Rebuilt only when the count actually changes. */
+    if (n >= 1 && n !== _playerSidCount) {
+      _playerSidCount = n;
+      const box = document.getElementById('sendsid-mute-btns');
+      if (box && box.dataset.built === 'player') initPlayerMuteGrid();
+    }
 
     /* What is driving the tune, and how it was started. Both are read out of
      * the emulated chips rather than the file, so they describe the subtune
@@ -1180,6 +1267,66 @@ function songEndAtMs() {
   return (total % 1000 === 0) ? Math.max(0, total - END_MARGIN_MS) : total;
 }
 
+/**
+ * MD5 of a byte array, as lower case hex.
+ *
+ * Here because SendSID has no player to ask. Every other mode gets the key from
+ * `player.md5()`, but SendSID uploads the file to the board and never builds a
+ * player at all, so its STIL lookup had nothing to key on and the panel stayed
+ * empty for every tune. `crypto.subtle` does not do MD5, deliberately, so this
+ * does.
+ *
+ * Checked against node's own implementation on the empty string, "abc" and three
+ * tunes from the served library, including the one whose STIL bucket key is known:
+ * Commando.sid gives 6d019ecba831a9f853675aac29a61c10. A wrong MD5 here would look
+ * exactly like a tune with no STIL entry, which is the common case, so it would not
+ * have shown up as a fault.
+ */
+function md5Hex(bytes) {
+  const S = [7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,
+             5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,
+             4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,
+             6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21];
+  const K = new Int32Array(64);
+  for (let i = 0; i < 64; i++) K[i] = (Math.abs(Math.sin(i + 1)) * 4294967296) | 0;
+
+  const len = bytes.length;
+  const withPad = (((len + 8) >> 6) + 1) << 6;
+  const m = new Uint8Array(withPad);
+  m.set(bytes);
+  m[len] = 0x80;
+  const bitLo = (len << 3) >>> 0;
+  const bitHi = Math.floor(len / 536870912) >>> 0;
+  const dv = new DataView(m.buffer);
+  dv.setUint32(withPad - 8, bitLo, true);
+  dv.setUint32(withPad - 4, bitHi, true);
+
+  let a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+  const rot = (x, c) => (x << c) | (x >>> (32 - c));
+
+  for (let off = 0; off < withPad; off += 64) {
+    let A = a0, B = b0, C = c0, D = d0;
+    for (let i = 0; i < 64; i++) {
+      let F, g;
+      if (i < 16)      { F = (B & C) | (~B & D);        g = i; }
+      else if (i < 32) { F = (D & B) | (~D & C);        g = (5 * i + 1) & 15; }
+      else if (i < 48) { F = B ^ C ^ D;                 g = (3 * i + 5) & 15; }
+      else             { F = C ^ (B | ~D);              g = (7 * i) & 15; }
+      F = (F + A + K[i] + dv.getUint32(off + g * 4, true)) | 0;
+      A = D; D = C; C = B;
+      B = (B + rot(F, S[i])) | 0;
+    }
+    a0 = (a0 + A) | 0; b0 = (b0 + B) | 0; c0 = (c0 + C) | 0; d0 = (d0 + D) | 0;
+  }
+
+  const out = new Uint8Array(16);
+  new DataView(out.buffer).setUint32(0, a0 >>> 0, true);
+  new DataView(out.buffer).setUint32(4, b0 >>> 0, true);
+  new DataView(out.buffer).setUint32(8, c0 >>> 0, true);
+  new DataView(out.buffer).setUint32(12, d0 >>> 0, true);
+  return Array.from(out).map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+
 /* ── STIL ──────────────────────────────────────────────────────────────────
  *
  * HVSC's SID Tune Information List: what a tune is a cover of, who wrote the
@@ -1234,8 +1381,18 @@ function resolveStil() {
   const seq = ++_stilSeq;
   _stilEntry = null;
   renderStil();
-  if (!p || typeof p.md5 !== 'function') return;
-  const key = p.md5();
+
+  /* The player knows the key when there is a player. On the SendSID path there is
+   * not: the file goes to the board and nothing here emulates it, so the bytes are
+   * the only thing to work from. */
+  let key = '';
+  if (p && typeof p.md5 === 'function') {
+    key = p.md5();
+  } else if (_loadedBytes && _loadedBytes.length) {
+    try { key = md5Hex(_loadedBytes); } catch (e) {
+      usbsidLog('Could not hash the tune for STIL:', e && e.message ? e.message : e);
+    }
+  }
   if (!key || key.length < STIL_BUCKET_CHARS) return;
   stilBucket(key.slice(0, STIL_BUCKET_CHARS)).then((bucket) => {
     /* Another tune was chosen while the bucket was on its way. */
@@ -1836,13 +1993,20 @@ function updatePlayerSideButtons() {
   if (sendsidBtns) sendsidBtns.style.display = shown ? 'flex' : 'none';
   /* The mute grid rides with them, but only when the transport in use can carry
    * the command: the serial route to the onboard player has no playerMute(). */
+  /* The mute grid is not SendSID's alone any more, despite the id: the WebUSB and
+   * Web Serial modes get the same three controls, acting on the emulation rather
+   * than on the board. See muteTarget(). */
   const muteBtns = document.getElementById('sendsid-mute-btns');
   if (muteBtns) {
-    const usable = shown && onboardMuteSupported();
+    const target = muteTarget();
+    const usable = (target === 'board') ? shown : (target === 'player');
     muteBtns.style.display = usable ? 'block' : 'none';
-    if (usable && !muteBtns.dataset.built) {
-      muteBtns.dataset.built = '1';
-      initOnboardMuteGridDefault();
+    if (usable && muteBtns.dataset.built !== target) {
+      /* Rebuilt when the target changes, not once for the session: the two have
+       * different chip counts and different state to read. */
+      muteBtns.dataset.built = target;
+      if (target === 'board') initOnboardMuteGridDefault();
+      else initPlayerMuteGrid();
     }
   }
 }
@@ -2880,7 +3044,9 @@ function initTransportButtons() {
       await onboardMuteAll((_muteChipMask & chipBits) !== chipBits);
     },
     'btn-player-mute-refresh': async () => {
-      await refreshOnboardLayout();
+      /* The layout read is the board's, and asking it in an emulated mode would
+       * send config commands to a device that is not the one playing. */
+      if (muteTarget() === 'board') await refreshOnboardLayout();
       await refreshOnboardMute();
     },
     /* WebUSB player-area buttons.

@@ -191,6 +191,8 @@ export class USBSIDPlayerWeb {
     this._setVoiceMute = M.cwrap('usp_set_voice_mute', null,
                                  ['number', 'number', 'number']);
     this._voiceMuteBits = M.cwrap('usp_voice_mute', 'number', ['number']);
+    this._setChipMute = M.cwrap('usp_set_chip_mute', null, ['number', 'number']);
+    this._chipMuteBits = M.cwrap('usp_chip_mute', 'number', []);
     /* the ring */
     this._ringPtr     = M.cwrap('usbsid_web_ring_ptr', 'number', []);
     this._ringEntries = M.cwrap('usbsid_web_ring_entries', 'number', []);
@@ -687,6 +689,25 @@ export class USBSIDPlayerWeb {
 
   /** The mute bits of one chip, bit 0 being voice 1. Chip counts from 1. */
   voiceMute(chip = 1) { return this._voiceMuteBits(chip); }
+
+  /**
+   * Hold a whole chip silent, dropping its writes.
+   *
+   * Not the same as muting its three voices, and not a shorthand for it. A voice
+   * mute masks the gate and the sustain and lets every other write through; a chip
+   * mute drops the writes, which is the only one of the two that reaches $18. A
+   * tune playing samples through the volume register keeps sounding however many
+   * voices are muted, and stops when its chip is.
+   *
+   * @param {number} chip 1 to 4
+   * @param {boolean} muted
+   */
+  setChipMute(chip, muted) {
+    this._setChipMute(chip, muted ? 1 : 0);
+  }
+
+  /** The muted chips as a bitmask, bit 0 being chip one. */
+  chipMute() { return this._chipMuteBits(); }
 
   /**
    * What is driving the tune, and how it was started.
