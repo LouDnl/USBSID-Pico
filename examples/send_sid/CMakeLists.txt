@@ -28,6 +28,10 @@
 ### Cmake minimum version
 cmake_minimum_required(VERSION 3.17)
 
+### Cmake compiler standard versions
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
+
 ### CMake stuff for ZED
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -36,7 +40,7 @@ set(PROJECT_NAME send_sid)
 set(EXECUTABLE ${PROJECT_NAME} CACHE STRING "EXECUTABLE")
 
 ### Project type
-project(${PROJECT_NAME} C ASM)
+project(${PROJECT_NAME} C CXX ASM)
 
 ### Include
 include_directories(".")
@@ -60,14 +64,53 @@ set(TARGET_LL
 )
 endif (WIN32)
 
+### SID Player source
+set(EMUDIR "" CACHE STRING "Path to the USBSID-Player checkout")
+if(NOT EMUDIR STREQUAL "")
+  ## A relative EMUDIR is ambiguous, and it fails in a way that reads like a
+  ## different fault. `if(EXISTS)` resolves a relative path against the
+  ## working directory while `include()` resolves it against the including
+  ## file's directory, so `cmake -S master -DEMUDIR=master/lib/usbsid-player`
+  ## passes the existence check below and then fails the include with
+  ## "could not find requested file", having looked in master/master/lib.
+  ## Resolve it here and carry an absolute path from this point on.
+  if(IS_ABSOLUTE "${EMUDIR}")
+    set(USPLAYER_LIST_DIR "${EMUDIR}")
+  else()
+    set(USPLAYER_LIST_DIR "")
+    foreach(BASE "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/.." "${CMAKE_BINARY_DIR}")
+      get_filename_component(EMUDIR_TRY "${BASE}/${EMUDIR}" ABSOLUTE)
+      if(EXISTS "${EMUDIR_TRY}/src/file/songlengths.cpp")
+        set(USPLAYER_LIST_DIR "${EMUDIR_TRY}")
+        message(STATUS "EMUDIR '${EMUDIR}' is relative, resolved to ${USPLAYER_LIST_DIR}")
+        break()
+      endif()
+    endforeach()
+    ## Nothing matched. Keep the most likely reading so the error below names
+    ## a real path instead of an empty one.
+    if(USPLAYER_LIST_DIR STREQUAL "")
+      get_filename_component(USPLAYER_LIST_DIR "${CMAKE_SOURCE_DIR}/${EMUDIR}" ABSOLUTE)
+    endif()
+  endif()
+elseif(EXISTS "${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player/src/file/songlengths.cpp")
+  set(USPLAYER_LIST_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player")
+else()
+  get_filename_component(USPLAYER_LIST_DIR
+    "${CMAKE_CURRENT_LIST_DIR}/../player-repo" ABSOLUTE)
+endif()
+message(STATUS "USPLAYER_LIST_DIR is set to ${USPLAYER_LIST_DIR}")
+
 ### Source is horse ofcourse ofcourse
 set(SOURCEFILES
   send_sid.c
+  sl_interface.cpp
+  ${USPLAYER_LIST_DIR}/src/file/songlengths.cpp
 )
 
 ### Header directories to include
 set(TARGET_INCLUDE_DIRS PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}
+  ${USPLAYER_LIST_DIR}/src
   /usr/local/lib
   /usr/local/include
   /usr/lib

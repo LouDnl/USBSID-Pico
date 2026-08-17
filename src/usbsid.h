@@ -78,6 +78,7 @@ extern uint8_t * sidfile; /* Temporary buffer to store incoming data */
 extern volatile int sidfile_size;
 extern volatile char tuneno;
 extern volatile bool is_prg;
+extern volatile uint32_t playtime, maxplaytime;
 #endif /* ONBOARD_SIDPLAYER */
 extern volatile bool is_sidplayerplaying(void); /* Always returns false if no sidplayer available */
 

@@ -71,6 +71,13 @@ const SidBrowser = (function () {
   let _view    = [];     /* the tunes currently listed, in display order */
   let _display = [];     /* the same, with group headings interleaved */
   let _drawn   = 0;      /* how much of _display is in the DOM */
+  /* View index -> position in _display, built on first use and thrown away with
+   * the pane. ensureDrawn() used to scan _display for it, which is 63000
+   * comparisons per pick on the live library's `all` view. */
+  let _pos = null;
+  /* The row currently carrying `sid-file-on`. Held so the highlight can be moved
+   * without walking every drawn row, see markCurrent(). */
+  let _onRow = null;
   let _openDir = null;   /* which directory's files are shown, by name */
   let _group   = null;   /* type filter in force, or null for all of them */
   let _query   = '';
@@ -467,14 +474,46 @@ const SidBrowser = (function () {
   }
 
   /** Render far enough that the row for `idx` exists, for PREV and NEXT. */
-  function ensureDrawn(idx) {
-    if (idx < 0) return;
-    for (let i = 0; i < _display.length; i++) {
-      if (_display[i].i === idx) {
-        if (i >= _drawn) draw(i + PAGE);
-        return;
+  /* How far past what is drawn it is worth drawing to reveal a row.
+   *
+   * Revealing means drawing every row in between, so the cost is the distance,
+   * not the row. Walking the list a page at a time never travels far, but a
+   * shuffled pick lands anywhere: on the live library's `all` view, 63243 tunes,
+   * the average jump is over thirty thousand rows and building those synchronously
+   * froze the tab for seconds. Pressing NEXT again while it was frozen queued
+   * another one, and a few presses took the tab down.
+   *
+   * Past this distance the row is simply not revealed. Nothing breaks: the tune
+   * plays, and the transport box above already says what it is. The list just
+   * does not scroll to it, which is a fair trade and is what shuffle over sixty
+   * thousand tunes means anyway. */
+  const REVEAL_MAX = PAGE * 4;
+
+  /** Position of a view index within `_display`, or -1. */
+  function displayPos(idx) {
+    if (!_pos) {
+      _pos = new Map();
+      for (let i = 0; i < _display.length; i++) {
+        if (_display[i].i !== undefined) _pos.set(_display[i].i, i);
       }
     }
+    const at = _pos.get(idx);
+    return (at === undefined) ? -1 : at;
+  }
+
+  /**
+   * Make sure a row is in the DOM, if that can be done cheaply.
+   *
+   * @returns true when the row is drawn and can be pointed at.
+   */
+  function ensureDrawn(idx) {
+    if (idx < 0) return false;
+    const at = displayPos(idx);
+    if (at < 0) return false;
+    if (at < _drawn) return true;
+    if (at - _drawn > REVEAL_MAX) return false;
+    draw(at + PAGE);
+    return true;
   }
 
   function onPaneScroll() {
@@ -497,6 +536,8 @@ const SidBrowser = (function () {
     _view = [];
     _display = [];
     _drawn = 0;
+    _pos = null;
+    _onRow = null;
     _order = [];
     _orderPos = -1;
 
@@ -594,18 +635,27 @@ const SidBrowser = (function () {
   function markCurrent() {
     const pane = $('sid-file-list');
     if (!pane) return;
-    ensureDrawn(_current);
-    for (const row of pane.querySelectorAll('.sid-file')) {
-      row.classList.toggle('sid-file-on',
-                           Number(row.dataset.idx) === _current);
+    const drawn = ensureDrawn(_current);
+
+    /* Move the highlight rather than toggling the class on every drawn row. That
+     * loop was O(rows drawn) on every pick, so once a shuffled jump had drawn
+     * thirty thousand rows it stayed slow for the rest of the session even for
+     * picks that needed no drawing at all. */
+    if (_onRow) {
+      _onRow.classList.remove('sid-file-on');
+      _onRow = null;
     }
+    if (!drawn) return;
     /* offsetTop is pane relative: the pane is `position: relative`, which makes
      * it the offsetParent of its contents. */
-    const on = pane.querySelector('.sid-file-on');
-    if (on && on.offsetTop < pane.scrollTop) {
+    const on = pane.querySelector('.sid-file[data-idx="' + _current + '"]');
+    if (!on) return;
+    on.classList.add('sid-file-on');
+    _onRow = on;
+    if (on.offsetTop < pane.scrollTop) {
       pane.scrollTop = on.offsetTop;
-    } else if (on && on.offsetTop + on.offsetHeight >
-                     pane.scrollTop + pane.clientHeight) {
+    } else if (on.offsetTop + on.offsetHeight >
+               pane.scrollTop + pane.clientHeight) {
       pane.scrollTop = on.offsetTop - pane.clientHeight + on.offsetHeight;
     }
   }
@@ -885,6 +935,15 @@ const SidBrowser = (function () {
     pick,
     next: () => step(1),
     prev: () => step(-1),
+    /* Whether stepping would actually go anywhere.
+     *
+     * step() returns silently when there is no list, which is the case for a
+     * tune opened straight from a file or a URL rather than picked from here.
+     * The caller needs to know, because the end of song handler consumes its own
+     * guard before asking and would otherwise never ask again: a tune that
+     * finished with nowhere to go simply kept playing, five minutes into a forty
+     * second tune. */
+    canStep: () => _view.length > 0,
     setShuffle,
     shuffling: () => _shuffle,
     setLocalFiles,

@@ -84,6 +84,172 @@ volatile int data_buffer_size = 0;
 
 
 /**
+ * @brief Write back data to USB CDC or Vendor
+ *
+ * @param buffersize
+ */
+void write_back_data(size_t buffersize)
+{
+  switch (rtype) {
+    case 'C':
+      cdc_write(cdc_itf, buffersize);
+      break;
+    case 'W':
+      webserial_write(wusb_itf, buffersize);
+      break;
+  }
+  return;
+}
+
+/**
+ * @brief Set the onboard SID player maxplaytime
+ *
+ * @param buffer[5] = { CMD, FF000000, 00FF0000, 0000FF00, 000000FF }
+ *
+ * @result Combines 4x uint8_t into a single uint32_t and sets maxplaytime
+ * @result { FF000000, 00FF0000, 0000FF00, 000000FF } -> 0xFFFFFFFF
+ */
+void set_maxplaytime(uint8_t * buffer)
+{
+#if defined(ONBOARD_SIDPLAYER)
+  maxplaytime = ((buffer[1] << 24) | (buffer[2] << 16) | (buffer[3] << 8) | buffer[4]);
+  double maxtimeplayed = maxplaytime / 1000.0; /* Force floating-point division by using 1000.0 */
+  int minutes = (int)(maxtimeplayed / 60); /* Get total whole minutes */
+  double secs = maxtimeplayed - (minutes * 60); /* Get remaining seconds with decimals */
+  usCFG("Max playtime set to ms: %u, maxtimeplayed: %f. Max playtime: %02d:%05.2f\n",
+    maxplaytime, maxtimeplayed, minutes, secs
+  );
+#endif
+  return;
+}
+
+/**
+ * @brief Get the onboard SID player current playtime
+ *
+ * @note Does not return anything
+ * @note Writes am uint8_t buffer to the requesting endpoint
+ *
+ * @result uint32_t playtime cut into 4x uint8_t
+ * @result { FF000000, 00FF0000, 0000FF00, 000000FF }
+ */
+void get_playtime(void)
+{
+#if defined(ONBOARD_SIDPLAYER)
+  if (sidplayer_playing) {
+    playtime = usplayer_playtime_ms();
+  }
+  memset(write_buffer_p, 0, 64);
+  write_buffer_p[0] = (uint8_t)((playtime >> 24) & 0xFF);
+  write_buffer_p[1] = (uint8_t)((playtime >> 16) & 0xFF);
+  write_buffer_p[2] = (uint8_t)((playtime >> 8) & 0xFF);
+  write_buffer_p[3] = (uint8_t)(playtime & 0xFF);
+  write_back_data(4);
+
+  double timeplayed = playtime / 1000.0; /* Force floating-point division by using 1000.0 */
+  int minutes = (int)(timeplayed / 60); /* Get total whole minutes */
+  double secs = timeplayed - (minutes * 60); /* Get remaining seconds with decimals */
+  usCFG("Playtime in ms: %u/%u, timeplayed: %f. Playtime: %02d:%05.2f\n",
+    playtime, maxplaytime, timeplayed, minutes, secs
+  );
+#endif
+  return;
+}
+
+/**
+* @brief Hold one onboard SID player voice of one SID silent
+ *       while the tune keeps playing.
+ *
+ * @param buffer[4] = { CMD, chip, voice, mute }
+ * @param chip  1 to 4, higher will discard the command completely
+ * @param voice 1 to 3, higher will discard the command completely
+ * @param mute  0 or 1, higher will discard the command completely
+ *
+ * @note use chip = 0, voice = 0, mute 1 or 0 to
+ *       mute or unmute all.
+ * @note chip = 0, voice = !0 or too high numbers are
+ *       invalid combinations
+ */
+void set_mutestate(uint8_t * buffer)
+{
+#if defined(ONBOARD_SIDPLAYER)
+  if ((buffer[1] == 0 && buffer[2] > 1) /* all chips, no voices specified */
+      || (buffer[1] > 4) /* chip */
+      || (buffer[2] > 3) /* voice */
+      || (buffer[3] > 1) /* mute */) {
+    usWRN("Invalid chip (%u)/ voice (%u)/ mute (%u) combination!\n",
+      buffer[1], buffer[2], buffer[3]);
+    return;
+  }
+
+  uint8_t chip  = buffer[1];
+  uint8_t voice = buffer[2];
+  bool mute = buffer[3];
+
+  if (chip == 0 && voice == 0) {
+    usCFG("%s all chips & all voices\n",
+      (mute ? "Muting" : "Unmuting"));
+    for (int s = 1; s < 5; s++) {
+      usCFG("  Chip %d\n", s);
+      usplayer_set_chip_mute(s, mute);
+      for (int v = 1; v < 4; v++) {
+        usNFO(" Voice %d", v);
+        usplayer_set_voice_mute(s, v, mute);
+      }
+      usNFO("\n");
+    }
+  } else if (voice == 0) {
+    usCFG("%s chip %u\n",
+      (mute ? "Muting" : "Unmuting"), chip);
+      usplayer_set_chip_mute(chip, mute);
+  } else {
+    usCFG("%s voice %u on chip %u\n",
+      (mute ? "Muting" : "Unmuting"), chip, voice);
+    usplayer_set_voice_mute(chip, voice, mute);
+  }
+  return;
+#endif
+}
+
+/**
+ * @brief Get the onboard SID player mute state of
+ *        all chips and voices
+ *
+ * @note does not return anything
+ * @note writes a buffer to the requesting endpoint
+ *
+ * @result chip byte: 0b111 = voice 321
+ * @result { uint8_t chip1, uint8_t chip2, uint8_t chip3, uint8_t chip4 }
+ */
+void get_mutestate(void)
+{
+#if defined(ONBOARD_SIDPLAYER)
+  uint8_t chips = 0, chip1 = 0, chip2 = 0, chip3 = 0, chip4 = 0;
+  if (sidplayer_playing) {
+    chips = usplayer_chip_mute();
+    chip1 = usplayer_voice_mute(1);
+    chip2 = usplayer_voice_mute(2);
+    chip3 = usplayer_voice_mute(3);
+    chip4 = usplayer_voice_mute(4);
+  }
+  memset(write_buffer_p, 0, 64);
+  write_buffer_p[0] = chips;
+  write_buffer_p[1] = chip1;
+  write_buffer_p[2] = chip2;
+  write_buffer_p[3] = chip3;
+  write_buffer_p[4] = chip4;
+  write_back_data(5);
+
+  usCFG("SID player mute state\n");
+  usCFG("  CHIPS :%04b\n", chips);
+  usCFG("  CHIP 1:%03b\n", chip1);
+  usCFG("  CHIP 2:%03b\n", chip2);
+  usCFG("  CHIP 3:%03b\n", chip3);
+  usCFG("  CHIP 4:%03b\n", chip4);
+  return;
+#endif
+}
+
+/**
  * @brief Returns true if either of the variables is true
  *
  * @return bool
@@ -389,19 +555,6 @@ void __no_inline_not_in_flash_func(save_config)(Config* config)
   }
   write_config(config);
   usCFG("Configuration saved!\n");
-  return;
-}
-
-void write_back_data(size_t buffersize)
-{
-  switch (rtype) {
-    case 'C':
-      cdc_write(cdc_itf, buffersize);
-      break;
-    case 'W':
-      webserial_write(wusb_itf, buffersize);
-      break;
-  }
   return;
 }
 
@@ -1218,6 +1371,8 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
 #if defined(ONBOARD_SIDPLAYER)
     case UPLOAD_SID_START:
       usCFG("UPLOAD_SID_START: %d\n",buffer[1]);
+      playtime = 0; /* Reset playtime on upload to 0 */
+      maxplaytime = 300000; /* Reset max playtime on upload back to 5 minutes in milliseconds */
       receiving_sidfile = true;
       sidbytes_received = 0;
       is_prg = ((buffer[1] == PRG_FILE) ? true : false);
@@ -1251,6 +1406,10 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       sidfile_size = (buffer[1]<<8|buffer[2]);
       usDBG("Received SID file size: %u\n", sidfile_size);
       break;
+    case UPLOAD_SID_PLAYTIME:
+      usCFG("UPLOAD_SID_PLAYTIME\n");
+      set_maxplaytime(buffer);
+      break;
     case SID_PLAYER_TUNE:
       usCFG("SID_PLAYER_TUNE %d\n", buffer[1]);
       tuneno = buffer[2]; /* Should be 0 if not supplied */
@@ -1268,6 +1427,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case SID_PLAYER_STOP:
       usCFG("SID_PLAYER_STOP\n");
       if (sidplayer_playing) {
+        maxplaytime = 300000; /* Reset max playtime on play stop back to 5 minutes in milliseconds */
         sidplayer_stop = true;
       }
       /* Deinit all sidplayer variables */
@@ -1291,15 +1451,25 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       usCFG("SID_PLAYER_TWO\n");
       force_socktwo();
       break;
-    case SID_PLAYER_FFWD: break;
-    case SID_PLAYER_RWND: break;
-    case SID_PLAYER_MUTE:
+    case SID_PLAYER_FFWD: /* Non functional */
+      usCFG("SID_PLAYER_FFWD: %s\n",
+        (buffer[1] ? "ON" : "OFF"));
+      /* emu_ffwd((bool)buffer[1]); */
       break;
-    case SID_PLAYER_MUTE_V1: break;
-    case SID_PLAYER_MUTE_V2: break;
-    case SID_PLAYER_MUTE_V3: break;
-    case SID_PLAYER_MUTED: break;
-    case SID_PLAYER_TIME: break;
+    case SID_PLAYER_RWND: /* Not implemented */
+      break;
+    case SID_PLAYER_MUTE:
+      usCFG("SID_PLAYER_MUTE\n");
+      set_mutestate(buffer);
+      break;
+    case SID_PLAYER_MUTED:
+      usCFG("SID_PLAYER_MUTED\n");
+      get_mutestate();
+      break;
+    case SID_PLAYER_TIME:
+      usCFG("SID_PLAYER_TIME\n");
+      get_playtime();
+      break;
     case TEST_FN2:
       if (buffer[1] == 0x00) {
         usCFG("[USPLAYER @ 1000000] %u kcycles/s\n", usplayer_benchmark(1000000));

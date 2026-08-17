@@ -335,6 +335,11 @@ const handlers = {
     player.setVoiceMute(chip, voice, !!muted);
     return { ok: true };
   },
+  /* Same reason as voiceMute above: the worker holds the player that is sounding. */
+  chipMute({ chip, muted }) {
+    player.setChipMute(chip, !!muted);
+    return { ok: true };
+  },
   speed({ mult }) { player.setSpeed(mult); return { ok: true }; },
   fastForward({ on, mult }) { player.fastForward(!!on, mult); return { ok: true }; },
   nextSubtune() { player.nextSubtune(); return { ok: true }; },

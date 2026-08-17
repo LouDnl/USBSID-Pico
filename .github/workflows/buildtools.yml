@@ -3,6 +3,7 @@ name: USBSID-Pico Build Tools
 env:
   BUILD_THREADS: 4
   BUILD_TYPE: Release
+  EMUDIR:
 
 on:
   push:
@@ -71,12 +72,8 @@ jobs:
           submodules: true
           path: repo
 
-      - name: Install dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config cmake build-essential libusb-1.0-0 libusb-1.0-0-dev
-
+      # Must run before any step using the job default shell, which is
+      # `msys2 {0}` on Windows and does not exist until this action has run.
       - name: Set up MSYS2 (Windows)
         if: matrix.os == 'windows-2022'
         uses: msys2/setup-msys2@v2
@@ -89,6 +86,27 @@ jobs:
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-pkg-config
             mingw-w64-x86_64-ninja
+
+      - name: 📇 Checkout USBSID-Player
+        if: ${{ matrix.buildname == 'send_sid' }}
+        uses: actions/checkout@v4
+        with:
+          repository: loudnl/usbsid-player
+          path: repo/lib/usbsid-player
+
+      # Relative to the cmake source dir (repo/examples/<directory>), which the
+      # build step below runs from. An absolute ${{github.workspace}} path would
+      # be backslash separated on Windows and mangled by the time cmake sees it.
+      - name: 📇 Set USBSID-Player EMUDIR
+        if: ${{ matrix.buildname == 'send_sid' }}
+        run: |
+          echo "EMUDIR=../../lib/usbsid-player" >> $GITHUB_ENV
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config cmake build-essential libusb-1.0-0 libusb-1.0-0-dev
 
       # - name: Install dependencies (MacOs)
       #   if: matrix.os == 'macos-14' || matrix.os == 'macos-15-intel'
@@ -106,7 +124,7 @@ jobs:
       - name: Configure and build ${{ matrix.buildname }}
         run: |
           pushd repo/examples/${{ matrix.directory }}
-          cmake -S . -B build -DEXECUTABLE=${{ matrix.buildname }} && cmake --build build -j$(nproc)
+          cmake -S . -B build -DEXECUTABLE=${{ matrix.buildname }} -DEMUDIR=${{ env.EMUDIR }} && cmake --build build -j$(nproc)
           ls -lhai
           popd
 

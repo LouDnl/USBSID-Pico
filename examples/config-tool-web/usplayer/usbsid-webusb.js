@@ -69,6 +69,35 @@ const SET_CLOCK = 0x50;
 const SET_AUDIO    = 0x89;   /* item: 0 mono, 1 stereo */
 const TOGGLE_AUDIO = 0x88;
 const GET_AUDIO    = 0x91;
+/* What the firmware was compiled with, one byte of flags. config.h: bit 0
+ * Pico2, 1 wifi/bluetooth, 2 RGB LED, 3 PIO UART, 6 Cynthcart, **bit 7 the
+ * embedded SID player**. */
+const US_FEATURES  = 0x82;
+export const FEATURE_SIDPLAYER = 1 << 7;
+
+/* The onboard player: upload a file, then drive it. Same sub commands and the
+ * same 64 byte slots as the serial transport uses, because it is the same
+ * firmware answering; only the way a packet reaches it differs. */
+const UPLOAD_SID_START    = 0xD0;
+const UPLOAD_SID_DATA     = 0xD1;
+const UPLOAD_SID_END      = 0xD2;
+const UPLOAD_SID_SIZE     = 0xD3;
+const UPLOAD_SID_PLAYTIME = 0xD4;
+const SID_PLAYER_TUNE     = 0xE0;
+const SID_PLAYER_START    = 0xE1;
+const SID_PLAYER_STOP     = 0xE2;
+const SID_PLAYER_PAUSE    = 0xE3;
+const SID_PLAYER_NEXT     = 0xE4;
+const SID_PLAYER_PREV     = 0xE5;
+const SID_PLAYER_TWO      = 0xE6;
+/* 0xE7 SID_PLAYER_FFWD is deliberately absent: the firmware marks it non
+   functional and its emu_ffwd() call is commented out, because on the device the
+   SID writes are the pacing and there is nothing to skip until the embedded build
+   has a pacer. Nothing should offer a control for it. */
+const SID_PLAYER_MUTE     = 0xE9;
+const SID_PLAYER_MUTED    = 0xEA;
+const SID_PLAYER_TIME     = 0xEB;
+const SLOT                = 64;
 /* Config reads. The 12 byte socket buffer's layout is the driver's: byte 2 is
  * socket one, byte 5 socket two, high nibble 1 for present and low nibble 1
  * for a socket carrying two chips. See USBSID_GetSocketNumSIDS(). */
@@ -417,7 +446,14 @@ export class USBSIDWebUSBTransport {
    * and documents. Returns null when there is nothing to ask, which includes
    * a shared device, whose owner does its own reads.
    */
-  async _configRead(sub) {
+  /**
+   * @param sub  the config command
+   * @param len  how many bytes to ask for. Match what the firmware sends for that
+   *             command: SID_PLAYER_TIME and SID_PLAYER_MUTED answer with 4, the
+   *             config and socket reads with a full packet. Asking for more than
+   *             the board sends is not free, so the callers say.
+   */
+  async _configRead(sub, len = MAX_PACKET) {
     if (!this._open || this._extDev || !this._dev) return null;
     this._flushBatch();
     try {
@@ -432,7 +468,7 @@ export class USBSIDWebUSBTransport {
        * readBoardConfig() stops asking after the first unanswered question
        * rather than carrying on and misreading the answers. */
       const r = await Promise.race([
-        this._dev.transferIn(this._epIn, MAX_PACKET),
+        this._dev.transferIn(this._epIn, len),
         new Promise((res) => setTimeout(() => res(null), CONFIG_TIMEOUT_MS)),
       ]);
       if (!r || !r.data || r.data.byteLength === 0) return null;
@@ -440,6 +476,181 @@ export class USBSIDWebUSBTransport {
     } catch (e) {
       return null;
     }
+  }
+
+  /**
+   * What the firmware was built with, or null when it will not say.
+   *
+   * See FEATURE_SIDPLAYER: a board without the embedded player takes an upload
+   * and plays nothing, which looks exactly like a bad file.
+   */
+  async features() {
+    const r = await this._configRead(US_FEATURES);
+    return (r && r.length >= 1) ? r[0] : null;
+  }
+
+  /** Does this board carry the onboard SID player? null when it will not say. */
+  async hasSidPlayer() {
+    const f = await this.features();
+    return (f === null) ? null : (f & FEATURE_SIDPLAYER) !== 0;
+  }
+
+  /* ---- the onboard player ---------------------------------------------- */
+
+  /**
+   * One command packet, now, past the write queue entirely.
+   *
+   * **Not `_send()`.** That queue is for register writes, and when it is full it
+   * drops its oldest entry rather than lag the tune, which is right for sound
+   * and ruinous for a file: a 61566 byte tune is 993 packets posted back to
+   * back, and the board received 17422 bytes of it. `uploadSIDFile()` over Web
+   * Serial had always been correct because that transport writes each packet
+   * straight out and waits for it.
+   *
+   * So this waits for each transfer. It is slower than the queue by design; an
+   * upload is a second of one-off work, not something in the audio path.
+   */
+  async _sendNow(sub, payload = null) {
+    if (!this._open) return false;
+    this._flushBatch();
+    const pkt = new Uint8Array(SLOT);
+    pkt[0] = CFG_CMD;
+    pkt[1] = sub & 0xFF;
+    if (payload) pkt.set(payload.subarray(0, SLOT - 2), 2);
+    try { await this._transfer(pkt); return true; }
+    catch (_) { return false; }
+  }
+
+  playerLoadTune(subtune) {
+    /* The firmware counts subtunes from zero. */
+    const t = new Uint8Array([subtune & 0xFF]);
+    return this._sendNow(SID_PLAYER_TUNE, t);
+  }
+  playerStart()     { return this._sendNow(SID_PLAYER_START); }
+  playerStop()      { return this._sendNow(SID_PLAYER_STOP); }
+  playerPause()     { return this._sendNow(SID_PLAYER_PAUSE); }
+  playerNext()      { return this._sendNow(SID_PLAYER_NEXT); }
+  playerPrev()      { return this._sendNow(SID_PLAYER_PREV); }
+  playerSocketTwo() { return this._sendNow(SID_PLAYER_TWO); }
+
+  /**
+   * How long the tune just uploaded should run, in milliseconds.
+   *
+   * Send after the upload. Without it the board stops after five minutes, which
+   * is its own default and not the tune's length. UPLOAD_SID_START zeroes both the
+   * position and the maximum, and SID_PLAYER_STOP puts the maximum back to five
+   * minutes, so this belongs with every upload rather than once per session.
+   */
+  playerSetPlaytime(ms) {
+    const v = Math.max(0, Math.round(ms)) >>> 0;
+    return this._sendNow(UPLOAD_SID_PLAYTIME, new Uint8Array([
+      (v >>> 24) & 0xFF, (v >>> 16) & 0xFF, (v >>> 8) & 0xFF, v & 0xFF,
+    ]));
+  }
+
+  /**
+   * The board's play position in milliseconds, or null when it will not say.
+   *
+   * The firmware only samples the player while it is playing, so the value holds
+   * at the last live reading once playback stops rather than dropping to zero.
+   * UPLOAD_SID_START resets it, so it cannot carry a stale position from the
+   * previous tune into a new one.
+   *
+   * One read at a time. `_configRead()` leaves a timed out read pending, and a
+   * late reply then satisfies the *next* one, so a caller polling this must not
+   * let two overlap: hence the guard rather than trusting the caller.
+   */
+  async playerTime() {
+    if (this._timeBusy) return null;
+    this._timeBusy = true;
+    try {
+      const r = await this._configRead(SID_PLAYER_TIME, 4);
+      if (!r || r.length < 4) return null;
+      return ((r[0] << 24) | (r[1] << 16) | (r[2] << 8) | r[3]) >>> 0;
+    } finally {
+      this._timeBusy = false;
+    }
+  }
+
+  /**
+   * Mute or unmute one voice, or everything.
+   *
+   *   chip 1..4, voice 1..3   that voice, masked on the way out
+   *   chip 1..4, voice 0      that whole chip, by dropping its writes
+   *   chip 0,    voice 0      every chip and every voice
+   *
+   * Two mechanisms, not degrees of one. A voice mute masks the gate and the
+   * sustain and lets every other write through. A chip mute drops the chip's
+   * writes, which is the only one of the two that reaches $18, so it is what
+   * silences a tune playing samples through the volume register.
+   */
+  playerMute(chip, voice, mute) {
+    return this._sendNow(SID_PLAYER_MUTE,
+      new Uint8Array([chip & 0xFF, voice & 0xFF, mute ? 1 : 0]));
+  }
+
+  /** Every voice of every chip. */
+  playerMuteAll(mute) { return this.playerMute(0, 0, mute); }
+
+  /**
+   * One whole chip, in one command.
+   *
+   * Sent as voice 0, which set_mutestate() routes to usplayer_set_chip_mute().
+   * This used to send the three voices, because the firmware had no chip form.
+   */
+  playerMuteChip(chip, mute) { return this.playerMute(chip, 0, mute); }
+
+  /**
+   * The mute state as one bitmask per chip, bits 0 to 2 for voices 1 to 3, or
+   * null. Reads zeros for every chip while nothing is playing: the firmware only
+   * asks the player when it is running.
+   */
+  async playerMuteState() {
+    if (this._timeBusy) return null;
+    this._timeBusy = true;
+    try {
+      const r = await this._configRead(SID_PLAYER_MUTED, 4);
+      if (!r || r.length < 4) return null;
+      return [r[0], r[1], r[2], r[3]];
+    } finally {
+      this._timeBusy = false;
+    }
+  }
+
+
+  /**
+   * Send a whole file to the board's own player and start it.
+   *
+   * Seven steps in this order: stop, START, the data in 62 byte pieces, END,
+   * SIZE, load the subtune, start. 62 and not 64 because two bytes of every
+   * packet are the command and the sub command.
+   *
+   * @param {Uint8Array} bytes     the file
+   * @param {number} subtune       counted from one, as a host counts songs
+   * @param {number} fileType      1 for a SID file
+   * @param {function} [onProgress] called with (sent, total)
+   */
+  async uploadSIDFile(bytes, subtune = 1, fileType = 0x01, onProgress = null) {
+    if (!this._open) return false;
+    const CHUNK = SLOT - 2;
+    const total = bytes.length;
+
+    if (!await this.playerStop()) return false;
+    if (!await this._sendNow(UPLOAD_SID_START, new Uint8Array([fileType]))) return false;
+
+    let sent = 0;
+    while (sent < total) {
+      const end = Math.min(sent + CHUNK, total);
+      if (!await this._sendNow(UPLOAD_SID_DATA, bytes.subarray(sent, end))) return false;
+      sent = end;
+      if (onProgress) onProgress(sent, total);
+    }
+
+    if (!await this._sendNow(UPLOAD_SID_END)) return false;
+    if (!await this._sendNow(UPLOAD_SID_SIZE,
+          new Uint8Array([(total >> 8) & 0xFF, total & 0xFF]))) return false;
+    if (!await this.playerLoadTune(subtune > 0 ? subtune - 1 : 0)) return false;
+    return await this.playerStart();
   }
 
   /**
