@@ -104,6 +104,8 @@ uint8_t * sidfile = NULL; /* Temporary buffer to store incoming data */
 volatile int sidfile_size = 0;
 volatile char tuneno = 0;
 volatile bool is_prg = false; /* Default to SID file */
+volatile uint32_t playtime = 0;
+volatile uint32_t maxplaytime = 300000; /* 5 minutes in milliseconds */
 #else
 volatile bool is_sidplayerplaying(void) { return false; };
 #endif /* ONBOARD_SIDPLAYER */
@@ -766,8 +768,16 @@ void core1_main(void)
     }
     if __us_likely(sidplayer_playing) {
       loop_sidplayer();
+      playtime = usplayer_playtime_ms();
       if __us_unlikely(sidplayer_next || sidplayer_prev) {
         sidplayer_playing = false;
+      }
+      if __us_unlikely(playtime >= maxplaytime) {
+        sidplayer_stop = true;
+        /* Deinit all sidplayer variables */
+        sidplayer_init = false;
+        sidplayer_start = false;
+        maxplaytime = 300000; /* Reset max playtime on boundary crossing back to 5 minutes in milliseconds */
       }
     }
 #endif /* ONBOARD_SIDPLAYER */
