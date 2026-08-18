@@ -608,7 +608,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
       break;
     case TUSB_REQ_TYPE_VENDOR:    /* 2 */
       switch (request->bRequest) {
-        case VENDOR_REQUEST_WEBUSB:
+        case VENDOR_REQUEST_WEBUSB: /* 1 */
           /* Match vendor request in BOS descriptor
            * Get landing page url and return it
            * if on default config first boot
@@ -619,7 +619,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
           } else {
             return tud_control_status(rhport, request);
           }
-        case VENDOR_REQUEST_MICROSOFT:
+        case VENDOR_REQUEST_MICROSOFT: /* 2 */
           if (request->wIndex == 7) {
             /* Get Microsoft OS 2.0 compatible descriptor */
             uint16_t total_len;
