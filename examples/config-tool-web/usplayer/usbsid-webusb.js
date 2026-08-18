@@ -138,7 +138,24 @@ const MAX_INFLIGHT = 32;
  * The board replies in well under a millisecond when it is going to reply at
  * all, so this is generous rather than tight.
  */
-const CONFIG_TIMEOUT_MS = 250;
+/**
+ * Whether to trace every config read.
+ *
+ * The reads that matter happen while the page is loading, so a flag set from the
+ * console is always too late. `localStorage.setItem('usbsid-debug-reads', '1')`
+ * survives the reload, which is the only way to see a connect from the start.
+ */
+function debugReads() {
+  if (typeof window === 'undefined') return false;
+  if (window.USBSID_DEBUG_READS) return true;
+  try { return window.localStorage.getItem('usbsid-debug-reads') === '1'; }
+  catch (_) { return false; }
+}
+
+const CONFIG_TIMEOUT_MS = 2000;
+/* How long a read may go unanswered before it is worth saying so. It is not a
+ * deadline: nothing is given up on when it passes. See _configRead(). */
+const CONFIG_STUCK_MS = 10000;
 
 /**
  * Commands sent in one transferOut.
@@ -338,6 +355,10 @@ export class USBSIDWebUSBTransport {
 
   async disconnect() {
     this._open = false;
+    /* A fresh chain for the next connection: the old one may still hold a read
+     * that will never be answered now, and everything queued behind it would
+     * wait on a device that has gone. */
+    this._cfgReadChain = null;
     this._q.length = 0;
     this._batchCount = 0;
     this._inflight = 0;
@@ -453,28 +474,118 @@ export class USBSIDWebUSBTransport {
    *             config and socket reads with a full packet. Asking for more than
    *             the board sends is not free, so the callers say.
    */
+  /**
+   * Ask the board something and wait for the answer.
+   *
+   * **Never raced, and always serialised.** WebUSB has no way to cancel a
+   * `transferIn`, so a read given up on is not aborted, it is *abandoned*: the
+   * reply still arrives and is handed to whoever reads next. One timeout
+   * therefore puts every later read one reply behind for the rest of the
+   * session, and the backlog only grows. That is what this used to do, with a
+   * 250 ms `Promise.race`, and it is why the socket read at connect would answer
+   * and the FM/OPL read straight after it would not.
+   *
+   * So the timeout only *reports*. Reporting is free; abandoning is what breaks
+   * the session. And every read goes through one chain, because two readers on
+   * one endpoint take each other's replies.
+   *
+   * A caller that must not block waits on the promise this returns with a
+   * timeout of its own. That is safe in a way racing the transfer is not: the
+   * read stays on the chain and its reply is still consumed by the reader that
+   * asked for it, so nothing is left dangling for the next question to trip over.
+   * See `readBoardConfig()`.
+   */
   async _configRead(sub, len = MAX_PACKET) {
     if (!this._open || this._extDev || !this._dev) return null;
+    const mine = this._cfgReadChain = (this._cfgReadChain || Promise.resolve())
+      .then(() => this._configReadOnce(sub, len),
+            () => this._configReadOnce(sub, len));
+    return await mine;
+  }
+
+  async _configReadOnce(sub, len) {
+    if (!this._open || this._extDev || !this._dev) return null;
     this._flushBatch();
+    /* Says so if a read never comes back, without giving up on it. Reads are
+     * serialised, so a stuck one holds the others rather than burying them. */
+    if (debugReads()) {
+      console.debug('[usbsid-webusb] read 0x' + (sub & 0xff).toString(16) +
+                    ' issued, open=' + this._open + ' ext=' + !!this._extDev);
+    }
+    const stuck = setTimeout(() => {
+      console.warn('[usbsid-webusb] config read 0x' + (sub & 0xff).toString(16) +
+                   ' has not answered after ' + (CONFIG_STUCK_MS / 1000) +
+                   's, still waiting (reads are serialised, so nothing else' +
+                   ' will run until it does)');
+    }, CONFIG_STUCK_MS);
     try {
       await this._dev.transferOut(this._epOut,
         new Uint8Array([CFG_CMD, sub, 0, 0, 0, 0]));
-      /* Bounded: see CONFIG_TIMEOUT_MS. A null here means "the board did not
-       * answer", which every caller already treats as "do not know" rather
-       * than as an error.
-       *
-       * The losing transferIn is left pending, which is the one wart: if a late
-       * reply does turn up it will satisfy the next read instead. That is why
-       * readBoardConfig() stops asking after the first unanswered question
-       * rather than carrying on and misreading the answers. */
-      const r = await Promise.race([
-        this._dev.transferIn(this._epIn, len),
-        new Promise((res) => setTimeout(() => res(null), CONFIG_TIMEOUT_MS)),
-      ]);
+      const r = await this._dev.transferIn(this._epIn, MAX_PACKET); /* Vendor is fixed at 64 bytes */
       if (!r || !r.data || r.data.byteLength === 0) return null;
-      return new Uint8Array(r.data.buffer, r.data.byteOffset, r.data.byteLength);
+      const out = new Uint8Array(r.data.buffer, r.data.byteOffset, r.data.byteLength);
+      if (debugReads()) {
+        console.debug('[usbsid-webusb] read 0x' + (sub & 0xff).toString(16) +
+                      ' answered ' + out.length + ' bytes');
+      }
+      return out;
     } catch (e) {
+      /* Quiet until now, which hid a read that failed rather than timed out:
+       * the caller sees null either way and the two want different fixes. */
+      console.warn('[usbsid-webusb] config read 0x' + (sub & 0xff).toString(16) +
+                   ' failed: ' + (e && e.message ? e.message : e));
       return null;
+    } finally {
+      clearTimeout(stuck);
+    }
+  }
+
+  /**
+   * Wait on a config read, but not for ever, without abandoning the read.
+   *
+   * For the connect path, where a board that will not answer must not stop the
+   * page coming up. The read itself carries on to completion on the chain, so
+   * its reply is consumed by it and the next question still gets its own answer.
+   * Only this caller stops waiting.
+   */
+  async _configReadBounded(sub, len = MAX_PACKET, ms = CONFIG_TIMEOUT_MS) {
+    const name = '0x' + (sub & 0xff).toString(16);
+    const t0 = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+    const waiting = this._cfgReadsQueued | 0;
+    this._cfgReadsQueued = waiting + 1;
+    const read = this._configRead(sub, len)
+      .finally(() => { this._cfgReadsQueued = (this._cfgReadsQueued | 0) - 1; });
+    let timer = null;
+    let gaveUp = false;
+    const bound = new Promise((res) => {
+      timer = setTimeout(() => { gaveUp = true; res(null); }, ms);
+    });
+    try {
+      return await Promise.race([read, bound]);
+    } finally {
+      clearTimeout(timer);
+      if (gaveUp) {
+        /* Say what actually happened rather than only that it did not arrive in
+         * time. The read is still on the chain and still going to be answered,
+         * so whether it lands a moment later or never lands at all are two very
+         * different faults and this is the only place that can tell them apart.
+         *
+         * `waiting` is how many reads were already queued when this one was
+         * asked for: a read that is simply behind a slow one is not the same
+         * problem as a read that is first in line and still does not answer. */
+        console.warn('[usbsid-webusb] config read ' + name + ' gave up after ' +
+                     ms + 'ms, ' + waiting + ' read(s) were queued ahead of it');
+        read.then((late) => {
+          const dt = ((typeof performance !== 'undefined')
+                        ? performance.now() : Date.now()) - t0;
+          console.warn('[usbsid-webusb] config read ' + name + ' did answer, ' +
+                       dt.toFixed(0) + 'ms after it was asked for (' +
+                       (late ? late.length + ' bytes: ' +
+                          Array.from(late).slice(0, 8)
+                            .map((x) => x.toString(16)).join(' ')
+                        : 'null') + ')');
+        }, () => {});
+      }
     }
   }
 
@@ -522,8 +633,18 @@ export class USBSIDWebUSBTransport {
   }
 
   playerLoadTune(subtune) {
-    /* The firmware counts subtunes from zero. */
-    const t = new Uint8Array([subtune & 0xFF]);
+    /* Two bytes, and the order of them is the whole point: the file id first,
+     * 0 being the one just uploaded, then the subtune, which the firmware
+     * counts from zero.
+     *
+     * The file id used to be left out, so the subtune went into its byte and
+     * the firmware read the subtune out of the byte after it, which was always
+     * zero. Every SendSID upload therefore played song 1 whichever song was
+     * asked for, on a board reached over WebUSB. The Web Serial transport sent
+     * both bytes and was right all along, which is why this only ever showed up
+     * on some machines. `config.c` reads it as `tuneno = buffer[2]` with the
+     * config init byte already stripped, so that is this packet's byte 3. */
+    const t = new Uint8Array([0, subtune & 0xFF]);
     return this._sendNow(SID_PLAYER_TUNE, t);
   }
   playerStart()     { return this._sendNow(SID_PLAYER_START); }
@@ -671,10 +792,17 @@ export class USBSIDWebUSBTransport {
        * configCmdRead(), which answers with an array of packets. */
       const d = this._extDev;
       try {
+        /* The driver's own helpers, not its generic `configCmdRead()`.
+         *
+         * `readSocketConfig()` answers `{one, two}` already counted, so there is
+         * nothing here to parse; the old route asked `configCmdRead()` for the
+         * raw buffer and ran it through this file's `parseSocketConfig()`, which
+         * duplicated the driver's own logic and read the wrong shape back from
+         * it. Both of these go through the driver's serialised config read, which
+         * is the only path that recovers from a lost reply. */
         let parsed = null;
-        if (typeof d.configCmdRead === 'function') {
-          const packets = await d.configCmdRead(READ_SOCKETCFG, 0, 0, 0, 0, MAX_PACKET);
-          if (packets && packets.length) parsed = parseSocketConfig(packets[0]);
+        if (typeof d.readSocketConfig === 'function') {
+          parsed = await d.readSocketConfig();
         }
         const fm = (typeof d.readFMOplSID === 'function') ? await d.readFMOplSID() : 0;
         return {
@@ -682,16 +810,25 @@ export class USBSIDWebUSBTransport {
           sidsSocketTwo: parsed ? parsed.two : 0,
           fmoplSid: fm || -1,
         };
-      } catch (_) { return null; }
+      } catch (e) {
+        console.warn('[usbsid-webusb] board config read through the app driver ' +
+                     'failed: ' + (e && e.message ? e.message : e));
+        return null;
+      }
     }
 
-    const cfg = await this._configRead(READ_SOCKETCFG);
+    /* Bounded, because this runs on the connect path and a board that will not
+     * answer must not stop the page coming up. Bounded at this level and not at
+     * the transfer: the reads stay on the chain and their replies are still
+     * consumed there, so a slow answer costs one unknown value rather than every
+     * value after it. */
+    const cfg = await this._configReadBounded(READ_SOCKETCFG);
     if (!cfg) return null;
     const parsed = parseSocketConfig(cfg);
     /* If this one goes unanswered the sockets are still known and worth having:
      * only FM/OPL is lost, and an fmoplSid of -1 is the same as a board with no
      * FM chip. Reporting the sockets beats reporting nothing. */
-    const fm = await this._configRead(READ_FMOPLSID);
+    const fm = await this._configReadBounded(READ_FMOPLSID);
     if (!fm) {
       console.warn('[usbsid-webusb] the board did not answer the FM/OPL read; ' +
                    'FM/OPL tunes will play their SID voices only');

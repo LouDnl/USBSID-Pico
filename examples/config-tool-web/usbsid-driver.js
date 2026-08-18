@@ -1,6 +1,25 @@
 /**
  * USBSID-Pico WebUSB Driver
  * Direct WebUSB implementation (no worker) for config + playback in same page.
+ *
+ * ONE FILE, FOUR PLACES. Byte identical in all of them, and it has to stay that
+ * way: this is the only driver that recovers from a lost reply, and a copy that
+ * falls behind takes its host's config reads with it.
+ *
+ *   repo/examples/config-tool-web/usbsid-driver.js          loaded by a <script>
+ *                                                           tag, index.html:16
+ *   usbsid.loudai.nl/public_html/usbsid-driver.js            the same, live
+ *   git.deepsid/js/handlers/usplayer/usbsid-driver.js        imported as a module
+ *                                                           by usplayer-adapter-deepsid.js
+ *   deepsid/public_html/deepsid/js/handlers/usplayer/...     the same, live
+ *
+ * There is deliberately no copy in `player-repo/web`: the player does not use it,
+ * the hosts do, so there is no source tree that owns it. Compare the four before
+ * changing any one of them.
+ *
+ * Loaded both ways, which is why the tail of this file assigns to `globalThis`
+ * rather than using `export`: a file with an export in it is a module, and the
+ * plain script tag above could no longer load it.
  * Updated to match config.h command set.
  */
 
@@ -289,8 +308,9 @@ class USBSIDDevice {
       }
       await this._device.claimInterface(this._ifaceNum);
       await this._device.selectAlternateInterface(this._ifaceNum, 0);
-      try { await this._device.clearHalt('out', this._epOut); } catch (_) {}
-      try { await this._device.clearHalt('in',  this._epIn);  } catch (_) {}
+      // The following two lines are commented out, they cause reading issues!
+      // try { await this._device.clearHalt('out', this._epOut); } catch (_) {}
+      // try { await this._device.clearHalt('in',  this._epIn);  } catch (_) {}
       await this._device.controlTransferOut({
         requestType: 'class',
         recipient:   'interface',
@@ -353,7 +373,8 @@ class USBSIDDevice {
     const buf = data instanceof Uint8Array ? data : new Uint8Array(data);
     try {
       await this._device.transferOut(this._epOut, buf);
-      const result = await this._device.transferIn(this._epIn, readLen);
+      const result = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE); /* Vendor is fixed at 64 bytes */
+      this._device.transferIn(this._epIn, 0); /* Account for the second 0 length packet */
       return new Uint8Array(result.data.buffer);
     } catch (e) {
       this._log('writeAndRead error:', e);
@@ -365,7 +386,8 @@ class USBSIDDevice {
   async read(readLen = MAX_PACKET_SIZE) {
     if (!this._isOpen) return null;
     try {
-      const result = await this._device.transferIn(this._epIn, readLen);
+      const result = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE); /* Vendor is fixed at 64 bytes */
+      this._device.transferIn(this._epIn, 0); /* Account for the second 0 length packet */
       return new Uint8Array(result.data.buffer);
     } catch (e) {
       this._log('read error:', e);
@@ -417,9 +439,10 @@ class USBSIDDevice {
      * SID count and the FM/OPL slot one after another produced three zeros and
      * then a fourth read that returned one of *their* replies, which is how this
      * was found. Serialised, so the pairing holds. */
-    const mine = this._cfgReadChain = (this._cfgReadChain || Promise.resolve())
-      .then(() => this._configCmdReadOnce(sub, b2, b3, b4, b5, numBytes, timeoutMs),
-            () => this._configCmdReadOnce(sub, b2, b3, b4, b5, numBytes, timeoutMs));
+    const mine = this._configCmdReadOnce(sub, b2, b3, b4, b5, numBytes, timeoutMs);
+    // const mine = this._cfgReadChain = (this._cfgReadChain || Promise.resolve())
+    //   .then(() => this._configCmdReadOnce(sub, b2, b3, b4, b5, numBytes, timeoutMs)/* ,
+    //         () => this._configCmdReadOnce(sub, b2, b3, b4, b5, numBytes, timeoutMs) */);
     return await mine;
   }
 
@@ -442,23 +465,24 @@ class USBSIDDevice {
      * consumes it. Raced, because the alternative is waiting for ever when the
      * timeout was a command the firmware does not implement, and given a long
      * enough limit that a board which is going to answer has answered. */
-    if (this._cfgReadSkew) {
-      this._cfgReadSkew = false;
-      try {
-        const stale = await Promise.race([
-          this._device.transferIn(this._epIn, MAX_PACKET_SIZE),
-          new Promise((res) => setTimeout(() => res(null), 1500)),
-        ]);
-        if (stale) {
-          usbsidLog('configCmdRead: resynchronised, discarded a late reply');
-        } else {
-          /* Nothing came, so the earlier timeout was a question this board does
-           * not answer. Say so once: the reads are in step, there is simply no
-           * answer to that one. */
-          usbsidLog('configCmdRead: no late reply, the board does not answer that command');
-        }
-      } catch (_) { /* closed under us; the next read will report it */ }
-    }
+    // if (this._cfgReadSkew) {
+    //   this._cfgReadSkew = false;
+    //   try {
+    //     const stale = await Promise.race([
+    //       this._device.transferIn(this._epIn, MAX_PACKET_SIZE), /* Vendor is fixed at 64 bytes */
+    //       new Promise((res) => setTimeout(() => res(null), 1500)),
+    //     ]);
+    //     this._device.transferIn(this._epIn, 0); /* Account for the second 0 length packet */
+    //     if (stale) {
+    //       usbsidLog('configCmdRead: resynchronised, discarded a late reply');
+    //     } else {
+    //       /* Nothing came, so the earlier timeout was a question this board does
+    //        * not answer. Say so once: the reads are in step, there is simply no
+    //        * answer to that one. */
+    //       usbsidLog('configCmdRead: no late reply, the board does not answer that command');
+    //     }
+    //   } catch (_) { /* closed under us; the next read will report it */ }
+    // }
 
     try {
       await this._device.transferOut(this._epOut, cmdBuf);
@@ -467,12 +491,14 @@ class USBSIDDevice {
       return packets;
     }
     try {
-      const r = await Promise.race([
-        this._device.transferIn(this._epIn, numBytes),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('configCmdRead timeout')), timeoutMs)
-        ),
-      ]);
+      const r = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE); /* Vendor is fixed at 64 bytes */
+      // const r = await Promise.race([
+      //   this._device.transferIn(this._epIn, MAX_PACKET_SIZE), /* Vendor is fixed at 64 bytes */
+      //   new Promise((_, reject) =>
+      //     setTimeout(() => reject(new Error('configCmdRead timeout')), timeoutMs)
+      //   ),
+      // ]);
+      this._device.transferIn(this._epIn, 0); /* Account for the second 0 length packet */
       packets.push(new Uint8Array(r.data.buffer));
     } catch (e) {
       /* Remember it: the next read clears up after this one. The abandoned
@@ -530,10 +556,13 @@ class USBSIDDevice {
                 ' has not answered after 10s, still waiting (reads are serialised,'
                 + ' so nothing else will run until it does)');
     }, 10000);
+    const CC = this.cmd(COMMAND, CONFIG);
+    const cmdBuf = new Uint8Array([CC, sub, b2, b3, b4, b5]);
     try {
-      await this._device.transferOut(this._epOut,
-        new Uint8Array([this.cmd(COMMAND, CONFIG), sub, b2, b3, b4, b5]));
-      const r = await this._device.transferIn(this._epIn, len);
+      await this._device.transferOut(this._epOut, cmdBuf);
+      const r = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE); /* Vendor is fixed at 64 bytes */
+      r.data.byteLength == 64 ? this._device.transferIn(this._epIn, 0) : null ; /* Account for the second 0 length packet */
+      await us_delay(100);
       return new Uint8Array(r.data.buffer);
     } catch (e) {
       usbsidLog('configReadNoRace error:', e.message || e);
@@ -556,8 +585,9 @@ class USBSIDDevice {
      * without this it can run at the same time as one of those and the two take
      * each other's replies: one reader at a time is the only thing that keeps a
      * reply paired with its question. */
-    const mine = this._cfgReadChain = (this._cfgReadChain || Promise.resolve())
-      .then(() => this._readConfigOnce(), () => this._readConfigOnce());
+    const mine = this._readConfigOnce();
+    // const mine = this._cfgReadChain = (this._cfgReadChain || Promise.resolve())
+    //   .then(() => this._readConfigOnce(), () => this._readConfigOnce());
     return await mine;
   }
 
@@ -579,8 +609,9 @@ class USBSIDDevice {
        *              in the buffer are stale and skipped by magic checks in later reads.
        * WebUSB rejects all pending transferIn on disconnect, so no infinite hang. */
       await this._device.transferOut(this._epOut, cmdBuf);
-      for (let i = 0; i < 8; i++) {
-        const r = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE);
+      for (let i = 0; i < 4; i++) {
+        const r = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE); /* Vendor is fixed at 64 bytes */
+        r.data.byteLength == 64 ? this._device.transferIn(this._epIn, 0) : null ; /* Account for the second 0 length packet */
         const chunk = new Uint8Array(r.data.buffer);
         if (all.length === 0) {
           if (chunk.length === 0) { this._log('readConfig: skipping zero-length packet'); continue; }
@@ -1085,3 +1116,27 @@ class USBSID_queue {
 
 /* Singleton device instance */
 const usbsidDevice = new USBSIDDevice();
+
+/* Usable from an ES module as well as from a classic script.
+ *
+ * `export` is deliberately not used: config-tool-web loads this file with a
+ * plain <script src="usbsid-driver.js"> tag (index.html:16), and a file with an
+ * export in it is a module, which that tag cannot load. Properties on globalThis
+ * work in both, and the declarations above still shadow them for anything
+ * referring to the bare names, so nothing that works today changes.
+ *
+ * `usbsidLog` is the host's, not this file's: config-tool-web declares it in
+ * usbsid-app.js, a classic script, so it is simply there. Loaded as a module by
+ * another host there is no such global and the thirteen calls to it in here
+ * throw a ReferenceError from inside a read. The fallback is only installed when
+ * the host has not supplied one.
+ */
+if (typeof usbsidLog === 'undefined') {
+  globalThis.usbsidLog = (...args) => console.debug('[usbsid-driver]', ...args);
+}
+if (typeof globalThis !== 'undefined') {
+  if (!globalThis.USBSIDDevice) globalThis.USBSIDDevice = USBSIDDevice;
+  /* The singleton this file already creates, so a second host talks to the same
+   * board through the same driver rather than opening its own. */
+  if (!globalThis.usbsidDevice) globalThis.usbsidDevice = usbsidDevice;
+}

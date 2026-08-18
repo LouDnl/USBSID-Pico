@@ -596,6 +596,38 @@ export class USPlayerAdapter {
   }
 
   /**
+   * Let go of the board, the port or the MIDI output.
+   *
+   * The other half of `connect()`, so a host can offer one button that does
+   * both. Software audio has nothing to let go of and says so by returning
+   * false.
+   *
+   * The transport is kept and reopened by the next `connect()`, which is why
+   * `_ready` is left memoized: `_ensure()` builds the transport and picks
+   * between WebUSB and Web Serial, and that decision does not change because
+   * the link was closed. What does change is that the next `connect()` shows a
+   * picker again, since the granted device was released here.
+   *
+   * @returns {Promise<boolean>} true when the link is really shut
+   */
+  async disconnect() {
+    if (this._isAudio) return false;
+    /* SendSID is the one mode where the tune is playing on the far side, so
+     * closing the link would leave the board playing with nothing left able to
+     * stop it. Stop it first. The other modes emulate here and only send
+     * writes, which a shut transport drops on the floor. */
+    if (this._isSendsid) { try { this.stop(); } catch (_) { /* going anyway */ } }
+    this._stopBoardPoll();
+    if (this._transport && typeof this._transport.disconnect === 'function') {
+      try { await this._transport.disconnect(); }
+      catch (e) { this._log('disconnect: ' + (e && e.message ? e.message : e)); }
+    }
+    this._log('disconnected');
+    this._status('disconnected');
+    return !this.isConnected();
+  }
+
+  /**
    * Refuse a board that cannot play what SendSID sends it.
    *
    * The firmware says what it was compiled with, one byte of flags, and bit 7
@@ -829,6 +861,16 @@ export class USPlayerAdapter {
     return (this._transport && this._transport.lastError) || null;
   }
 
+  /**
+   * Fetch a file and play it.
+   *
+   * @param {number} subtune  0 based, the way `load_sidtune()` counts: 0 is the
+   *                          file's own default song, 1 is the second song. A
+   *                          host that counts from one converts before calling.
+   * @param {number} timeout  unused, kept for the host signature
+   * @param {string} url      what to fetch
+   * @param {function} callback  called once the tune is loaded and running
+   */
   async load(subtune, timeout, url, callback) {
     await this._ensure();
     /* Stop clocking the tune that is playing, before the fetch rather than
@@ -972,12 +1014,20 @@ export class USPlayerAdapter {
          * the other modes is the `start()` in the branch below.
          *
          * `uploadSIDFile()` is the whole sequence: stop, START, the file in 62
-         * byte pieces, END, SIZE, pick the subtune, start. It counts songs from
-         * one, the same as this method's argument. */
+         * byte pieces, END, SIZE, pick the subtune, start.
+         *
+         * It counts songs from **one**, and this method's argument is 0 based
+         * like `load_sidtune()` and like every other branch here, so the two
+         * have to be converted between. They used not to be, and this branch
+         * read the argument as 1 based: every host that passed a 0 based number
+         * played song 1 whichever song it asked for, and the one host that
+         * passed a 1 based number got the right song here and the wrong one in
+         * all four other modes. */
         if (!this._transport || !this._transport.isOpen) {
           throw new Error('no board on the serial port to send it to');
         }
-        const sent = await this._transport.uploadSIDFile(bytes, subtune || 1);
+        const song = (subtune || 0) + 1;
+        const sent = await this._transport.uploadSIDFile(bytes, song);
         if (!sent) {
           throw new Error(this._transport.lastError || 'the board would not take the file');
         }
@@ -988,9 +1038,9 @@ export class USPlayerAdapter {
          * than at its own five minute default. The lengths come from the same
          * database the host uses, and the local player has already read the file,
          * so this is available without asking anyone. */
-        await this._sendBoardPlaytime(subtune || 1);
+        await this._sendBoardPlaytime(song);
         this._log(`sent to the board: ${bytes.length} bytes, ` +
-                  `song ${subtune || 1} of ${i.songs}, playing on its own player`);
+                  `song ${song} of ${i.songs}, playing on its own player`);
       } else {
         await this._player.start();
       }

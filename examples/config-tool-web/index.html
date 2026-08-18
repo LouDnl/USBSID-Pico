@@ -103,23 +103,23 @@
           <label class="c64-radio">
             <input type="radio" name="emulator-mode" value="usplayer-asid">
             <span class="c64-radio-text">ASID (USBSID-Player)</span>
+          <span id="asid-midi-row" style="display:none">
+            <label for="asid-midi-outputs" style="margin-left:12px">ASID MIDI:</label>
+            <select id="asid-midi-outputs" class="c64-select">
+              <option value="">- no MIDI -</option>
+            </select>
+          </span>
           </label>
           <label class="c64-radio">
             <input type="radio" name="emulator-mode" value="sendsid">
             <span class="c64-radio-text">SendSID (onboard USBSID-Player)</span>
+            <span id="sendsid-socket-row" style="display:none;align-items:center;gap:6px;margin-left:12px">
+              <input type="checkbox" id="chk-sendsid-socket2" style="cursor:pointer;accent-color:var(--c64-cyan)">
+              <label for="chk-sendsid-socket2" style="cursor:pointer;font-size:0.9rem;color:var(--c64-cyan);text-transform:uppercase;user-select:none">Force socket 2 play</label>
+            </span>
           </label>
           </div>
         </fieldset>
-        <span id="asid-midi-row" style="display:none">
-          <label for="asid-midi-outputs" style="margin-left:12px">ASID MIDI:</label>
-          <select id="asid-midi-outputs" class="c64-select">
-            <option value="">- no MIDI -</option>
-          </select>
-        </span>
-        <span id="sendsid-socket-row" style="display:none;align-items:center;gap:6px;margin-left:12px">
-          <input type="checkbox" id="chk-sendsid-socket2" style="cursor:pointer;accent-color:var(--c64-cyan)">
-          <label for="chk-sendsid-socket2" style="cursor:pointer;font-size:0.9rem;color:var(--c64-cyan);text-transform:uppercase;user-select:none">Force socket 2</label>
-        </span>
       </div>
     </div>
 
