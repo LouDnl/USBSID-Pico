@@ -291,6 +291,9 @@ restart:
     goto restart;
   }
 end:
+  if (r == 0xC0) {
+    clear_fmopl_registers_at_addr(base_address);
+  }
   return (r == 0xC0 ? true : false);
 }
 
