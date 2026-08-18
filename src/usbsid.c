@@ -179,7 +179,12 @@ void init_logging(void)
 
 /* USB TO HOST */
 
-/* Write from device to host */
+/**
+ * @brief Write from device to CDC host
+ *
+ * @param itf
+ * @param n
+ */
 void cdc_write(volatile uint8_t * itf, uint32_t n)
 { /* No need to check if write available with current driver code */
   usIO("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
@@ -188,14 +193,26 @@ void cdc_write(volatile uint8_t * itf, uint32_t n)
   return;
 }
 
-/* Write from device to host */
+/**
+ * @brief Write from device to Vendor host
+ *
+ * @note n is dropped and we always write MAX_BUFFER_SIZE back to the Vendor interfaec
+ * @note for some unknown reason the Vendor ITF has another 0 byte length packet
+ *       waiting in the fifo. send a 0 byte length read to account for it.
+ *
+ * @param itf
+ * @param n
+ */
 void webserial_write(volatile uint8_t * itf, uint32_t n)
-{ /* No need to check if write available with current driver code */
+{
   usIO("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
-  tud_vendor_n_write(*itf, write_buffer, n);
+  /* ADDED: pending is what is still unsent in the TX fifo. Non zero means this
+   * reply is about to be merged with the previous one into a single packet, which
+   * is what produced a 14 byte reply to a 1 byte question on the host. */
+  uint32_t pending = CFG_TUD_VENDOR_TX_BUFSIZE - tud_vendor_n_write_available(*itf);
+  uint32_t wrote = tud_vendor_n_write(*itf, write_buffer, MAX_BUFFER_SIZE);
+  usIO("[VDR] TXQ want:%lu wrote:%lu pending_before:%lu\n", n, wrote, pending);
   tud_vendor_n_write_flush(*itf);
-  // tud_vendor_write(write_buffer, n);
-  // tud_vendor_flush();
   return;
 }
 
@@ -591,7 +608,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
       break;
     case TUSB_REQ_TYPE_VENDOR:    /* 2 */
       switch (request->bRequest) {
-        case VENDOR_REQUEST_WEBUSB:
+        case VENDOR_REQUEST_WEBUSB: /* 1 */
           /* Match vendor request in BOS descriptor
            * Get landing page url and return it
            * if on default config first boot
@@ -602,7 +619,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
           } else {
             return tud_control_status(rhport, request);
           }
-        case VENDOR_REQUEST_MICROSOFT:
+        case VENDOR_REQUEST_MICROSOFT: /* 2 */
           if (request->wIndex == 7) {
             /* Get Microsoft OS 2.0 compatible descriptor */
             uint16_t total_len;

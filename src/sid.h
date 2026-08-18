@@ -64,6 +64,7 @@ void clear_bus_all(void);
 void pause_sid(void);
 void pause_sid_withmute(void);
 void reset_sid(void);
+void clear_fmopl_registers_at_addr(uint8_t base_address);
 void clear_sid_registers_at_addr(uint8_t base_address);
 void clear_sid_registers(int sidno);
 void reset_sid_registers(void);

@@ -587,19 +587,19 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       break;
     case READ_CONFIG:
       usCFG("READ_CONFIG\n");
-      /* ISSUE:
-         It should send 4 packets of 64 bytes, but sends only 2 and a zero packet
-         Although 4 writes are performed, only the first 2 are received, (due to zero content data) */
+      /* NOTICE: Vendor device (WebUSB) only:
+         It should send 1 packet of 64 bytes (the size of the current config array),
+         but sends 1 and a zero packet. This 0 packet must be accounted for in drivers
+         */
       read_config(&usbsid_config);
       print_cfg(config_array, count_of(config_array), false);
       memset(write_buffer_p, 0, 64);
+      /* Account for the Config array size with a loop */
       for (int i = 0; i < cfg_read_writes; i++) {
-        usCFG("Write back config array part %d of %d\n", i, cfg_read_writes);
+        usCFG("Write back config array part %d of %d\n", (i+1), cfg_read_writes); /* i+1 because humans count from 1 :) */
         memcpy(write_buffer_p, config_array + (i * 64), 64);
         write_back_data(64);
       }
-      memcpy(write_buffer_p, config_array, 64);
-      write_back_data(64);
       break;
     case READ_SOCKETCFG:
       usCFG("READ_SOCKETCFG\n");

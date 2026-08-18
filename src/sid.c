@@ -240,6 +240,10 @@ void pause_sid_withmute(void)
   return;
 }
 
+/**
+ * @brief Reset all SIDS by pulling the reset line low for 10 clockcycles
+ *
+ */
 void reset_sid(void)
 {
   set_reset_state(true);
@@ -253,6 +257,40 @@ void reset_sid(void)
   }
   sPIN(RES);
   set_reset_state(false);
+  return;
+}
+
+/**
+ * @brief Reset/ Silence/ Mute the FMOpl at address
+ *
+ * @param base_address
+ */
+void clear_fmopl_registers_at_addr(uint8_t base_address)
+{
+  /* $bd = $00 ~ rhythm mode off */
+  cycled_write_operation(base_address,          0xbd, 10);  /* index port */
+  cycled_write_operation((base_address + 0x10), 0x00, 10);  /* data port  */
+  /* $80..$95 = $0f ~ sustain level 0, release rate 15, the fastest available */
+  for (uint8_t idx = 0x80; idx <= 0x95; idx++) {
+    cycled_write_operation(base_address,          idx, 10);   /* index port */
+    cycled_write_operation((base_address + 0x10), 0x0f, 10);  /* data port  */
+  }
+  /* $b0..$b8 = $00 ~ key off all nine melodic channels (bit 5 clear) */
+  for (uint8_t idx = 0xb0; idx <= 0xb8; idx++) {
+    cycled_write_operation(base_address,          idx, 10);   /* index port */
+    cycled_write_operation((base_address + 0x10), 0x00, 10);  /* data port  */
+  }
+  /* $40..$55 = $3f ~ total level to max attenuation */
+  for (uint8_t idx = 0x40; idx <= 0x55; idx++) {
+    cycled_write_operation(base_address,          idx, 10);   /* index port */
+    cycled_write_operation((base_address + 0x10), 0x3f, 10);  /* data port  */
+  }
+  /* $08 = $00, $01 = $00 ~ CSM/note-select off, waveform select off */
+  cycled_write_operation(base_address,          0x08, 10);  /* index port */
+  cycled_write_operation((base_address + 0x10), 0x00, 10);  /* data port  */
+  cycled_write_operation(base_address,          0x01, 10);  /* index port */
+  cycled_write_operation((base_address + 0x10), 0x00, 10);  /* data port  */
+
   return;
 }
 
@@ -286,7 +324,12 @@ void clear_sid_registers_at_addr(uint8_t base_address)
  */
 void clear_sid_registers(int sidno)
 {
-  clear_sid_registers_at_addr((sidno * 0x20));
+  if __us_unlikely(cfg.fmopl_enabled
+    && (cfg.fmopl_sid == (sidno+1))) { /* sidno + 1 because fmopl_sid is human readable */
+    clear_fmopl_registers_at_addr((sidno * 0x20));
+  } else {
+    clear_sid_registers_at_addr((sidno * 0x20));
+  }
   return;
 }
 

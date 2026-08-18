@@ -242,7 +242,7 @@ async function onDeviceConnected() {
   refreshTransportButtons();
 
   /* Auto-read config */
-  /* setTimeout(() => doReadConfig(), 300); */
+  setTimeout(() => doReadConfig(), 300);
 }
 
 /* Check if v1.5+ board needs config confirmation and update UI accordingly */
