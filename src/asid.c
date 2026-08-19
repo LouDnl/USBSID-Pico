@@ -409,6 +409,8 @@ void handle_asid_typemessage(uint8_t* buffer)
 /* Spy vs Spy ? */
 void decode_asid_message(uint8_t* buffer, int size)
 {
+  if __us_unlikely(get_reset_state()) return;
+  if __us_unlikely(!usbsid_config.Asid.enabled) return;
   static uint32_t rate; /* Tracks the rate of ASID messages */
   switch(buffer[2]) {
     case 0x4C:  /* Play start */
