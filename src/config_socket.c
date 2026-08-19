@@ -38,6 +38,7 @@
 
 
 /* Pre declarations */
+static SocketPreset detect_current_preset(void);
 ConfigError validate_config(void);
 Socket default_socket(int id);
 
@@ -460,6 +461,9 @@ SOCKTWO:;
     }
   }
 
+  /* Set current matching preset in config */
+  usbsid_config.last_preset = detect_current_preset();
+
   return CFG_OK;
 }
 
@@ -845,8 +849,6 @@ void verify_socket_config(void)
   /* Clear DMA channels and PIO bus afterwards */
   clear_dma_channels();
 
-  /* Set current matching preset in config */
-  usbsid_config.last_preset = detect_current_preset();
 #endif
   return;
 }
