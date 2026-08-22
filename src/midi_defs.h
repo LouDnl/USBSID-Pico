@@ -35,9 +35,6 @@
 #endif
 
 
-// TODO:
-// Add command for enabling/disabling multivoice settings
-// Add command for linking voices e.g. copy settings from selected voice to voice x
 typedef struct midi_ccvalues {
   /* Voice related */
   uint8_t CC_NOTE;  /* Note frequency */
@@ -82,6 +79,18 @@ typedef struct midi_ccvalues {
   uint8_t CC_LVCE;  /* Link/Unlink voice */
   uint8_t CC_LSID;  /* Link/Unlink SID */
   uint8_t CC_VELM;  /* Velocity Mode */
+  /* Phase 4 ~ Modulation and timing */
+  uint8_t CC_LFOW;  /* LFO waveform */
+  uint8_t CC_LFOR;  /* LFO rate */
+  uint8_t CC_LFOD;  /* LFO depth */
+  uint8_t CC_LFOT;  /* LFO destination (target) */
+  uint8_t CC_PORT;  /* Portamento time */
+  uint8_t CC_ARPM;  /* Arpeggiator mode */
+  uint8_t CC_ARPR;  /* Arpeggiator rate */
+  uint8_t CC_ARPO;  /* Arpeggiator octave range */
+  uint8_t CC_ARPE;  /* Arpeggiator enable */
+  /* TODO 14 ~ FMOpl */
+  uint8_t CC_FMEN;  /* Target this channel's notes at the FMOpl chip instead of a SID */
   /* Fixed CC values ~ Cynthcart related */
   uint8_t CC_CEN;   /* Enable  Cynthcart */
   uint8_t CC_CDI;   /* Disable Cynthcart */
@@ -114,7 +123,7 @@ typedef struct midi_ccvalues {
   .CC_ATT  =  0x11,  /*  17 ~ Attack */ \
   .CC_DEC  =  0x12,  /*  18 ~ Decay */ \
   .CC_SUS  =  0x13,  /*  19 ~ Sustain */ \
-  .CC_REL  =  0x14,  /*  20 ~ Release */ \
+  .CC_REL  =  0x1D,  /*  29 ~ Release (moved off 0x14, collided with CC_NOIS) */ \
   /* Default values ~ Chip related */ \
   .CC_FFC  =  0x20,  /*  32 ~ Filter Frequency Cutoff */ \
   .CC_RES  =  0x21,  /*  33 ~ Filter resonance */ \
@@ -139,10 +148,23 @@ typedef struct midi_ccvalues {
   .CC_GTEN =  0x77,  /* 119 ~ Gate auto enabled on noteon note off */ \
   .CC_SPLY =  0x6F,  /* 111 ~ Turn on polyfonic for current SID */ \
   .CC_CVCE =  0x08,  /*   8 ~ Enable copy voice mode */ \
-  .CC_CSID =  0x18,  /*  24 ~ Enable copy SID mode */ \
+  .CC_CSID =  0x09,  /*   9 ~ Enable copy SID mode (moved off 0x18, collided with CC_TEST) */ \
   .CC_LVCE =  0x28,  /*  40 ~ Link/Unlink voice */ \
   .CC_LSID =  0x38,  /*  56 ~ Link/Unlink SID */ \
   .CC_VELM =  0x48,  /*  72 ~ Velocity Mode */ \
+  /* Default values ~ Phase 4 modulation and timing */ \
+  .CC_LFOW =  0x00,  /*   0 ~ LFO waveform */ \
+  .CC_LFOR =  0x02,  /*   2 ~ LFO rate */ \
+  .CC_LFOD =  0x03,  /*   3 ~ LFO depth */ \
+  .CC_LFOT =  0x04,  /*   4 ~ LFO destination */ \
+  .CC_PORT =  0x05,  /*   5 ~ Portamento time */ \
+  .CC_ARPM =  0x06,  /*   6 ~ Arpeggiator mode */ \
+  .CC_ARPR =  0x0A,  /*  10 ~ Arpeggiator rate */ \
+  .CC_ARPO =  0x0B,  /*  11 ~ Arpeggiator octave range */ \
+  .CC_ARPE =  0x0C,  /*  12 ~ Arpeggiator enable */ \
+  /* Default values ~ TODO 14 FMOpl. 88 chosen from the largest free run */ \
+  /* (88-103) left after every CC above - see TODO 14's own research note. */ \
+  .CC_FMEN =  0x58,  /*  88 ~ Target this channel at the FMOpl chip instead of a SID */ \
   /* Cynthcart related _FIXED_ CC values */ \
   .CC_CEN  =  0x55,  /*  85 ~ Enable Cynthcart */ \
   .CC_CDI  =  0x56,  /*  86 ~ Disable Cynthcart */ \
@@ -159,9 +181,6 @@ typedef struct midi_ccvalues {
   .CC_MOD  =  0xFF,  /* 255 ~ Modulation wheel */ \
   .CC_MODL =  0xFF,  /* 255 ~ Modulation wheel LSB */ \
 } \
-
-/* static const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT; */
-/* const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT; */
 
 
 #ifdef __cplusplus

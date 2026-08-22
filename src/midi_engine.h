@@ -3,7 +3,7 @@
  * for interfacing one or two MOS SID chips and/or hardware SID emulators over
  * (WEB)USB with your computer, phone or ASID supporting player
  *
- * midi_handler.h
+ * midi_engine.h
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
@@ -23,37 +23,24 @@
  *
  */
 
-#ifndef _MIDI_HANDLER_H_
-#define _MIDI_HANDLER_H_
+#ifndef _USBSID_MIDI_ENGINE_H_
+#define _USBSID_MIDI_ENGINE_H_
 #pragma once
 
 #ifdef __cplusplus
   extern "C" {
 #endif
 
-#include <midi_defs.h>  /* midi_ccvalues */
-
-
-/* Functions from midi_handler.c */
-void midi_processor_init(void);
-void process_midi(uint8_t *buffer, int size);
-
-/* The 1kHz modulation tick (LFO, portamento, arpeggiator). Called from
- * midi_engine_task() on core1, never from core0. */
-void midi_tick(void);
-
-/* midi_handler.c's live CC map is private to that file. These exist so
- * midi_config.c's flash persistence can save/restore it - there is no CC
- * remapping feature yet (CC is only ever set once, from
- * midi_ccvalues_defaults, at midi_processor_init()), so today this always
- * round-trips the compiled-in defaults. Included now anyway so the blob
- * format does not need a version bump the day remapping is added. */
-void midi_handler_get_ccmap(midi_ccvalues *out);
-void midi_handler_set_ccmap(const midi_ccvalues *in);
+/* Called from the core1 loop in usbsid.c, next to led_runner() and the SID
+ * test queue drain. Drains whatever midi_queue_pop() has waiting and hands
+ * each event to process_midi(), which is where the SID bus writes happen.
+ * Safe to call every core1 iteration; it is a no-op when the ring is empty
+ * or MIDI is disabled. */
+void midi_engine_task(void);
 
 
 #ifdef __cplusplus
   }
 #endif
 
-#endif /* _MIDI_HANDLER_H_ */
+#endif /* _USBSID_MIDI_ENGINE_H_ */

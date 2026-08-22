@@ -89,6 +89,25 @@ extern uint32_t ADDR_PERSISTENT[];
 #define FLASH_PERSISTENT_SIZE (PICO_FLASH_SIZE_BYTES - FLASH_PERSISTENT_OFFSET)
 /* Default config offset in flash memory */
 #define FLASH_CONFIG_OFFSET (FLASH_PERSISTENT_OFFSET + ((FLASH_PERSISTENT_SIZE / 4) * 3))
+
+/* MIDI expansion: its own partition, directly after Config's, added by the
+ * linker script rather than derived a second independent way in C. Both
+ * ADDR_CONFIG (linker) and FLASH_CONFIG_OFFSET (the macro above, computed
+ * from PICO_FLASH_SIZE_BYTES at compile time) describe the same address by
+ * construction; verify_midiconfig_offset() in config.c checks that at boot
+ * so the two never quietly drift apart. */
+extern uint32_t ADDR_CONFIG[];
+extern uint32_t ADDR_MIDICONFIG[];
+/* Set by verify_midiconfig_offset() at boot; midi_config_save()/load() must
+ * refuse to touch flash while this is false. */
+extern bool midiconfig_offset_ok;
+#define FLASH_MIDICONFIG_OFFSET ((uint32_t)ADDR_MIDICONFIG - XIP_BASE)
+/* One save = one whole sector (the blob does not fit in a 256B page like
+ * Config's does), 16 sectors round-robin = 64KB, matches __MIDI_STORAGE_LEN
+ * in the linker scripts. */
+#define MIDICONFIG_SAVE_SLOTS 16
+#define MIDICONFIG_SLOT_SIZE  FLASH_SECTOR_SIZE
+
 /* Max config size = 256 Bytes == FLASH_PAGE_SIZE (FLASH_SECTOR_SIZE / 16 config saves) */
 #define CONFIG_SIZE (FLASH_SECTOR_SIZE / 16)
 
@@ -517,6 +536,7 @@ extern const char    *pcb_version;
 /* Functions from config.c */
 bool        config_unacknowledged(void);
 void        load_config(Config *config);
+void        verify_midiconfig_offset(void);
 void        save_config_ext(void);
 void        handle_config_request(uint8_t *buffer, uint32_t size);
 void        print_config(void);

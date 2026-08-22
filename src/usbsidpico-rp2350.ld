@@ -24,6 +24,17 @@
 /* __PERSISTENT_STORAGE_LEN = 4k; */
 __PERSISTENT_STORAGE_LEN = 1024k;
 
+/* Sub-regions inside FLASH_PERSISTENT, added for the MIDI expansion.
+ * ADDR_CONFIG keeps the exact same numeric offset the old
+ * FLASH_CONFIG_OFFSET macro in config.h already computed at runtime
+ * (ADDR_PERSISTENT + (__PERSISTENT_STORAGE_LEN / 4) * 3) - this does not
+ * move Config's existing storage, it just also exposes the address as a
+ * linker symbol so ADDR_MIDICONFIG can be placed directly after it instead
+ * of being derived a second, independent way. config.c asserts the two
+ * computations agree at boot. */
+__CONFIG_STORAGE_LEN = 4k;   /* 1 sector, 16 x 256B wear-levelled slots (unchanged, Config's own scheme) */
+__MIDI_STORAGE_LEN   = 64k;  /* 16 sectors, 16 x 4k wear-levelled slots (the MIDI blob is bigger than one page) */
+
 MEMORY
 {
     FLASH(rx) : ORIGIN = 0x10000000, LENGTH = 4096K - __PERSISTENT_STORAGE_LEN
@@ -282,6 +293,8 @@ SECTIONS
         . = ALIGN(4);
         KEEP(*(.section_persistent*))
         "ADDR_PERSISTENT" = .;
+        "ADDR_CONFIG"     = ADDR_PERSISTENT + ((__PERSISTENT_STORAGE_LEN / 4) * 3);
+        "ADDR_MIDICONFIG" = ADDR_CONFIG + __CONFIG_STORAGE_LEN;
     } > FLASH_PERSISTENT
 
     /* stack limit is poorly named, but historically is maximum heap ptr */
@@ -307,6 +320,8 @@ SECTIONS
     ASSERT(__StackLimit >= __HeapLimit, "region RAM overflowed")
 
     ASSERT( __binary_info_header_end - __logical_binary_start <= 1024, "Binary info must be in first 1024 bytes of the binary")
+    ASSERT( (ADDR_MIDICONFIG + __MIDI_STORAGE_LEN) <= (ADDR_PERSISTENT + __PERSISTENT_STORAGE_LEN),
+        "ERROR: MIDI config storage overflows past the end of FLASH_PERSISTENT")
     ASSERT( __embedded_block_end - __logical_binary_start <= 4096, "Embedded block must be in first 4096 bytes of the binary")
 
     /* todo assert on extra code */

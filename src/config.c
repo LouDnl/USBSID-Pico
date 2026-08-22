@@ -29,6 +29,7 @@
 #include <config.h>
 #include <gpio.h>
 #include <midi.h>
+#include <midi_config.h>
 #include <sid.h>
 #include <bus.h>
 #include <dma.h>
@@ -67,6 +68,7 @@ const char __in_flash("us_vars") *us_product = USBSID_PRODUCT;
 /* Declare local variables */
 /* 0x15 (16) max before starting at 0 flash sector erase */
 static uint8_t config_saveid = 0;
+bool midiconfig_offset_ok = false;  /* set by verify_midiconfig_offset(), see config.h */
 /* 256 Bytes MAX == FLASH_PAGE_SIZE (Max storage size is 4096 bytes == FLASH_SECTOR_SIZE) */
 static uint8_t config_array[FLASH_PAGE_SIZE] = {0};
 /* 12 bytes and counting */
@@ -452,6 +454,34 @@ void __no_inline_not_in_flash_func(default_config)(Config* config)
   config_saveid = config->config_saveid;  /* Preserve config saveid */
   memcpy(config, &usbsid_default_config, sizeof(Config));
   config->config_saveid = config_saveid;  /* Copy saveid back into the default config */
+  return;
+}
+
+/**
+ * @brief Cross-check the MIDI partition's address against the existing
+ *        Config partition's address
+ *
+ * `ADDR_CONFIG` (linker symbol, in the .ld scripts) and `FLASH_CONFIG_OFFSET`
+ * (the macro above, derived at compile time from `PICO_FLASH_SIZE_BYTES`)
+ * compute the identical address two different ways. They have to agree by
+ * construction; this just says so out loud at boot, before anything ever
+ * writes to the MIDI partition that sits directly after both of them. A
+ * mismatch here would mean the two build-time views of the flash layout
+ * have drifted apart, which is exactly the kind of thing that must be
+ * caught before a flash_range_erase() runs anywhere near it.
+ */
+void verify_midiconfig_offset(void)
+{
+  uint32_t linker_config_offset = (uint32_t)ADDR_CONFIG - XIP_BASE;
+  usCFG("MIDI storage: FLASH_CONFIG_OFFSET = 0x%X, linker ADDR_CONFIG offset = 0x%X, FLASH_MIDICONFIG_OFFSET = 0x%X\n",
+    FLASH_CONFIG_OFFSET, linker_config_offset, FLASH_MIDICONFIG_OFFSET);
+  if (linker_config_offset != FLASH_CONFIG_OFFSET) {
+    usERR("MIDI storage: ADDR_CONFIG (linker) 0x%X != FLASH_CONFIG_OFFSET (macro) 0x%X - refusing to trust MIDI flash offsets!\n",
+      linker_config_offset, FLASH_CONFIG_OFFSET);
+    midiconfig_offset_ok = false;
+  } else {
+    midiconfig_offset_ok = true;
+  }
   return;
 }
 
@@ -946,9 +976,17 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       usCFG("TRIPLE_SID SOCKET 2\n");
       apply_preset_wrapper(PRESET_TRIPLE_S2);
       break;
-    case LOAD_MIDI_STATE: /* Unused */
+    case LOAD_MIDI_STATE:
+      usCFG("LOAD_MIDI_STATE\n");
+      midi_config_load();
+      break;
     case SAVE_MIDI_STATE:
+      usCFG("SAVE_MIDI_STATE\n");
+      midi_config_save();
+      break;
     case RESET_MIDI_STATE:
+      usCFG("RESET_MIDI_STATE\n");
+      midi_config_reset();
       break;
     case SET_CLOCK:         /* Change SID clock frequency by array id */
       usCFG("SET_CLOCK\n");

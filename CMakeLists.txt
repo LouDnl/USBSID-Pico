@@ -55,7 +55,7 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(USBIO_DEBUGGING 0)      # Enable debugging in usbsid.c
   set(GPIOBUS_DEBUGGING 0)    # Enable debugging in gpio.c
   set(MIDI_DEBUGGING 0)       # Enable debugging in midi.c
-  set(MIDIVOICE_DEBUGGING 1)  # Enable debugging in midi.c
+  set(MIDIVOICE_DEBUGGING 0)  # Enable debugging in midi.c ~ usMVCE/usMDAT fire on every message
   set(ASID_DEBUGGING 1)       # Enable debugging in acid.c and asid_buffer.c
   set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
   set(SIDWRITES_DEBUGGING 0)  # Enable logging of SID writes one core 2
@@ -374,6 +374,12 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/bus.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi_handler.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi_queue.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi_engine.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi_voice.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi_config.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi_patch.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi_fmopl.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid_buffer.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sysex.c

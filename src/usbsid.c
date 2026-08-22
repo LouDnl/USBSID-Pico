@@ -39,6 +39,7 @@
 #include <sid.h>
 #include <sid_tests.h>
 #include <midi.h>
+#include <midi_engine.h>
 #include <asid.h>
 #include <logging.h>
 
@@ -411,31 +412,14 @@ void tud_resume_cb(void)
 
 /* USB MIDI CLASS TASK & CALLBACKS */
 
-void midi_task(void) /* Disabled in loop ~ keeping for optional later use */
-{ /* Same as the callback routine */
-  if (tud_midi_n_mounted(MIDI_ITF)) {
-    while (tud_midi_n_available(MIDI_ITF, MIDI_CABLE)) {  /* Loop as long as there is data available */
-      set_receivedata(true);
-      uint32_t available = tud_midi_n_stream_read(MIDI_ITF, MIDI_CABLE, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
-      process_stream(midimachine.usbstreambuffer, available);
-    }
-    /* Clear usb buffer after use ~ Disabled due to prematurely cut off tunes */
-    /* memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer)); */
-    return;
-  }
-  return;
-}
-
 void tud_midi_rx_cb(uint8_t itf)
 {
   if (tud_midi_n_mounted(itf)) {
-    while (tud_midi_n_available(itf, MIDI_CABLE)) {  /* Loop as long as there is data available */
+    uint8_t packet[4];
+    while (tud_midi_n_packet_read(itf, packet)) {  /* Loop as long as there are full packets available */
       set_receivedata(true);
-      uint32_t available = tud_midi_n_stream_read(itf, MIDI_CABLE, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
-      process_stream(midimachine.usbstreambuffer, available);
+      process_usb_midi_packet(packet);
     }
-    /* Clear usb buffer after use ~ Disabled due to prematurely cut off tunes */
-    /* memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer)); */
     return;
   }
   return;
@@ -741,6 +725,10 @@ void core1_main(void)
       }
     }
 
+    /* Drain the MIDI event ring; this is where the SID bus writes for MIDI
+     * input now happen, off the USB callback on core0 */
+    midi_engine_task();
+
 #ifdef ONBOARD_SIDPLAYER
     if (sidplayer_init) {
       sidplayer_init = false;
@@ -875,6 +863,8 @@ int main()
 
   /* Load config before init of USBSID settings ~ NOTE: This cannot be run from Core 1! */
   load_config(&usbsid_config);
+  verify_midiconfig_offset();  /* must run before anything ever touches the MIDI flash partition */
+
   /* Apply saved config to used vars */
   err = apply_config(true); /* At boot */
   if (err != CFG_OK) {
@@ -944,6 +934,11 @@ int main()
   /* Init DMA */
   usBOOT("Setup DMA channels\n");
   setup_dmachannels();
+
+  /* Claim the bus spinlock before core1 is released to its main loop, so it
+   * exists before anything could contend on it */
+  usBOOT("Setup bus lock\n");
+  bus_lock_init();
 
   /* Start the VU */
   usBOOT("Initialise Vu\n");

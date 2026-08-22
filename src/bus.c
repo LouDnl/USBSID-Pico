@@ -51,6 +51,36 @@ volatile static uint8_t control_word, read_data;
 volatile static uint16_t delay_word;
 volatile static uint32_t data_word, dir_mask;
 
+/* Bus lock.
+ *
+ * `control_word` / `data_word` / `delay_word` above, the four shared DMA
+ * channels they feed, and `sid_memory[]` are written by every operation
+ * below. Until the MIDI engine moved onto core1 (see midi_engine.c), core0
+ * was the only writer and this was safe by convention. It no longer is:
+ * core1 already writes the bus when `ONBOARD_SIDPLAYER` is running, and now
+ * does so for MIDI too, so overlap between the two cores is routine rather
+ * than theoretical.
+ *
+ * A claimed hardware spinlock, not a software one: `spin_lock_blocking()`
+ * also disables interrupts for the critical section's duration, which is
+ * exactly the handful of cycles it takes to set the shared words and kick
+ * the DMA trigger. The blocking wait itself only happens if the other core
+ * is mid write, which is rare and short. */
+static spin_lock_t *bus_spinlock = NULL;
+
+/**
+ * @brief Claim and initialise the bus spinlock
+ *
+ * Must run on core0, before core1 is released to its main loop, i.e.
+ * alongside `setup_dmachannels()` during boot. Called once.
+ */
+void bus_lock_init(void)
+{
+  int lock_num = spin_lock_claim_unused(true);
+  bus_spinlock = spin_lock_init(lock_num);
+  return;
+}
+
 
 /**
  * @brief Set the bits going to the PIO databus based on provided address
@@ -291,8 +321,10 @@ uint16_t __no_inline_not_in_flash_func(cycled_delay_operation)(uint16_t cycles)
  */
 void __no_inline_not_in_flash_func(write_operation)(uint8_t address, uint8_t data)
 {
+  uint32_t bus_irq = spin_lock_blocking(bus_spinlock);
   sid_memory[(address & 0x7F)] = data;
   if __us_unlikely(set_bus_bits(address, true) != 1) {
+    spin_unlock(bus_spinlock, bus_irq);
     return;
   }
 
@@ -304,6 +336,7 @@ void __no_inline_not_in_flash_func(write_operation)(uint8_t address, uint8_t dat
   pio_sm_put_blocking(bus_pio, sm_data, data_word);
 
   set_sidwriting(false);
+  spin_unlock(bus_spinlock, bus_irq);
   return;
 }
 
@@ -350,9 +383,11 @@ void __no_inline_not_in_flash_func(cycled_write_operation_nondma)(uint8_t addres
  */
 uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t address, uint8_t data, uint16_t cycles)
 { /* This is a blocking function! */
+  uint32_t bus_irq = spin_lock_blocking(bus_spinlock);
   sid_memory[(address & 0x7F)] = data;
   set_vu_action(); /* Keep that shiny Vu blinking! */
   if __us_unlikely(set_bus_bits(address, true) != 1) {
+    spin_unlock(bus_spinlock, bus_irq);
     return 0;
   }
 
@@ -360,7 +395,9 @@ uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t a
   dma_channel_set_read_addr(dma_tx_data, &data_word, false);
   __dsb();  /* ensure all config writes reach DMA controller before trigger */
 
-  cycled_delay_operation(cycles); /* Replaces the delay DMA */
+  cycled_delay_operation(cycles); /* Replaces the delay DMA, held under the same lock as
+                                      the rest of this write since it shares delay_word
+                                      and the delay DMA channel with everything else here */
   pio_sm_exec(bus_pio, sm_control, pio_encode_irq_set(false, PIO_IRQ0));  /* Preset the statemachine IRQ to not wait for a 1 */
   pio_sm_exec(bus_pio, sm_data, pio_encode_irq_set(false, PIO_IRQ1));     /* Preset the statemachine IRQ to not wait for a 1 */
   pio_sm_exec(bus_pio, sm_data, pio_encode_wait_pin(true, PHI1));
@@ -372,6 +409,7 @@ uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t a
   dma_channel_wait_for_finish_blocking(dma_tx_control);
 
   set_sidwriting(false);
+  spin_unlock(bus_spinlock, bus_irq);
   return cycles;
 }
 
@@ -387,9 +425,11 @@ uint16_t __no_inline_not_in_flash_func(cycled_delayed_write_operation)(uint8_t a
  */
 void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint8_t data, uint16_t cycles)
 {
+  uint32_t bus_irq = spin_lock_blocking(bus_spinlock);
   delay_word = cycles;
   sid_memory[(address & 0x7F)] = data; /* Store SID write data in SID memory */
   if (set_bus_bits(address, true) != 1) { /* Set bus bits (uses SID memory as source) */
+    spin_unlock(bus_spinlock, bus_irq);
     return;
   }
 
@@ -417,6 +457,7 @@ void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint
     address, data, cycles, delay_word);
 
   set_sidwriting(false);
+  spin_unlock(bus_spinlock, bus_irq);
   return;
 }
 
@@ -431,8 +472,10 @@ void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint
  */
 uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, uint16_t cycles)
 {
+  uint32_t bus_irq = spin_lock_blocking(bus_spinlock);
   delay_word = cycles;
   if __us_unlikely(set_bus_bits(address, false) != 1) {
+    spin_unlock(bus_spinlock, bus_irq);
     return 0x00;
   }
 
@@ -453,7 +496,9 @@ uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, ui
   sid_memory[(address & 0x7F)] = (read_data & 0xFF);
 
   set_sidwriting(false);
-  return sid_memory[(address & 0x7F)];
+  uint8_t result = sid_memory[(address & 0x7F)];
+  spin_unlock(bus_spinlock, bus_irq);
+  return result;
 }
 
 /**

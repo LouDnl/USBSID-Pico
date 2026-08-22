@@ -44,6 +44,7 @@ void     cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
 uint8_t  cycled_read_operation(uint8_t address, uint16_t cycles);
 
 /* Functions from bus.c */
+void     bus_lock_init(void);
 void     restart_bus(void);
 int      bus_drain(void);
 void     bus_resync(void);
