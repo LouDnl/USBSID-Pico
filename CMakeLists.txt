@@ -719,7 +719,20 @@ message(TRACE "Compile time include dirs:")
 message(TRACE "${TARGET_INCLUDE_DIRS}")
 
 ### Compile targets
+# FW_VERSION_INT/PCB_VERSION_INT below get emitted as bare (unquoted) numeric
+# -D defines, so the C compiler parses them as C integer literals - any
+# literal starting with "0" is octal there, and octal digits only run 0-7.
+# "0.8.0" collapses to "080", which broke the very first time a MAJOR
+# version of 0 met a MINOR/PATCH digit of 8 or 9 (every version before this
+# happened to concatenate to all-0-7 digits, so this never came up). Strip
+# leading zeros so the literal can never be mistaken for octal, regardless
+# of platform version - "080" -> "80" (still stays a valid, comparable
+# integer for the PCB_VERSION_INT >= NN checks throughout src/).
 string(REPLACE "." "" FWVER_INT "${FWVERSION}")
+string(REGEX REPLACE "^0+" "" FWVER_INT "${FWVER_INT}")
+if(FWVER_INT STREQUAL "")
+  set(FWVER_INT "0")
+endif()
 foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSIONS)
   # set filename
   set(BUILD ${FILENAME})
@@ -731,7 +744,14 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   # executable
   add_executable(${BUILD} ${SOURCEFILES})
   # BUILD TYPES
+  # Same octal-literal trap as FWVER_INT above - not hit yet (1.0/1.3/1.5
+  # never start with "0"), but stripped for the same reason so it can't
+  # silently reappear if a PCB version ever does.
   string(REPLACE "." "" PCBVER_INT "${PCBVERSION}")
+  string(REGEX REPLACE "^0+" "" PCBVER_INT "${PCBVER_INT}")
+  if(PCBVER_INT STREQUAL "")
+    set(PCBVER_INT "0")
+  endif()
   if(PICOTYPE STREQUAL "RGB")
     target_compile_definitions(${BUILD} PRIVATE USBSID USBSID_PRODUCT="${BUILD_VERSION}" USE_RGB=1 PCB_VERSION="${PCBVERSION}" PCB_VERSION_INT=${PCBVER_INT} FW_VERSION_INT=${FWVER_INT})
   else()
