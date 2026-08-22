@@ -393,7 +393,6 @@ void tud_umount_cb(void)
   set_receivedata(false), dtype = rtype = ntype;
   /* usDBG("[%s]\n", __func__); */
   usNFO("[CDC] Unmount\n");
-  disable_sid();  /* NOTICE: Testing if this is causing the random lockups */
 }
 
 void tud_suspend_cb(bool remote_wakeup_en)
