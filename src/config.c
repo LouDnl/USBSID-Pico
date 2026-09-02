@@ -723,9 +723,9 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       write_back_data(SOCKET_BUFFER_SIZE);
       break;
     case READ_NUMSIDS:
-      usCFG("READ_NUMSIDS: %u\n", (uint8_t)cfg.numsids);
+      usCFG("READ_NUMSIDS: %u\n", get_numsids());
       memset(write_buffer_p, 0, 64);
-      write_buffer_p[0] = (uint8_t)cfg.numsids;
+      write_buffer_p[0] = get_numsids();
       write_back_data(1);
       break;
     case READ_FMOPLSID:

@@ -261,12 +261,12 @@ void pause_sid(void)
  */
 void pause_sid_withmute(void)
 {
-  usDBG("[PAUSE STATE PRE] %d\n", paused_state);
-  if (!paused_state) mute_sid();
-  if (paused_state) unmute_sid();
+  usDBG("[PAUSE STATE PRE] %d\n", get_paused_state());
+  if (!get_paused_state()) mute_sid();
+  if (get_paused_state()) unmute_sid();
   pause_sid();
-  set_paused_state(!paused_state);
-  usDBG("[PAUSE STATE POST] %d\n", paused_state);
+  set_paused_state(!get_paused_state());
+  usDBG("[PAUSE STATE POST] %d\n", get_paused_state());
   return;
 }
 
