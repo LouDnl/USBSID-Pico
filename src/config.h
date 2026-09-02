@@ -390,7 +390,7 @@ enum
   /* legacy commands */
   PDSID            = 0xA3,  /* Holds the reset line for 5 seconds to change SID type on a PDSID */
 
-#if defined(ONBOARD_EMULATOR) || defined(ONBOARD_SIDPLAYER)
+#if defined(ONBOARD_SIDPLAYER)
   /* Internal SID player */
   UPLOAD_SID_START    = 0xD0,  /* Start command for USBSID to go into receiving mode */
   UPLOAD_SID_DATA     = 0xD1,  /* Init byte for each packet containing data */
@@ -516,7 +516,7 @@ static const uint8_t us_features = (
 #endif
   /* 4 Unused */
   /* 5 Unused */
-#if defined(ONBOARD_EMULATOR)
+#if defined(ONBOARD_CYNTHCART)
   | (1 << 6)
 #endif
 #if defined(ONBOARD_SIDPLAYER)

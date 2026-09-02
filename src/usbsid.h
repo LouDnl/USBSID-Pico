@@ -38,12 +38,7 @@ extern uint8_t uart_buffer[];
 extern uint8_t *write_buffer_p;
 
 /* SID register shadow memory from usbsid.c */
-#if defined(ONBOARD_EMULATOR)
-extern uint8_t c64memory[];
-extern uint8_t *sid_memory;
-#else
 extern uint8_t sid_memory[];
-#endif
 
 /* USB connection state */
 /* extern volatile bool receivedata, sidwriting; */
@@ -58,12 +53,12 @@ extern volatile uint8_t *cdc_itf, *wusb_itf;
 extern volatile double cpu_mhz, cpu_us, sid_hz, sid_mhz, sid_us;
 
 /* Emulator flags from usbsid.c */
-#if defined(ONBOARD_EMULATOR)
+#if defined(ONBOARD_CYNTHCART)
 extern volatile bool
   emulator_running,
   starting_emulator,
   stopping_emulator;
-#endif /* ONBOARD_EMULATOR */
+#endif /* ONBOARD_CYNTHCART */
 
 /* SID player flags from usbsid.c */
 #if defined(ONBOARD_SIDPLAYER)
@@ -74,8 +69,12 @@ extern volatile bool
   sidplayer_stop,
   sidplayer_next,
   sidplayer_prev;
-extern uint8_t * sidfile; /* Temporary buffer to store incoming data */
-extern volatile int sidfile_size;
+/* REVERT NOTE: `sidfile` (calloc'd staging buffer) and `sidfile_size`
+ * (the announced size from UPLOAD_SID_SIZE) used to live here and get
+ * passed to load_prg()/load_sidtune(). Removed: UPLOAD_SID_DATA now feeds
+ * usplayer's own tune buffer directly via usplayer_upload_feed(), so there
+ * is nothing left to stage or size here. See config.c's UPLOAD_SID_* cases
+ * and usplayer.h's "Streaming upload" block. */
 extern volatile char tuneno;
 extern volatile bool is_prg;
 extern volatile uint32_t playtime, maxplaytime;

@@ -52,15 +52,8 @@ uint8_t __not_in_flash("usbsid_buffer") config_buffer[MAX_BUFFER_SIZE] __aligned
 uint8_t __not_in_flash("usbsid_buffer") uart_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);   /* 64 Bytes, 128 bytes aligned */
 uint8_t *write_buffer_p = write_buffer; /* Init pointer for external use */
 
-#if defined(ONBOARD_EMULATOR)
-/* Use full 64KB memory for C64 emulator */
-uint8_t __not_in_flash("c64_memory") c64memory[C64_MEMORY_SIZE] __aligned(128) = {0}; /* 64 Kilo Bytes, 128 bytes aligned */
-/* Pointer to SID address range in memory */
-uint8_t * sid_memory = &c64memory[0xd400]; /* Pointer to $d400 of 128 Bytes total */
-#else
 /* 128 Bytes 'Memory' storage for SID registers */
 uint8_t __not_in_flash("usbsid_buffer") sid_memory[SID_MEMORY_SIZE] __aligned(SID_MEMORY_SIZE) = {0}; /* 128 Bytes, 128 bytes aligned */
-#endif
 
 volatile static bool receivedata = false, sidwriting = false;
 /**
@@ -103,14 +96,6 @@ volatile bool sid_change_unacknowledged = true;
 const bool detected_sid_change = false;
 #endif
 
-/* Cynthcart emulator */
-#if defined(ONBOARD_EMULATOR)
-#include <emudore_emulator.h>
-volatile bool emulator_running = false;
-volatile bool starting_emulator = false;
-volatile bool stopping_emulator = false;
-#endif /* ONBOARD_EMULATOR */
-
 /* SID player */
 #if defined(ONBOARD_SIDPLAYER)
 #include <usplayer.h>
@@ -126,12 +111,19 @@ volatile bool is_sidplayerplaying(void) { return sidplayer_playing; };
 volatile bool sidplayer_stop = false;
 volatile bool sidplayer_next = false;
 volatile bool sidplayer_prev = false;
-uint8_t * sidfile = NULL; /* Temporary buffer to store incoming data */
-volatile int sidfile_size = 0;
 volatile char tuneno = 0;
 volatile bool is_prg = false; /* Default to SID file */
 volatile uint32_t playtime = 0;
 volatile uint32_t maxplaytime = 300000; /* 5 minutes in milliseconds */
+/* Cynthcart, via USBSID-Player's MC68B50 ACIA */
+#if defined(ONBOARD_CYNTHCART)
+#include <cynthcart_embedded.h>
+volatile bool emulator_running = false;
+volatile bool starting_emulator = false;
+volatile bool stopping_emulator = false;
+#else
+volatile bool emulator_running = false;
+#endif /* ONBOARD_CYNTHCART */
 #else
 /**
  * @brief Check whether the onboard SID player is currently playing
@@ -931,24 +923,35 @@ void core1_main(void)
 
     /* Drain the MIDI event ring; this is where the SID bus writes for MIDI
      * input now happen, off the USB callback on core0 */
-    midi_engine_task();
+#ifdef ONBOARD_CYNTHCART
+    if __us_likely(!emulator_running) {
+#endif
+      midi_engine_task();
+#ifdef ONBOARD_CYNTHCART
+    }
+#endif
 
 #ifdef ONBOARD_SIDPLAYER
-    if (sidplayer_init) {
+    if (sidplayer_init && !emulator_running) {
       sidplayer_init = false;
       sidplayer_start = false;
       sidplayer_playing = false;
       offload_ledrunner = true;
+      /* REVERT NOTE: this used to be load_prg(sidfile, sidfile_size, false) /
+       * load_sidtune(sidfile, sidfile_size, tuneno) followed by
+       * free(sidfile) - the file lived in a firmware-owned buffer filled by
+       * config.c's UPLOAD_SID_DATA case. That buffer is gone: config.c now
+       * streams straight into usplayer's own tune buffer as each packet
+       * arrives (usplayer_upload_start()/_feed()), and these two calls just
+       * finish what was already fed in, no buffer or size to pass. */
       if (is_prg) {
-        load_prg(sidfile, sidfile_size, false); /* Load PRG without auto looping */
+        usplayer_upload_finish_prg(false); /* Load PRG without auto looping */
       } else {
-        load_sidtune(sidfile, sidfile_size, tuneno);
+        usplayer_upload_finish_tune(tuneno);
       }
       sidplayer_start = true;
-      free(sidfile);
-      sidfile = NULL;
     }
-    if (sidplayer_start) {
+    if (sidplayer_start  && !emulator_running) {
       sidplayer_init = false;
       sidplayer_start = false;
       sidplayer_playing = true;
@@ -958,30 +961,30 @@ void core1_main(void)
         start_sidplayer(false); /* No auto loop */
       }
     }
-    if (sidplayer_stop) {
+    if (sidplayer_stop  && !emulator_running) {
       stop_sidplayer();
       sidplayer_stop = false;
       sidplayer_playing = false;
       offload_ledrunner = true;
     }
-    if __us_unlikely (sidplayer_next && !sidplayer_playing) {
+    if __us_unlikely ((sidplayer_next && !sidplayer_playing) && !emulator_running) {
       next_subtune();
       sleep_us(20000);
       sidplayer_next = false;
       sidplayer_playing = true;
     }
-    if __us_unlikely (!sidplayer_playing && sidplayer_prev) {
+    if __us_unlikely ((!sidplayer_playing && sidplayer_prev) && !emulator_running) {
       previous_subtune();
       sidplayer_prev = false;
       sidplayer_playing = true;
     }
-    if __us_likely(sidplayer_playing) {
+    if __us_likely(sidplayer_playing && !emulator_running) {
       loop_sidplayer();
       playtime = usplayer_playtime_ms();
       if __us_unlikely(sidplayer_next || sidplayer_prev) {
         sidplayer_playing = false;
       }
-      if __us_unlikely(playtime >= maxplaytime) {
+      if __us_unlikely((playtime >= maxplaytime) && !emulator_running) {
         sidplayer_stop = true;
         /* Deinit all sidplayer variables */
         sidplayer_init = false;
@@ -991,16 +994,17 @@ void core1_main(void)
     }
 #endif /* ONBOARD_SIDPLAYER */
 
-#ifdef ONBOARD_EMULATOR
-    if (!emulator_running && starting_emulator) {
+#if defined(ONBOARD_CYNTHCART)
+    if ((!emulator_running && starting_emulator) && !sidplayer_playing) {
       starting_emulator = false;
       emulator_running = true;
+      offload_ledrunner = true;
       start_cynthcart();
     }
-    if (emulator_running && !starting_emulator) {
+    if ((emulator_running && !starting_emulator) && !sidplayer_playing) {
       run_cynthcart();
     }
-#endif /* ONBOARD_EMULATOR */
+#endif /* ONBOARD_CYNTHCART */
 
 #ifdef WRITE_DEBUG  /* Only run this queue when needed */
     if (is_receivedata()) {
@@ -1198,12 +1202,13 @@ int main()
 
   {
     usNFO("\n");
-#ifdef ONBOARD_EMULATOR
-    usDBG("Firmware is compiled with Cynthcart support\n");
-#endif
-#ifdef ONBOARD_SIDPLAYER
+#if defined(ONBOARD_SIDPLAYER)
     usDBG("Firmware is compiled with onboard SID player\n");
-#endif
+#if defined(ONBOARD_CYNTHCART)
+    usDBG("Firmware is compiled with Cynthcart support\n");
+#endif /* ONBOARD_CYNTHCART */
+#endif /* ONBOARD_SIDPLAYER */
+
     if (!detected_sid_change) {
       usDBG("%s v%s Started successfully\n\n", us_product, project_version);
     } else {

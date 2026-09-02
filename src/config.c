@@ -43,11 +43,6 @@
 #include <config_logging.h>
 #include <logging.h>
 
-/* Cynthcart emulator */
-#if defined(ONBOARD_EMULATOR)
-#include <emudore_emulator.h>
-#endif /* ONBOARD_EMULATOR */
-
 /* SID player */
 #if defined(ONBOARD_SIDPLAYER)
 #include <usplayer.h>
@@ -1496,41 +1491,53 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       break;
 #if defined(ONBOARD_SIDPLAYER)
     case UPLOAD_SID_START:
+      /* REVERT NOTE: this used to stage the incoming file in its own
+       * calloc'd buffer (0x10000 on RP2350, 0x8000 on RP2040) here, then
+       * hand it to load_prg()/load_sidtune() on core1, which copied it a
+       * second time into usplayer's own tune buffer before freeing this
+       * one - two copies of one file. usplayer_upload_start()/_feed() now
+       * write straight into usplayer's buffer as packets arrive, so there
+       * is nothing to allocate here any more. See usplayer.h's "Streaming
+       * upload" block for the replacement API, and git history for this
+       * file if the old staged-buffer approach ever needs to come back. */
       usCFG("UPLOAD_SID_START: %d\n",buffer[1]);
       playtime = 0; /* Reset playtime on upload to 0 */
       maxplaytime = 300000; /* Reset max playtime on upload back to 5 minutes in milliseconds */
       receiving_sidfile = true;
       sidbytes_received = 0;
       is_prg = ((buffer[1] == PRG_FILE) ? true : false);
-      sidfile = (uint8_t*)calloc(1, 0x10000); /* allocate 64KB */
-      if (sidfile == NULL) {
-        /*
-        * Handle out-of-memory error
-        * NOTE: RP2040 has 264KB RAM; 64KB is ~25% of total.
-        */
-      }
+      usplayer_upload_start();
       break;
     case UPLOAD_SID_DATA:
       if (sidbytes_received == 0) usCFG("UPLOAD_SID_DATA\n");
       if (receiving_sidfile) {
-        for (int i = 1; i < 63; i++) { /* Max buffer size minus command byte (config init byte is already gone) */
-          sidfile[sidbytes_received] = buffer[i];
-          sidbytes_received++;
+        /* Max buffer size minus command byte (config init byte is already
+         * gone); straight into usplayer's own tune buffer, no local copy. */
+        if (!usplayer_upload_feed(&buffer[1], 62)) {
+          receiving_sidfile = false;
+          usERR("More incoming data than usplayer has room for, aborting upload here!\n");
+          break;
         }
+        sidbytes_received += 62; /* kept for the log line below only */
       }
       break;
     case UPLOAD_SID_END:
       usCFG("UPLOAD_SID_END\n");
       usDBG("Received %u bytes\n", sidbytes_received);
       receiving_sidfile = false;
-      /* ISSUE: These are never the same size */
-      /* sidfile_size = sidbytes_received; */
       sidbytes_received = 0;
       break;
     case UPLOAD_SID_SIZE:
+      /* REVERT NOTE: used to be stored in sidfile_size and passed to
+       * load_prg()/load_sidtune() as the byte count. Dropped: usplayer now
+       * tracks the real count itself as bytes stream in, which is more
+       * honest than this announced value ever was (see the removed "these
+       * are never the same size" note this replaces). The command is still
+       * accepted so the upload sequence on the wire is unchanged; the value
+       * itself just goes nowhere now. */
       usCFG("UPLOAD_SID_SIZE\n");
-      sidfile_size = (buffer[1]<<8|buffer[2]);
-      usDBG("Received SID file size: %u\n", sidfile_size);
+      usDBG("Received file size announcement: %u (no longer used)\n",
+        (unsigned)(buffer[1]<<8|buffer[2]));
       break;
     case UPLOAD_SID_PLAYTIME:
       usCFG("UPLOAD_SID_PLAYTIME\n");

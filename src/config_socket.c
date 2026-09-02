@@ -57,7 +57,6 @@ void set_socketconfig_logging(bool enabled)
   return;
 }
 
-#if defined(ONBOARD_EMULATOR)
 /**
  * @brief Helper function for retrieving the number of SID's configured
  *
@@ -67,7 +66,6 @@ uint8_t get_numsids(void)
 {
   return cfg.numsids;
 }
-#endif /* ONBOARD_EMULATOR */
 
 /**
  * @brief Returns the FMOpl SID number
