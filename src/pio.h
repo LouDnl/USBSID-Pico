@@ -48,17 +48,18 @@
 
 
 /* NOTICE: PIO & Statemachine usage
- * PIO0
- * SM0: sm_clkcnt  - PHI1 SID clock (clock.pio / pio.c)
+ * PIO0 ~ bus_pio
+ * SM0: sm_clock   - PHI1 SID clock (clock.pio / pio.c)
  * SM1: sm_control - Bus control write and data read (bus_control.pio / pio.c)
  * SM2: sm_data    - Data and address bus write (bus_control.pio / pio.c)
  * SM3: sm_delay   - Delay cycle counter interrupt for bus SM1 & SM2 (bus_control.pio / pio.c)
- * PIO1
+ * PIO1 ~ led_pio & clkcnt_pio
  * SM0: Buffer raster cycle counter (ASID) (bus_control.pio / asid_buffer.c)
- * SM1: LED PWM control (Non Wifi boards only, unused otherwise) (vu.pio)
- * SM2: RGB LED control (as LED but for RGB Boards only, unused otherwise) (vu_rgb.pio)
- * SM3: PHI1 Clock cycle counter (cycle_counter.pio)
+ * SM1: sm_pwmled  - LED PWM control (Non Wifi boards only, unused otherwise) (vu.pio)
+ * SM2: sm_rgbled  - RGB LED control (as LED but for RGB Boards only, unused otherwise) (vu_rgb.pio)
+ * SM3: sm_clkcnt  - PHI1 Clock cycle counter (cycle_counter.pio)
  * PIO2 (rp2350 only!)
+ * On the pico2_w the BT & WiFi (when used) is offloaded to this PIO, unknown is what SM it uses
  * SM0: Uart RX (uart_rx.pio / uart.c)
  * SM1:
  * SM2:
@@ -76,8 +77,8 @@
   * SM3: dma_tx_delay   - DMA_SIZE_16 - DREQ_PIO0_TX3
   * PIO1
   * SM0: - no DMA use
-  * SM1: dma_pwmled     - DMA_SIZE_32 - DREQ_PIO1_TX0
-  * SM2: dma_rgbled     - DMA_SIZE_32 - DREQ_PIO1_TX1
+  * SM1: dma_pwmled     - DMA_SIZE_32 - DREQ_PIO1_TX1
+  * SM2: dma_rgbled     - DMA_SIZE_32 - DREQ_PIO1_TX2
   * SM3: dma_counter    - DMA_SIZE_32 - DREQ_PIO1_RX3 (dual channel on rp2040)
   * PIO2 (rp2350 only!)
   * SM0:
