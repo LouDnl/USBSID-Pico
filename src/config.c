@@ -1679,7 +1679,7 @@ void print_config(void)
 void apply_busclock_settings(bool silent)
 {
   if (!silent) usCFG("  Applying bus clock settings\n");
-  stop_dma_channels();
+  abort_dma_bustransfers();
   restart_bus_clocks();
   sync_pios(false);
 }
@@ -1910,10 +1910,8 @@ void apply_clockrate(int n_clock, bool suspend_sids)
         usCFG("  C64 SID Clock @ %.0f Hz, %.6f MHz, %.4f uS\n",
           sid_hz, sid_mhz, sid_us);
         /* Start clock set */
-        // ISSUE: EVEN THOUGH THIS IS BETTER IT DOES NOT SOLVE THE CRACKLING/BUS ROT ISSUE!
-        stop_dma_channels();
+        abort_dma_bustransfers();
         restart_bus_clocks();
-        start_dma_channels();
         sync_pios(false);
         if (suspend_sids) {
           usCFG("Enable SID's and UnMute\n");

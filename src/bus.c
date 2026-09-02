@@ -512,7 +512,7 @@ uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, ui
 void restart_bus(void)
 {
   usDBG("Restarting BUS\n");
-  /* unclaim dma channels */
+  /* unclaim all dma channels */
   unclaim_dma_channels();
   /* stop all pio's */
   stop_pios();
@@ -520,6 +520,7 @@ void restart_bus(void)
   setup_piobus();
   /* start dma */
   setup_dmachannels();
+  setup_vu_dma(); /* Unclaimed in unclaim dma channels */
   /* sync pios */
   sync_pios(false);
   usDBG("Finished restarting BUS\n");

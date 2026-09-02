@@ -267,33 +267,47 @@ void clear_dma_channels(void)
   return;
 }
 
-void stop_dma_channels(void) /* TODO: Fix like `clear_dma_channels` */
-{ // TODO: Fix and finish per RP2040-E13 and RP2350-E5
-  // usCFG("[STOP DMA CHANNELS]\n");
-  /* Clear any Interrupt enable bits as per RP2040-E13 */
-  // TODO: FINISH
-  /* Atomically abort channels */
-  // dma_hw->abort = (1 << dma_tx_delay) | (1 << dma_rx_data) | (1 << dma_tx_data) | (1 << dma_tx_control);
-  /* Wait for all aborts to complete */
-  // while (dma_hw->abort) tight_loop_contents();
-  /* Check and clear any Interrupt enable bits as per RP2040-E13 */
-  // TODO: FINISH
-  /* Wait for channels to not be busy */
-  // while (dma_hw->ch[dma_tx_delay].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS) tight_loop_contents();
-  // while (dma_hw->ch[dma_rx_data].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS) tight_loop_contents();
-  // while (dma_hw->ch[dma_tx_data].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS) tight_loop_contents();
-  // while (dma_hw->ch[dma_tx_control].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS) tight_loop_contents();
+/**
+ * @brief Abort the 4 bus DMA channels only, leaving the counter channel(s)
+ *        and PIO/fifo state untouched. Used before a clock/PIO resync (see
+ *        `apply_busclock_settings` and `apply_clockrate` in config.c), the
+ *        fifo flush and statemachine resync there is done by the following
+ *        `sync_pios(false)` call, not by this function.
+ *
+ *        The 4 bus DMA channels stay claimed, configured and enabled across
+ *        the abort (`dma_channel_abort` never touches CTRL_EN); each is
+ *        re-triggered on demand per bus operation with a freshly written
+ *        buffer address (see bus.c), so there is nothing to re-arm
+ *        afterwards. NOTE: never trigger these channels via
+ *        `dma_hw->multi_channel_trigger` right after this call, it would
+ *        replay whatever stale control/data word was still loaded when
+ *        the abort below ran
+ *
+ */
+void abort_dma_bustransfers(void)
+{
+  uint32_t abort_mask = (1u << dma_tx_control) | (1u << dma_tx_data)
+                      | (1u << dma_rx_data)    | (1u << dma_tx_delay);
+  /* RP2040-E13 / RP2350-E5: disable IRQ enables for these channels before
+   * aborting so a pending completion cannot block the abort */
+  uint32_t saved_inte0 = dma_hw->inte0 & abort_mask;
+  hw_clear_bits(&dma_hw->inte0, abort_mask);
+  /* Atomically abort all four channels */
+  dma_hw->abort = abort_mask;
+  while (dma_hw->abort & abort_mask) tight_loop_contents();
+  /* Clear any spurious interrupt status raised during abort */
+  dma_hw->ints0 = abort_mask;
+  /* Restore interrupt enables */
+  hw_set_bits(&dma_hw->inte0, saved_inte0);
   return;
 }
 
-void start_dma_channels(void)
-{ /* NOTE: DO NOT USE, THIS STARTS A TRANSFER IN THE CURRENT CONFIG */
-  /* Trigger -> start dma channels all at once */
-  // usCFG("[START DMA CHANNELS]\n");
-  // dma_hw->multi_channel_trigger = (1 << dma_tx_delay) | (1 << dma_rx_data) | (1 << dma_tx_data) | (1 << dma_tx_control);
-  return;
-}
-
+/**
+ * @brief Unclaim all bus, clock-counter and VU LED DMA channels
+ *
+ * Counterpart to setup_dmachannels/setup_vu_dma, used when restarting the
+ * bus (see restart_bus in bus.c).
+ */
 void unclaim_dma_channels(void)
 {
   /* disable delay timer dma */
@@ -304,9 +318,21 @@ void unclaim_dma_channels(void)
   dma_channel_unclaim(dma_tx_data);
   /* disable control bus dma */
   dma_channel_unclaim(dma_tx_control);
+
+  /* disable counter dma */
+  dma_channel_unclaim(dma_counter);
+#if PICO_RP2040
+  /* disable counter chain dma */
+  dma_channel_unclaim(dma_counter_chain);
+#endif
+
+#if defined(PICO_DEFAULT_LED_PIN)
+  /* disable pwmled dma */
+  dma_channel_unclaim(dma_pwmled);
+#if defined(USE_RGB)  /* No RGB LED on _w Pico's */
+  /* disable rgbled dma */
+  dma_channel_unclaim(dma_rgbled);
+#endif
+#endif
   return;
 }
-
-// dma_hw->abort = (1 << dma_counter);
-// while (dma_hw->abort) tight_loop_contents();
-// while (dma_hw->ch[dma_counter].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS) tight_loop_contents();
