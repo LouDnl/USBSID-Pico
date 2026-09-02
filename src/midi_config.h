@@ -36,6 +36,7 @@
 #include <sid_defs.h>   /* MAX_CHANNELS, MAX_SIDS, MAX_VOICES */
 #include <midi_defs.h>  /* midi_ccvalues, for the persisted blob below */
 #include <midi_patch.h> /* midi_patch_t, MIDI_PATCH_COUNT, for the persisted blob below */
+#include <midi_arp_table.h> /* midi_arp_table_t, MIDI_ARP_TABLE_COUNT, for the persisted blob below */
 
 
 typedef enum {
@@ -48,7 +49,7 @@ typedef enum {
 typedef enum {
   MIDI_AT_FILTER = 0,
   MIDI_AT_VOLUME,
-  MIDI_AT_VIBRATO,  /* Phase 4: sets lfo_depth on the fly, see handle_aftertouch() */
+  MIDI_AT_VIBRATO,  /* sets lfo_depth on the fly, see handle_aftertouch() */
 } midi_aftertouch_target_t;
 
 typedef enum {
@@ -70,12 +71,14 @@ typedef enum {
   MIDI_ARP_UPDOWN,
   MIDI_ARP_RANDOM,
   MIDI_ARP_AS_PLAYED,
+  MIDI_ARP_TABLE,  /* steps arp_tables[arp_table_sel] instead of a fixed shape - see
+                       arp_advance_table() in midi_handler.c */
 } midi_arp_mode_t;
 
 #define MIDI_CH_AUTO_GATE      (1u << 0)  /* gate follows note-on/off automatically */
 #define MIDI_CH_VELOCITY_MODE  (1u << 1)  /* velocity scales decay instead of doing nothing */
 #define MIDI_CH_ARP_ENABLED    (1u << 2)  /* note-on/off feed the arpeggiator instead of the pool directly */
-/* Set/cleared by CC_FMEN (midi_fmopl.c's midi_fmopl_set_target()), TODO 14:
+/* Set/cleared by CC_FMEN (midi_fmopl.c's midi_fmopl_set_target()):
  * a channel with this set never touches the SID voice pool - note-on/off,
  * Program Change and CC_VOL are redirected to midi_fmopl.c entirely, and
  * every other SID-specific CC becomes a no-op for it (see
@@ -83,6 +86,13 @@ typedef enum {
  * sid_override - deliberately so, since the one physical FMOpl chip has
  * nothing to do with SID slot routing. */
 #define MIDI_CH_TARGET_FMOPL   (1u << 3)
+/* Channel claims MIDI_VOICE_UNISON_COUNT (3) adjacent pool slots on
+ * one SID per note instead of 1 - detuned unison, MBSID Lead-engine style.
+ * Real tradeoff, not a free addition: that SID drops from 3-voice polyphony
+ * to monophonic while a channel with this set is sounding on it. See
+ * midi_voice_alloc_unison() (midi_voice.h/.c) and note_on()/note_off()'s
+ * unison branch (midi_handler.c). */
+#define MIDI_CH_UNISON         (1u << 4)
 
 /* Held-note capacity for the arpeggiator's input pattern. A held key beyond
  * this is simply not added to the pattern; the arp still plays whatever
@@ -98,9 +108,7 @@ typedef enum {
  * MIDI_OVERRIDE_NONE clears the restriction. */
 #define MIDI_OVERRIDE_NONE 0xFF
 
-/* Per-channel routing and voice-template state, one entry per MIDI channel.
- * Patch fields (Phase 5) are added when persistence gives them something to
- * be loaded into; everything else the design called for is here. */
+/* Per-channel routing and voice-template state, one entry per MIDI channel. */
 typedef struct {
   uint16_t voice_mask;      /* configured pool slots this channel may use, bit i = slot i */
   uint8_t  poly_limit;      /* max simultaneously held notes; 1 = mono */
@@ -120,6 +128,12 @@ typedef struct {
   uint8_t  tmpl_susrel;
   uint8_t  tmpl_pwmlo;
   uint8_t  tmpl_pwmhi;
+
+  /* Unison detune spread (0-255, MBSID's own single-field
+   * convention - see mbsidv2_sysex_implementation.txt addr 0x051). Voice 2
+   * and 3 of a claimed unison triplet are offset +detune/-detune from the
+   * struck pitch; unused unless MIDI_CH_UNISON is set in `flags`. */
+  uint8_t  unison_detune;
 
   /* Pitch bend: current offset in note-index*256 fixed point, updated
    * immediately on a pitch-bend message and re-applied every tick (so LFO
@@ -144,6 +158,20 @@ typedef struct {
   uint32_t lfo_sh_seed;
   int16_t  lfo_sh_value;
 
+  /* A second, fully independent LFO. Same shape as the fields
+   * above, stacked at the tick (midi_tick(), midi_handler.c): if both
+   * target the same destination their offsets simply add before the one
+   * bus write for that destination, same principle write_voice_pitch()
+   * already uses for bend+portamento+LFO. Reuses midi_lfo_wave_t/
+   * midi_lfo_dest_t - two destinations, not two enums. */
+  uint8_t  lfo2_wave;
+  uint8_t  lfo2_rate;
+  uint8_t  lfo2_depth;
+  uint8_t  lfo2_dest;
+  uint16_t lfo2_phase;
+  uint32_t lfo2_sh_seed;
+  int16_t  lfo2_sh_value;
+
   /* Arpeggiator. Held notes are the arp's *input* pattern, separate from
    * the voice pool: only the currently stepped note is ever a gated voice.
    * `arp_rate` free-runs like the LFO when no MIDI clock is present; when a
@@ -152,6 +180,7 @@ typedef struct {
   uint8_t  arp_mode;    /* midi_arp_mode_t */
   uint8_t  arp_rate;
   uint8_t  arp_octaves; /* repeat the held pattern transposed by 0..arp_octaves extra octaves */
+  uint8_t  arp_table_sel;  /* which arp_tables[] slot MIDI_ARP_TABLE reads, set by CC_ARPT */
   uint8_t  arp_held[MIDI_ARP_MAX_NOTES];
   uint8_t  arp_held_count;
   uint8_t  arp_step;        /* index into the expanded (octaves-multiplied) pattern */
@@ -169,7 +198,7 @@ typedef struct {
    * would drift since the tick writes that same register. */
   uint16_t filter_cutoff;
 
-  /* Phase 5: currently selected Program Change patch, MIDI_PATCH_NONE if
+  /* Currently selected Program Change patch, MIDI_PATCH_NONE if
    * none has been selected since boot (the compiled-in defaults above are
    * what a channel plays until then). */
   uint8_t  patch;
@@ -190,7 +219,7 @@ void midi_config_init(void);
 uint16_t midi_channel_effective_mask(uint8_t channel);
 
 
-/* --- Flash persistence (Phase 5) -----------------------------------------
+/* --- Flash persistence ----------------------------------------------------
  *
  * A fixed magic distinct from MAGIC_SMOKE (which is the build date, see
  * globals.h - tying to it would wipe the MIDI blob on every rebuild) plus a
@@ -208,7 +237,15 @@ uint16_t midi_channel_effective_mask(uint8_t channel);
  * -------------------------------------------------------------------- */
 
 #define MIDI_CONFIG_MAGIC   0x4D494431u  /* 'MID1', fixed, independent of MAGIC_SMOKE */
-#define MIDI_CONFIG_VERSION 1
+#define MIDI_CONFIG_VERSION 3  /* 2: arp_tables[] added to the blob and
+                                   arp_table_sel added to midi_channel_cfg_t.
+                                   3: the lfo2 fields and unison_detune added
+                                   to midi_channel_cfg_t, and the lfo2 and
+                                   unison fields added to midi_patch_t (see
+                                   midi_patch.h). Old size no longer matches
+                                   either bump; midi_config_load's existing
+                                   size check falls back to defaults on an
+                                   old blob rather than misreading it. */
 
 typedef struct {
   uint32_t magic;
@@ -222,6 +259,7 @@ typedef struct {
                                                   for why the transient runtime fields inside
                                                   it are safe to persist as-is */
   midi_patch_t        patch[MIDI_PATCH_COUNT];
+  midi_arp_table_t    arp_table[MIDI_ARP_TABLE_COUNT];  /* midi_arp_table.h */
 } midi_config_blob_t;
 
 /* Erase-and-write a new slot with the current live state (midi_channels[],

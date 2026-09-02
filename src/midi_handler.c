@@ -35,6 +35,7 @@
 #include <midi_config.h>
 #include <midi_voice.h>
 #include <midi_patch.h>
+#include <midi_arp_table.h>
 #include <midi_fmopl.h>
 #include <midi_handler.h>
 
@@ -66,18 +67,38 @@ static void all_notes_off(uint8_t channel, uint8_t cc, uint8_t value);
 static void release_channel_voices(uint8_t channel);
 
 /* Internal helper functions */
+/**
+ * @brief Fast SID register write with no artificial cycle delay
+ *
+ * @param uint8_t a, register address
+ * @param uint8_t b, value to write
+ */
 static void midi_bus_operation(uint8_t a, uint8_t b)
 {
   cycled_write_operation(a, b, 0);  /* 0 cycles constant for fast writing */
   return;
 }
 
+/**
+ * @brief Get the currently configured SID clock rate, falling back to the compile-time default
+ *
+ * @return uint32_t clock rate in Hz
+ */
 static inline uint32_t midi_clockrate(void)
 {
   /* The configured clock lives on usbsid_config, not on the runtime cfg */
   return (usbsid_config.clock_rate == 0 ? (uint32_t)CLOCK_DEFAULT : usbsid_config.clock_rate);
 }
 
+/**
+ * @brief Rebuild the clock-scaled MIDI note frequency table for the current clock rate
+ *
+ * Rescales musical_scale_values[] (generated for a 1.000 MHz SID clock)
+ * to the currently configured clock rate, rounding rather than truncating
+ * since a truncated step costs real tuning accuracy at the bottom of the
+ * range. Records note_table_clock so check_note_table() can detect a
+ * later clock change.
+ */
 static void build_note_table(void)
 {
   uint32_t rate = midi_clockrate();
@@ -92,34 +113,67 @@ static void build_note_table(void)
   return;
 }
 
-/* Cheap enough to run on every incoming message and keeps the table honest
- * without config.c having to call into the MIDI handler on a clock change */
+/**
+ * @brief Rebuild the note table if the configured clock rate has changed since it was last built
+ *
+ * Cheap enough to run on every incoming MIDI message, keeping the table
+ * honest without config.c having to call into the MIDI handler on a
+ * clock change.
+ */
 static inline void check_note_table(void)
 {
   if __us_unlikely(note_table_clock != midi_clockrate()) build_note_table();
   return;
 }
 
-/* Bit / nibble helpers, generalised to a target byte pointer.
- * A target is either a live sid_memory[] location (written straight to the
- * bus by the caller afterwards) or a channel's per-voice register template
- * (pushed to every held voice by propagate_reg() afterwards). Neither of
- * these helpers writes the bus itself. */
+/**
+ * @brief Set the given bit(s) in a target byte
+ *
+ * Bit/nibble helpers in this group are generalised to a target byte
+ * pointer. A target is either a live sid_memory[] location (written
+ * straight to the bus by the caller afterwards) or a channel's per-voice
+ * register template (pushed to every held voice by propagate_reg()
+ * afterwards). None of these helpers writes the bus itself.
+ *
+ * @param uint8_t * target
+ * @param int bit
+ */
 static inline void set_bit_at(uint8_t *target, int bit)
 {
   *target = (uint8_t)(*target | bit);
   return;
 }
+/**
+ * @brief Clear the given bit(s) in a target byte
+ *
+ * @param uint8_t * target
+ * @param int bit
+ */
 static inline void unset_bit_at(uint8_t *target, int bit)
 {
   *target = (uint8_t)(*target & ~bit);
   return;
 }
+/**
+ * @brief Toggle the given bit(s) in a target byte
+ *
+ * @param uint8_t * target
+ * @param int bit
+ */
 static inline void toggle_bit_at(uint8_t *target, int bit)
 {
   *target = (uint8_t)((~(*target & bit) & bit) | (*target & ~bit));
   return;
 }
+/**
+ * @brief Set, clear or toggle a bit in a target byte based on a MIDI CC value
+ *
+ * CC value 127 sets the bit, 0 clears it, any other value toggles it.
+ *
+ * @param uint8_t * target
+ * @param int bit
+ * @param uint8_t cc_value
+ */
 static inline void handle_bit_at(uint8_t *target, int bit, uint8_t cc_value)
 {
   switch (cc_value) {
@@ -129,6 +183,18 @@ static inline void handle_bit_at(uint8_t *target, int bit, uint8_t cc_value)
   }
   return;
 }
+/**
+ * @brief Write a value into one nibble of a target byte, preserving the other nibble
+ *
+ * nibble_to_preserve is the mask of the nibble to keep unchanged: when it
+ * is R_NIBBLE (preserve the low nibble), val is shifted left 4 bits and
+ * written into the high nibble; otherwise val is written into the low
+ * nibble as-is.
+ *
+ * @param uint8_t * target
+ * @param uint8_t val
+ * @param int nibble_to_preserve
+ */
 static inline void set_nibble_at(uint8_t *target, uint8_t val, int nibble_to_preserve)
 {
   uint8_t wrval = ((nibble_to_preserve == R_NIBBLE) ? (val << SHIFT_4) : val);
@@ -140,7 +206,7 @@ static inline void set_nibble_at(uint8_t *target, uint8_t val, int nibble_to_pre
  * @brief Push a per-voice register value to every voice `channel` currently
  *        holds
  *
- * Replaces Phase 0's poly_propagate(), which walked the 3 voices of one
+ * Replaces the old poly_propagate(), which walked the 3 voices of one
  * fixed active SID. This walks the whole pool and matches on ownership
  * instead, since a channel's held voices can now be spread across SIDs and
  * come and go per note rather than sitting at fixed positions.
@@ -228,6 +294,17 @@ static uint8_t channel_sid_bases(uint8_t channel, uint8_t out[MAX_SIDS])
 /* --- Per-voice register CCs: update the channel's template, then push it
  *     live to every voice the channel currently holds --------------------- */
 
+/**
+ * @brief Update a channel's control-register waveform/test/sync/ring-mod bit template and push it to every held voice
+ *
+ * Maps CC_NOIS/CC_PULS/CC_SAWT/CC_TRIA/CC_TEST/CC_RMOD/CC_SYNC to their
+ * CONTR bit, updates the channel's tmpl_contr, then propagates it live
+ * (preserving each voice's own gate bit).
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc
+ * @param uint8_t value
+ */
 static void set_controlreg(uint8_t channel, uint8_t cc, uint8_t value)
 {
   midi_channel_cfg_t *ch = &midi_channels[channel];
@@ -245,9 +322,17 @@ static void set_controlreg(uint8_t channel, uint8_t cc, uint8_t value)
   return;
 }
 
-/* Manual gate toggle. Deliberately not part of the template: a held drone
- * gated open manually should not be silently re-gated by the next CC that
- * happens to touch CONTR on the same voice. */
+/**
+ * @brief Manually set, clear or toggle the gate bit on every voice a channel currently holds
+ *
+ * Deliberately not part of the CONTR template: a held drone gated open
+ * manually should not be silently re-gated by the next CC that happens to
+ * touch CONTR on the same voice.
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
 static void set_gate(uint8_t channel, uint8_t cc, uint8_t value)
 {
   (void)cc;
@@ -260,6 +345,13 @@ static void set_gate(uint8_t channel, uint8_t cc, uint8_t value)
   return;
 }
 
+/**
+ * @brief Update a channel's ADSR nibble template from CC_ATT/CC_DEC/CC_SUS/CC_REL and push it to every held voice
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc
+ * @param uint8_t value
+ */
 static void set_adsr(uint8_t channel, uint8_t cc, uint8_t value)
 {
   midi_channel_cfg_t *ch = &midi_channels[channel];
@@ -272,6 +364,13 @@ static void set_adsr(uint8_t channel, uint8_t cc, uint8_t value)
   return;
 }
 
+/**
+ * @brief Update a channel's pulse width template from CC_PWM and push it to every held voice
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
 static void set_voicepwm(uint8_t channel, uint8_t cc, uint8_t value)
 {
   (void)cc;
@@ -284,10 +383,18 @@ static void set_voicepwm(uint8_t channel, uint8_t cc, uint8_t value)
   return;
 }
 
-/* CC_NOTE: manual pitch entry. A one-shot nudge on whatever the channel is
- * currently holding, snapped in (no glide) through the same pitch machinery
- * as everything else, so a subsequent tick's LFO/portamento pass does not
- * silently overwrite it with a stale target. */
+/**
+ * @brief CC_NOTE: one-shot manual pitch entry on every voice a channel currently holds
+ *
+ * Snapped in (no glide) through the same pitch machinery as everything
+ * else (midi_voice_set_pitch() + write_voice_pitch()), so a subsequent
+ * tick's LFO/portamento pass does not silently overwrite it with a stale
+ * target.
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
 static void set_notefrequency(uint8_t channel, uint8_t cc, uint8_t value)
 {
   (void)cc;
@@ -303,6 +410,17 @@ static void set_notefrequency(uint8_t channel, uint8_t cc, uint8_t value)
 /* --- Chip-wide CCs: write straight to every SID in the channel's mask,
  *     no template needed, these registers are not per-voice --------------- */
 
+/**
+ * @brief Set filter cutoff (CC_FFC) on every SID in a channel's mask
+ *
+ * Remembers the value on midi_channels[channel].filter_cutoff so the
+ * LFO-cutoff tick (apply_lfo_cutoff()) has a stable centre to modulate
+ * around instead of the live register, which it also writes.
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
 static void set_filtercutoff(uint8_t channel, uint8_t cc, uint8_t value)
 {
   (void)cc;
@@ -321,6 +439,13 @@ static void set_filtercutoff(uint8_t channel, uint8_t cc, uint8_t value)
   return;
 }
 
+/**
+ * @brief Set filter resonance and routing (CC_RES/CC_FLT1-3/CC_FLTE) on every SID in a channel's mask
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc
+ * @param uint8_t value
+ */
 static void set_resfilter(uint8_t channel, uint8_t cc, uint8_t value)
 {
   uint8_t bases[MAX_SIDS];
@@ -339,6 +464,13 @@ static void set_resfilter(uint8_t channel, uint8_t cc, uint8_t value)
   return;
 }
 
+/**
+ * @brief Set master volume and filter mode bits (CC_VOL/CC_3OFF/CC_HPF/CC_BPF/CC_LPF) on every SID in a channel's mask
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc
+ * @param uint8_t value
+ */
 static void set_modevolume(uint8_t channel, uint8_t cc, uint8_t value)
 {
   uint8_t bases[MAX_SIDS];
@@ -374,23 +506,28 @@ static void set_modevolume(uint8_t channel, uint8_t cc, uint8_t value)
  * @param uint8_t channel
  * @param uint8_t patch_index, must be < MIDI_PATCH_COUNT
  */
-static void apply_patch_to_channel(uint8_t channel, uint8_t patch_index)
+/**
+ * @brief Push a patch's filter cutoff/resonance/routing/mode to every SID
+ *        in a channel's mask
+ *
+ * The chip-register-only half of apply_patch_to_channel(): filter_cutoff is
+ * cached on the channel (ch->filter_cutoff) but resonance/filter_routing/
+ * filter_mode are not cached anywhere in RAM at all (see
+ * midi_handler_capture_patch()'s own doc comment) - they only ever exist as
+ * live RESFLT/MODVOL register bits. Factored out so midi_processor_init()
+ * can re-sync these specifically after a config reload (midi_config_load()
+ * only restores RAM structs, it never touches hardware registers), without
+ * re-running the template/LFO/arp portion of apply_patch_to_channel() and
+ * so re-applying it to a channel that has drifted live since its last
+ * Program Change (a filter tweak the user made after selecting the patch,
+ * for instance).
+ *
+ * @param uint8_t channel
+ * @param const midi_patch_t * p
+ */
+static void apply_patch_filter_hw(uint8_t channel, const midi_patch_t *p)
 {
-  const midi_patch_t *p = &midi_patches[patch_index];
-  midi_channel_cfg_t *ch = &midi_channels[channel];
-
-  ch->tmpl_contr  = p->tmpl_contr;
-  ch->tmpl_attdec = p->tmpl_attdec;
-  ch->tmpl_susrel = p->tmpl_susrel;
-  ch->tmpl_pwmlo  = p->tmpl_pwmlo;
-  ch->tmpl_pwmhi  = p->tmpl_pwmhi;
-  propagate_reg(channel, CONTR,  ch->tmpl_contr,  true);
-  propagate_reg(channel, ATTDEC, ch->tmpl_attdec, false);
-  propagate_reg(channel, SUSREL, ch->tmpl_susrel, false);
-  propagate_reg(channel, PWMLO,  ch->tmpl_pwmlo,  false);
-  propagate_reg(channel, PWMHI,  ch->tmpl_pwmhi,  false);
-
-  ch->filter_cutoff = p->filter_cutoff;
+  midi_channels[channel].filter_cutoff = p->filter_cutoff;
   uint8_t Clo = (uint8_t)(p->filter_cutoff & F_MASK_LO);
   uint8_t Chi = (uint8_t)((p->filter_cutoff & F_MASK_HI) >> SHIFT_3);
   uint8_t bases[MAX_SIDS];
@@ -409,18 +546,106 @@ static void apply_patch_to_channel(uint8_t channel, uint8_t patch_index)
     uint8_t modvol = (uint8_t)((sid_memory[bases[i]+MODVOL] & (BIT_7 | NIBBLE_MAX)) | p->filter_mode);
     sid_memory[bases[i]+MODVOL] = modvol; midi_bus_operation(bases[i]+MODVOL, modvol);
   }
+  return;
+}
+
+static void apply_patch_to_channel(uint8_t channel, uint8_t patch_index)
+{
+  const midi_patch_t *p = &midi_patches[patch_index];
+  midi_channel_cfg_t *ch = &midi_channels[channel];
+
+  ch->tmpl_contr  = p->tmpl_contr;
+  ch->tmpl_attdec = p->tmpl_attdec;
+  ch->tmpl_susrel = p->tmpl_susrel;
+  ch->tmpl_pwmlo  = p->tmpl_pwmlo;
+  ch->tmpl_pwmhi  = p->tmpl_pwmhi;
+  propagate_reg(channel, CONTR,  ch->tmpl_contr,  true);
+  propagate_reg(channel, ATTDEC, ch->tmpl_attdec, false);
+  propagate_reg(channel, SUSREL, ch->tmpl_susrel, false);
+  propagate_reg(channel, PWMLO,  ch->tmpl_pwmlo,  false);
+  propagate_reg(channel, PWMHI,  ch->tmpl_pwmhi,  false);
+
+  apply_patch_filter_hw(channel, p);
 
   ch->lfo_wave    = p->lfo_wave;
   ch->lfo_rate    = p->lfo_rate;
   ch->lfo_depth   = p->lfo_depth;
   ch->lfo_dest    = p->lfo_dest;
+  ch->lfo2_wave   = p->lfo2_wave;
+  ch->lfo2_rate   = p->lfo2_rate;
+  ch->lfo2_depth  = p->lfo2_depth;
+  ch->lfo2_dest   = p->lfo2_dest;
   ch->arp_mode    = p->arp_mode;
   ch->arp_rate    = p->arp_rate;
   ch->arp_octaves = p->arp_octaves;
   ch->bend_range  = p->bend_range;
+  if (p->unison_enabled) ch->flags = (uint8_t)(ch->flags | MIDI_CH_UNISON);
+  else                   ch->flags = (uint8_t)(ch->flags & (uint8_t)~MIDI_CH_UNISON);
+  ch->unison_detune = p->unison_detune;
   ch->patch       = patch_index;
 
   usNFO("[PATCH] ch%d -> patch %d\n", channel, patch_index);
+  return;
+}
+
+/**
+ * @brief Capture a channel's current live state into a patch slot - the
+ *        inverse of apply_patch_to_channel()/Program Change
+ *
+ * Reads back exactly the fields apply_patch_to_channel() writes: the
+ * channel's own template/LFO/arp/bend/unison fields directly, and filter
+ * resonance/routing/mode from the first SID in the channel's mask (those
+ * three are chip-wide registers, not cached per-channel - see
+ * set_resfilter()/set_modevolume() above). RAM only, exactly like
+ * SYSEX_MIDI_PATCH_LOAD; SYSEX_MIDI_SAVE persists it. Caller (sysex.c's
+ * handle_patch_save()) is responsible for range-checking channel and
+ * patch_index before calling this.
+ *
+ * @param uint8_t channel
+ * @param uint8_t patch_index, must be < MIDI_PATCH_COUNT
+ */
+void midi_handler_capture_patch(uint8_t channel, uint8_t patch_index)
+{
+  const midi_channel_cfg_t *ch = &midi_channels[channel];
+  midi_patch_t *p = &midi_patches[patch_index];
+
+  p->tmpl_contr  = ch->tmpl_contr;
+  p->tmpl_attdec = ch->tmpl_attdec;
+  p->tmpl_susrel = ch->tmpl_susrel;
+  p->tmpl_pwmlo  = ch->tmpl_pwmlo;
+  p->tmpl_pwmhi  = ch->tmpl_pwmhi;
+
+  p->filter_cutoff = ch->filter_cutoff;
+
+  uint8_t bases[MAX_SIDS];
+  uint8_t n = channel_sid_bases(channel, bases);
+  if (n > 0) {
+    uint8_t resflt = sid_memory[bases[0]+RESFLT];
+    p->resonance      = (uint8_t)((resflt >> SHIFT_4) & NIBBLE_MAX);
+    p->filter_routing = (uint8_t)(resflt & NIBBLE_MAX);
+    p->filter_mode    = (uint8_t)(sid_memory[bases[0]+MODVOL] & (BIT_4 | BIT_5 | BIT_6));
+  } else {
+    p->resonance = 0;
+    p->filter_routing = 0;
+    p->filter_mode = 0;
+  }
+
+  p->lfo_wave    = ch->lfo_wave;
+  p->lfo_rate    = ch->lfo_rate;
+  p->lfo_depth   = ch->lfo_depth;
+  p->lfo_dest    = ch->lfo_dest;
+  p->lfo2_wave   = ch->lfo2_wave;
+  p->lfo2_rate   = ch->lfo2_rate;
+  p->lfo2_depth  = ch->lfo2_depth;
+  p->lfo2_dest   = ch->lfo2_dest;
+  p->arp_mode    = ch->arp_mode;
+  p->arp_rate    = ch->arp_rate;
+  p->arp_octaves = ch->arp_octaves;
+  p->bend_range  = ch->bend_range;
+  p->unison_enabled = (ch->flags & MIDI_CH_UNISON) ? 1 : 0;
+  p->unison_detune  = ch->unison_detune;
+
+  usNFO("[PATCH] ch%d captured -> patch %d\n", channel, patch_index);
   return;
 }
 
@@ -430,6 +655,18 @@ static void apply_patch_to_channel(uint8_t channel, uint8_t patch_index)
  *     controller sending only "select" (typically 127) behaves exactly as
  *     it always has. --------------------------------------------------- */
 
+/**
+ * @brief Set or clear a channel's manual SID-socket override from CC_SID1-4
+ *
+ * Narrows the channel's configured voice_mask at runtime without altering
+ * the configured mask itself. value 0 clears the override
+ * (MIDI_OVERRIDE_NONE); any other value selects the SID socket matching
+ * the CC number (CC_SID1..CC_SID4 -> socket 0..3).
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc
+ * @param uint8_t value
+ */
 static void set_sid_override(uint8_t channel, uint8_t cc, uint8_t value)
 {
   midi_channel_cfg_t *ch = &midi_channels[channel];
@@ -438,10 +675,21 @@ static void set_sid_override(uint8_t channel, uint8_t cc, uint8_t value)
   else if (cc == CC.CC_SID2) ch->sid_override = 1;
   else if (cc == CC.CC_SID3) ch->sid_override = 2;
   else if (cc == CC.CC_SID4) ch->sid_override = 3;
-  usMVCE("[SID OVERRIDE] ch%d -> %d\n", channel, ch->sid_override);
+  usNFO("[SID OVERRIDE] ch%d -> %d\n", channel, ch->sid_override);
   return;
 }
 
+/**
+ * @brief Set or clear a channel's manual voice-within-SID override from CC_VCE1-3
+ *
+ * value 0 clears the override (MIDI_OVERRIDE_NONE); any other value
+ * selects the voice matching the CC number (CC_VCE1..CC_VCE3 -> voice
+ * 0..2).
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc
+ * @param uint8_t value
+ */
 static void set_voice_override(uint8_t channel, uint8_t cc, uint8_t value)
 {
   midi_channel_cfg_t *ch = &midi_channels[channel];
@@ -449,7 +697,7 @@ static void set_voice_override(uint8_t channel, uint8_t cc, uint8_t value)
   if (cc == CC.CC_VCE1) ch->voice_override = 0;
   else if (cc == CC.CC_VCE2) ch->voice_override = 1;
   else if (cc == CC.CC_VCE3) ch->voice_override = 2;
-  usMVCE("[VOICE OVERRIDE] ch%d -> %d\n", channel, ch->voice_override);
+  usNFO("[VOICE OVERRIDE] ch%d -> %d\n", channel, ch->voice_override);
   return;
 }
 
@@ -457,34 +705,163 @@ static void set_voice_override(uint8_t channel, uint8_t cc, uint8_t value)
  *     the arpeggiator's own functions, since enabling/disabling it needs
  *     note_off() which is not declared yet at this point in the file. --- */
 
+/**
+ * @brief Set a channel's LFO1 waveform from a CC value
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
 static void set_lfo_wave(uint8_t channel, uint8_t cc, uint8_t value)
 {
   (void)cc;
   midi_channels[channel].lfo_wave = (uint8_t)MAP(value, MIN_VAL, MIDI_CC_MAX, MIDI_LFO_TRI, MIDI_LFO_SH);
   return;
 }
+/**
+ * @brief Set a channel's LFO1 rate from a CC value
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
 static void set_lfo_rate(uint8_t channel, uint8_t cc, uint8_t value)
 {
   (void)cc;
   midi_channels[channel].lfo_rate = value;
   return;
 }
+/**
+ * @brief Set a channel's LFO1 depth from a CC value
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
 static void set_lfo_depth(uint8_t channel, uint8_t cc, uint8_t value)
 {
   (void)cc;
   midi_channels[channel].lfo_depth = value;
   return;
 }
+/**
+ * @brief Set a channel's LFO1 modulation destination (pitch/PWM/cutoff) from a CC value
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
 static void set_lfo_dest(uint8_t channel, uint8_t cc, uint8_t value)
 {
   (void)cc;
   midi_channels[channel].lfo_dest = (uint8_t)MAP(value, MIN_VAL, MIDI_CC_MAX, MIDI_LFO_DEST_PITCH, MIDI_LFO_DEST_CUTOFF);
   return;
 }
+/**
+ * @brief Set a channel's portamento glide time from a CC value
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
 static void set_porta_time(uint8_t channel, uint8_t cc, uint8_t value)
 {
   (void)cc;
   midi_channels[channel].porta_time = value;
+  return;
+}
+
+/* --- LFO 2, a second independent oscillator stacked with LFO 1 at
+ *     the tick (midi_tick(), below) - same 4 CC shape as LFO 1's own. ----- */
+
+/**
+ * @brief Set a channel's LFO2 waveform from a CC value
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
+static void set_lfo2_wave(uint8_t channel, uint8_t cc, uint8_t value)
+{
+  (void)cc;
+  midi_channels[channel].lfo2_wave = (uint8_t)MAP(value, MIN_VAL, MIDI_CC_MAX, MIDI_LFO_TRI, MIDI_LFO_SH);
+  return;
+}
+/**
+ * @brief Set a channel's LFO2 rate from a CC value
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
+static void set_lfo2_rate(uint8_t channel, uint8_t cc, uint8_t value)
+{
+  (void)cc;
+  midi_channels[channel].lfo2_rate = value;
+  return;
+}
+/**
+ * @brief Set a channel's LFO2 depth from a CC value
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
+static void set_lfo2_depth(uint8_t channel, uint8_t cc, uint8_t value)
+{
+  (void)cc;
+  midi_channels[channel].lfo2_depth = value;
+  return;
+}
+/**
+ * @brief Set a channel's LFO2 modulation destination (pitch/PWM/cutoff) from a CC value
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
+static void set_lfo2_dest(uint8_t channel, uint8_t cc, uint8_t value)
+{
+  (void)cc;
+  midi_channels[channel].lfo2_dest = (uint8_t)MAP(value, MIN_VAL, MIDI_CC_MAX, MIDI_LFO_DEST_PITCH, MIDI_LFO_DEST_CUTOFF);
+  return;
+}
+
+/* --- Unison on/off and detune spread. Turning unison on does not
+ *     retouch any note already sounding - like a patch change, it only
+ *     governs the next note_on() (midi_handler.c). --------------------- */
+
+/**
+ * @brief Enable or disable unison mode on a channel from a CC value
+ *
+ * value >= 64 enables unison (MIDI_CH_UNISON), below disables it. Takes
+ * effect only on the next note-on; an already-sounding note is not
+ * retouched.
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
+static void set_unison_enable(uint8_t channel, uint8_t cc, uint8_t value)
+{
+  (void)cc;
+  midi_channel_cfg_t *ch = &midi_channels[channel];
+  if (value >= 64) ch->flags = (uint8_t)(ch->flags | MIDI_CH_UNISON);
+  else             ch->flags = (uint8_t)(ch->flags & (uint8_t)~MIDI_CH_UNISON);
+  usNFO("[CC_UNIS] ch%d unison %s\n", channel, (ch->flags & MIDI_CH_UNISON) ? "on" : "off");
+  return;
+}
+/**
+ * @brief Set a channel's unison detune spread from a CC value
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
+static void set_unison_detune(uint8_t channel, uint8_t cc, uint8_t value)
+{
+  (void)cc;
+  midi_channels[channel].unison_detune = value;
   return;
 }
 
@@ -498,6 +875,46 @@ static uint8_t mask_popcount(uint16_t mask)
   return (n == 0 ? 1 : n);
 }
 
+/**
+ * @brief Recompute every channel's poly_limit against the SID count
+ *        actually present, once that count is known
+ *
+ * midi_config_init() (midi_config.c) runs during midi_init(), before
+ * detect_default_config()/verify_socket_config() (usbsid.c) have settled
+ * cfg.numsids - so it hardcodes channel 1's poly_limit at the
+ * MAX_SIDS*MAX_VOICES compile-time ceiling and channels 2-5's at
+ * MAX_VOICES, both of which assume every physical SID slot exists. On a
+ * board with fewer SIDs than MAX_SIDS this leaves poly_limit stuck above
+ * the pool's real capacity: midi_voice_alloc()'s own "held >= limit"
+ * self-steal never triggers, so once the pool is actually full every
+ * further note-on falls straight into the cross-channel steal path
+ * instead, silently pulling a voice away from another channel's held note
+ * rather than stealing the channel's own oldest one first. Called once at
+ * boot, after cfg.numsids is authoritative and before the host is allowed
+ * to enumerate (usbsid.c), so there is nothing yet for this to race
+ * against.
+ */
+void midi_config_sync_poly_limits(void)
+{
+  for (uint8_t c = 0; c < MAX_CHANNELS; c++) {
+    midi_channels[c].poly_limit = mask_popcount(midi_channel_effective_mask(c));
+  }
+  return;
+}
+
+/**
+ * @brief Dispatch CC_GTEN, CC_VELM, CC_SPLY, CC_MONO and CC_POLY handling for a channel
+ *
+ * CC_GTEN/CC_VELM toggle their channel flag bits (127 forces on, 0 forces
+ * off, any other value toggles). CC_SPLY changes poly_limit between 1 and
+ * the channel's full voice count without silencing already-held notes.
+ * CC_MONO/CC_POLY do the same but also call release_channel_voices() to
+ * give the channel a clean slate on the mode switch.
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc
+ * @param uint8_t value
+ */
 static void set_handler(uint8_t channel, uint8_t cc, uint8_t value)
 {
   midi_channel_cfg_t *ch = &midi_channels[channel];
@@ -513,19 +930,6 @@ static void set_handler(uint8_t channel, uint8_t cc, uint8_t value)
     if (now) ch->flags = (uint8_t)(ch->flags | toggles[i].flag_bit);
     else ch->flags = (uint8_t)(ch->flags & (uint8_t)~toggles[i].flag_bit);
     usNFO("[%s] ch%d From %d To %d\n", toggles[i].name, channel, was, now);
-    return;
-  }
-
-  /* CC_CVCE/CC_CSID/CC_LVCE/CC_LSID: the old "copy/link voice or SID"
-   * family existed to copy a manually selected active voice's timbre onto
-   * its siblings. The flat pool has no single active voice: every channel
-   * already carries one template that propagate_reg() pushes to every
-   * voice it holds on every CC change. There is nothing left for these to
-   * do. Kept bound, as documented no-ops, so the CC numbers stay reserved
-   * and a controller still sending them gets a log line instead of
-   * silently landing on whatever handler claims the number next. */
-  if (cc == CC.CC_CVCE || cc == CC.CC_CSID || cc == CC.CC_LVCE || cc == CC.CC_LSID) {
-    usNFO("[MIDI][CC] %d is deprecated, superseded by automatic per-channel voice templates\n", cc);
     return;
   }
 
@@ -552,10 +956,18 @@ static void set_handler(uint8_t channel, uint8_t cc, uint8_t value)
   return;
 }
 
-/* Pool-wide: CC_ASOF (All Sound Off), CC_RACT (Reset All Controllers) and
- * CC_ANOF (All Notes Off) are device-wide panic buttons, not scoped to the
- * sending channel, so this clears every voice on the whole pool regardless
- * of which channel owns it, always forcing the gate off. */
+/**
+ * @brief Handler for CC_ASOF, CC_RACT and CC_ANOF: silence and release every voice in the whole pool
+ *
+ * Device-wide panic buttons, not scoped to the sending channel: clears
+ * every gated voice regardless of which channel owns it, always forcing
+ * the gate off, and also silences any FMOpl-targeted channel via
+ * midi_fmopl_all_notes_off().
+ *
+ * @param uint8_t channel, unused
+ * @param uint8_t cc, unused
+ * @param uint8_t value, unused
+ */
 static void all_notes_off(uint8_t channel, uint8_t cc, uint8_t value)
 {
   (void)channel; (void)cc; (void)value;
@@ -566,12 +978,18 @@ static void all_notes_off(uint8_t channel, uint8_t cc, uint8_t value)
     midi_bus_operation(addr, sid_memory[addr]);
     midi_voice_release(i);
   }
-  midi_fmopl_all_notes_off();  /* covers any FMOpl-targeted channel too, TODO 14 */
+  midi_fmopl_all_notes_off();  /* covers any FMOpl-targeted channel too (midi_fmopl.c) */
   return;
 }
 
-/* Channel-scoped: used by CC_MONO/CC_POLY to give a clean slate on a mode
- * switch without silencing any other channel. */
+/**
+ * @brief Silence and release every voice held by one channel
+ *
+ * Channel-scoped, used by CC_MONO/CC_POLY to give a clean slate on a mode
+ * switch without silencing any other channel.
+ *
+ * @param uint8_t channel
+ */
 static void release_channel_voices(uint8_t channel)
 {
   for (uint8_t i = 0; i < MIDI_VOICE_COUNT; i++) {
@@ -584,9 +1002,21 @@ static void release_channel_voices(uint8_t channel)
   return;
 }
 
+/**
+ * @brief Route channel aftertouch pressure to its configured destination
+ *
+ * Ignored for a channel targeting FMOpl (both destination branches write
+ * straight to SID registers via channel_sid_bases(), which has no notion
+ * of skipping the FMOpl slot). Otherwise applies pressure to filter
+ * cutoff (CC_FFC) or master volume (CC_VOL) depending on at_target, or
+ * drives LFO1 depth directly for a vibrato-style target.
+ *
+ * @param uint8_t channel
+ * @param uint8_t pressure
+ */
 static void handle_aftertouch(uint8_t channel, uint8_t pressure)
 {
-  /* TODO 14: not wired for FMOpl yet - both branches below write straight
+  /* Not wired for FMOpl yet - both branches below write straight
    * to SID registers via channel_sid_bases(), which has no notion of "skip
    * the FMOpl slot", so this channel is excluded here instead. */
   if (midi_channels[channel].flags & MIDI_CH_TARGET_FMOPL) return;
@@ -606,18 +1036,49 @@ static void handle_aftertouch(uint8_t channel, uint8_t pressure)
   return;
 }
 
+/**
+ * @brief Scale a held voice's attack/decay and sustain/release nibbles by note velocity
+ *
+ * No-op if velocity is 0 or the channel does not have
+ * MIDI_CH_VELOCITY_MODE enabled (default is no scaling, to avoid stomping
+ * CC 7 the way the old default of writing velocity into the master volume
+ * nibble did). High velocity shortens decay (punchy) and low velocity
+ * lengthens it (soft); sustain is scaled alongside decay since sustain,
+ * not decay, controls a held SID voice's loudness, floored at 3 so the
+ * softest velocity is quiet rather than silent.
+ *
+ * @param uint8_t channel
+ * @param uint8_t slot
+ * @param uint8_t velocity
+ */
 static void handle_velocity(uint8_t channel, uint8_t slot, uint8_t velocity)
 {
   if (velocity == 0) return;
-  /* Default is no scaling. See Phase 0: the old default wrote velocity into
-   * the master volume nibble on every note, stomping CC 7. */
+  /* Default is no scaling. An earlier default wrote velocity into
+   * the master volume nibble on every note, stomping CC 7 - fixed by
+   * gating this on MIDI_CH_VELOCITY_MODE instead. */
   if (!(midi_channels[channel].flags & MIDI_CH_VELOCITY_MODE)) return;
 
-  /* High velocity = short decay (punchy); low velocity = long decay (soft) */
+  /* High velocity = short decay (punchy); low velocity = long decay (soft).
+   * Decay alone is inaudible whenever the active template's sustain sits at
+   * its default of 15/full - ATTDEC's decay nibble only shapes the ramp
+   * *into* sustain, never the loudness a held note settles at, so with a
+   * full-sustain patch two notes struck at velocity 1 and 127 sound
+   * identical once the (very short) attack/decay phase passes. Sustain is
+   * scaled alongside it for exactly that reason: it is the field that
+   * actually controls held loudness on a SID voice, so it is the field that
+   * has to move for velocity to be heard at all, not just felt as a
+   * difference in attack transient length. Floored at 3, not 0, so the
+   * softest velocity is quiet rather than silent. */
   uint8_t vel_dec = MAP(velocity, 1, 127, 14, 0);
-  uint8_t addr = (uint8_t)(midi_voice_sidbase(slot) + midi_voice_regbase(slot) + ATTDEC);
-  set_nibble_at(&sid_memory[addr], vel_dec, L_NIBBLE);
-  midi_bus_operation(addr, sid_memory[addr]);
+  uint8_t addr_ad = (uint8_t)(midi_voice_sidbase(slot) + midi_voice_regbase(slot) + ATTDEC);
+  set_nibble_at(&sid_memory[addr_ad], vel_dec, L_NIBBLE);
+  midi_bus_operation(addr_ad, sid_memory[addr_ad]);
+
+  uint8_t vel_sus = MAP(velocity, 1, 127, 3, NIBBLE_MAX);
+  uint8_t addr_sr = (uint8_t)(midi_voice_sidbase(slot) + midi_voice_regbase(slot) + SUSREL);
+  set_nibble_at(&sid_memory[addr_sr], vel_sus, R_NIBBLE);
+  midi_bus_operation(addr_sr, sid_memory[addr_sr]);
   return;
 }
 
@@ -639,52 +1100,86 @@ static int32_t porta_step_amount(uint8_t porta_time)
 }
 
 /**
- * @brief Advance one channel's LFO phase by one tick and return its
- *        depth-scaled output
+ * @brief Advance one LFO's phase by one tick and return its depth-scaled
+ *        output
  *
- * @param midi_channel_cfg_t *ch
- * @return int16_t -1000..+1000 (per-mille), already scaled by lfo_depth
+ * Parameterised over an explicit (wave, rate, depth, phase,
+ * sh_seed, sh_value) tuple rather than reading midi_channel_cfg_t's LFO1
+ * fields directly, so the identical algorithm serves LFO1 and LFO2 without
+ * two copies drifting apart - lfo_step()/lfo2_step() below are the two thin
+ * wrappers, byte-identical arithmetic to the original single-LFO version.
+ *
+ * @return int16_t -1000..+1000 (per-mille), already scaled by depth
  */
-static int16_t lfo_step(midi_channel_cfg_t *ch)
+static int16_t lfo_step_generic(uint8_t wave, uint8_t rate, uint8_t depth,
+  uint16_t *phase, uint32_t *sh_seed, int16_t *sh_value)
 {
   /* rate: CC 0-127 -> 0.1-20.0 Hz (tenths of Hz), free-running - LFO rate is
    * not clock-synced, unlike the arpeggiator, since a wobbling vibrato
    * locked to tempo is not how anyone actually wants a synth LFO to behave */
-  uint16_t rate_dHz = (uint16_t)MAP(ch->lfo_rate, 0, 127, 1, 200);
+  uint16_t rate_dHz = (uint16_t)MAP(rate, 0, 127, 1, 200);
   uint32_t inc = ((uint32_t)65536u * rate_dHz) / 10000u;  /* phase step per 1kHz tick */
-  uint16_t old_phase = ch->lfo_phase;
-  ch->lfo_phase = (uint16_t)(ch->lfo_phase + inc);
-  bool wrapped = (ch->lfo_phase < old_phase);
+  uint16_t old_phase = *phase;
+  *phase = (uint16_t)(*phase + inc);
+  bool wrapped = (*phase < old_phase);
 
   int16_t raw;
-  switch (ch->lfo_wave) {
+  switch (wave) {
     case MIDI_LFO_TRI:
-      raw = (ch->lfo_phase < 32768)
-        ? (int16_t)(((int32_t)ch->lfo_phase * 2000 / 32768) - 1000)
-        : (int16_t)(1000 - (((int32_t)ch->lfo_phase - 32768) * 2000 / 32768));
+      raw = (*phase < 32768)
+        ? (int16_t)(((int32_t)*phase * 2000 / 32768) - 1000)
+        : (int16_t)(1000 - (((int32_t)*phase - 32768) * 2000 / 32768));
       break;
     case MIDI_LFO_SAW:
-      raw = (int16_t)(((int32_t)ch->lfo_phase * 2000 / 65536) - 1000);
+      raw = (int16_t)(((int32_t)*phase * 2000 / 65536) - 1000);
       break;
     case MIDI_LFO_SQUARE:
-      raw = (ch->lfo_phase < 32768) ? -1000 : 1000;
+      raw = (*phase < 32768) ? -1000 : 1000;
       break;
     case MIDI_LFO_SH:
       if (wrapped) {
         /* Cheap LCG, reseeded per channel at init so channels do not lock
          * step. A new value is drawn once per cycle, held for the rest of
          * it - that is the "hold" half of sample & hold. */
-        ch->lfo_sh_seed = ch->lfo_sh_seed * 1103515245u + 12345u;
-        ch->lfo_sh_value = (int16_t)(((ch->lfo_sh_seed >> 16) % 2001)) - 1000;
+        *sh_seed = *sh_seed * 1103515245u + 12345u;
+        *sh_value = (int16_t)(((*sh_seed >> 16) % 2001)) - 1000;
       }
-      raw = ch->lfo_sh_value;
+      raw = *sh_value;
       break;
     default:
       raw = 0;
       break;
   }
 
-  return (int16_t)(((int32_t)raw * ch->lfo_depth) / 127);
+  return (int16_t)(((int32_t)raw * depth) / 127);
+}
+
+/**
+ * @brief Advance a channel's LFO1 by one tick and return its depth-scaled output
+ *
+ * Thin wrapper around lfo_step_generic() bound to the channel's LFO1 state.
+ *
+ * @param midi_channel_cfg_t * ch
+ * @return int16_t -1000..+1000 (per-mille)
+ */
+static inline int16_t lfo_step(midi_channel_cfg_t *ch)
+{
+  return lfo_step_generic(ch->lfo_wave, ch->lfo_rate, ch->lfo_depth,
+    &ch->lfo_phase, &ch->lfo_sh_seed, &ch->lfo_sh_value);
+}
+
+/**
+ * @brief Advance a channel's LFO2 by one tick and return its depth-scaled output
+ *
+ * Thin wrapper around lfo_step_generic() bound to the channel's LFO2 state.
+ *
+ * @param midi_channel_cfg_t * ch
+ * @return int16_t -1000..+1000 (per-mille)
+ */
+static inline int16_t lfo2_step(midi_channel_cfg_t *ch)
+{
+  return lfo_step_generic(ch->lfo2_wave, ch->lfo2_rate, ch->lfo2_depth,
+    &ch->lfo2_phase, &ch->lfo2_sh_seed, &ch->lfo2_sh_value);
 }
 
 /**
@@ -743,31 +1238,19 @@ static void apply_lfo_cutoff(uint8_t channel, int16_t raw_permille)
   return;
 }
 
-static void note_on(uint8_t channel, uint8_t raw_note, uint8_t velocity)
+/**
+ * @brief Stamp one voice slot with the channel's current timbre, apply the
+ *        given pitch, and gate it - the per-slot body of note_on()
+ *
+ * Factored out so a unison note-on can call this 3 times (once per
+ * claimed oscillator, each with its own detuned start/target) without
+ * duplicating the whole note-on body; the single-voice path below calls it
+ * once, byte-identical to what note_on() did before this split.
+ */
+static void note_on_slot(uint8_t channel, uint8_t slot, int32_t start_x256, int32_t target_x256, uint8_t velocity)
 {
-  /* TODO 14: a channel targeting the FMOpl chip never touches the SID pool
-   * at all - entirely separate note path, see midi_fmopl.c. */
-  if (midi_channels[channel].flags & MIDI_CH_TARGET_FMOPL) {
-    midi_fmopl_note_on(channel, raw_note, velocity);
-    return;
-  }
-
-  uint8_t slot = midi_voice_alloc(channel, raw_note, velocity);
-  if (slot == MIDI_VOICE_NONE) return;  /* channel disabled (empty mask), or steal refused */
-
   midi_channel_cfg_t *ch = &midi_channels[channel];
-  int16_t ni = (int16_t)raw_note + ch->transpose;
-  uint8_t note_index = (uint8_t)(ni < 0 ? 0 : ni > SCALE_MAX ? SCALE_MAX : ni);
-  int32_t target_x256 = (int32_t)note_index << MIDI_PITCH_FRAC_BITS;
-
-  /* Portamento: glide in from the last note this channel triggered, rather
-   * than starting flat at the new pitch. `last_target_x256 < 0` means no
-   * prior note exists yet on this channel, so the very first note never
-   * glides from nowhere. */
-  int32_t start_x256 = target_x256;
-  if (ch->porta_time > 0 && ch->last_target_x256 >= 0) start_x256 = ch->last_target_x256;
   midi_voice_set_pitch(slot, start_x256, target_x256);
-  ch->last_target_x256 = target_x256;
 
   uint8_t base = (uint8_t)(midi_voice_sidbase(slot) + midi_voice_regbase(slot));
   write_voice_pitch(slot, 0);
@@ -794,6 +1277,88 @@ static void note_on(uint8_t channel, uint8_t raw_note, uint8_t velocity)
   return;
 }
 
+/**
+ * @brief Handle a MIDI note-on for a channel: allocate voice(s) and gate them
+ *
+ * Redirects to midi_fmopl_note_on() for a channel targeting FMOpl. Applies
+ * the channel's transpose and clamps to the valid note range, computes the
+ * portamento glide start (the channel's last triggered pitch, if any) and
+ * target. For a unison channel, allocates all 3 oscillators of the unison
+ * group with a fixed per-oscillator detune spread (position 0 centred,
+ * position 1 up, position 2 down) and stamps each via note_on_slot();
+ * otherwise allocates a single voice (respecting poly_limit/steal) and
+ * stamps it the same way.
+ *
+ * @param uint8_t channel
+ * @param uint8_t raw_note
+ * @param uint8_t velocity
+ */
+static void note_on(uint8_t channel, uint8_t raw_note, uint8_t velocity)
+{
+  /* A channel targeting the FMOpl chip never touches the SID pool
+   * at all - entirely separate note path, see midi_fmopl.c. */
+  if (midi_channels[channel].flags & MIDI_CH_TARGET_FMOPL) {
+    midi_fmopl_note_on(channel, raw_note, velocity);
+    return;
+  }
+
+  midi_channel_cfg_t *ch = &midi_channels[channel];
+  int16_t ni = (int16_t)raw_note + ch->transpose;
+  uint8_t note_index = (uint8_t)(ni < 0 ? 0 : ni > SCALE_MAX ? SCALE_MAX : ni);
+  int32_t target_x256 = (int32_t)note_index << MIDI_PITCH_FRAC_BITS;
+
+  /* Portamento: glide in from the last note this channel triggered, rather
+   * than starting flat at the new pitch. `last_target_x256 < 0` means no
+   * prior note exists yet on this channel, so the very first note never
+   * glides from nowhere. */
+  int32_t start_x256 = target_x256;
+  if (ch->porta_time > 0 && ch->last_target_x256 >= 0) start_x256 = ch->last_target_x256;
+
+  if (ch->flags & MIDI_CH_UNISON) {
+    /* 3 real oscillators, one note. Detune is baked into each
+     * oscillator's stored cur/target pitch once, here, rather than applied
+     * live every tick (unlike LFO/bend) - it is a constant per-oscillator
+     * offset from the struck pitch, not something that varies over time, so
+     * there is nothing for the tick to recompute. Position 0 (the SID's
+     * first physical voice in the claimed triplet) is centred; position 1
+     * is detuned up, position 2 down - MBSID's own single-spread-value
+     * convention (mbsidv2_sysex_implementation.txt addr 0x051). */
+    uint8_t slots[MIDI_VOICE_UNISON_COUNT];
+    if (midi_voice_alloc_unison(channel, raw_note, velocity, slots) == MIDI_VOICE_NONE) return;
+    ch->last_target_x256 = target_x256;
+
+    int32_t spread_x256 = ((int32_t)ch->unison_detune * 256) / 255;  /* 0-255 -> 0..1 semitone x256 at full spread */
+    for (uint8_t v = 0; v < MIDI_VOICE_UNISON_COUNT; v++) {
+      if (slots[v] == MIDI_VOICE_NONE) continue;
+      int32_t detune = (v == 1) ? spread_x256 : (v == 2) ? -spread_x256 : 0;
+      note_on_slot(channel, slots[v], start_x256 + detune, target_x256 + detune, velocity);
+    }
+    return;
+  }
+
+  uint8_t slot = midi_voice_alloc(channel, raw_note, velocity);
+  if (slot == MIDI_VOICE_NONE) return;  /* channel disabled (empty mask), or steal refused */
+
+  ch->last_target_x256 = target_x256;
+  note_on_slot(channel, slot, start_x256, target_x256, velocity);
+  return;
+}
+
+/**
+ * @brief Handle a MIDI note-off for a channel: release the matching voice(s)
+ *
+ * Redirects to midi_fmopl_note_off() for a channel targeting FMOpl.
+ * Otherwise finds every voice slot matching (channel, note): 1 for an
+ * ordinary note, up to 3 for a unison note. Applies velocity-scaled
+ * release, ungates each voice (if MIDI_CH_AUTO_GATE is set) and frees the
+ * slot. No release-phase tracking: a freed slot can be reallocated
+ * immediately, which may cut a SID's own hardware envelope release short
+ * if reused too soon.
+ *
+ * @param uint8_t channel
+ * @param uint8_t raw_note
+ * @param uint8_t velocity
+ */
 static void note_off(uint8_t channel, uint8_t raw_note, uint8_t velocity)
 {
   if (midi_channels[channel].flags & MIDI_CH_TARGET_FMOPL) {
@@ -801,26 +1366,51 @@ static void note_off(uint8_t channel, uint8_t raw_note, uint8_t velocity)
     return;
   }
 
-  uint8_t slot = midi_voice_find(channel, raw_note);
-  if (slot == MIDI_VOICE_NONE) return;
+  /* midi_voice_find_all() generalises midi_voice_find() to every
+   * slot sharing (channel, note) - ordinary single-voice allocation never
+   * produces more than one match, so this releases 1 slot exactly as before
+   * for every non-unison note, and all 3 together for a unison one, with no
+   * separate unison branch needed here. */
+  uint8_t slots[MIDI_VOICE_UNISON_COUNT];
+  uint8_t n = midi_voice_find_all(channel, raw_note, slots);
+  if (n == 0) return;
 
-  handle_velocity(channel, slot, velocity);
+  for (uint8_t k = 0; k < n; k++) {
+    uint8_t slot = slots[k];
+    handle_velocity(channel, slot, velocity);
 
-  if (midi_channels[channel].flags & MIDI_CH_AUTO_GATE) {
-    uint8_t addr = (uint8_t)(midi_voice_sidbase(slot) + midi_voice_regbase(slot) + CONTR);
-    unset_bit_at(&sid_memory[addr], BIT_0);
-    midi_bus_operation(addr, sid_memory[addr]);
+    if (midi_channels[channel].flags & MIDI_CH_AUTO_GATE) {
+      uint8_t addr = (uint8_t)(midi_voice_sidbase(slot) + midi_voice_regbase(slot) + CONTR);
+      unset_bit_at(&sid_memory[addr], BIT_0);
+      midi_bus_operation(addr, sid_memory[addr]);
+    }
+
+    /* No release-phase tracking yet (a VOICE_RELEASING allocator state,
+     * timed off the existing 1kHz tick, would be the natural way to add
+     * it): the slot is free to be reallocated the instant a new note
+     * needs it, which can cut a SID's own hardware envelope release short
+     * if reused too soon. The old model had no timed release tracking
+     * either; this is a documented limitation, not a regression. */
+    midi_voice_release(slot);
   }
-
-  /* No release-phase tracking yet (that is Phase 4's VOICE_RELEASING
-   * state): the slot is free to be reallocated the instant a new note
-   * needs it, which can cut a SID's own hardware envelope release short if
-   * reused too soon. The old model had no timed release tracking either;
-   * this is a documented limitation, not a regression. */
-  midi_voice_release(slot);
   return;
 }
 
+/**
+ * @brief Handle a MIDI pitch bend message: compute the channel's bend offset and re-apply pitch to every held voice
+ *
+ * 14 bit bend value, LSB first, both bytes 7 bit, centre 0x2000. Stores
+ * the resulting offset on the channel (bend_x256, read by
+ * write_voice_pitch()) rather than computing a one-off frequency here, so
+ * it composes correctly with whatever portamento/LFO is doing on the same
+ * voices, and applies immediately to every voice the channel currently
+ * holds, matching the MIDI spec (channel pitch bend affects every
+ * sounding note on that channel).
+ *
+ * @param uint8_t channel
+ * @param uint8_t lo
+ * @param uint8_t hi
+ */
 static void pitch_notefrequency(uint8_t channel, uint8_t lo, uint8_t hi)
 {
   /* 14 bit, LSB first, both bytes are 7 bit. Centre is 0x2000, full is 0x3FFF.
@@ -858,6 +1448,16 @@ static void pitch_notefrequency(uint8_t channel, uint8_t lo, uint8_t hi)
  * everything else a normal note gets, for free.
  * ------------------------------------------------------------------------- */
 
+/**
+ * @brief Add a held note to a channel's arpeggiator input pattern
+ *
+ * Ignores a note already in the pattern. Resets the step position and
+ * direction when this is the first held key, so a run starts from a known
+ * position rather than wherever a previous, fully-released run left it.
+ *
+ * @param uint8_t channel
+ * @param uint8_t raw_note
+ */
 static void arp_note_on(uint8_t channel, uint8_t raw_note)
 {
   midi_channel_cfg_t *ch = &midi_channels[channel];
@@ -874,6 +1474,17 @@ static void arp_note_on(uint8_t channel, uint8_t raw_note)
   return;
 }
 
+/**
+ * @brief Remove a held note from a channel's arpeggiator input pattern
+ *
+ * Compacts the held-note array when the note is found. When the last held
+ * key is released, silences whatever the arp was currently sounding
+ * rather than leaving a note ringing with nothing left in the pattern to
+ * advance it.
+ *
+ * @param uint8_t channel
+ * @param uint8_t raw_note
+ */
 static void arp_note_off(uint8_t channel, uint8_t raw_note)
 {
   midi_channel_cfg_t *ch = &midi_channels[channel];
@@ -896,18 +1507,77 @@ static void arp_note_off(uint8_t channel, uint8_t raw_note)
 /* Arpeggiator CCs. Kept here rather than with the LFO/portamento CCs above
  * because CC_ARPE's toggle needs note_off(), not declared yet up there. */
 
+/**
+ * @brief Set a channel's arpeggiator mode from a CC value
+ *
+ * Uses bucket division against the full 6-mode range rather than MAP()'s
+ * linear interpolation, since MAP() truncates rather than rounds and
+ * would leave some modes unreachable at their intended CC value.
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
 static void set_arp_mode(uint8_t channel, uint8_t cc, uint8_t value)
 {
   (void)cc;
-  midi_channels[channel].arp_mode = (uint8_t)MAP(value, MIN_VAL, MIDI_CC_MAX, MIDI_ARP_UP, MIDI_ARP_AS_PLAYED);
+  /* MAP()'s linear interpolation between MIDI_ARP_UP and MIDI_ARP_TABLE
+   * (inclusive endpoints, 5-wide) truncates rather than rounds, so evenly
+   * spaced CC values meant to hit each of the 6 modes land one bucket short
+   * at several boundaries (e.g. 0x19 "down" truncated back to 0/"up").
+   * Bucket division against the full 6-wide category count instead - each
+   * of the 128 CC values falls into exactly one of 6 equal-width buckets. */
+  midi_channels[channel].arp_mode = (uint8_t)(MIDI_ARP_UP +
+    ((uint16_t)value * (MIDI_ARP_TABLE - MIDI_ARP_UP + 1)) / (MIDI_CC_MAX + 1));
   return;
 }
+/**
+ * @brief Set a channel's arpeggiator rate from a CC value
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
 static void set_arp_rate(uint8_t channel, uint8_t cc, uint8_t value)
 {
   (void)cc;
   midi_channels[channel].arp_rate = value;
   return;
 }
+/**
+ * @brief Select which arp_tables[] slot a channel's arpeggiator uses in table mode
+ *
+ * Independent of arp_mode itself: selecting a table does not switch the
+ * channel into table mode, CC_ARPM does that. Uses bucket division against
+ * the full 16-slot range for the same reason set_arp_mode() does.
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
+static void set_arp_table(uint8_t channel, uint8_t cc, uint8_t value)
+{
+  (void)cc;
+  /* Which arp_tables[] slot MIDI_ARP_TABLE reads. Independent of
+   * arp_mode itself - selecting a table does not switch a channel into
+   * table mode, CC_ARPM does that (value maps up to MIDI_ARP_TABLE now).
+   * Same truncation bug as set_arp_mode() above: bucket division against
+   * the full 16-wide slot count instead of MAP()'s 15-wide interpolation,
+   * so all 16 slots are reachable at their intended CC value. */
+  midi_channels[channel].arp_table_sel = (uint8_t)(((uint16_t)value * MIDI_ARP_TABLE_COUNT) / (MIDI_CC_MAX + 1));
+  return;
+}
+/**
+ * @brief Set a channel's arpeggiator octave-repeat count from a CC value
+ *
+ * Capped at 3 extra octaves, close to the headroom write_voice_pitch()'s
+ * SCALE_MAX clamping leaves before a repeated chord starts flattening at
+ * the top of the pattern.
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
 static void set_arp_octaves(uint8_t channel, uint8_t cc, uint8_t value)
 {
   (void)cc;
@@ -918,6 +1588,18 @@ static void set_arp_octaves(uint8_t channel, uint8_t cc, uint8_t value)
   midi_channels[channel].arp_octaves = (uint8_t)MAP(value, MIN_VAL, MIDI_CC_MAX, 0, 3);
   return;
 }
+/**
+ * @brief Enable or disable a channel's arpeggiator from a CC value
+ *
+ * 127 forces on, 0 forces off, any other value toggles the current state.
+ * Disabling silences whatever the arp was sounding and clears the held
+ * pattern, so a stray physically-held key does not resume arpeggiating
+ * the moment the mode is switched back on.
+ *
+ * @param uint8_t channel
+ * @param uint8_t cc, unused
+ * @param uint8_t value
+ */
 static void set_arp_enable(uint8_t channel, uint8_t cc, uint8_t value)
 {
   (void)cc;
@@ -945,19 +1627,60 @@ static void set_arp_enable(uint8_t channel, uint8_t cc, uint8_t value)
 }
 
 /**
- * @brief Step the arpeggiator one position and gate the resulting note
+ * @brief Step a channel through its selected arp table instead of
+ *        one of the 5 fixed shapes
  *
- * The expanded pattern is `held_count * (arp_octaves + 1)` long: the held
- * notes in playing order, repeated once per extra octave. Index arithmetic
- * (`idx % held_count`, `idx / held_count`) maps a position in that expanded
- * pattern back to which held note and which octave, so MIDI_ARP_UP simply
- * counting 0..pattern_len-1 automatically plays the chord once per octave
- * before wrapping - the classic arpeggiator octave-repeat shape.
+ * Root note is the first-held key (arp_held[0]) rather than the lowest or
+ * most-recently-played held note - GoatTracker's own convention, not yet
+ * independently confirmed against real GoatTracker/SidWizard behaviour on
+ * hardware. Deliberately ignores arp_octaves: table steps are already fully
+ * authored offsets, an octave multiplier on top would be a second degree of
+ * freedom the table itself already owns - out of scope for a first pass.
+ */
+static void arp_advance_table(uint8_t channel)
+{
+  midi_channel_cfg_t *ch = &midi_channels[channel];
+  const midi_arp_table_t *t = &arp_tables[ch->arp_table_sel];
+  if (t->step_count == 0) return;  /* unauthored table: nothing to play */
+
+  uint8_t step = ch->arp_step;
+  if (step >= t->step_count) step = 0;  /* also recovers from a stale/out-of-range loop_start */
+
+  int16_t raw_note = (int16_t)ch->arp_held[0] + (int16_t)t->offsets[step];
+  if (raw_note < 0) raw_note = 0;
+  if (raw_note > 127) raw_note = 127;
+
+  uint8_t next = (uint8_t)(step + 1);
+  ch->arp_step = (next >= t->step_count) ? t->loop_start : next;
+
+  if (ch->arp_voice_slot != MIDI_VOICE_NONE) {
+    uint8_t prev_note = midi_voice_note(ch->arp_voice_slot);
+    note_off(channel, prev_note, 0);
+  }
+  note_on(channel, (uint8_t)raw_note, 100);  /* fixed velocity, same as the shape-based modes */
+  ch->arp_voice_slot = midi_voice_find(channel, (uint8_t)raw_note);
+  return;
+}
+
+/**
+ * @brief Step the arpeggiator through one of its shape-based modes (up/down/up-down/random/as-played) and gate the resulting note
+ *
+ * Delegates to arp_advance_table() when arp_mode is MIDI_ARP_TABLE. The
+ * expanded pattern is held_count * (arp_octaves + 1) long: the held notes
+ * in playing order, repeated once per extra octave. Index arithmetic
+ * (idx % held_count, idx / held_count) maps a position in that expanded
+ * pattern back to which held note and which octave. Releases whatever
+ * note the arp was previously sounding before gating the next one at a
+ * fixed velocity of 100.
+ *
+ * @param uint8_t channel
  */
 static void arp_advance(uint8_t channel)
 {
   midi_channel_cfg_t *ch = &midi_channels[channel];
   if (ch->arp_held_count == 0) return;
+
+  if (ch->arp_mode == MIDI_ARP_TABLE) { arp_advance_table(channel); return; }
 
   uint8_t pattern_len = (uint8_t)(ch->arp_held_count * (ch->arp_octaves + 1));
   if (pattern_len == 0) return;
@@ -1065,17 +1788,40 @@ void midi_tick(void)
      * applied rather than waiting a full tick period. */
     arp_tick(c);
 
-    bool lfo_pitch  = (ch->lfo_depth > 0 && ch->lfo_dest == MIDI_LFO_DEST_PITCH);
-    bool lfo_pwm    = (ch->lfo_depth > 0 && ch->lfo_dest == MIDI_LFO_DEST_PWM);
-    bool lfo_cutoff = (ch->lfo_depth > 0 && ch->lfo_dest == MIDI_LFO_DEST_CUTOFF);
-    int32_t lfo_pitch_x256 = 0;
+    /* LFO1 and LFO2 are each independently gated on their own
+     * depth/dest, and each advances its own phase only while its own depth
+     * is above 0 (unchanged LFO1 behaviour). If both target the same
+     * destination this tick, their per-mille outputs are summed before the
+     * single write to that destination - apply_lfo_pwm()/apply_lfo_cutoff()
+     * and write_voice_pitch() are all linear in the offset they are handed,
+     * so summing two raw outputs before the one call is exactly equivalent
+     * to applying two independent offsets. */
+    bool lfo1_pitch  = (ch->lfo_depth > 0 && ch->lfo_dest == MIDI_LFO_DEST_PITCH);
+    bool lfo1_pwm    = (ch->lfo_depth > 0 && ch->lfo_dest == MIDI_LFO_DEST_PWM);
+    bool lfo1_cutoff = (ch->lfo_depth > 0 && ch->lfo_dest == MIDI_LFO_DEST_CUTOFF);
+    bool lfo2_pitch  = (ch->lfo2_depth > 0 && ch->lfo2_dest == MIDI_LFO_DEST_PITCH);
+    bool lfo2_pwm    = (ch->lfo2_depth > 0 && ch->lfo2_dest == MIDI_LFO_DEST_PWM);
+    bool lfo2_cutoff = (ch->lfo2_depth > 0 && ch->lfo2_dest == MIDI_LFO_DEST_CUTOFF);
 
-    if (lfo_pitch || lfo_pwm || lfo_cutoff) {
-      int16_t raw = lfo_step(ch);  /* advances phase once per channel per tick, regardless of dest */
-      if (lfo_pitch)  lfo_pitch_x256 = ((int32_t)raw * MIDI_LFO_PITCH_MAX_SEMITONES * 256) / 1000;
-      if (lfo_pwm)    apply_lfo_pwm(c, raw);
-      if (lfo_cutoff) apply_lfo_cutoff(c, raw);
+    int32_t lfo_pitch_x256 = 0;
+    int16_t pwm_permille = 0;
+    int16_t cutoff_permille = 0;
+
+    if (lfo1_pitch || lfo1_pwm || lfo1_cutoff) {
+      int16_t raw = lfo_step(ch);  /* advances LFO1 phase once per tick while depth > 0 */
+      if (lfo1_pitch)  lfo_pitch_x256 += ((int32_t)raw * MIDI_LFO_PITCH_MAX_SEMITONES * 256) / 1000;
+      if (lfo1_pwm)    pwm_permille = (int16_t)(pwm_permille + raw);
+      if (lfo1_cutoff) cutoff_permille = (int16_t)(cutoff_permille + raw);
     }
+    if (lfo2_pitch || lfo2_pwm || lfo2_cutoff) {
+      int16_t raw = lfo2_step(ch);  /* advances LFO2 phase once per tick while depth > 0 */
+      if (lfo2_pitch)  lfo_pitch_x256 += ((int32_t)raw * MIDI_LFO_PITCH_MAX_SEMITONES * 256) / 1000;
+      if (lfo2_pwm)    pwm_permille = (int16_t)(pwm_permille + raw);
+      if (lfo2_cutoff) cutoff_permille = (int16_t)(cutoff_permille + raw);
+    }
+    bool lfo_pitch = lfo1_pitch || lfo2_pitch;
+    if (lfo1_pwm    || lfo2_pwm)    apply_lfo_pwm(c, pwm_permille);
+    if (lfo1_cutoff || lfo2_cutoff) apply_lfo_cutoff(c, cutoff_permille);
 
     for (uint8_t i = 0; i < MIDI_VOICE_COUNT; i++) {
       if (midi_voice_state(i) != MIDI_VOICE_GATED || midi_voice_channel(i) != c) continue;
@@ -1133,6 +1879,13 @@ static void assign_func_ptr(const char *name, uint8_t cc, cc_handler_t f_ptr)
 /* Passes the CC name through so a refusal names the culprit */
 #define ASSIGN_CC(field, fn)  assign_func_ptr(#field, CC.field, fn)
 
+/**
+ * @brief Reset the CC dispatch table and bind every supported CC number to its handler
+ *
+ * Clears cc_func_ptr_array[] and registers each handler via ASSIGN_CC(),
+ * grouped by handler-toggle, SID/voice override, per-voice, chip-wide,
+ * modulation/timing and fixed-action CCs.
+ */
 void midi_cc_init(void)
 {
   for (int i = 0; i < 128; i++) {
@@ -1142,10 +1895,6 @@ void midi_cc_init(void)
   /* Handler settings */
   ASSIGN_CC(CC_GTEN, set_handler);
   ASSIGN_CC(CC_SPLY, set_handler);
-  ASSIGN_CC(CC_CVCE, set_handler);
-  ASSIGN_CC(CC_CSID, set_handler);
-  ASSIGN_CC(CC_LVCE, set_handler);
-  ASSIGN_CC(CC_LSID, set_handler);
   ASSIGN_CC(CC_VELM, set_handler);
 
   /* SID / voice mask override */
@@ -1186,16 +1935,23 @@ void midi_cc_init(void)
   ASSIGN_CC(CC_LPF, set_modevolume);
   ASSIGN_CC(CC_VOL, set_modevolume);
 
-  /* Modulation and timing (Phase 4) */
+  /* Modulation and timing */
   ASSIGN_CC(CC_LFOW, set_lfo_wave);
   ASSIGN_CC(CC_LFOR, set_lfo_rate);
   ASSIGN_CC(CC_LFOD, set_lfo_depth);
   ASSIGN_CC(CC_LFOT, set_lfo_dest);
   ASSIGN_CC(CC_PORT, set_porta_time);
+  ASSIGN_CC(CC_LFO2W, set_lfo2_wave);
+  ASSIGN_CC(CC_LFO2R, set_lfo2_rate);
+  ASSIGN_CC(CC_LFO2D, set_lfo2_depth);
+  ASSIGN_CC(CC_LFO2T, set_lfo2_dest);
+  ASSIGN_CC(CC_UNIS, set_unison_enable);
+  ASSIGN_CC(CC_UDET, set_unison_detune);
   ASSIGN_CC(CC_ARPM, set_arp_mode);
   ASSIGN_CC(CC_ARPR, set_arp_rate);
   ASSIGN_CC(CC_ARPO, set_arp_octaves);
   ASSIGN_CC(CC_ARPE, set_arp_enable);
+  ASSIGN_CC(CC_ARPT, set_arp_table);
 
   /* Fixed Midi actions */
   ASSIGN_CC(CC_ASOF, all_notes_off);
@@ -1233,6 +1989,20 @@ static void apply_default_volume(void)
   return;
 }
 
+/**
+ * @brief Initialise (or reset, on MIDI System Reset) the whole MIDI subsystem to its power-up state
+ *
+ * Loads the compiled-in default CC map, then initialises channel config,
+ * voice pool, patches, arp tables and FMOpl, rebinds the CC dispatch
+ * table, rebuilds the note table, applies an audible default master
+ * volume to every configured SID, and finally lets midi_config_load()
+ * overwrite the compiled-in defaults with whatever was last saved to
+ * flash, if anything was. Once loaded, re-pushes every channel's currently
+ * selected patch's filter fields to hardware (apply_patch_filter_hw()) -
+ * midi_config_load() only restores RAM, so this is what actually makes a
+ * mid-session reset's filter state match what was loaded, not just the
+ * compiled-in flat default apply_default_volume() left on the chip.
+ */
 void midi_processor_init(void)
 {
   usNFO("[MIDI] Handler init\n");
@@ -1242,7 +2012,8 @@ void midi_processor_init(void)
   midi_config_init();
   midi_voice_init();
   midi_patch_init();
-  midi_fmopl_init();  /* TODO 14, no-ops harmlessly if no FMOpl chip is configured */
+  midi_arp_table_init();
+  midi_fmopl_init();  /* no-ops harmlessly if no FMOpl chip is configured */
   midi_cc_init();
   build_note_table();
   apply_default_volume();
@@ -1260,9 +2031,40 @@ void midi_processor_init(void)
    * every time a controller happens to send 0xFF. */
   midi_config_load();
 
+  /* midi_config_load() only restores RAM structs - it never touches
+   * hardware registers. That's invisible at cold boot (nothing has played
+   * yet, so the next note-on/Program Change naturally picks up the loaded
+   * values), but on a mid-session MIDI System Reset it left filter cutoff/
+   * resonance/routing/mode silently stuck at whatever apply_default_volume()
+   * (or the pre-reset live state) had just written, never resynced to match
+   * a channel's actually-loaded, actually-selected patch - a real bug, not
+   * a "defaults on reset" design choice (unlike master volume itself, which
+   * intentionally has no saved value to restore - see apply_default_volume()
+   * above). Fixed here: for every channel with a patch actually selected
+   * (ch->patch != MIDI_PATCH_NONE), re-push that patch's filter fields to
+   * hardware now, the same way Program Change would. */
+  for (uint8_t c = 0; c < MAX_CHANNELS; c++) {
+    uint8_t patch_index = midi_channels[c].patch;
+    if (patch_index != MIDI_PATCH_NONE) apply_patch_filter_hw(c, &midi_patches[patch_index]);
+  }
+
   return;
 }
 
+/**
+ * @brief Dispatch one Control/Mode Change message to its CC handler
+ *
+ * CC_FMEN is handled directly regardless of the channel's current FMOpl
+ * target state, since it is the CC that sets that state. For a channel
+ * already targeting FMOpl, only CC_VOL and CC_PWM are wired live (via
+ * midi_fmopl_set_volume()/midi_fmopl_set_mod_wheel()); every other CC is
+ * silently ignored rather than misdirected onto the chip as a bogus SID
+ * register write. Otherwise dispatches through cc_func_ptr_array[].
+ *
+ * @param uint8_t channel
+ * @param uint8_t * buffer, [0]=CC number, [1]=value
+ * @param int size, unused
+ */
 static void handle_control_change(uint8_t channel, uint8_t *buffer, int size)
 {
   (void)size;
@@ -1287,11 +2089,23 @@ static void handle_control_change(uint8_t channel, uint8_t *buffer, int size)
   }
 
   if (cc_func_ptr_array[cc] != NULL) {
+    usNFO("[MIDI] [CHANNEL] %02d [CC] 0x%02X -> %02x\n", channel, cc, value);
     cc_func_ptr_array[cc](channel, cc, value);
   }
   return;
 }
 
+/**
+ * @brief Entry point for one incoming MIDI message: rebuild the note table if needed and dispatch by status byte
+ *
+ * Handles Control/Mode Change, Note Off, Note On (velocity 0 treated as
+ * Note Off), Pitch Bend, Program Change, Channel Pressure and Polyphonic
+ * Key Pressure, routing Note On/Off through the arpeggiator or FMOpl when
+ * a channel is configured for either.
+ *
+ * @param uint8_t * buffer
+ * @param int size
+ */
 void process_midi(uint8_t *buffer, int size)
 {
   usMVCE("");
@@ -1310,7 +2124,7 @@ void process_midi(uint8_t *buffer, int size)
       handle_control_change(channel, (buffer+1), (size-1));
       break;
     case 0x80:  /* Note Off ~ 3-bytes */
-      /* TODO 14: FMOpl-targeted channels bypass the arpeggiator entirely for
+      /* FMOpl-targeted channels bypass the arpeggiator entirely for
        * now (note_on()/note_off() themselves redirect to midi_fmopl.c) -
        * arp+FMOpl together is simply not implemented yet, checked first so
        * it never falls into the arp branch below. */
@@ -1343,7 +2157,7 @@ void process_midi(uint8_t *buffer, int size)
        * only 32 patches, program number alone already reaches every one
        * of them, so a bank concept has nothing to select yet. */
       if (midi_channels[channel].flags & MIDI_CH_TARGET_FMOPL) {
-        /* Separate 32-slot patch set (TODO 14/15, MIDI_FMOPL_PATCH_COUNT,
+        /* Separate 32-slot patch set (MIDI_FMOPL_PATCH_COUNT,
          * midi_fmopl.h) - same size and same range-checked-not-wrapped
          * convention as MIDI_PATCH_COUNT above, just a different array;
          * midi_fmopl_program_change() does its own range check. */
@@ -1365,12 +2179,22 @@ void process_midi(uint8_t *buffer, int size)
   return;
 }
 
+/**
+ * @brief Copy the current live CC map out to the caller
+ *
+ * @param midi_ccvalues * out
+ */
 void midi_handler_get_ccmap(midi_ccvalues *out)
 {
   memcpy(out, &CC, sizeof(midi_ccvalues));
   return;
 }
 
+/**
+ * @brief Replace the current live CC map with the caller's
+ *
+ * @param const midi_ccvalues * in
+ */
 void midi_handler_set_ccmap(const midi_ccvalues *in)
 {
   memcpy(&CC, in, sizeof(midi_ccvalues));

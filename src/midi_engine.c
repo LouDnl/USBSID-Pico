@@ -26,6 +26,7 @@
 #include <globals.h>
 #include <config.h>
 #include <sid.h>
+#include <logging.h>
 #include <midi_queue.h>
 #include <midi_handler.h>
 #include <midi_engine.h>
@@ -40,6 +41,25 @@
 #define MIDI_TICK_PERIOD_US 1000
 static uint64_t next_tick_us = 0;
 
+/* Last midi_queue_dropped() total this task has already reported, so a
+ * player holding notes for minutes does not print the same total on every
+ * pass - only the delta since the last time it changed. */
+static uint32_t last_reported_dropped = 0;
+
+/**
+ * @brief Drain the MIDI event ring and drive the 1kHz modulation tick
+ *
+ * Called from core1's main loop. Pops and processes every event queued by
+ * midi_queue_push() (core0) in one pass rather than one per call, since
+ * core1 also services the LED runner, SID test queue and SID player and a
+ * single event per pass could starve the ring under a fast player. Reports
+ * (once, on change) how many events midi_queue_push() had to drop due to a
+ * full ring. Then fires midi_tick() at a 1kHz cadence re-derived from
+ * time_us_64() each pass, so a stall (e.g. a flash_safe_execute() config
+ * save) resumes with a single tick rather than a burst of catch-up ticks.
+ *
+ * @note runs on core 1
+ */
 void midi_engine_task(void)
 {
   if __us_unlikely(get_reset_state()) return;
@@ -53,6 +73,20 @@ void midi_engine_task(void)
   while (midi_queue_pop(&ev)) {
     uint8_t buf[3] = { ev.status, ev.d1, ev.d2 };
     process_midi(buf, ev.len);
+  }
+
+  /* midi_queue_push() (core0) already counts every event it has to drop
+   * because this side was not draining fast enough; nothing ever read that
+   * counter back out until now, so a ring genuinely overflowing under a
+   * real keyboard was indistinguishable from a note silently mis-parsed
+   * further down the pipeline. Checked after the drain above so a burst
+   * that filled the ring between polls is reported in the same pass that
+   * caught up on it. */
+  uint32_t dropped = midi_queue_dropped();
+  if __us_unlikely(dropped != last_reported_dropped) {
+    usWRN("[MIDI] queue full, dropped %u event(s) (%u total)\n",
+      dropped - last_reported_dropped, dropped);
+    last_reported_dropped = dropped;
   }
 
   uint64_t now = time_us_64();

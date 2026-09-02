@@ -38,9 +38,21 @@
 void midi_processor_init(void);
 void process_midi(uint8_t *buffer, int size);
 
+/* Recomputes every channel's poly_limit against the SID count actually
+ * present. Call once at boot after cfg.numsids is authoritative (usbsid.c),
+ * before the host is allowed to enumerate. See its definition for why
+ * midi_config_init()'s own poly_limit defaults can be stale. */
+void midi_config_sync_poly_limits(void);
+
 /* The 1kHz modulation tick (LFO, portamento, arpeggiator). Called from
  * midi_engine_task() on core1, never from core0. */
 void midi_tick(void);
+
+/* Capture channel's current live timbre/LFO/arp/filter state into a patch
+ * slot (RAM only) - the inverse of Program Change/apply_patch_to_channel().
+ * Caller must range-check channel (< MAX_CHANNELS) and patch_index
+ * (< MIDI_PATCH_COUNT) first; see sysex.c's handle_patch_save(). */
+void midi_handler_capture_patch(uint8_t channel, uint8_t patch_index);
 
 /* midi_handler.c's live CC map is private to that file. These exist so
  * midi_config.c's flash persistence can save/restore it - there is no CC

@@ -34,16 +34,16 @@
 #include <stdint.h>
 
 
-/* __todo/plans/midi-full-input-expansion/_project/TODO.md item 14: first-pass
- * MIDI control of a board's FMOpl chip, if one is configured (RuntimeCFG's
- * cfg.fmopl_enabled/cfg.fmopl_sid, set via config_socket.c). A real OPL2 has
- * exactly 9 hardware melodic channels total (no per-chip multiplication the
- * way SID voices spread across cfg.numsids) - this is a single small
- * allocator over those 9, entirely separate from midi_voice.c's SID pool.
+/* First-pass MIDI control of a board's FMOpl chip, if one is configured
+ * (RuntimeCFG's cfg.fmopl_enabled/cfg.fmopl_sid, set via config_socket.c). A
+ * real OPL2 has exactly 9 hardware melodic channels total (no per-chip
+ * multiplication the way SID voices spread across cfg.numsids) - this is a
+ * single small allocator over those 9, entirely separate from
+ * midi_voice.c's SID pool.
  *
  * UNVERIFIED ON REAL HARDWARE: there is no FMOpl-equipped board available to
- * test any of this against (see TODO 14's own text). Everything here builds
- * and is internally consistent, but the note-on/off register sequencing, the
+ * test any of this against. Everything here builds and is internally
+ * consistent, but the note-on/off register sequencing, the
  * clock-scaled Fnum math (build_fmopl_note_table() in the .c, which assumes
  * the FMOpl chip shares the same PIO-generated PHI clock as every SID socket
  * - there is no separate FMOpl clock generator anywhere in this firmware),
@@ -58,8 +58,9 @@
  * fmopl_write_instrument() (midi_fmopl.c) is a direct copy, no further
  * bit-twiddling - and so sysex.c's pack/unpack can do the same. Public
  * (rather than kept inside the .c the way the old fixed factory-instrument
- * table was) now that TODO 15 lets a patch be authored/loaded at runtime,
- * the same shape TODO 7 already gave midi_patch_t. */
+ * table was) now that SYSEX_FMOPL_PATCH_LOAD/DUMP/DATA (sysex.c) let a
+ * patch be authored/loaded at runtime, the same shape
+ * SYSEX_MIDI_PATCH_LOAD/DUMP/DATA already gave midi_patch_t. */
 typedef struct {
   uint8_t op_mult[2];    /* bit7=AM, bit6=Vibrato, bit5=EG type (1=sustained), bit4=KSR, bits3:0=Multiple */
   uint8_t op_ksl_tl[2];  /* bits7:6=Key Scale Level, bits5:0=Total Level (0=loudest, 63=silent) */
@@ -92,8 +93,8 @@ void midi_fmopl_init(void);
  * the channel has MIDI_CH_TARGET_FMOPL set (midi_config.h) - a channel with
  * that flag never touches the SID voice pool at all, these are the entire
  * note path for it. Velocity is accepted but not yet used (OPL2 has no
- * per-note velocity input; velocity-to-Total-Level scaling is unimplemented,
- * see TODO 14's own follow-up list). */
+ * per-note velocity input; velocity-to-Total-Level scaling is
+ * unimplemented). */
 void midi_fmopl_note_on(uint8_t channel, uint8_t note, uint8_t velocity);
 void midi_fmopl_note_off(uint8_t channel, uint8_t note, uint8_t velocity);
 
@@ -104,6 +105,13 @@ void midi_fmopl_note_off(uint8_t channel, uint8_t note, uint8_t velocity);
  * Does not rewrite already-sounding voices, same as a real hardware
  * synth's patch change affecting new notes only. */
 void midi_fmopl_program_change(uint8_t channel, uint8_t program);
+
+/* Capture a channel's currently-selected instrument into another patch slot
+ * (RAM only) - see midi_fmopl.c's own doc comment for why this is a plain
+ * duplicate today rather than a true live-tweaks capture. Caller must
+ * range-check channel and patch_index first; see sysex.c's
+ * handle_fmopl_patch_save(). */
+void midi_fmopl_capture_patch(uint8_t channel, uint8_t patch_index);
 
 /* CC_FMEN (midi_defs.h): toggles MIDI_CH_TARGET_FMOPL on `channel` - 127 on,
  * 0 off, anything else flips whatever it currently is (same convention as

@@ -33,13 +33,30 @@
 
 midi_channel_cfg_t midi_channels[MAX_CHANNELS];
 
-/* Bitmask of the 3 pool slots that belong to SID index `sid` (0..MAX_SIDS-1).
- * Slot layout matches midi_voice.c: slot n is SID n/MAX_VOICES, voice n%MAX_VOICES. */
+/**
+ * @brief Bitmask of the pool slots that belong to SID index `sid`
+ *
+ * Slot layout matches midi_voice.c: slot n is SID n/MAX_VOICES, voice
+ * n%MAX_VOICES.
+ *
+ * @param uint8_t sid, SID index (0..MAX_SIDS-1)
+ * @return uint16_t bitmask of the MAX_VOICES pool slots belonging to that SID
+ */
 static inline uint16_t sid_slot_bits(uint8_t sid)
 {
   return (uint16_t)(((1u << MAX_VOICES) - 1) << (sid * MAX_VOICES));
 }
 
+/**
+ * @brief Initialise midi_channels[] to their compiled-in default configuration
+ *
+ * Resets every channel's voice mask, poly/steal/bend/aftertouch settings,
+ * per-voice waveform template, both LFOs, the arpeggiator state, and the
+ * filter/patch defaults. Channel 1 (index 0) is set up with every voice
+ * slot enabled and full polyphony, channels 2-5 (index 1-4) get one SID
+ * each exclusive with poly within that SID, and channels 6-16 (index 5-15)
+ * are left disabled via an empty voice_mask.
+ */
 void midi_config_init(void)
 {
   for (uint8_t c = 0; c < MAX_CHANNELS; c++) {
@@ -47,10 +64,10 @@ void midi_config_init(void)
     ch->voice_mask     = 0;  /* disabled unless set below */
     ch->poly_limit     = 1;
     ch->steal_mode     = MIDI_STEAL_OLDEST;
-    ch->transpose      = MIDI_TRANSPOSE;  /* Phase 0's compile-time default, now per-channel */
+    ch->transpose      = MIDI_TRANSPOSE;  /* was a compile-time-only default, now per-channel */
     ch->bend_range     = 2;
     ch->at_target      = MIDI_AT_FILTER;
-    ch->flags          = MIDI_CH_AUTO_GATE;  /* velocity mode off, matches the Phase 0 fix */
+    ch->flags          = MIDI_CH_AUTO_GATE;  /* velocity mode off by default */
     ch->sid_override   = MIDI_OVERRIDE_NONE;
     ch->voice_override = MIDI_OVERRIDE_NONE;
     /* Audible defaults, not silent ones: BIT_4 selects the triangle
@@ -68,6 +85,7 @@ void midi_config_init(void)
     ch->tmpl_susrel    = 0xF0;    /* full sustain, fast release */
     ch->tmpl_pwmlo     = 0;
     ch->tmpl_pwmhi     = 0;
+    ch->unison_detune  = 0;
 
     ch->bend_x256        = 0;
     ch->porta_time       = 0;  /* off */
@@ -81,9 +99,19 @@ void midi_config_init(void)
     ch->lfo_sh_seed   = (uint32_t)(c + 1) * 2654435761u; /* distinct per channel */
     ch->lfo_sh_value  = 0;
 
+    ch->lfo2_wave     = MIDI_LFO_TRI;
+    ch->lfo2_rate     = 32;
+    ch->lfo2_depth    = 0;   /* off */
+    ch->lfo2_dest     = MIDI_LFO_DEST_PITCH;
+    ch->lfo2_phase    = 0;
+    ch->lfo2_sh_seed  = (uint32_t)(c + 1) * 40503u; /* distinct multiplier from lfo_sh_seed's,
+                                                        so LFO1 and LFO2 S&H never lock step */
+    ch->lfo2_sh_value = 0;
+
     ch->arp_mode           = MIDI_ARP_UP;
     ch->arp_rate           = 64;
     ch->arp_octaves        = 0;
+    ch->arp_table_sel      = 0;
     ch->arp_held_count     = 0;
     ch->arp_step            = 0;
     ch->arp_step_up         = true;
@@ -116,6 +144,17 @@ void midi_config_init(void)
   return;
 }
 
+/**
+ * @brief Compute the runtime-usable voice mask for a MIDI channel
+ *
+ * Starts from the channel's configured voice_mask, restricts it to the SID
+ * slots actually present (cfg.numsids), then further restricts it to a
+ * single SID and/or a single voice if the channel's sid_override or
+ * voice_override is set.
+ *
+ * @param uint8_t channel
+ * @return uint16_t effective voice mask
+ */
 uint16_t midi_channel_effective_mask(uint8_t channel)
 {
   midi_channel_cfg_t *ch = &midi_channels[channel];
@@ -152,10 +191,18 @@ static_assert(sizeof(midi_config_blob_t) < MIDICONFIG_SLOT_SIZE,
 static uint8_t  midi_saveid = 0;
 static uint32_t midi_sequence = 0;
 
-/* IEEE 802.3 CRC32, bit-by-bit rather than table-based: nothing else in
- * this firmware needed a CRC32 before, and a save happens rarely enough
- * (a user action, not a hot path) that a 256-entry lookup table would cost
- * flash for no measurable benefit. */
+/**
+ * @brief IEEE 802.3 CRC32 over a byte buffer, bit-by-bit
+ *
+ * Bit-by-bit rather than table-based: nothing else in this firmware needed
+ * a CRC32 before, and a save happens rarely enough (a user action, not a
+ * hot path) that a 256-entry lookup table would cost flash for no
+ * measurable benefit.
+ *
+ * @param uint8_t *data
+ * @param size_t len
+ * @return uint32_t CRC32 checksum
+ */
 static uint32_t midi_crc32(const uint8_t *data, size_t len)
 {
   uint32_t crc = 0xFFFFFFFFu;
@@ -169,9 +216,16 @@ static uint32_t midi_crc32(const uint8_t *data, size_t len)
   return ~crc;
 }
 
-/* CRC covers everything from `saveid` onward - i.e. everything except the
+/**
+ * @brief Compute the CRC32 of a MIDI config blob's persisted content
+ *
+ * Covers everything from `saveid` onward, i.e. everything except the
  * magic/version/size/crc32 header fields themselves, which describe the
- * blob rather than being covered by its own checksum. */
+ * blob rather than being covered by its own checksum.
+ *
+ * @param midi_config_blob_t *blob
+ * @return uint32_t CRC32 of the blob's covered range
+ */
 static uint32_t midi_blob_crc(const midi_config_blob_t *blob)
 {
   const uint8_t *start = (const uint8_t *)&blob->saveid;
@@ -208,6 +262,15 @@ static void __no_inline_not_in_flash_func(write_midi_config_lowlevel)(void *blob
   return;
 }
 
+/**
+ * @brief Save the current MIDI configuration to the next flash slot
+ *
+ * Builds a midi_config_blob_t from midi_channels, midi_patches, arp_tables
+ * and the CC map, stamps it with a magic/version/size header, an
+ * incrementing sequence number, and a CRC32, then erases and programs it
+ * into the next round-robin slot via write_midi_config_lowlevel(). Refuses
+ * to run if the MIDI flash offset failed its boot-time cross-check.
+ */
 void midi_config_save(void)
 {
   if (!midiconfig_offset_ok) {
@@ -226,6 +289,7 @@ void midi_config_save(void)
   midi_handler_get_ccmap(&blob->ccmap);
   memcpy(blob->channel, midi_channels, sizeof(blob->channel));
   memcpy(blob->patch, midi_patches, sizeof(blob->patch));
+  memcpy(blob->arp_table, arp_tables, sizeof(blob->arp_table));
   blob->crc32 = midi_blob_crc(blob);
 
   usCFG("[MIDI CONFIG] Saving to slot %u (sequence %u) at 0x%x\n",
@@ -266,6 +330,8 @@ static void sanitise_loaded_channels(void)
     ch->last_target_x256   = -1;
     ch->lfo_phase           = 0;
     ch->lfo_sh_value        = 0;
+    ch->lfo2_phase          = 0;
+    ch->lfo2_sh_value       = 0;
     ch->arp_held_count      = 0;
     ch->arp_step             = 0;
     ch->arp_step_up          = true;
@@ -277,6 +343,16 @@ static void sanitise_loaded_channels(void)
   return;
 }
 
+/**
+ * @brief Load the most recently saved MIDI configuration from flash
+ *
+ * Scans all MIDICONFIG_SAVE_SLOTS slots, validating each candidate's magic,
+ * size, and CRC32, and keeps the one with the highest sequence number.
+ * Applies its CC map, channel config, patches, and arpeggiator tables, then
+ * calls sanitise_loaded_channels() to clear transient runtime state. Leaves
+ * the compiled-in defaults in place if no valid slot is found. Refuses to
+ * run if the MIDI flash offset failed its boot-time cross-check.
+ */
 void midi_config_load(void)
 {
   if (!midiconfig_offset_ok) {
@@ -323,6 +399,7 @@ void midi_config_load(void)
   midi_handler_set_ccmap(&candidate.ccmap);
   memcpy(midi_channels, candidate.channel, sizeof(midi_channels));
   memcpy(midi_patches, candidate.patch, sizeof(midi_patches));
+  memcpy(arp_tables, candidate.arp_table, sizeof(arp_tables));
   sanitise_loaded_channels();
 
   midi_saveid = (uint8_t)((best_slot + 1) % MIDICONFIG_SAVE_SLOTS);
@@ -333,10 +410,16 @@ void midi_config_load(void)
   return;
 }
 
-/* flash_safe_execute() calls back with `void (*)(void *param)`; the slot
+/**
+ * @brief Erase one MIDI config flash slot, run inside flash_safe_execute()
+ *
+ * flash_safe_execute() calls back with `void (*)(void *param)`; the slot
  * offset to erase is passed through `param` as its numeric value rather
  * than a pointer to it, since there is nothing to point to that outlives
- * the call - the offset is fully known before the call is made. */
+ * the call, the offset is fully known before the call is made.
+ *
+ * @param void *param, the slot's flash offset, cast to a pointer-sized value
+ */
 static void __no_inline_not_in_flash_func(erase_one_midi_slot_lowlevel)(void *param)
 { /* No logging in this function to avoid errors, matching write_midi_config_lowlevel() */
   uint32_t slot_offset = (uint32_t)(uintptr_t)param;
@@ -346,10 +429,20 @@ static void __no_inline_not_in_flash_func(erase_one_midi_slot_lowlevel)(void *pa
   return;
 }
 
+/**
+ * @brief Reset MIDI configuration to compiled-in defaults and erase flash
+ *
+ * Reinitialises midi_channels, midi_patches, and the arpeggiator tables in
+ * RAM, then erases every MIDICONFIG_SAVE_SLOTS flash slot via
+ * erase_one_midi_slot_lowlevel() and resets the save/sequence counters. If
+ * the MIDI flash offset failed its boot-time cross-check, only the RAM
+ * reset is applied.
+ */
 void midi_config_reset(void)
 {
   midi_config_init();
   midi_patch_init();
+  midi_arp_table_init();
 
   if (!midiconfig_offset_ok) {
     usERR("[MIDI CONFIG] Reset applied to RAM only: MIDI flash offset failed its boot-time cross-check\n");

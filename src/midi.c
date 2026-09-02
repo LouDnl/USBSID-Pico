@@ -51,13 +51,20 @@ queue_t cynthcart_queue;
 /* MIDI state machine (declared extern in midi.h) */
 midi_machine midimachine;
 
-/* Always boot with default CC values ~ // TODO: Load from flash!? */
+/* Compile-time defaults, always the CC map's starting point at boot;
+ * midi_processor_init() then calls midi_config_load() (midi_config.c) as its
+ * last step, which overwrites this with a saved ccmap from flash if
+ * verify_midiconfig_offset() finds a valid one - see
+ * midi_handler_set_ccmap() (midi_handler.c). */
 const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT;
 
 /* USB-MIDI 1.0 Code Index Number (low nibble of byte 0 in a 4-byte USB-MIDI
  * event packet). The high nibble of byte 0 is the cable number, which this
  * firmware does not yet route anywhere: the descriptor exposes one embedded
- * cable, so cable is always 0 on the wire today (see TODO 2 for multi-cable). */
+ * cable (TUD_MIDI_DESCRIPTOR, usb_descriptors.c), so cable is always 0 on
+ * the wire today. process_usb_midi_packet() already masks the cable nibble
+ * out rather than assuming 0, so the routing side is ready whenever a
+ * multi-cable descriptor lands. */
 typedef enum {
   CIN_MISC          = 0x0, /* reserved, unused */
   CIN_CABLE_EVENT   = 0x1, /* reserved, unused */

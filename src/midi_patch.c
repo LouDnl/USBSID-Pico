@@ -30,6 +30,15 @@
 
 midi_patch_t midi_patches[MIDI_PATCH_COUNT];
 
+/**
+ * @brief Initialise midi_patches[] with default and factory-preset patches
+ *
+ * Zeroes the whole array, then fills patch 0 to mirror midi_config_init()'s
+ * channel 1 defaults (so selecting it right after boot is a no-op) and
+ * patches 1-15 (bank 0) with a curated set of basic instruments so a fresh
+ * board has something to play via Program Change without a config tool.
+ * Patches 16-31 (bank 1) stay zeroed, reserved for the user's own saves.
+ */
 void midi_patch_init(void)
 {
   memset(midi_patches, 0, sizeof(midi_patches));
@@ -55,6 +64,11 @@ void midi_patch_init(void)
   midi_patches[0].arp_rate       = 64;
   midi_patches[0].arp_octaves    = 0;
   midi_patches[0].bend_range     = 2;
+  midi_patches[0].lfo2_wave      = MIDI_LFO_TRI;
+  midi_patches[0].lfo2_rate      = 32;
+  /* lfo2_depth 0, lfo2_dest MIDI_LFO_DEST_PITCH (0), unison_enabled 0,
+   * unison_detune 0 - already correct from the memset above, same as
+   * lfo_depth/lfo_dest/arp_mode's own zero-is-correct fields. */
 
   /* Patches 1-15 (bank 0): a curated set of basic instruments so a fresh
    * board has something to play immediately via Program Change, without
@@ -134,8 +148,9 @@ void midi_patch_init(void)
 
   /* Patches 16-31 (bank 1) stay zeroed: no waveform bit set, filter closed
    * - inert and silent rather than surprising, until loaded from flash or
-   * set some other way (there is no "save current sound as patch N"
-   * trigger wired yet; see _project/TODO.md). */
+   * set some other way. Nothing yet captures a channel's current live state
+   * into a patch slot - SYSEX_MIDI_PATCH_LOAD (sysex.c) only writes data
+   * sent to it. */
 
   return;
 }

@@ -43,6 +43,11 @@ static volatile uint8_t ring_head = 0;
 static volatile uint8_t ring_tail = 0;
 static volatile uint32_t queue_dropped = 0;
 
+/**
+ * @brief Reset the MIDI ring buffer to empty
+ *
+ * Clears head, tail and the dropped-event counter.
+ */
 void midi_queue_init(void)
 {
   ring_head = 0;
@@ -51,6 +56,21 @@ void midi_queue_init(void)
   return;
 }
 
+/**
+ * @brief Push one MIDI event onto the ring buffer
+ *
+ * Copies up to 3 status/data bytes from `buf` into the next ring slot. If
+ * the ring is full (next head would collide with tail), the event is
+ * dropped and `queue_dropped` is incremented instead of blocking.
+ *
+ * @note single-producer: must only be called from core0 (the USB callback)
+ * @note a data memory barrier separates the entry write from publishing
+ *       the new head, so the consumer never sees a half-written entry
+ *
+ * @param uint8_t const * buf
+ * @param uint8_t len number of valid bytes in buf (1 to 3)
+ * @return bool true if the event was queued, false if the ring was full
+ */
 bool midi_queue_push(const uint8_t *buf, uint8_t len)
 {
   uint8_t h = ring_head;
@@ -70,6 +90,16 @@ bool midi_queue_push(const uint8_t *buf, uint8_t len)
   return true;
 }
 
+/**
+ * @brief Pop one MIDI event off the ring buffer
+ *
+ * @note single-consumer: must only be called from core1
+ * @note a data memory barrier pairs with the producer's barrier, ordering
+ *       the entry read after the head is observed to have advanced
+ *
+ * @param midi_event_t * out
+ * @return bool true if an event was popped, false if the ring was empty
+ */
 bool midi_queue_pop(midi_event_t *out)
 {
   uint8_t t = ring_tail;
@@ -80,6 +110,11 @@ bool midi_queue_pop(midi_event_t *out)
   return true;
 }
 
+/**
+ * @brief Get the number of MIDI events dropped due to a full ring buffer
+ *
+ * @return uint32_t total dropped event count since the last midi_queue_init()
+ */
 uint32_t midi_queue_dropped(void)
 {
   return queue_dropped;

@@ -62,6 +62,29 @@ uint8_t midi_voice_regbase(uint8_t slot);   /* (slot % MAX_VOICES) * VOICE_REGS 
  * match. */
 uint8_t midi_voice_find(uint8_t channel, uint8_t note);
 
+/* Unison claims MIDI_VOICE_UNISON_COUNT (3) slots per (channel, note)
+ * instead of 1, all three tagged with the same key - normal single-voice
+ * allocation never produces more than one match, so this is a safe
+ * generalisation of midi_voice_find(), not a unison-specific function.
+ * Writes up to MIDI_VOICE_UNISON_COUNT slot indices into `out` and returns
+ * how many were found (0-3). */
+#define MIDI_VOICE_UNISON_COUNT 3
+uint8_t midi_voice_find_all(uint8_t channel, uint8_t note, uint8_t out_slots[MIDI_VOICE_UNISON_COUNT]);
+
+/* Claim MIDI_VOICE_UNISON_COUNT adjacent slots on one SID together for
+ * (channel, note) - a genuine tradeoff, not a bigger midi_voice_alloc():
+ * that SID drops to 1 note of polyphony while the claim holds. First-pass
+ * policy: refuse if no single SID in the channel's effective mask has all
+ * 3 of its slots free (no stealing yet, simplest correct default). A repeat
+ * note-on for an already-gated (channel, note) retriggers the same 3 slots,
+ * same key-collision handling as midi_voice_alloc()'s own retrigger path.
+ *
+ * @param uint8_t out_slots[MIDI_VOICE_UNISON_COUNT], written regardless of
+ *        outcome: MIDI_VOICE_NONE in every element on refusal.
+ * @return uint8_t out_slots[0], or MIDI_VOICE_NONE on refusal
+ */
+uint8_t midi_voice_alloc_unison(uint8_t channel, uint8_t note, uint8_t velocity, uint8_t out_slots[MIDI_VOICE_UNISON_COUNT]);
+
 /* Allocate a slot for (channel, note): a free slot inside the channel's
  * effective mask if one exists and the channel is under its poly_limit;
  * otherwise steal per the channel's steal_mode. Returns MIDI_VOICE_NONE if

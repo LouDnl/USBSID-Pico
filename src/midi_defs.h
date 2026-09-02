@@ -74,12 +74,12 @@ typedef struct midi_ccvalues {
   /* Custom commands */
   uint8_t CC_GTEN;  /* Gate auto enabled on noteon note off */
   uint8_t CC_SPLY;  /* Turn on polyfonic for current SID */
-  uint8_t CC_CVCE;  /* Enable copy voice mode */
-  uint8_t CC_CSID;  /* Enable copy SID mode */
-  uint8_t CC_LVCE;  /* Link/Unlink voice */
-  uint8_t CC_LSID;  /* Link/Unlink SID */
+  // uint8_t CC_CVCE;  /* Enable copy voice mode */ /* DEPRECATED */
+  // uint8_t CC_CSID;  /* Enable copy SID mode */ /* DEPRECATED */
+  // uint8_t CC_LVCE;  /* Link/Unlink voice */ /* DEPRECATED */
+  // uint8_t CC_LSID;  /* Link/Unlink SID */ /* DEPRECATED */
   uint8_t CC_VELM;  /* Velocity Mode */
-  /* Phase 4 ~ Modulation and timing */
+  /* Modulation and timing */
   uint8_t CC_LFOW;  /* LFO waveform */
   uint8_t CC_LFOR;  /* LFO rate */
   uint8_t CC_LFOD;  /* LFO depth */
@@ -89,12 +89,23 @@ typedef struct midi_ccvalues {
   uint8_t CC_ARPR;  /* Arpeggiator rate */
   uint8_t CC_ARPO;  /* Arpeggiator octave range */
   uint8_t CC_ARPE;  /* Arpeggiator enable */
-  /* TODO 14 ~ FMOpl */
+  /* Arpeggiator tables (midi_arp_table.h) */
+  uint8_t CC_ARPT;  /* Arpeggiator table select (used when arp_mode == MIDI_ARP_TABLE) */
+  /* Second LFO, stacked with LFO1 at whichever destination(s) each targets
+   * (midi_tick(), midi_handler.c) */
+  uint8_t CC_LFO2W; /* LFO 2 waveform */
+  uint8_t CC_LFO2R; /* LFO 2 rate */
+  uint8_t CC_LFO2D; /* LFO 2 depth */
+  uint8_t CC_LFO2T; /* LFO 2 destination (target) */
+  /* 3-oscillator unison (midi_voice_alloc_unison(), midi_voice.h/.c) */
+  uint8_t CC_UNIS;  /* Unison mode on/off (channel drops to 1 note/SID while on) */
+  uint8_t CC_UDET;  /* Unison detune spread */
+  /* FMOpl (midi_fmopl.h/.c) */
   uint8_t CC_FMEN;  /* Target this channel's notes at the FMOpl chip instead of a SID */
   /* Fixed CC values ~ Cynthcart related */
   uint8_t CC_CEN;   /* Enable  Cynthcart */
   uint8_t CC_CDI;   /* Disable Cynthcart */
-  uint8_t CC_CRE;   /* Restart Cynthcart */
+  uint8_t CC_CRE;   /* Reset Cynthcart */
   /* Midi related */
   uint8_t CC_BMSB;  /* Bank Select MSB */
   uint8_t CC_BLSB;  /* Bank Select LSB */
@@ -147,12 +158,8 @@ typedef struct midi_ccvalues {
   /* Default CC values ~ custom commands */ \
   .CC_GTEN =  0x77,  /* 119 ~ Gate auto enabled on noteon note off */ \
   .CC_SPLY =  0x6F,  /* 111 ~ Turn on polyfonic for current SID */ \
-  .CC_CVCE =  0x08,  /*   8 ~ Enable copy voice mode */ \
-  .CC_CSID =  0x09,  /*   9 ~ Enable copy SID mode (moved off 0x18, collided with CC_TEST) */ \
-  .CC_LVCE =  0x28,  /*  40 ~ Link/Unlink voice */ \
-  .CC_LSID =  0x38,  /*  56 ~ Link/Unlink SID */ \
   .CC_VELM =  0x48,  /*  72 ~ Velocity Mode */ \
-  /* Default values ~ Phase 4 modulation and timing */ \
+  /* Default values ~ modulation and timing */ \
   .CC_LFOW =  0x00,  /*   0 ~ LFO waveform */ \
   .CC_LFOR =  0x02,  /*   2 ~ LFO rate */ \
   .CC_LFOD =  0x03,  /*   3 ~ LFO depth */ \
@@ -162,8 +169,22 @@ typedef struct midi_ccvalues {
   .CC_ARPR =  0x0A,  /*  10 ~ Arpeggiator rate */ \
   .CC_ARPO =  0x0B,  /*  11 ~ Arpeggiator octave range */ \
   .CC_ARPE =  0x0C,  /*  12 ~ Arpeggiator enable */ \
-  /* Default values ~ TODO 14 FMOpl. 88 chosen from the largest free run */ \
-  /* (88-103) left after every CC above - see TODO 14's own research note. */ \
+  /* Default values ~ Arpeggiator tables. Adjacent to CC_ARPM/R/O/E */ \
+  /* above but they were already full 0x06/0x0A-0x0C, so this sits in the */ \
+  /* next free run instead - see temp/cc_collision_check.py's free list. */ \
+  .CC_ARPT =  0x1E,  /*  30 ~ Arpeggiator table select */ \
+  /* Default values ~ second LFO. Contiguous with LFO1's own */ \
+  /* 0x00/0x02-0x05 block (0x01 is CC_PWM, already taken). */ \
+  .CC_LFO2W =  0x0D,  /*  13 ~ LFO 2 waveform */ \
+  .CC_LFO2R =  0x0E,  /*  14 ~ LFO 2 rate */ \
+  .CC_LFO2D =  0x0F,  /*  15 ~ LFO 2 depth */ \
+  .CC_LFO2T =  0x10,  /*  16 ~ LFO 2 destination */ \
+  /* Default values ~ unison. Adjacent to CC_LVCE (0x28), the */ \
+  /* other per-voice-shape override CC. */ \
+  .CC_UNIS  =  0x29,  /*  41 ~ Unison mode on/off */ \
+  .CC_UDET  =  0x2A,  /*  42 ~ Unison detune spread */ \
+  /* Default values ~ FMOpl. 88 chosen from the largest free run */ \
+  /* (88-103) left after every CC above (midi_fmopl.h/.c). */ \
   .CC_FMEN =  0x58,  /*  88 ~ Target this channel at the FMOpl chip instead of a SID */ \
   /* Cynthcart related _FIXED_ CC values */ \
   .CC_CEN  =  0x55,  /*  85 ~ Enable Cynthcart */ \

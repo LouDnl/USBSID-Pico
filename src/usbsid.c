@@ -40,6 +40,7 @@
 #include <sid_tests.h>
 #include <midi.h>
 #include <midi_engine.h>
+#include <midi_handler.h>
 #include <asid.h>
 #include <logging.h>
 
@@ -1216,6 +1217,14 @@ int main()
       usWRN("Please verify socket configuration before further use!\n\n");
     }
   }
+
+  /* cfg.numsids is authoritative by now (detect_default_config() /
+   * verify_socket_config() above); midi_config_init() (during midi_init(),
+   * earlier in this same boot sequence) ran before that and could only
+   * guess at MAX_SIDS. The host has not been allowed to enumerate yet
+   * (tud_connect() is still ahead), so there is no MIDI traffic this could
+   * race against. */
+  midi_config_sync_poly_limits();
 
   /* Signal Core 1 to enter main loop (sync point 2) */
   usBOOT("<CORE 0> Signaling core1 ~ 2\n");

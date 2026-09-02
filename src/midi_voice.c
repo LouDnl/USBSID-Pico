@@ -43,6 +43,9 @@ typedef struct {
 static voice_slot_t __not_in_flash("midi") voices[MIDI_VOICE_COUNT];
 static uint32_t alloc_serial = 0;
 
+/**
+ * @brief Reset all voice slots to free and clear the allocation serial counter
+ */
 void midi_voice_init(void)
 {
   for (uint8_t i = 0; i < MIDI_VOICE_COUNT; i++) {
@@ -58,21 +61,46 @@ void midi_voice_init(void)
   return;
 }
 
+/**
+ * @brief Get the SID chip index a voice slot belongs to
+ *
+ * @param uint8_t slot
+ * @return uint8_t SID index (slot / MAX_VOICES)
+ */
 uint8_t midi_voice_sidindex(uint8_t slot)
 {
   return (uint8_t)(slot / MAX_VOICES);
 }
 
+/**
+ * @brief Get the bus base address of the SID chip a voice slot belongs to
+ *
+ * @param uint8_t slot
+ * @return uint8_t SID base address
+ */
 uint8_t midi_voice_sidbase(uint8_t slot)
 {
   return cfg.sidaddr[cfg.ids[midi_voice_sidindex(slot)]];
 }
 
+/**
+ * @brief Get the voice register base offset of a slot within its SID chip
+ *
+ * @param uint8_t slot
+ * @return uint8_t register offset, (slot % MAX_VOICES) * VOICE_REGS
+ */
 uint8_t midi_voice_regbase(uint8_t slot)
 {
   return (uint8_t)((slot % MAX_VOICES) * VOICE_REGS);
 }
 
+/**
+ * @brief Find the gated voice slot holding the given channel and note
+ *
+ * @param uint8_t channel
+ * @param uint8_t note
+ * @return uint8_t slot index, or MIDI_VOICE_NONE if not found
+ */
 uint8_t midi_voice_find(uint8_t channel, uint8_t note)
 {
   for (uint8_t i = 0; i < MIDI_VOICE_COUNT; i++) {
@@ -83,6 +111,27 @@ uint8_t midi_voice_find(uint8_t channel, uint8_t note)
     }
   }
   return MIDI_VOICE_NONE;
+}
+
+/**
+ * @brief Find every gated voice slot holding the given channel and note
+ *
+ * @param uint8_t channel
+ * @param uint8_t note
+ * @param uint8_t out_slots[MIDI_VOICE_UNISON_COUNT] filled with matching slot indices
+ * @return uint8_t number of matching slots found
+ */
+uint8_t midi_voice_find_all(uint8_t channel, uint8_t note, uint8_t out_slots[MIDI_VOICE_UNISON_COUNT])
+{
+  uint8_t n = 0;
+  for (uint8_t i = 0; i < MIDI_VOICE_COUNT && n < MIDI_VOICE_UNISON_COUNT; i++) {
+    if (voices[i].state == MIDI_VOICE_GATED
+      && voices[i].channel == channel
+      && voices[i].note == note) {
+      out_slots[n++] = i;
+    }
+  }
+  return n;
 }
 
 /**
@@ -126,6 +175,23 @@ static uint8_t pick_steal(uint16_t candidates, uint8_t steal_mode)
   return best;
 }
 
+/**
+ * @brief Allocate a voice slot for a note-on, retriggering or stealing as needed
+ *
+ * A note-on for a (channel, note) pair that is already gated retriggers the
+ * existing voice instead of allocating a new one, so a fast re-strike never
+ * orphans a voice. Otherwise the channel's effective slot mask is consulted:
+ * if the channel is already at its poly_limit, a voice is stolen from among
+ * its own gated slots (never another channel's); if a free slot exists in
+ * the mask it is used directly; if the mask is exhausted (only possible when
+ * two channels' masks overlap) a voice is stolen from within the mask,
+ * following the channel's configured steal_mode.
+ *
+ * @param uint8_t channel
+ * @param uint8_t note
+ * @param uint8_t velocity
+ * @return uint8_t allocated (or retriggered/stolen) slot index, or MIDI_VOICE_NONE if none available
+ */
 uint8_t midi_voice_alloc(uint8_t channel, uint8_t note, uint8_t velocity)
 {
   /* A note-on for a (channel, note) that is already gated - a key repeat,
@@ -192,6 +258,76 @@ uint8_t midi_voice_alloc(uint8_t channel, uint8_t note, uint8_t velocity)
   return slot;
 }
 
+/**
+ * @brief Allocate 3 voice slots on a single SID chip for a unison note-on
+ *
+ * Retriggers the existing 3 slots if (channel, note) is already gated,
+ * mirroring midi_voice_alloc()'s retrigger behaviour. Otherwise scans the
+ * channel's effective mask for a SID chip that grants all
+ * MIDI_VOICE_UNISON_COUNT of its voice slots and has them all free; refuses
+ * (no stealing) if no such SID exists.
+ *
+ * @param uint8_t channel
+ * @param uint8_t note
+ * @param uint8_t velocity
+ * @param uint8_t out_slots[MIDI_VOICE_UNISON_COUNT] filled with the 3 allocated slots, or MIDI_VOICE_NONE entries on failure
+ * @return uint8_t the first allocated slot, or MIDI_VOICE_NONE if no SID had 3 free slots
+ */
+uint8_t midi_voice_alloc_unison(uint8_t channel, uint8_t note, uint8_t velocity, uint8_t out_slots[MIDI_VOICE_UNISON_COUNT])
+{
+  /* Retrigger: a note-on for a (channel, note) already gated must restrike
+   * the same 3 slots, not claim a second triplet - same reasoning as
+   * midi_voice_alloc()'s own retrigger branch. */
+  uint8_t found = midi_voice_find_all(channel, note, out_slots);
+  if (found > 0) {
+    for (uint8_t k = 0; k < found; k++) {
+      voices[out_slots[k]].velocity = velocity;
+      voices[out_slots[k]].age = ++alloc_serial;
+    }
+    for (uint8_t k = found; k < MIDI_VOICE_UNISON_COUNT; k++) out_slots[k] = MIDI_VOICE_NONE;
+    return out_slots[0];
+  }
+
+  out_slots[0] = out_slots[1] = out_slots[2] = MIDI_VOICE_NONE;
+
+  uint16_t mask = midi_channel_effective_mask(channel);
+  if (mask == 0) return MIDI_VOICE_NONE;
+
+  /* First-pass policy: refuse rather than steal if no single SID
+   * in the mask has all MIDI_VOICE_UNISON_COUNT of its slots free. Slot
+   * layout matches midi_voice_sidindex()/midi_voice_regbase(): slot n is
+   * SID n/MAX_VOICES, voice n%MAX_VOICES within it, so SID s's slots are
+   * exactly s*MAX_VOICES .. s*MAX_VOICES+MAX_VOICES-1. */
+  for (uint8_t s = 0; s < MAX_SIDS; s++) {
+    uint16_t sid_bits = (uint16_t)(((1u << MAX_VOICES) - 1) << (s * MAX_VOICES));
+    if ((mask & sid_bits) != sid_bits) continue;  /* mask doesn't grant every slot on this SID */
+
+    bool all_free = true;
+    for (uint8_t v = 0; v < MIDI_VOICE_UNISON_COUNT; v++) {
+      if (voices[(s * MAX_VOICES) + v].state != MIDI_VOICE_FREE) { all_free = false; break; }
+    }
+    if (!all_free) continue;
+
+    for (uint8_t v = 0; v < MIDI_VOICE_UNISON_COUNT; v++) {
+      uint8_t slot = (uint8_t)((s * MAX_VOICES) + v);
+      voices[slot].channel  = channel;
+      voices[slot].note     = note;
+      voices[slot].velocity = velocity;
+      voices[slot].age      = ++alloc_serial;
+      voices[slot].state    = MIDI_VOICE_GATED;
+      out_slots[v] = slot;
+    }
+    return out_slots[0];
+  }
+
+  return MIDI_VOICE_NONE;  /* no SID in the mask has 3 free slots: refuse */
+}
+
+/**
+ * @brief Free a voice slot, clearing its channel/note and marking it free
+ *
+ * @param uint8_t slot
+ */
 void midi_voice_release(uint8_t slot)
 {
   voices[slot].channel = MIDI_CH_NONE;
@@ -200,26 +336,57 @@ void midi_voice_release(uint8_t slot)
   return;
 }
 
+/**
+ * @brief Get the state of a voice slot
+ *
+ * @param uint8_t slot
+ * @return midi_voice_state_t
+ */
 midi_voice_state_t midi_voice_state(uint8_t slot)
 {
   return voices[slot].state;
 }
 
+/**
+ * @brief Get the MIDI channel a voice slot is assigned to
+ *
+ * @param uint8_t slot
+ * @return uint8_t channel
+ */
 uint8_t midi_voice_channel(uint8_t slot)
 {
   return voices[slot].channel;
 }
 
+/**
+ * @brief Get the note a voice slot is playing
+ *
+ * @param uint8_t slot
+ * @return uint8_t note
+ */
 uint8_t midi_voice_note(uint8_t slot)
 {
   return voices[slot].note;
 }
 
+/**
+ * @brief Get the velocity of a voice slot
+ *
+ * @param uint8_t slot
+ * @return uint8_t velocity
+ */
 uint8_t midi_voice_velocity(uint8_t slot)
 {
   return voices[slot].velocity;
 }
 
+/**
+ * @brief Set the current and target portamento pitch for a voice slot
+ *
+ * @param uint8_t slot
+ * @param int32_t cur_x256 current pitch, note-index * 256
+ * @param int32_t target_x256 target pitch, note-index * 256
+ */
 void midi_voice_set_pitch(uint8_t slot, int32_t cur_x256, int32_t target_x256)
 {
   voices[slot].cur_pitch_x256    = cur_x256;
@@ -227,11 +394,23 @@ void midi_voice_set_pitch(uint8_t slot, int32_t cur_x256, int32_t target_x256)
   return;
 }
 
+/**
+ * @brief Get the current portamento pitch of a voice slot
+ *
+ * @param uint8_t slot
+ * @return int32_t current pitch, note-index * 256
+ */
 int32_t midi_voice_cur_pitch(uint8_t slot)
 {
   return voices[slot].cur_pitch_x256;
 }
 
+/**
+ * @brief Get the target portamento pitch of a voice slot
+ *
+ * @param uint8_t slot
+ * @return int32_t target pitch, note-index * 256
+ */
 int32_t midi_voice_target_pitch(uint8_t slot)
 {
   return voices[slot].target_pitch_x256;

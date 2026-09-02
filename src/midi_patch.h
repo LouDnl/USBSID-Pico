@@ -84,6 +84,23 @@ typedef struct {
   uint8_t  arp_octaves;
 
   uint8_t  bend_range;
+
+  /* LFO 2 and unison fields: appended, not inserted - the SysEx frame
+   * (sysex.c's pack_patch()/unpack_patch(), 0x20-0x22) is a fixed nibble
+   * layout already
+   * hardware-verified byte-for-byte; new fields go at the tail only, so an
+   * old (shorter) dump is refused by the size check rather than misread,
+   * and a new dump sent to old firmware just has its unknown trailing
+   * nibbles ignored. See midi_config.h's MIDI_CONFIG_VERSION comment for
+   * the matching flash-blob side of the same rule. */
+  uint8_t  lfo2_wave;
+  uint8_t  lfo2_rate;
+  uint8_t  lfo2_depth;
+  uint8_t  lfo2_dest;
+  uint8_t  unison_enabled;  /* 0/1 - stored as a byte, not folded into a flags
+                                bitfield, since a patch has no flags byte of
+                                its own to fold it into */
+  uint8_t  unison_detune;
 } midi_patch_t;
 
 extern midi_patch_t midi_patches[MIDI_PATCH_COUNT];
