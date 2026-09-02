@@ -287,7 +287,7 @@ ConfigError apply_detection_results(const DetectionResult *det)
 /**
  * @brief Verifies detection results on socket change activity only
  *
- * @param det
+ * @param DetectionResult *det
  * @return ConfigError
  */
 ConfigError verify_socket_detection_results(const DetectionResult *det)
@@ -505,7 +505,6 @@ void flip_sockets(void)
  * @brief Helper funtion to apply requested socket preset
  *
  * @param SocketPreset preset
- * @return ConfigError
  */
 static void apply_socket_preset(SocketPreset preset)
 {
@@ -571,7 +570,6 @@ static SocketPreset detect_current_preset(void)
  * @brief Apply requested preset only if not already active
  *
  * @param SocketPreset preset
- * @param bool at_boot
  * @return ConfigError
  */
 static ConfigError apply_preset(SocketPreset preset)
@@ -704,7 +702,7 @@ void socket_config_fallback(void)
  * @brief Autodetection for sock chip change
  * @note Any change _will_ lock USBSID untill verification
  *
- * @return * ConfigError
+ * @return ConfigError CFG_OK when no change detected, otherwise the detected change/error code
  */
 ConfigError detect_socket_change(void)
 {

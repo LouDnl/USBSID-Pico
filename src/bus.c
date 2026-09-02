@@ -534,7 +534,8 @@ void restart_bus(void)
  * @note rp2350 uses a single DMA channel and native endless transfer
  * @note rp2040 uses a two chained DMA channels for endless transfer
  *
- * @returns uint32_t */
+ * @return uint32_t current C64 PHI1 clock cycle count
+ */
 uint32_t clockcycles(void)
 {
   return (uint32_t)cycle_count_word;

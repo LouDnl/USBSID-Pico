@@ -55,6 +55,12 @@ static async_context_threadsafe_background_t async_context;
 static async_when_pending_worker_t worker = { .do_work = async_worker_func };
 
 
+/**
+ * @brief Configure and start the PIO UART RX state machine on the given pin
+ *
+ * @param uint pin
+ * @param uint baud
+ */
 static inline void uart_rx_program_init(uint pin, uint baud)
 {
   pio_sm_set_consecutive_pindirs(uart_pio, sm_uartrx, pin, 1, false);
@@ -77,6 +83,14 @@ static inline void uart_rx_program_init(uint pin, uint baud)
   return;
 }
 
+/**
+ * @brief Blocking read of one byte from the PIO UART RX FIFO
+ *
+ * Reads the uppermost byte of the FIFO word since incoming data is
+ * left-justified, spinning until the FIFO has data.
+ *
+ * @return char the received byte
+ */
 static inline char uart_rx_program_getc(void)
 {
   /* 8-bit read from the uppermost byte of the FIFO, as data is left-justified */
@@ -86,6 +100,14 @@ static inline char uart_rx_program_getc(void)
   return (char)*rxfifo_shift;
 }
 
+/**
+ * @brief PIO RX FIFO interrupt handler
+ *
+ * Drains all available bytes from the RX FIFO into fifo_uartrx, then
+ * signals the async worker that data is pending.
+ *
+ * @note panics if fifo_uartrx is full
+ */
 static void pio_irq_func(void)
 {
   while(!pio_sm_is_rx_fifo_empty(uart_pio, sm_uartrx)) {
@@ -99,6 +121,24 @@ static void pio_irq_func(void)
   return;
 }
 
+/**
+ * @brief Async worker that drains received UART bytes and dispatches them as SID writes
+ *
+ * Invoked when pio_irq_func() signals pending work. Pulls bytes out of
+ * fifo_uartrx into uart_buffer. A run of two adjacent 0xFF bytes anywhere in
+ * the first 4 buffer positions is treated as a reset marker and returns the
+ * receiver to its 8-byte initial packet size. Otherwise, once a full packet
+ * has been received it is either applied as a cycled_write_operation (2-byte
+ * or 4-byte packets: register/value, optionally with an explicit cycle
+ * count) or, for 8-byte packets matching the {FF EE DD .. DD EE FF}
+ * initiator pattern, used to reconfigure bytes_per_rxpacket for subsequent
+ * packets.
+ *
+ * @note bytes_per_rxpacket currently cannot be reset back to 8 without a restart
+ *
+ * @param async_context_t * async_context (unused)
+ * @param async_when_pending_worker_t * worker (unused)
+ */
 static void async_worker_func(__unused async_context_t *async_context, __unused async_when_pending_worker_t *worker)
 { /* TODO: Finish */
   set_vu_action(); /* Keep that shiny Vu blinking! */
@@ -152,6 +192,11 @@ static void async_worker_func(__unused async_context_t *async_context, __unused 
   return;
 }
 
+/**
+ * @brief Set up the threadsafe background async context and register the pending-work worker
+ *
+ * @note panics if the async context cannot be initialised
+ */
 static void init_async(void)
 {
   /* Setup an async context and worker to perform work when needed */
@@ -162,6 +207,15 @@ static void init_async(void)
   return;
 }
 
+/**
+ * @brief Initialise the PIO UART receiver
+ *
+ * Sets up the byte queue, async context/worker, claims a free PIO state
+ * machine for the RX program on PIOUART_RX, starts it, and wires up its
+ * IRQ (falling back to the next IRQ number if the first is already in use).
+ *
+ * @note panics if no PIO state machine or IRQ is available
+ */
 void init_uart(void)
 {
   /* Explicitely set bytes_per_rxpacket to 8 at start for potential compiler zeroing issue */
@@ -200,6 +254,15 @@ void init_uart(void)
   return;
 }
 
+/**
+ * @brief Tear down the PIO UART receiver
+ *
+ * Disables and removes the RX FIFO interrupt, frees the claimed PIO
+ * program/state machine, removes the async worker and deinitialises the
+ * async context, and frees the byte queue.
+ *
+ * @note implementation incomplete (TODO), currently unused
+ */
 void deinit_uart(void)
 {
   // /* Echo characters received from PIO to the console */

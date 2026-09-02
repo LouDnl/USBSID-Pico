@@ -88,7 +88,7 @@ volatile int data_buffer_size = 0;
 /**
  * @brief Write back data to USB CDC or Vendor
  *
- * @param buffersize
+ * @param size_t buffersize
  */
 void write_back_data(size_t buffersize)
 {
@@ -106,10 +106,10 @@ void write_back_data(size_t buffersize)
 /**
  * @brief Set the onboard SID player maxplaytime
  *
- * @param buffer[5] = { CMD, FF000000, 00FF0000, 0000FF00, 000000FF }
+ * Combines 4x uint8_t from the buffer into a single uint32_t and sets
+ * maxplaytime: buffer[1..4] = { FF000000, 00FF0000, 0000FF00, 000000FF } -> 0xFFFFFFFF
  *
- * @result Combines 4x uint8_t into a single uint32_t and sets maxplaytime
- * @result { FF000000, 00FF0000, 0000FF00, 000000FF } -> 0xFFFFFFFF
+ * @param uint8_t * buffer buffer[5] = { CMD, FF000000, 00FF0000, 0000FF00, 000000FF }
  */
 void set_maxplaytime(uint8_t * buffer)
 {
@@ -128,11 +128,10 @@ void set_maxplaytime(uint8_t * buffer)
 /**
  * @brief Get the onboard SID player current playtime
  *
- * @note Does not return anything
- * @note Writes am uint8_t buffer to the requesting endpoint
+ * Writes the uint32_t playtime cut into 4x uint8_t, i.e.
+ * { FF000000, 00FF0000, 0000FF00, 000000FF }, to the requesting endpoint.
  *
- * @result uint32_t playtime cut into 4x uint8_t
- * @result { FF000000, 00FF0000, 0000FF00, 000000FF }
+ * @note Does not return anything, writes the buffer directly
  */
 void get_playtime(void)
 {
@@ -158,18 +157,17 @@ void get_playtime(void)
 }
 
 /**
-* @brief Hold one onboard SID player voice of one SID silent
- *       while the tune keeps playing.
+ * @brief Hold one onboard SID player voice of one SID silent while the
+ *        tune keeps playing
  *
- * @param buffer[4] = { CMD, chip, voice, mute }
- * @param chip  1 to 4, higher will discard the command completely
- * @param voice 1 to 3, higher will discard the command completely
- * @param mute  0 or 1, higher will discard the command completely
+ * buffer[4] = { CMD, chip, voice, mute }: chip is 1 to 4, voice is 1 to 3,
+ * mute is 0 or 1, any higher value in any field discards the command
+ * completely.
  *
- * @note use chip = 0, voice = 0, mute 1 or 0 to
- *       mute or unmute all.
- * @note chip = 0, voice = !0 or too high numbers are
- *       invalid combinations
+ * @note use chip = 0, voice = 0, mute 1 or 0 to mute or unmute all
+ * @note chip = 0, voice = !0 or too high numbers are invalid combinations
+ *
+ * @param uint8_t * buffer
  */
 void set_mutestate(uint8_t * buffer)
 {
@@ -213,14 +211,14 @@ void set_mutestate(uint8_t * buffer)
 }
 
 /**
- * @brief Get the onboard SID player mute state of
- *        all chips and voices
+ * @brief Get the onboard SID player mute state of all chips and voices
  *
- * @note does not return anything
- * @note writes a buffer to the requesting endpoint
+ * Writes { uint8_t chips, uint8_t chip1, uint8_t chip2, uint8_t chip3,
+ * uint8_t chip4 } to the requesting endpoint, where the chips byte packs
+ * per-chip mute bits and each chipN byte packs its 3 voice mute bits
+ * (0b111 = voices 3, 2, 1).
  *
- * @result chip byte: 0b111 = voice 321
- * @result { uint8_t chip1, uint8_t chip2, uint8_t chip3, uint8_t chip4 }
+ * @note does not return anything, writes the buffer directly
  */
 void get_mutestate(void)
 {
@@ -266,17 +264,18 @@ bool config_unacknowledged(void)
 }
 
 /**
- * @brief
+ * @brief Dispatch an incoming WRITE_CONFIG buffer to its config type handler
  *
  * @note 64 byte buffer before reaching this function:
  * @note { CMD, CFGCMD, INIT, VER, DATA ... 58 bytes max, VER, END }
  * @note 62 byte buffer reaching this function:
  * @note { INIT, VER, DATA ... 58 bytes max, VER, END }
  * @note if more then 64 bytes, VER and END are not in this packet
+ * @note the FULL_CONFIG / SOCKET_CONFIG / MIDI_CONFIG / MIDI_CCVALUES cases
+ *       are currently unimplemented stubs
  *
- * @param buffer
- * @param size
- * @return * void
+ * @param uint8_t * buffer
+ * @param uint32_t size
  */
 void handle_config_buffer(uint8_t * buffer, uint32_t size)
 {
@@ -294,6 +293,17 @@ void handle_config_buffer(uint8_t * buffer, uint32_t size)
   return;
 }
 
+/**
+ * @brief Encode a Config struct into the 64 byte READ_CONFIG wire buffer
+ *
+ * Fills the static `config_array` with the fields the host expects for a
+ * READ_CONFIG response (clock, socket one/two, LED, RGBLED, feature enable
+ * flags, audio switch, mirrored/flipped/mixed bits, terminator bytes), and
+ * scans the array for the 0x8F/0xFF end marker to compute `cfg_read_writes`,
+ * the number of 64 byte USB writes needed to send it back.
+ *
+ * @param Config* config
+ */
 void read_config(Config* config)
 {
   memset(config_array, 0, sizeof config_array);  /* Make sure we don't send garbled old data */
@@ -408,6 +418,15 @@ void read_config(Config* config)
   return;
 }
 
+/**
+ * @brief Encode a Config struct into the 12 byte READ_SOCKETCFG wire buffer
+ *
+ * Fills the static `socket_config_array` with the socket one/two enabled,
+ * dualsid, chiptype and SID type/id fields plus the mirrored/flipped/mixed
+ * bits, for the READ_SOCKETCFG response.
+ *
+ * @param Config* config
+ */
 void read_socket_config(Config* config)
 {
   memset(socket_config_array, 0, sizeof socket_config_array);  /* Make sure we don't send garbled old data */
@@ -433,6 +452,12 @@ void read_socket_config(Config* config)
   return;
 }
 
+/**
+ * @brief Encode the firmware version string into `p_version_array`
+ *
+ * Writes { USBSID_VERSION, length, version string bytes } for the
+ * USBSID_VERSION large-write response.
+ */
 void read_firmware_version(void)
 {
   p_version_array[0] = USBSID_VERSION;  /* Initiator byte */
@@ -441,6 +466,12 @@ void read_firmware_version(void)
   return;
 }
 
+/**
+ * @brief Encode the PCB version string into `p_version_array`
+ *
+ * Writes { US_PCB_VERSION, length, version string bytes } for the
+ * US_PCB_VERSION large-write response.
+ */
 void read_pcb_version(void)
 {
   p_version_array[0] = US_PCB_VERSION;  /* Initiator byte */
@@ -449,6 +480,14 @@ void read_pcb_version(void)
   return;
 }
 
+/**
+ * @brief Reset a Config struct to the compiled-in default configuration
+ *
+ * Preserves the config's `config_saveid` across the reset so the flash
+ * save slot bookkeeping stays intact.
+ *
+ * @param Config* config
+ */
 void __no_inline_not_in_flash_func(default_config)(Config* config)
 {
   config_saveid = config->config_saveid;  /* Preserve config saveid */
@@ -485,6 +524,21 @@ void verify_midiconfig_offset(void)
   return;
 }
 
+/**
+ * @brief Load the most recently saved configuration from flash
+ *
+ * Walks the flash save slots (`FLASH_PAGE_SIZE` apart, up to 16 slots)
+ * starting at slot 0, following the `config_saveid` chain until it finds a
+ * slot whose stored id no longer matches its position; that means the
+ * previous slot holds the latest saved config, which is then copied into
+ * `*config`. Falls back to `default_config()` if the loaded config's magic
+ * number does not match `MAGIC_SMOKE`.
+ *
+ * @note must not log directly after the flash memcpy without an
+ *       stdio_flush() first, or the Pico will freeze
+ *
+ * @param Config* config
+ */
 void __no_inline_not_in_flash_func(load_config)(Config* config)
 {
   print_cfg_addr();
@@ -542,6 +596,19 @@ AGAIN:
   return;
 }
 
+/**
+ * @brief Erase (if needed) and program one flash page with the config data
+ *
+ * Runs with interrupts disabled for the duration of the flash operation.
+ * Erases the whole `FLASH_SECTOR_SIZE` sector only when `config_saveid` is
+ * 0, to keep the number of flash erases low, then programs the
+ * `FLASH_PAGE_SIZE` page at the current save slot.
+ *
+ * @note no logging in this function, to avoid errors while flash is busy
+ * @note intended to be invoked via flash_safe_execute() from write_config()
+ *
+ * @param void* config_data
+ */
 void __no_inline_not_in_flash_func(write_config_lowlevel)(void* config_data)
 { /* No logging in this function to avoid errors */
   uint32_t ints = save_and_disable_interrupts();
@@ -554,6 +621,16 @@ void __no_inline_not_in_flash_func(write_config_lowlevel)(void* config_data)
   return;
 }
 
+/**
+ * @brief Write a Config struct to flash via flash_safe_execute()
+ *
+ * Copies the config into a `CONFIG_SIZE` local buffer (statically asserted
+ * to fit the whole struct), then runs write_config_lowlevel() through
+ * flash_safe_execute() so the flash operation is safely coordinated with
+ * core1, and sleeps 100ms afterwards.
+ *
+ * @param const Config* config
+ */
 void __no_inline_not_in_flash_func(write_config)(const Config* config)
 {
   uint8_t config_data[CONFIG_SIZE] = {0};
@@ -567,6 +644,16 @@ void __no_inline_not_in_flash_func(write_config)(const Config* config)
   return;
 }
 
+/**
+ * @brief Advance the save slot id and persist a Config struct to flash
+ *
+ * Only proceeds if `usbsid_config.config_saveid` and the local
+ * `config_saveid` counter still agree; increments and wraps the id at 0xF
+ * (16 slots), then calls write_config(). Logs an error and returns without
+ * writing if the ids have gone out of sync.
+ *
+ * @param Config* config
+ */
 void __no_inline_not_in_flash_func(save_config)(Config* config)
 {
   usNFO("\n");
@@ -591,19 +678,20 @@ void __no_inline_not_in_flash_func(save_config)(Config* config)
 /**
  * @brief Handles incoming config request buffers
  *
- * @param uint8_t buffer of max 64 bytes
- * @param uint32_t size length of the buffer
+ * Dispatches on buffer[0] (the command byte) to the whole USB config/control
+ * protocol: config read/write, presets, clock control, audio switch, SID
+ * detection, clone chip config, SID player upload/transport, and test
+ * commands. Two buffer layouts are used depending on the command:
  *
- * 5 bytes
- * Byte 0 ~ command
- * Byte 1 ~ struct setting e.g. socketOne, clock_rate or additional command
- * Byte 2 ~ setting entry e.g. dualsid
- * Byte 3 ~ new value
- * Byte 4 ~ reserved
- * >= 6 bytes
- * Byte 0 ~ write command e.g. WRITE_CONFIG
- * Byte 1 ~ config type or byte 1
- * Byte 2 ... 61 the data
+ * 5 bytes: Byte 0 command, Byte 1 struct setting (e.g. socketOne,
+ * clock_rate) or additional command, Byte 2 setting entry (e.g. dualsid),
+ * Byte 3 new value, Byte 4 reserved.
+ *
+ * >= 6 bytes: Byte 0 write command (e.g. WRITE_CONFIG), Byte 1 config type,
+ * Byte 2..61 the data.
+ *
+ * @param uint8_t * buffer buffer of max 64 bytes
+ * @param uint32_t size length of the buffer
  */
 void handle_config_request(uint8_t * buffer, uint32_t size)
 {
@@ -1527,6 +1615,14 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
   return;
 }
 
+/**
+ * @brief Resolve which SID the RGBLED VU should follow
+ *
+ * If the configured `RGBLED.sid_to_use` is out of range (higher than
+ * `cfg.numsids`) or points at a SID that is not type 2 or 3 (i.e. not an
+ * 8580/6581), falls back to the first configured SID of type 2 or 3, or to
+ * SID 1 if none is found. Otherwise leaves the configured value in place.
+ */
 void apply_rgbled_config()
 { /* if SID to use is higher then the number of sids, use first available SID */
   int sid = -1;
@@ -1553,6 +1649,12 @@ void apply_rgbled_config()
   return;
 }
 
+/**
+ * @brief Print the full current configuration and runtime state to the log
+ *
+ * Calls print_pico_features(), print_config_overview(),
+ * print_config_summary() and print_runtime_summary() in sequence.
+ */
 void print_config(void)
 { /* The truth, and nothing but the truth! */
   print_pico_features();
@@ -1562,15 +1664,29 @@ void print_config(void)
   return;
 }
 
+/**
+ * @brief Abort in-flight bus DMA transfers and restart the bus clocks/PIOs
+ *
+ * @param bool silent suppress the log line when true
+ */
 void apply_busclock_settings(bool silent)
 {
   if (!silent) usCFG("  Applying bus clock settings\n");
   stop_dma_channels();
   restart_bus_clocks();
   sync_pios(false);
-  start_dma_channels();
 }
 
+/**
+ * @brief Validate and apply usbsid_config as a new preset, silently
+ *
+ * Validates the config, applying the fallback socket config on failure.
+ * Builds a new RuntimeCFG from usbsid_config, applies the FMOpl config to
+ * it, then atomically swaps it into the global `cfg` with interrupts
+ * disabled, and applies the bus clock settings without logging.
+ *
+ * @return ConfigError CFG_OK on success, or the validation error
+ */
 ConfigError apply_new_presetconfig(void)
 {
   /* Start with validation */
@@ -1599,6 +1715,20 @@ ConfigError apply_new_presetconfig(void)
   return CFG_OK;
 }
 
+/**
+ * @brief Validate and apply usbsid_config to the running configuration
+ *
+ * Validates the config, applying the fallback socket config on failure.
+ * Builds a new RuntimeCFG from usbsid_config, applies the FMOpl config to
+ * it, then atomically swaps it into the global `cfg` with interrupts
+ * disabled. Restarts the PIO/bus clocks unless called at boot, applies the
+ * RGBLED SID selection when RGB is available, and prints the full config
+ * when not at boot.
+ *
+ * @param bool at_boot true when called during startup, skips hardware
+ *        reapplication and the final config print
+ * @return ConfigError always CFG_OK
+ */
 ConfigError apply_config(bool at_boot)
 {
   usNFO("\n");
@@ -1646,6 +1776,9 @@ ConfigError apply_config(bool at_boot)
   return CFG_OK;
 }
 
+/**
+ * @brief Save usbsid_config to flash then load it straight back
+ */
 void save_load_config(void)
 {
   save_config(&usbsid_config);
@@ -1653,6 +1786,15 @@ void save_load_config(void)
   return;
 }
 
+/**
+ * @brief Save, reload and apply usbsid_config, then verify socket voltages
+ *
+ * Calls save_load_config() and apply_config(), and on PCB v1.5+ also calls
+ * verify_socket_config(), which applies the correct socket voltages if
+ * needed.
+ *
+ * @param bool at_boot forwarded to apply_config()
+ */
 void save_load_apply_config(bool at_boot)
 {
   save_load_config();
@@ -1663,12 +1805,26 @@ void save_load_apply_config(bool at_boot)
   return;
 }
 
+/**
+ * @brief Public wrapper for save_config(&usbsid_config)
+ *
+ * @note for saving the config from outside of config.c
+ */
 void save_config_ext(void)
 { /* For saving the config outside of config.c */
   save_config(&usbsid_config);
   return;
 }
 
+/**
+ * @brief Run first-boot auto detection when the loaded config is the default
+ *
+ * If `usbsid_config.default_config` is set, clears the flag, sets
+ * `first_boot` (so the link popup is sent once), runs sid_auto_detect() at
+ * boot (which turns on the socket regulators on v1.5+), forces
+ * `need_confirmation`/`detected_sid_change` and turns the regulators back
+ * off again on v1.5+, and saves the resulting config.
+ */
 void detect_default_config(void)
 {
   usNFO("\n");
@@ -1695,6 +1851,12 @@ void detect_default_config(void)
   return;
 }
 
+/**
+ * @brief Look up the array index of the currently configured clock rate
+ *
+ * @return int index into `clockrates` matching `usbsid_config.clock_rate`,
+ *         or 0 if not found
+ */
 int return_clockrate(void)
 {
   for (uint i = 0; i < count_of(clockrates); i++) {
@@ -1705,6 +1867,19 @@ int return_clockrate(void)
   return 0;
 }
 
+/**
+ * @brief Change the SID clock rate to the given clockrates table entry
+ *
+ * No-op if an external clock is in use or the clockrate is locked, or if
+ * the requested rate already matches the current one. Otherwise updates
+ * `clock_rate`/`refresh_rate`/`raster_rate` and the derived `sid_hz`/
+ * `sid_mhz`/`sid_us` cycled-write timing variables, then aborts in-flight
+ * DMA bus transfers and restarts the bus clocks/PIOs.
+ *
+ * @param int n_clock index into the `clockrates` table
+ * @param bool suspend_sids when true, disables the SIDs (RES low) before
+ *        the clock change and re-enables/unmutes them afterwards
+ */
 void apply_clockrate(int n_clock, bool suspend_sids)
 {
   if (!usbsid_config.external_clock) {
@@ -1754,6 +1929,14 @@ void apply_clockrate(int n_clock, bool suspend_sids)
   return;
 }
 
+/**
+ * @brief Sanity-check usbsid_config.clock_rate against the known clock values
+ *
+ * If not using an external clock and `clock_rate` is not one of
+ * CLOCK_DEFAULT, CLOCK_PAL, CLOCK_NTSC or CLOCK_DREAN, resets the clock
+ * rate/refresh rate/raster rate to the default entry, saves and reloads the
+ * config, and resets the MCU.
+ */
 void verify_clockrate(void)
 {
   if (!usbsid_config.external_clock) {

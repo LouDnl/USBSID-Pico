@@ -94,7 +94,14 @@ static volatile bool     clock_running       = false;
 #define MIDI_CLOCK_PRESENT_TIMEOUT_US 500000ull
 
 
-/* Initialise the midi handlers */
+/**
+ * @brief Initialise the MIDI state machine and start the buffer processor
+ *
+ * Resets midimachine's state and index, clears the stream buffer, and
+ * initialises the MIDI queue and buffer processor. Runs on core0 before
+ * core1 is released to its main loop, so there is no consumer racing the
+ * queue init.
+ */
 void midi_init(void)
 {
   usNFO("\n");
@@ -121,12 +128,25 @@ void midi_init(void)
 }
 
 #ifdef ONBOARD_EMULATOR
+
+/**
+ * @brief Initialise the Cynthcart data queue
+ *
+ * Allocates a 128 entry queue used to hand MIDI/emulator data bytes to the
+ * embedded Cynthcart (emudore-derived) C64 core.
+ */
 void emulator_queue_init(void)
 {
   /* emudore */
   queue_init(&cynthcart_queue, sizeof(cynthcart_queue_entry_t), 128); /* 128 entries as buffer */
 }
 
+/**
+ * @brief Free the Cynthcart data queue and reset the SID
+ *
+ * Releases the queue allocated by emulator_queue_init() and resets the SID
+ * chip and its registers.
+ */
 inline void emulator_queue_deinit(void)
 {
   /* emudore */
@@ -135,6 +155,12 @@ inline void emulator_queue_deinit(void)
   reset_sid_registers();
 }
 
+/**
+ * @brief Forward the current MIDI stream buffer to the Cynthcart queue
+ *
+ * Pushes every byte of `midimachine.streambuffer` (up to `midimachine.index`)
+ * onto the Cynthcart queue, blocking if the queue is full.
+ */
 inline void handle_emulater_data(void)
 {
   for (size_t e = 0; e < midimachine.index; e++) {
@@ -148,6 +174,12 @@ inline void handle_emulater_data(void)
   return;
 }
 
+/**
+ * @brief Request Cynthcart emulator startup
+ *
+ * Initialises the Cynthcart queue and sets the flags core1 uses to hand off
+ * to the emulator on its next loop iteration.
+ */
 inline void emulator_enable(void)
 {
   emulator_queue_init();
@@ -157,6 +189,11 @@ inline void emulator_enable(void)
   return;
 }
 
+/**
+ * @brief Stop the Cynthcart emulator and release its resources
+ *
+ * Signals the emulator to stop, tears down Cynthcart, and frees the queue.
+ */
 void emulator_disable(void)
 {
   emulator_running = false;
@@ -167,12 +204,24 @@ void emulator_disable(void)
   return;
 }
 
+/**
+ * @brief Reset the Cynthcart emulator
+ *
+ * @note Not implemented yet, only logs a message
+ */
 inline void emulator_reset(void)
 {
   usMIDI("Emulator reset not implemented yet!\n");
   return;
 }
 
+/**
+ * @brief Dispatch a Control Change message to the Cynthcart enable/disable/reset handlers
+ *
+ * Compares the CC number in `midimachine.streambuffer[1]` against the
+ * CC_CEN/CC_CDI/CC_CRE control values and calls the matching
+ * emulator_enable()/emulator_disable()/emulator_reset() handler.
+ */
 static const void handle_emulator_cc(void)
 {
   if (midimachine.streambuffer[1] == midi_ccvalues_defaults.CC_CEN) { /* control emulator enable 0x55 (85) */
@@ -194,6 +243,16 @@ static const void handle_emulator_cc(void)
 }
 #endif
 
+/**
+ * @brief Process one MIDI clock pulse and update the smoothed BPM estimate
+ *
+ * Called on each 0xF8 System Real-Time Timing Clock byte (24 pulses per
+ * quarter note). Computes the interval since the previous pulse and, if it
+ * falls within a plausible tempo range (roughly 1..1000 BPM), folds it into
+ * `clock_bpm_x100` via an EWMA (alpha = 1/8) that smooths jitter without
+ * lagging tempo changes for more than a beat or so. Advances the 0..23
+ * pulse counter and the monotonic total pulse count.
+ */
 static void handle_midi_clock(void)
 {
   uint64_t now = time_us_64();
@@ -223,6 +282,13 @@ static void handle_midi_clock(void)
   return;
 }
 
+/**
+ * @brief Handle a MIDI Start (0xFA) message
+ *
+ * Resets the pulse phase and clears the last pulse timestamp so the next
+ * clock pulse does not compute an interval against a stale value, then
+ * marks the clock as running.
+ */
 static void handle_midi_start(void)
 {
   clock_pulse_count = 0;
@@ -231,6 +297,13 @@ static void handle_midi_start(void)
   return;
 }
 
+/**
+ * @brief Handle a MIDI Continue (0xFB) message
+ *
+ * Resumes the clock without resetting the pulse phase, unlike Start. Clears
+ * the last pulse timestamp so the next pulse's interval is not computed
+ * against a stale value.
+ */
 static void handle_midi_continue(void)
 {
   /* Resume without resetting phase, unlike Start */
@@ -239,33 +312,67 @@ static void handle_midi_continue(void)
   return;
 }
 
+/**
+ * @brief Handle a MIDI Stop (0xFC) message
+ *
+ * Marks the clock as not running.
+ */
 static void handle_midi_stop(void)
 {
   clock_running = false;
   return;
 }
 
+/**
+ * @brief Get the current smoothed MIDI clock tempo
+ *
+ * @return uint32_t tempo in BPM, fixed point times 100
+ */
 uint32_t midi_clock_bpm_x100(void)
 {
   return clock_bpm_x100;
 }
 
+/**
+ * @brief Check whether a MIDI clock Start/Continue has been received without a following Stop
+ *
+ * @return bool true when the clock is running
+ */
 bool midi_clock_running(void)
 {
   return clock_running;
 }
 
+/**
+ * @brief Check whether MIDI clock pulses are currently arriving
+ *
+ * The clock is considered present when running and the last pulse was
+ * received less than MIDI_CLOCK_PRESENT_TIMEOUT_US ago, so a caller can
+ * fall back to a free-running rate once a DAW stops sending clock.
+ *
+ * @return bool true when clock pulses are present
+ */
 bool midi_clock_present(void)
 {
   if (!clock_running || clock_last_pulse_us == 0) return false;
   return (time_us_64() - clock_last_pulse_us) < MIDI_CLOCK_PRESENT_TIMEOUT_US;
 }
 
+/**
+ * @brief Get the current pulse position within the quarter note
+ *
+ * @return uint32_t pulse count, 0..23 (24 PPQN)
+ */
 uint32_t midi_clock_pulse_count(void)
 {
   return clock_pulse_count;
 }
 
+/**
+ * @brief Get the monotonic MIDI clock pulse count
+ *
+ * @return uint32_t total pulses received since boot, for clock-synced division counting
+ */
 uint32_t midi_clock_total_pulses(void)
 {
   return clock_total_pulses;
@@ -281,8 +388,8 @@ uint32_t midi_clock_total_pulses(void)
  * callers are required to have already placed the message in
  * `midimachine.streambuffer` and set `midimachine.index` to its length.
  *
- * The `ONBOARD_EMULATOR` interception (Cynthcart CC's and, once running,
- * Cynthcart data) stays on core0 exactly as before: it never touches the
+ * The Cynthcart interception (CC's and, once running, Cynthcart data),
+ * present under `ONBOARD_CYNTHCART`, stays on core0 exactly as before: it never touches the
  * SID bus, so it never needed to move. Only the "otherwise it is a normal
  * MIDI message" branch changed, from calling `process_midi()` directly to
  * enqueueing it for `midi_engine_task()` on core1, which is where the SID
@@ -319,8 +426,17 @@ static inline void dispatch_complete_message(void)
   return;
 }
 
-/* Processes a 1 byte incoming midi buffer
- * Figures out if we're receiving midi or sysex */
+/**
+ * @brief Feed one incoming byte through the legacy MIDI/SysEx byte state machine
+ *
+ * Figures out whether the stream is System Real-Time, SysEx, or a channel
+ * voice message, accumulates bytes into `midimachine.streambuffer`, and
+ * dispatches the message via process_sysex() or dispatch_complete_message()
+ * once complete. Also handles MIDI running status by re-entering itself
+ * with the cached last_status byte.
+ *
+ * @param uint8_t buffer, one incoming MIDI byte
+ */
 static inline void midi_buffer_task(uint8_t buffer)
 {
   if (midimachine.index != 0) {
@@ -527,6 +643,15 @@ void process_usb_midi_packet(uint8_t pkt[4])
   return;
 }
 
+/**
+ * @brief Feed a buffer of MIDI bytes through midi_buffer_task() one byte at a time
+ *
+ * @note Processing byte by byte makes this more prone to latency than a
+ *       block-based approach
+ *
+ * @param uint8_t *buffer, bytes to process
+ * @param size_t size, number of bytes in buffer
+ */
 void process_stream(uint8_t *buffer, size_t size)
 { /* ISSUE: Processing the stream byte by byte makes it more prone to latency */
 #if 0

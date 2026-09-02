@@ -99,16 +99,34 @@ enum {
  * it. */
 #define PATCH_SYSEX_NIBBLES 36
 
+/**
+ * @brief Split one byte into two 7-bit-safe nibble bytes, high nibble first
+ *
+ * @param uint8_t v
+ * @param uint8_t * out
+ */
 static void encode_byte(uint8_t v, uint8_t *out)
 {
   out[0] = (uint8_t)((v >> 4) & 0x0F);
   out[1] = (uint8_t)(v & 0x0F);
   return;
 }
+/**
+ * @brief Recombine two nibble bytes produced by encode_byte() into one byte
+ *
+ * @param const uint8_t * in
+ * @return uint8_t decoded byte
+ */
 static uint8_t decode_byte(const uint8_t *in)
 {
   return (uint8_t)(((in[0] & 0x0F) << 4) | (in[1] & 0x0F));
 }
+/**
+ * @brief Split a 16 bit value into four 7-bit-safe nibble bytes, MSB first
+ *
+ * @param uint16_t v
+ * @param uint8_t * out
+ */
 static void encode_u16(uint16_t v, uint8_t *out)
 {
   out[0] = (uint8_t)((v >> 12) & 0x0F);
@@ -117,6 +135,12 @@ static void encode_u16(uint16_t v, uint8_t *out)
   out[3] = (uint8_t)(v & 0x0F);
   return;
 }
+/**
+ * @brief Recombine four nibble bytes produced by encode_u16() into one uint16_t
+ *
+ * @param const uint8_t * in
+ * @return uint16_t decoded value
+ */
 static uint16_t decode_u16(const uint8_t *in)
 {
   return (uint16_t)(((in[0] & 0x0F) << 12) | ((in[1] & 0x0F) << 8) | ((in[2] & 0x0F) << 4) | (in[3] & 0x0F));
@@ -177,6 +201,16 @@ static void unpack_patch(const uint8_t *in, midi_patch_t *p)
  * SYSEX_MIDI_PATCH_LOAD's and SYSEX_MIDI_PATCH_DATA's own layout */
 #define PATCH_SYSEX_MIN_SIZE (4 + PATCH_SYSEX_NIBBLES + 1)  /* + F0,50,cmd already counted by buffer[0..2]; +1 for F7 */
 
+/**
+ * @brief Handle SYSEX_MIDI_PATCH_LOAD: write one SID patch into RAM
+ *
+ * Validates the message length and patch index, then unpacks the nibble
+ * payload at buffer[4..] into midi_patches[patch_index]. RAM only; does
+ * not persist to flash (SYSEX_MIDI_SAVE does that).
+ *
+ * @param uint8_t * buffer
+ * @param int size
+ */
 static void handle_patch_load(uint8_t *buffer, int size)
 {
   if (size < PATCH_SYSEX_MIN_SIZE) {
@@ -193,6 +227,15 @@ static void handle_patch_load(uint8_t *buffer, int size)
   return;
 }
 
+/**
+ * @brief Handle SYSEX_MIDI_PATCH_DUMP: send one SID patch back over MIDI OUT
+ *
+ * Validates the patch index, packs midi_patches[patch_index] into a
+ * SYSEX_MIDI_PATCH_DATA SysEx message, and writes it out on MIDI_CABLE.
+ *
+ * @param uint8_t * buffer
+ * @param int size
+ */
 static void handle_patch_dump(uint8_t *buffer, int size)
 {
   if (size < 4) {
@@ -225,6 +268,12 @@ static void handle_patch_dump(uint8_t *buffer, int size)
  * file's own encode_byte()/decode_byte(). */
 #define FMOPL_SYSEX_NIBBLES 22
 
+/**
+ * @brief Pack an opl_instrument_t into FMOPL_SYSEX_NIBBLES nibble bytes
+ *
+ * @param const opl_instrument_t * p
+ * @param uint8_t * out
+ */
 static void pack_opl_instrument(const opl_instrument_t *p, uint8_t *out)
 {
   encode_byte(p->op_mult[0], out);    out += 2;
@@ -241,6 +290,12 @@ static void pack_opl_instrument(const opl_instrument_t *p, uint8_t *out)
   return;
 }
 
+/**
+ * @brief The inverse of pack_opl_instrument()
+ *
+ * @param const uint8_t * in
+ * @param opl_instrument_t * p
+ */
 static void unpack_opl_instrument(const uint8_t *in, opl_instrument_t *p)
 {
   p->op_mult[0]   = decode_byte(in); in += 2;
@@ -259,6 +314,15 @@ static void unpack_opl_instrument(const uint8_t *in, opl_instrument_t *p)
 
 #define FMOPL_PATCH_SYSEX_MIN_SIZE (4 + FMOPL_SYSEX_NIBBLES + 1)
 
+/**
+ * @brief Handle SYSEX_FMOPL_PATCH_LOAD: write one FMOpl patch into RAM
+ *
+ * Validates the message length and patch index, then unpacks the nibble
+ * payload at buffer[4..] into fmopl_patches[patch_index].
+ *
+ * @param uint8_t * buffer
+ * @param int size
+ */
 static void handle_fmopl_patch_load(uint8_t *buffer, int size)
 {
   if (size < FMOPL_PATCH_SYSEX_MIN_SIZE) {
@@ -275,6 +339,15 @@ static void handle_fmopl_patch_load(uint8_t *buffer, int size)
   return;
 }
 
+/**
+ * @brief Handle SYSEX_FMOPL_PATCH_DUMP: send one FMOpl patch back over MIDI OUT
+ *
+ * Validates the patch index, packs fmopl_patches[patch_index] into a
+ * SYSEX_FMOPL_PATCH_DATA SysEx message, and writes it out on MIDI_CABLE.
+ *
+ * @param uint8_t * buffer
+ * @param int size
+ */
 static void handle_fmopl_patch_dump(uint8_t *buffer, int size)
 {
   if (size < 4) {
@@ -305,6 +378,17 @@ static void handle_fmopl_patch_dump(uint8_t *buffer, int size)
 #define FMOPL_CLOCK_SYSEX_NIBBLES 6
 #define FMOPL_CLOCK_SYSEX_MIN_SIZE (3 + FMOPL_CLOCK_SYSEX_NIBBLES + 1)
 
+/**
+ * @brief Handle SYSEX_FMOPL_SET_CLOCK: apply a runtime OPL2 clock override
+ *
+ * Validates the message length, decodes the 3 big-endian nibble-packed
+ * bytes at buffer[3..8] into a 24 bit Hz value, and passes it to
+ * midi_fmopl_set_clock(). An all-zero payload resets the compiled-in
+ * default.
+ *
+ * @param uint8_t * buffer
+ * @param int size
+ */
 static void handle_fmopl_set_clock(uint8_t *buffer, int size)
 {
   if (size < FMOPL_CLOCK_SYSEX_MIN_SIZE) {
@@ -373,7 +457,11 @@ void decode_sysex_command(uint8_t * buffer, int size)
 }
 
 /**
- * @brief Is it ?
+ * @brief Route an incoming SysEx message by its manufacturer id (buffer[1])
+ *
+ * 0x2D dispatches to the ASID decoder (decode_asid_message), 0x50 to this
+ * file's own decode_sysex_command; any other id is ignored. Also sets
+ * dtype so downstream logging reports the correct data source.
  *
  * @param uint8_t * buffer
  * @param int size

@@ -337,10 +337,10 @@ SIDType detect_sidtype_at(uint8_t base_address, uint8_t chiptype)
 /**
  * @brief Internal function used in SID auto & socket change detection and routines
  *
- * @param result
- * @param s_addr1
- * @param s_addr2
- * @param socket
+ * @param DetectionResult result
+ * @param uint8_t s_addr1
+ * @param uint8_t s_addr2
+ * @param int socket
  * @return DetectionResult
  */
 static DetectionResult detect_socket_sid(DetectionResult result, uint8_t s_addr1, uint8_t s_addr2, const int socket)
@@ -642,9 +642,9 @@ ChipType detect_chiptype_at(uint8_t base_address)
 /**
  * @brief Internal function used in SID auto & socket change detection and routines
  *
- * @param result
- * @param probe
- * @param socket
+ * @param DetectionResult result
+ * @param Config * probe
+ * @param int socket
  * @return DetectionResult
  */
 static DetectionResult detect_socket_chip(DetectionResult result, Config * probe, const int socket)
@@ -700,8 +700,8 @@ static DetectionResult detect_socket_chip(DetectionResult result, Config * probe
  * @brief Internal function to verify if there is indeed a Chip present in the socket
  *        and update the probe config data if none detected
  *
- * @param result
- * @param socket
+ * @param DetectionResult result
+ * @param int socket
  * @return DetectionResult
  */
 static DetectionResult verify_socket_chip(DetectionResult result, const int socket)
@@ -729,9 +729,9 @@ static DetectionResult verify_socket_chip(DetectionResult result, const int sock
 /**
  * @brief Internal function for updating a probe config
  *
- * @param result
- * @param probe
- * @param socket
+ * @param DetectionResult result
+ * @param Config * probe
+ * @param int socket
  */
 static void update_probe_config_from_detection(DetectionResult result, Config * probe, const int socket)
 {
@@ -887,7 +887,7 @@ DetectionResult detect_all(void)
  * @brief Handles chip and SID detection and configuration changes
  *
  * @param bool at_boot
- * @return * ConfigError
+ * @return ConfigError CFG_OK on success, otherwise the error from applying detection results or config
  */
 ConfigError sid_auto_detect(bool at_boot)
 {
@@ -947,7 +947,7 @@ ConfigError sid_auto_detect(bool at_boot)
  * @brief Handles chip and SID detection and configuration changes
  * @note Special function used in config_socket:apply_preset()
  *
- * @return * ConfigError
+ * @return ConfigError CFG_OK on success, otherwise the error from applying detection results
  */
 ConfigError sid_auto_detect_silent(void)
 {

@@ -50,6 +50,19 @@ volatile uint32_t rgb_value = 0;
 #endif
 
 
+/**
+ * @brief Claim and configure all bus and clock-counter DMA channels
+ *
+ * Claims dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay and the
+ * clock cycle counter channel(s), then configures each to feed/drain the
+ * matching bus PIO state machine FIFO. The clock counter uses a single
+ * endless-transfer channel on RP2350, and a two-channel ping-pong chain
+ * on RP2040 (which lacks native endless transfer support), started
+ * immediately so cycle_count_word updates continuously.
+ *
+ * @note do not manually assign DMA channel numbers, this causes a panic on
+ *       the PicoW
+ */
 void setup_dmachannels(void)
 { /* NOTE: Do not manually assign DMA channels, this causes a Panic on the PicoW */
   usNFO("\n");
@@ -177,6 +190,12 @@ void setup_dmachannels(void)
   return;
 }
 
+/**
+ * @brief Claim and configure the VU LED DMA channels (PWM LED and RGB LED)
+ *
+ * Only runs when PICO_DEFAULT_LED_PIN is defined (no VU support on Pico W
+ * boards). The RGB LED channel is additionally gated on USE_RGB.
+ */
 void setup_vu_dma(void)
 {
   #if defined(PICO_DEFAULT_LED_PIN)  /* Cannot use VU on PicoW :( */

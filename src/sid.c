@@ -40,6 +40,11 @@ static volatile bool paused_state, reset_state, muted_state;
 static uint8_t volume_state[4] = {0};
 
 
+/**
+ * @brief deprecated
+ *
+ * @param sid_memory
+ */
 static void log_memory(uint8_t * sid_memory)
 {
   usDBG("[%c:%d][PWM]$%04x[V1]$%02X%02X$%02X%02X$%02X$%02X$%02X[V2]$%02X%02X$%02X%02X$%02X$%02X$%02X[V3]$%02X%02X$%02X%02X$%02X$%02X$%02X[FC]$%02x%02x$%02x[VOL]$%02x\n",
@@ -51,6 +56,10 @@ static void log_memory(uint8_t * sid_memory)
   return;
 }
 
+/**
+ * @brief deprecated
+ *
+ */
 void init_sid_chips(void)
 {
   /* Unfinished */
@@ -181,6 +190,11 @@ void mute_sid(void)
   return;
 }
 
+/**
+ * @brief Bring the SID(s) out of reset and clear the paused state
+ *
+ * @param bool unmute
+ */
 void enable_sid(bool unmute)
 {
   set_paused_state(false);
@@ -189,6 +203,12 @@ void enable_sid(bool unmute)
   return;
 }
 
+/**
+ * @brief Mute and de-select the SID(s), and hold them in reset
+ *
+ * Sets the paused state, mutes all SIDs, deasserts both chip selects and
+ * pulls the reset line low.
+ */
 void disable_sid(void)
 {
   set_paused_state(true);
@@ -222,6 +242,9 @@ void clear_bus_all(void)
   return;
 }
 
+/**
+ * @brief Deassert both chip selects, pausing SID bus activity
+ */
 void pause_sid(void)
 {
   sPIN(CS1);
@@ -229,6 +252,13 @@ void pause_sid(void)
   return;
 }
 
+/**
+ * @brief Toggle pause state, muting/unmuting and pausing/resuming the SID(s)
+ *
+ * On the transition into pause, mutes first; on the transition out of
+ * pause, unmutes first. Always calls pause_sid() and flips the paused
+ * state afterwards.
+ */
 void pause_sid_withmute(void)
 {
   usDBG("[PAUSE STATE PRE] %d\n", paused_state);

@@ -35,11 +35,30 @@ volatile bool running_tests = false;
 static const uint8_t waveforms[4] = { 16, 32, 64, 128 };
 
 
+/**
+ * @brief Write a single SID register with a fixed cycle delay
+ *
+ * @param uint8_t reg
+ * @param uint8_t val
+ */
 void test_operation(uint8_t reg, uint8_t val)
 {
   cycled_write_operation(reg, val, 5);  /* 5 cycle wait before writing */
 }
 
+/**
+ * @brief Sweep a voice's note frequency while a waveform is held on
+ *
+ * Sets the voice's CONTR register to `on`, sweeps NOTEHI from 1 to 255 with
+ * an 8ms delay between steps, then sets CONTR to `off`.
+ *
+ * @note aborts early and resets the SID registers if running_tests goes false
+ *
+ * @param uint8_t voices[3]
+ * @param int v, voice index 0..2
+ * @param int on, CONTR value to enable the waveform
+ * @param int off, CONTR value to disable the waveform
+ */
 void wave_form_test(uint8_t voices[3], int v, int on, int off)
 {
     if (!running_tests) { reset_sid_registers(); return; };
@@ -52,6 +71,20 @@ void wave_form_test(uint8_t voices[3], int v, int on, int off)
     test_operation((voices[v] + sid_registers[CONTR]), off);   /* CONTR */
 }
 
+/**
+ * @brief Sweep a voice's pulse width up and down while a waveform is held on
+ *
+ * Sets the voice's CONTR register to `on`, then for 6 iterations sweeps
+ * PWMHI from 0 to 15 and back down to 0 with a 16ms delay between steps,
+ * finally sets CONTR to `off`.
+ *
+ * @note aborts early and resets the SID registers if running_tests goes false
+ *
+ * @param uint8_t voices[3]
+ * @param int v, voice index 0..2
+ * @param int on, CONTR value to enable the waveform
+ * @param int off, CONTR value to disable the waveform
+ */
 void pulse_sweep_test(uint8_t voices[3], int v, int on, int off)
 {
   if (!running_tests) { reset_sid_registers(); return; };
@@ -72,6 +105,17 @@ void pulse_sweep_test(uint8_t voices[3], int v, int on, int off)
   test_operation((voices[v] + sid_registers[CONTR]), off);    /* CONTR */
 }
 
+/**
+ * @brief Run the triangle/sawtooth/pulse/noise waveform and pulse width sweep tests on every voice
+ *
+ * Sets volume to full, then for each of the 3 voices runs wave_form_test()
+ * for each of the 4 waveforms followed by pulse_sweep_test().
+ *
+ * @note aborts early and resets the SID registers if running_tests goes false
+ *
+ * @param uint8_t addr, SID base address offset
+ * @param uint8_t voices[3]
+ */
 void test_all_waveforms(uint8_t addr, uint8_t voices[3])
 {
   if (!running_tests) { reset_sid_registers(); return; };
@@ -104,6 +148,19 @@ void test_all_waveforms(uint8_t addr, uint8_t voices[3])
   }
 }
 
+/**
+ * @brief Sweep the filter cutoff through low/band/high pass for a given waveform on every voice
+ *
+ * Sets volume to full, then for filter frequencies 15/30/45 and each of the
+ * low/band/high pass modes, sweeps FC_HI from 0 to 255 with an 8ms delay
+ * per step on each of the 3 voices.
+ *
+ * @note aborts early and resets the SID registers if running_tests goes false
+ *
+ * @param uint8_t addr, SID base address offset
+ * @param uint8_t voices[3]
+ * @param int wf, waveform index: 0 triangle, 1 sawtooth, 2 pulse, 3 noise
+ */
 void filter_tests(uint8_t addr, uint8_t voices[3], int wf)
 {
   if (!running_tests) { reset_sid_registers(); return; };
@@ -137,6 +194,20 @@ void filter_tests(uint8_t addr, uint8_t voices[3], int wf)
   }
 }
 
+/**
+ * @brief Run attack/decay/sustain/release scenarios for a given waveform on every voice
+ *
+ * Sets volume to full, then for each voice runs three scenarios in
+ * sequence: a full ADSR (attack/decay then a held sustain then release), a
+ * sustain/release only test, and an attack/decay only test, with sleep_ms()
+ * delays between phases to let the envelope be heard.
+ *
+ * @note aborts early and resets the SID registers if running_tests goes false
+ *
+ * @param uint8_t addr, SID base address offset
+ * @param uint8_t voices[3]
+ * @param int wf, waveform index: 0 triangle, 1 sawtooth, 2 pulse, 3 noise
+ */
 void envelope_tests(uint8_t addr, uint8_t voices[3], int wf)
 {
   if (!running_tests) { reset_sid_registers(); return; };
@@ -190,6 +261,19 @@ void envelope_tests(uint8_t addr, uint8_t voices[3], int wf)
   }
 }
 
+/**
+ * @brief Run ring modulation tests pairing each voice with its modulator voice
+ *
+ * Sets volume to full, then for each voice pairs it with the SID's fixed
+ * ring-mod partner voice, enables the given waveform with ring modulation
+ * (CONTR + 3), and sweeps NOTEHI from 0 to 255 with a 24ms delay per step.
+ *
+ * @note aborts early and resets the SID registers if running_tests goes false
+ *
+ * @param uint8_t addr, SID base address offset
+ * @param uint8_t voices[3]
+ * @param int wf, waveform index: 0 triangle, 1 sawtooth, 2 pulse, 3 noise
+ */
 void modulation_tests(uint8_t addr, uint8_t voices[3], int wf)
 {
   if (!running_tests) { reset_sid_registers(); return; };
@@ -214,6 +298,23 @@ void modulation_tests(uint8_t addr, uint8_t voices[3], int wf)
   }
 }
 
+/**
+ * @brief Entry point for the interactive SID test suite
+ *
+ * Clears the target SID's registers, computes its 3 voice register
+ * addresses from `sidno`, sets volume to full, and dispatches to the
+ * requested test routine(s): '1' runs the full suite (waveforms, filter,
+ * envelope, modulation), '2' runs test_all_waveforms(), '3' runs
+ * filter_tests(), '4' runs envelope_tests(), '5' runs modulation_tests().
+ * For '3'/'4'/'5', `wf` selects a single waveform ('T'/'S'/'P', anything
+ * else meaning noise) or 'A' to run all four in turn.
+ *
+ * @note aborts early and resets the SID registers if running_tests goes false
+ *
+ * @param int sidno, SID index used to compute the register base address
+ * @param char test, which test suite to run: '1'..'5'
+ * @param char wf, waveform selector for tests '3'/'4'/'5'
+ */
 void sid_test(int sidno, char test, char wf)
 {
   if (!running_tests) { reset_sid_registers(); return; };
