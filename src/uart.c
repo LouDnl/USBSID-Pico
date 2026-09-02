@@ -263,7 +263,7 @@ void init_uart(void)
  *
  * @note implementation incomplete (TODO), currently unused
  */
-void deinit_uart(void)
+void __us_unused deinit_uart(void)
 {
   // /* Echo characters received from PIO to the console */
   // while (counter < MAX_COUNTER || work_done) {

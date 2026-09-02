@@ -41,11 +41,11 @@
 #include <midi_queue.h>
 #include <sysex.h>
 
-#if defined(ONBOARD_EMULATOR)
+#if defined(ONBOARD_CYNTHCART)
 #include <usbsid.h> /* emulator variables */
-#include <emudore_emulator.h> /* Cynthcart ~ Emudore */
+#include <cynthcart_embedded.h> /* Cynthcart ~ USBSID-Player */
 queue_t cynthcart_queue;
-#endif /* ONBOARD_EMULATOR */
+#endif /* ONBOARD_CYNTHCART */
 
 
 /* MIDI state machine (declared extern in midi.h) */
@@ -127,8 +127,7 @@ void midi_init(void)
   return;
 }
 
-#ifdef ONBOARD_EMULATOR
-
+#if defined(ONBOARD_CYNTHCART)
 /**
  * @brief Initialise the Cynthcart data queue
  *
@@ -241,7 +240,7 @@ static const void handle_emulator_cc(void)
   }
   return;
 }
-#endif
+#endif /* ONBOARD_CYNTHCART */
 
 /**
  * @brief Process one MIDI clock pulse and update the smoothed BPM estimate
@@ -402,7 +401,7 @@ static inline void dispatch_complete_message(void)
   usMCMD("\n");
   dtype = midi; /* Set data type to midi */
 
-  #ifdef ONBOARD_EMULATOR
+  #if defined(ONBOARD_CYNTHCART)
   if (((midimachine.streambuffer[0] & 0xF0) == 0xB0) /* Control mode change */
     && (midimachine.streambuffer[1] >= midi_ccvalues_defaults.CC_CEN)
     && (midimachine.streambuffer[1] <= midi_ccvalues_defaults.CC_CRE)) {
@@ -415,7 +414,7 @@ static inline void dispatch_complete_message(void)
     if (usbsid_config.Midi.enabled) {
       midi_queue_push(midimachine.streambuffer, (uint8_t)midimachine.index);
     }
-  #ifdef ONBOARD_EMULATOR
+  #if defined(ONBOARD_CYNTHCART)
   }
   #endif
 

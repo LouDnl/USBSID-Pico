@@ -363,7 +363,7 @@ const char * boolean_str(ZeroOne val)
  * @param ZeroOne val
  * @return const char* string
  */
-const char * confirmation_str(ZeroOne val)
+const char * __us_unused confirmation_str(ZeroOne val)
 {
   if (val >= 0 && val < OF_MAX) {
     return no_yes[val];

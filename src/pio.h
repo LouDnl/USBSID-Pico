@@ -109,8 +109,6 @@ extern uint sm_rgbled;
 /* Functions from pio.c */
 void setup_vu(void);
 void setup_sidclock(void);
-void init_sidclock(void);
-void deinit_sidclock(void);
 void setup_piobus(void);
 void clear_bus_fifos(void);
 void sync_pios(bool at_boot);

@@ -45,7 +45,7 @@ static uint8_t volume_state[4] = {0};
  *
  * @param sid_memory
  */
-static void log_memory(uint8_t * sid_memory)
+static void __us_deprecated log_memory(uint8_t * sid_memory)
 {
   usDBG("[%c:%d][PWM]$%04x[V1]$%02X%02X$%02X%02X$%02X$%02X$%02X[V2]$%02X%02X$%02X%02X$%02X$%02X$%02X[V3]$%02X%02X$%02X%02X$%02X$%02X$%02X[FC]$%02x%02x$%02x[VOL]$%02x\n",
     dtype, is_receivedata(), get_vu_value(),
@@ -60,7 +60,7 @@ static void log_memory(uint8_t * sid_memory)
  * @brief deprecated
  *
  */
-void init_sid_chips(void)
+void __us_deprecated init_sid_chips(void)
 {
   /* Unfinished */
   log_memory(sid_memory);

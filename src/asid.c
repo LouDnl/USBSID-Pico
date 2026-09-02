@@ -188,7 +188,7 @@ void handle_asid_fmoplmessage(uint8_t* buffer)
  * @param uint8_t* buffer ~ the buffer to process
  * @param int size        ~ the size of the buffer
  */
-void handle_complete_asid_buffer(uint8_t sid, uint8_t* buffer, int size)
+void __us_deprecated handle_complete_asid_buffer(uint8_t sid, uint8_t* buffer, int size)
 { /* Assumes byte 0-2 are included in the buffer and skips these */
   (void)size;  /* Stop calling me fat, I'm just big boned! */
   unsigned int reg = 0;
@@ -220,7 +220,7 @@ void handle_complete_asid_buffer(uint8_t sid, uint8_t* buffer, int size)
  * @param uint8_t sid     ~ the sidnumber
  * @param uint8_t* buffer ~ the buffer to process
  */
-void handle_asid_message(uint8_t sid, uint8_t* buffer)
+void __us_deprecated handle_asid_message(uint8_t sid, uint8_t* buffer)
 { /* Assumes byte 0-2 are not included in the buffer */
   unsigned int reg = 0;
   for (uint8_t mask = 0; mask < 4; mask++) {  /* no more then 4 masks */

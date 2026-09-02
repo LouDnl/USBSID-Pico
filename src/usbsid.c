@@ -710,7 +710,7 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
       wusb_itf = &itf; /* Since there's only 1 vendor interface, we know it's 0 */
       set_receivedata(true), dtype = wusb, rtype = wusb;
       webread = bufsize;
-      // /* No need to flush since we have no fifo */
+      /* Flush the fifo */
       tud_vendor_n_read_flush(*wusb_itf);
       memcpy(sid_buffer, buffer, bufsize);
       process_buffer(wusb_itf, &webread);

@@ -382,8 +382,10 @@ void setup_sidclock(void)
 
 /**
  * @brief De-init nMHz square wave output
+ *
+ * NOTE: The sidclock should actually never be disabled
  */
-void deinit_sidclock(void) /* TODO: Decide on implementation */
+static void __us_deprecated deinit_sidclock(void)
 {
   usDBG("SID Clock deinitialise\n");
   clock_program_deinit(bus_pio, sm_clock, offset_clock, clock_program);
