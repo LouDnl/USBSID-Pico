@@ -56,7 +56,7 @@ The `Pin 1` marking, the little square around the solder pad at the outer edge o
 
 
 == Optional Pico placements
-The USBSID-Pico v1.3 PCB has the option for you to solder your Pico directly to the PCB using the Pico's castelated edges. +
+The USBSID-Pico v1.5 PCB has the option for you to solder your Pico directly to the PCB using the Pico's castelated edges. +
 This creates more space and can be useful if you want to use a SID clone like FPGASID in socket 1.
 
 

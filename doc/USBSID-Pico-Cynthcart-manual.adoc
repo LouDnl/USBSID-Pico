@@ -20,12 +20,11 @@ include::disclaimer.adoc[]
 
 == Thank you
 First off thanks go out to Paul Slocum for creating Cynthcart and Mario Ballano for creating emudore. +
-(The onboard emulator is called 'adorable' and is a fork of 'emudore')
 
 
 == Firmwares with Cynthcart embedded
-Starting with firmware version v0.6.0-BETA firmwares ending with `_em` have an embedded emulator running Cynthcart. +
-For example `usbsidpico-v1.0_em.uf2` or `usbsidpico2-rgb-v1.3_em.uf2`
+Starting with firmware version v0.8.0 firmwares ending with `_cc` can run Cynthcart. +
+For example `usbsidpico-v1.0_sp_cc.uf2` or `usbsidpico2-rgb-v1.3_sp_cc.uf2`
 
 
 == Usage

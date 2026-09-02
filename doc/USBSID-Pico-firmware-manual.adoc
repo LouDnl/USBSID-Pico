@@ -35,11 +35,11 @@ The 1.X in each filename equals for the PCB revision as mentioned under firmware
 `usbsidA-BC.uf2` examples: `usbsidpico-v1.0-rgb.uf2`, `usbsidpico2_w-v1.3.uf2` or `usbsidpico2-v1.5-rgb_sp`. +
 A: The pico board type e.g. `pico`, `pico2`, `pico_2` or `pico2_w` +
 B: The PCB version e.g. `v1.0`, `v1.3` or `v1.5` +
-C: A combination of optional features e.g. `-rgb`, `_em` or `_sp`
+C: A combination of optional features e.g. `-rgb`, `_sp` or `_sp_cc`
 
 === Firmware naming per Pico type
 Firmwares suitable for rp2040 Pico1 boards start with `usbsidpico-`
-Firmwares suitable for rp2040 Pico1_w boards start with `usbsidpico_2-` +
+Firmwares suitable for rp2040 Pico1_w boards start with `usbsidpico_w-` +
 Firmwares suitable for rp2350 Pico2 boards start with `usbsidpico2-` +
 Firmwares suitable for rp2350 Pico2_w boards start with `usbsidpico2_w-` +
 
@@ -55,17 +55,17 @@ Firmware naming suited for the pico 2 always start with `usbsidpico2-` +
 `usbsidpico2-rgb-v1.X.uf2` for black clone rp2350 Pico2 boards with RGB LED onboard. +
 `usbsidpico2_w-v1.X.uf2` for regular green rp2350 Pico2W boards.
 
-=== Firmwares with Cynthcart embedded
-Starting with firmware version v0.6.0-BETA firmwares ending with `_em` have an embedded emulator running Cynthcart. +
-For example `usbsidpico-v1.0_em.uf2` or `usbsidpico2-rgb-v1.3_em.uf2` +
-See the `USBSID-Pico-Cynthcart-manual` file for more information.
-
 === Firmwares with embedded USBSID-Player
 Starting with firmware version v0.6.0-BETA firmwares ending with `_sp` have an embedded emulator that can play PSID and RSID tunes and PSID64 PRG/P00 files. +
 For example `usbsidpico2-v1.0_sp.uf2` or `usbsidpico2-v1.3-rgb_sp.uf2` +
 This USBSID-Player is still in active development and some tunes might not work or play at all. +
 The embedded USBSID-Player requires more then 256KB RAM and an overclocked CPU which makes this firmware only available for rp2350 Pico2 boards. +
 See the `USBSID-Player-manual` file for more information.
+
+=== Firmwares with Cynthcart embedded
+Starting with firmware version v0.8.0 firmwares ending with `_cc` can start Cynthcart with CC commands. +
+For example `usbsidpico-v1.0_sp_cc.uf2` or `usbsidpico2-rgb-v1.3_sp_cc.uf2` +
+See the `USBSID-Pico-Cynthcart-manual` file for more information.
 
 
 == How to flash your Pico
@@ -153,24 +153,25 @@ image:images/firmware/usbsidpico-configwebsite.png[Title=Config Commodore theme,
 _The player is set up with borrowed code from Deepsid using Hermit's JsSID implementation._
 
 === Default configuration (depends on the board version)
-Each firmware version comes with the same default configuration. +
+The default configuration differs slightly between Pico1 (rp2040) and Pico2 (rp2350) boards. +
 An explanation for these settings can be found further on in this document. +
-Board clock rate: `1000000Hz` +
+Board clock rate: `1000000Hz (DEFAULT)` for rp2040, `985248Hz (PAL)` for rp2350 +
 Clock rate locked: `False` +
 Audio mode: `Mono` +
+Preset silent auto detection: `False` (`True` for PCB revision v1.5+) +
 Socket One Enabled: `True` +
 Socket One Dualsid enabled: `False` +
-Socket One Chiptype: `Real` +
-Socket One Clonetype: `Disabled` +
-Socket One SID 1 type: `UNKNOWN` +
-Socket One SID 1 type: `N/A` +
+Socket One Chiptype: `Unknown` +
+Socket One SID 1 type: `Unknown` +
+Socket One SID 2 type: `N/A` +
 Socket Two Enabled: `True` +
 Socket Two Dualsid enabled: `False` +
-Socket Two Chiptype: `Real` +
-Socket Two Clonetype: `Disabled` +
-Socket Two SID 1 type: `UNKNOWN` +
-Socket Two SID 1 type: `N/A` +
+Socket Two Chiptype: `Unknown` +
+Socket Two SID 1 type: `Unknown` +
+Socket Two SID 2 type: `N/A` +
 Socket Two Act as One: `False` +
+Flip Socket One and Socket Two: `False` +
+Mix socket addresses (Quad SID): `False` +
 LED Enabled: `True` +
 LED Idle breathe enabled: `True` +
 RGBLED Enabled: `False` (`True` for RGB Pico's) +
@@ -204,6 +205,12 @@ When set to `Mono` the audio of both SID sockets will be combined to mono. +
 When set to `Stereo` the audio of both SID sockets will be separated into left for `SID1` and right for `SID2` +
 Available options are: +
 `Mono`, `Stereo`
+
+=== Lock audio switch
+_PCB revision v1.3 only_ +
+Locks the audio switch into its current state (`Mono` or `Stereo`) and prevents it from being changed. +
+Available options are: +
+`False`, `True`
 
 === SID Voltage & Configuration confirmation
 _PCB revision v1.5 only_ +
@@ -242,32 +249,41 @@ Available options are: +
 
 ==== Socket One/Two Dualsid enabled
 Enable or disable dualsid for this socket. +
-This requires the `Chiptype` for this socket to be set to `Clone` and ofcourse a dual SID supporting SID clone with support of connecting the A5 address line. +
+This requires the `Chiptype` for this socket to be set to any clone chip (not `MOS`) and ofcourse a dual SID supporting SID clone with support of connecting the A5 address line. +
 Available options are: +
 `False`, `True`
 
 ==== Socket One/Two Chiptype
 Set the type of SID chip for this socket. +
 Available options are: +
-`Real`, `Clone`, `Unknown`
-
-==== Socket One/Two Clonetype
-_This config setting is intended for future use_
-Available options are: +
-`Disabled`, `Other`, `SKPico`, `ARMSID`, `FPGASID`, `RedipSID`
+`MOS` (real SID), `Unknown`, `SKPico`, `ARMSID`, `ARM2SID`, `FPGASID`, `RedipSID`, `PDSID`, `BackSID`, `SIDEmu`
 
 ==== Socket One/Two SID 1 type
-_This config setting is intended for future use_
 Available options are: +
-`Unknown`, `N/A`, `MOS8580`, `MOS6581`, `FMOpl`
+`Unknown`, `N/A`, `8580`, `6581`, `FMOpl`
 
 ==== Socket One/Two SID 2 type
-_This config setting is intended for future use_
 Available options are: +
-`Unknown`, `N/A`, `MOS8580`, `MOS6581`, `FMOpl`
+`Unknown`, `N/A`, `8580`, `6581`, `FMOpl`
 
 ==== Socket Two Act as One
 When enabled, this will disable other Socket Two settings and this socket will receive all writes from Socket One as it were mirrored. +
+Available options are: +
+`False`, `True`
+
+==== Flip Socket One and Socket Two
+When enabled, Socket One and Socket Two are swapped so Socket One's physical position responds as Socket Two and vice versa. +
+Available options are: +
+`False`, `True`
+
+==== Mix socket addresses (Quad SID only)
+When enabled, addresses for a 4-SID setup are mixed between sockets instead of being assigned sequentially per socket. Combine with `Flip` for the remaining address orderings. +
+Available options are: +
+`False`, `True`
+
+==== Preset silent auto detection
+When enabled, the board silently re-runs chip/SID auto detection before applying a preset. +
+Default is `False` on PCB revision v1.0~v1.3 and `True` on PCB revision v1.5+. +
 Available options are: +
 `False`, `True`
 
@@ -327,12 +343,12 @@ Available options are: +
 `False`, `True`
 
 === Asid Enabled
-_This config setting is intended for future use_
+Disable or enable ASID protocol handling (SysEx-based SID playback over MIDI). +
 Available options are: +
 `False`, `True`
 
 === Midi Enabled
-_This config setting is intended for future use_
+Disable or enable MIDI input handling (note/CC/voice control of the SID(s)). +
 Available options are: +
 `False`, `True`
 
