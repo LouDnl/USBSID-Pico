@@ -55,6 +55,10 @@ set pins, 2  ; Drive pin low,  binary 0 <--- 250 ns ;total 500 ns period
     pio_sm_set_enabled(pio, sm, true);                          /* Enable or disable a PIO state machine */
   }
 
+  /**
+   * @brief Unused and not implemented, the clock should never deinit.
+   *
+   */
   static inline void clock_program_deinit(PIO pio, uint sm, uint offset, const struct pio_program clock_program) {
     pio_sm_set_enabled(pio, sm, false);               /* Disable the PIO state machine */
     pio_remove_program(pio, &clock_program, offset);  /* Remove the clock program at provided offset from the PIO state machine */
