@@ -1455,6 +1455,17 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         }
         usNFO("\n");
       }
+      if (buffer[1] == 0x10) {
+        usNFO("Vendor fifos\n");
+        bool vm = tud_vendor_n_mounted(WUSB_ITF);
+        uint32_t wa = tud_vendor_n_write_available(WUSB_ITF);
+        uint32_t ra = tud_vendor_n_available(WUSB_ITF);
+        usNFO("tud_vendor_n_mounted: %d\n", vm);
+        usNFO("tud_vendor_n_write_available: %u\n", wa);
+        usNFO("tud_vendor_n_available: %u\n", ra);
+        tud_vendor_n_write_flush(WUSB_ITF);
+        tud_vendor_n_read_flush(WUSB_ITF);
+      }
       break;
     case READ_CLONECHIP: /* Read configuration / data from clone Chips */
       usCFG("READ_CLONECHIP: $%02x @ $%02x\n", buffer[1], buffer[2]);
