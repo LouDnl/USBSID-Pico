@@ -1,25 +1,26 @@
 # Ignore everything by default
 *
 
-# extensions
-!./**/*.adoc
-!./**/*.c
-!./**/*.cpp
-!./**/*.h
-!./**/*.ld
-!./**/*.pio
-!./**/*.html
-!./**/*.ini
-!./**/*.jpg
-!./**/*.md
-!./**/*.mp3
-!./**/*.pdf
-!./**/*.png
-!./**/*.svg
-!./**/*.rules
-!./**/*.xcf
-!./**/*.yml
-!./**/*.zip
+# extensions in specific repo directories
+!src/**/*.c
+!src/**/*.cpp
+!src/**/*.h
+!src/**/*.ld
+!src/**/*.pio
+
+# extensions anywhere in the repo
+!*.adoc
+!*.html
+!*.ini
+!*.jpg
+!*.mp3
+!*.pdf
+!*.png
+!*.svg
+!*.rules
+!*.xcf
+!*.yml
+!*.zip
 
 # specific files
 !.gitignore
@@ -30,11 +31,8 @@
 !SHOWCASE.md
 !CHANGELOG.md
 !CMakeLists.txt
+
 # tool files
-!cfg_usbsid
-!cfg_usbsid.exe
-!send_sid
-!send_sid.exe
 !libusb-1.0.dll
 !libwinpthread-1.dll
 
@@ -48,11 +46,8 @@
 !src
 !src/pio
 !lib
-!lib/emulator
-!lib/emudore-embedded
-!lib/emulator/roms
 
-# non firmware related directories
+# non firmware related directories (and if applicable their contents)
 !cases
 !cases/**
 !doc
@@ -90,7 +85,6 @@
 !resources
 
 # recursive directory contents
-!lib/emudore-embedded/**
 !examples/cloje64/**
 !examples/config-tool/inih/**
 !examples/config-tool-web_old/**
@@ -100,7 +94,6 @@
 !examples/Cynthcart-Ninja_VST/**
 
 # specific files in specified directories
-examples/config-tool-web/*.md
 !examples/config-tool-web/*.js
 !examples/config-tool-web/*.css
 !examples/config-tool-web/lib/*.js
