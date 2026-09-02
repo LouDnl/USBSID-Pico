@@ -2,29 +2,33 @@
 *
 
 # extensions
-!*.adoc
-!*.c
-!*.cpp
-!*.h
-!*.html
-!*.ini
-!*.jpg
-!*.ld
-!*.md
-!*.mp3
-!*.pdf
-!*.pio
-!*.png
-!*.svg
-!*.rules
-!*.xcf
-!*.yml
-!*.zip
+!./**/*.adoc
+!./**/*.c
+!./**/*.cpp
+!./**/*.h
+!./**/*.ld
+!./**/*.pio
+!./**/*.html
+!./**/*.ini
+!./**/*.jpg
+!./**/*.md
+!./**/*.mp3
+!./**/*.pdf
+!./**/*.png
+!./**/*.svg
+!./**/*.rules
+!./**/*.xcf
+!./**/*.yml
+!./**/*.zip
 
 # specific files
 !.gitignore
 !.gitattributes
+!.gitmodules
 !LICENSE
+!README.md
+!SHOWCASE.md
+!CHANGELOG.md
 !CMakeLists.txt
 # tool files
 !cfg_usbsid
