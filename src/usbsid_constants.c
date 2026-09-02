@@ -24,6 +24,7 @@
  */
 
 #include <usbsid_constants.h>
+#include <macros.h>
 
 
 /**
