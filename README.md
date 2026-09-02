@@ -67,13 +67,12 @@ In development is a modular USBSID-Pro featuring 4 SID sockets with 4 mono out p
 
 
 # Swag!
-Do you like swag!? I sure do!! [greyandslate](https://bsky.app/profile/greyandslate.bsky.social) created these great t-shirt designs which are available for purchase in his [Etsy shop](https://greyandslate.etsy.com/?search_query=usbsid), link below.  
+Do you like swag!? I sure do!! [greyandslate](https://bsky.app/profile/greyandslate.bsky.social) created these great t-shirt designs which are available for purchase in his [Smallrun shop](https://smallrun.net/shop/grey-and-slate-haberdashers), link below.  
 **Use coupon code USBSID15 for a 15% discount!**  
-Shop link: [https://greyandslate.etsy.com/?search_query=usbsid](https://greyandslate.etsy.com/?search_query=usbsid)  
-[<img src="images/tees/usbsid-pico-tshirt-sids_logo.jpg" width="250em">](https://www.etsy.com/nl/listing/4426327828/usbsid-pico-met-mos-sid-chips-t-shirt?etsrc=sdt)
-[<img src="images/tees/usbsid-pico-tshirt-board_logo.jpg" width="250em">](https://www.etsy.com/nl/listing/4426318364/retrocomputing-t-shirt-usbsid-pico-sid?etsrc=sdt)<br>
-[<img src="images/tees/usbsid-pico-tshirt-logo.jpg" width="250em">](https://www.etsy.com/nl/listing/4426327960/t-shirt-usbsid-pico-logo-chiptune?etsrc=sdt)
-[<img src="images/tees/usbsid-pico-tshirt-board.jpg" width="250em">](https://www.etsy.com/nl/listing/4426320773/usbsid-pico-chiptune-board-t-shirt-met?etsrc=sdt)
+<img src="images/tees/usbsid-pico-tshirt-sids_logo.jpg" width="250em">  
+<img src="images/tees/usbsid-pico-tshirt-board_logo.jpg" width="250em">  
+<img src="images/tees/usbsid-pico-tshirt-logo.jpg" width="250em">  
+<img src="images/tees/usbsid-pico-tshirt-board.jpg" width="250em">  
 
 
 # Software support and features
@@ -161,7 +160,6 @@ Any questions about or support with USBSID-Pico can be asked
   - __Note:__ Its more present on v1.0 and v1.3 board, but still there on v1.5 boards. To fix this on the board would require significant layout and pcb changes.  
 
 **Firmware/Software**
-* Enabling and then disabling the onboard cynthcart emulator without restarting the board causes audio glitches
 * Switching on readmode and then switching it off again without restarting the PCB and Vice _will_ result in distorted audio  
 
 
