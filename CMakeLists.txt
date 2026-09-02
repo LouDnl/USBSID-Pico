@@ -63,9 +63,14 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(ENABLE_PROFILING 0)     # Experimental!
 endif()
 
-### Enable / Disable build with embedded emulator for Midi
-set(ONBOARD_EMULATOR 0 CACHE STRING "ONBOARD_EMULATOR")
+### Enable / Disable build with USBSID-Player for tune playback and/or Cynthcart
 set(ONBOARD_SIDPLAYER 0 CACHE STRING "ONBOARD_SIDPLAYER")
+### Run Cynthcart through the player's own MC68B50 ACIA. Requires ONBOARD_SIDPLAYER=1.
+### REVERT NOTE: this used to be an alternative to ONBOARD_EMULATOR, a standalone
+### emudore-based emulator (repo/lib/emulator + lib/emudore-embedded), which is
+### gone now that Cynthcart runs through the player instead - see git history
+### for that option and its compilation block if it's ever needed again.
+set(ONBOARD_CYNTHCART 0 CACHE STRING "ONBOARD_CYNTHCART")
 
 ### Enable/ Disable build with PIO Uart on unused pins 26/27
 set(USE_PIO_UART 0)
@@ -102,11 +107,17 @@ set(CMAKE_MESSAGE_LOG_LEVEL ${BUILD_DEBUGGING})
 message(DEBUG "LOG_LEVEL is ${CMAKE_MESSAGE_LOG_LEVEL}")
 
 message(DEBUG "Starting compilation of ${PRODUCT_STRING} firmware version ${PROJECT_VERSION}")
-if(ONBOARD_EMULATOR EQUAL 1)
-  message(STATUS "Firmware is built with ONBOARD_EMULATOR")
+
+### ONBOARD_CYNTHCART runs inside the player, so it needs one
+if(ONBOARD_CYNTHCART EQUAL 1 AND NOT ONBOARD_SIDPLAYER EQUAL 1)
+  message(FATAL_ERROR "ONBOARD_CYNTHCART requires ONBOARD_SIDPLAYER=1 (it runs inside the player).")
 endif()
+
 if(ONBOARD_SIDPLAYER EQUAL 1)
   message(STATUS "Firmware is built with ONBOARD_SIDPLAYER")
+endif()
+if(ONBOARD_CYNTHCART EQUAL 1)
+  message(STATUS "Firmware is built with ONBOARD_CYNTHCART")
 endif()
 
 
@@ -486,52 +497,17 @@ if(ONBOARD_SIDPLAYER EQUAL 1)
     ${TARGET_INCLUDE_DIRS}
     ${USPLAYER_INCLUDE_DIRS}
   )
-endif()
 
-### Embedded emulator compilation additions
-if(ONBOARD_EMULATOR EQUAL 1)
-  set(COMPILE_OPTS ${COMPILE_OPTS} -DEMBEDDED=1)
-  add_compile_definitions(ONBOARD_EMULATOR=1)
-  set(EMULATOR_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emulator)
-  if(NOT ${EMUDIR} STREQUAL "")
-    set(EMUDORE_LIST_DIR ${EMUDIR})
-  else()
-    set(EMUDORE_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emudore-embedded)
+  ### Cynthcart through the player's MC68B50 ACIA (see cmake/usbsid-player.cmake)
+  if(ONBOARD_CYNTHCART EQUAL 1)
+    add_compile_definitions(ONBOARD_CYNTHCART=1)
+    set(SOURCEFILES ${SOURCEFILES} ${USPLAYER_CYNTHCART_SOURCES})
+    set(TARGET_INCLUDE_DIRS ${TARGET_INCLUDE_DIRS} ${USPLAYER_CYNTHCART_INCLUDE_DIRS})
+    foreach(FILENAME ${FILENAMES})
+      list(APPEND FILENAMES_cc "${FILENAME}_cc")
+    endforeach()
+    set(FILENAMES ${FILENAMES_cc})
   endif()
-  message(DEBUG "EMUDORE_LIST_DIR is set to ${EMUDORE_LIST_DIR}")
-
-  ### Adjust filenames for user interpretation
-  foreach(FILENAME ${FILENAMES})
-    list(APPEND FILENAMES_tmp "${FILENAME}_em")
-  endforeach()
-  set(FILENAMES ${FILENAMES_tmp})
-
-  set(SOURCEFILES
-    ${SOURCEFILES}
-    ${EMULATOR_LIST_DIR}/emudore_emulator.c
-    ${EMULATOR_LIST_DIR}/interface.cpp
-    ${EMUDORE_LIST_DIR}/src/sidfile.cpp
-    ${EMUDORE_LIST_DIR}/src/cpu.cpp
-    ${EMUDORE_LIST_DIR}/src/memory.cpp
-    ${EMUDORE_LIST_DIR}/src/c64.cpp
-    ${EMUDORE_LIST_DIR}/src/cia1.cpp
-    ${EMUDORE_LIST_DIR}/src/cia2.cpp
-    ${EMUDORE_LIST_DIR}/src/io.cpp
-    ${EMUDORE_LIST_DIR}/src/vic.cpp
-    ${EMUDORE_LIST_DIR}/src/sidadapter.cpp
-    ${EMUDORE_LIST_DIR}/src/pla.cpp
-    ${EMUDORE_LIST_DIR}/src/cart.cpp
-    ${EMUDORE_LIST_DIR}/src/cart/MC68B50.cpp
-  )
-  set(TARGET_INCLUDE_DIRS
-    ${TARGET_INCLUDE_DIRS}
-    ${EMULATOR_LIST_DIR}
-    ${EMULATOR_LIST_DIR}/roms
-    ${EMUDORE_LIST_DIR}/src
-    ${EMUDORE_LIST_DIR}/src/cart
-  )
-  set(PICO_CXX_ENABLE_EXCEPTIONS 1)
-
 endif()
 
 ### PIO Uart compilation additions
