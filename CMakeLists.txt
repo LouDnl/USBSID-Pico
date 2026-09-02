@@ -390,6 +390,7 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/midi_voice.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi_config.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi_patch.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi_arp_table.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi_fmopl.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid_buffer.c
