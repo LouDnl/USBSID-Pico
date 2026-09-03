@@ -19,8 +19,11 @@
   --c64-btn-hover: #9090f0;
   --c64-btn-active:#b0b0ff;
   --c64-select-bg: #3030a0;
+  --c64-blogtext:  #9494f4;
+  --c64-bloggray:  #6969a9;
   --font-main:     'VT323', 'Share Tech Mono', monospace;
   --font-size:     18px;
+  /* --c64-blogfontsize: 15px; */
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -995,4 +998,82 @@ input[type=range].c64-range::-moz-range-thumb {
   color: var(--c64-gray);
   font-size: 0.75rem;
   text-align: center;
+}
+
+/* Blog panel - static content generated from _docs_etc/blog/blog.md by
+   _docs_etc/blog/blog_to_c64panel.py. Scoped to #panel-blog so it doesn't
+   affect the About panel's own hand-written c64-box content. */
+#panel-blog p {
+  color: var(--c64-blogtext);
+  line-height: 1.6;
+  margin: 0 0 8px;
+  /* font-size: var(--c64-blogfontsize); */
+}
+#panel-blog p:last-child { margin-bottom: 0; }
+#panel-blog strong { font-weight:bold; }
+#panel-blog a { color: var(--c64-cyan); text-decoration: none; }
+#panel-blog a:hover { text-decoration: underline; color: var(--c64-white); }
+#panel-blog img { display: block; max-width: 75%; height: auto; border-radius: 0px; padding-bottom: 2px; margin: 0px auto; }
+#panel-blog .c64-img-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 400px));
+  justify-content: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+#panel-blog .c64-img-grid img { max-width: 100%; margin: 0; }
+#panel-blog sup { display: block; margin: 0px auto; text-align: center; color: var(--c64-bloggray); font-size: 0.8em; }
+#panel-blog .c64-date-author { font-size: 0.8rem; color: var(--c64-bloggray); }
+#panel-blog code {
+  background: var(--c64-screen);
+  color: var(--c64-cyan);
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-size: 0.9em;
+}
+#panel-blog ul, #panel-blog ol {
+  color: var(--c64-blogtext);
+  line-height: 1.6;
+  margin: 0 0 8px;
+  padding-left: 22px;
+}
+#panel-blog ul ul, #panel-blog ol ol, #panel-blog ul ol, #panel-blog ol ul {
+  margin: 4px 0 4px;
+}
+.c64-blog-h2 {
+  color: var(--c64-yellow);
+  /* font-size: 0.95rem; */
+  font-size: 1.05rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 14px 0 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--c64-gray);
+}
+#panel-blog .c64-box > .c64-blog-h2:first-of-type { margin-top: 4px; }
+.c64-blog-h3 {
+  color: var(--c64-cyan);
+  /* font-size: 0.9rem; */
+  font-size: 1.1rem;
+  margin: 10px 0 4px;
+}
+#panel-blog .c64-box-title {
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  color: var(--c64-yellow);
+  letter-spacing: 0.14em;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--c64-gray);
+  padding-bottom: 6px;
+}
+#panel-blog .c64-blog-title {
+  font-size: 1.5rem;
+  text-transform: uppercase;
+  color: var(--c64-yellow);
+  letter-spacing: 0.14em;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--c64-gray);
+  padding-bottom: 3px;
+  /* display: block; */
+  /* align-self: auto; */
 }

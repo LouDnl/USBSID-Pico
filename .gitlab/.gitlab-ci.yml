@@ -99,7 +99,7 @@ default:
 # FIRMWARE BUILD TEMPLATE
 # All variants built sequentially in a single job to avoid redundant
 # dependency downloads. Dependencies are installed once, then each
-# board/emulator/sidplayer combination is built in a loop.
+# board/sidplayer combination is built in a loop.
 # ============================================================================
 
 .firmware_build_template:
@@ -148,17 +148,18 @@ default:
         cmake --build picotool-src/build -j${BUILD_THREADS} --target install
         rm -rf picotool-src
       fi
-    # Clone optional libraries (needed by emulator and sidplayer variants)
-    - git clone --depth 1 https://github.com/loudnl/emudore-embedded.git lib/emudore-embedded
+    # Clone optional library (needed by sidplayer variants; the standalone
+    # emudore-embedded emulator is gone, Cynthcart now runs through the
+    # player instead - see ONBOARD_CYNTHCART)
     - git clone --depth 1 https://github.com/loudnl/usbsid-player.git lib/usbsid-player
   script:
     - mkdir -p dist
     - |
       build_variant() {
-        local dir="$1" board="$2" platform="$3" emulator="$4" sidplayer="$5"
+        local dir="$1" board="$2" platform="$3" sidplayer="$4" cynthcart="${5:-0}"
         echo ""
         echo "================================================================"
-        echo "Building: ${dir} (board=${board} platform=${platform} emulator=${emulator} sidplayer=${sidplayer})"
+        echo "Building: ${dir} (board=${board} platform=${platform} sidplayer=${sidplayer} cynthcart=${cynthcart})"
         echo "================================================================"
         mkdir -p "build_${dir}"
         cmake -S . -B "build_${dir}" \
@@ -166,26 +167,24 @@ default:
           -DPICO_PLATFORM="${platform}" \
           -DPICO_BOARD="${board}" \
           -Dpicotool_DIR="$(pwd)/picotool/picotool" \
-          -DONBOARD_EMULATOR="${emulator}" \
-          -DONBOARD_SIDPLAYER="${sidplayer}"
+          -DONBOARD_SIDPLAYER="${sidplayer}" \
+          -DONBOARD_CYNTHCART="${cynthcart}"
         cmake --build "build_${dir}" --config ${BUILD_TYPE} -j${BUILD_THREADS}
         ls -la "build_${dir}"/*.uf2
         cp -v "build_${dir}"/*.uf2 dist/
         rm -rf "build_${dir}"
       }
     # Base builds
-    - build_variant pico       pico    rp2040       0 0
-    - build_variant picow      pico_w  rp2040       0 0
-    - build_variant pico2      pico2   rp2350-arm-s 0 0
-    - build_variant pico2w     pico2_w rp2350-arm-s 0 0
-    # Emulator builds
-    - build_variant pico_em    pico    rp2040       1 0
-    - build_variant pico_w_em  pico_w  rp2040       1 0
-    - build_variant pico2_em   pico2   rp2350-arm-s 1 0
-    - build_variant pico2_w_em pico2_w rp2350-arm-s 1 0
+    - build_variant pico       pico    rp2040       0
+    - build_variant picow      pico_w  rp2040       0
+    - build_variant pico2      pico2   rp2350-arm-s 0
+    - build_variant pico2w     pico2_w rp2350-arm-s 0
     # SID player builds
-    - build_variant pico2_sp   pico2   rp2350-arm-s 0 1
-    - build_variant pico2_w_sp pico2_w rp2350-arm-s 0 1
+    - build_variant pico2_sp   pico2   rp2350-arm-s 1
+    - build_variant pico2_w_sp pico2_w rp2350-arm-s 1
+    # Cynthcart builds (runs through the player, requires sidplayer=1)
+    - build_variant pico2_cc   pico2   rp2350-arm-s 1 1
+    - build_variant pico2_w_cc pico2_w rp2350-arm-s 1 1
     # Summary
     - echo "All builds complete. Artifacts:"
     - ls -la dist/

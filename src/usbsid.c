@@ -39,6 +39,8 @@
 #include <sid.h>
 #include <sid_tests.h>
 #include <midi.h>
+#include <midi_engine.h>
+#include <midi_handler.h>
 #include <asid.h>
 #include <logging.h>
 
@@ -51,20 +53,33 @@ uint8_t __not_in_flash("usbsid_buffer") config_buffer[MAX_BUFFER_SIZE] __aligned
 uint8_t __not_in_flash("usbsid_buffer") uart_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);   /* 64 Bytes, 128 bytes aligned */
 uint8_t *write_buffer_p = write_buffer; /* Init pointer for external use */
 
-#if defined(ONBOARD_EMULATOR)
-/* Use full 64KB memory for C64 emulator */
-uint8_t __not_in_flash("c64_memory") c64memory[C64_MEMORY_SIZE] __aligned(128) = {0}; /* 64 Kilo Bytes, 128 bytes aligned */
-/* Pointer to SID address range in memory */
-uint8_t * sid_memory = &c64memory[0xd400]; /* Pointer to $d400 of 128 Bytes total */
-#else
 /* 128 Bytes 'Memory' storage for SID registers */
 uint8_t __not_in_flash("usbsid_buffer") sid_memory[SID_MEMORY_SIZE] __aligned(SID_MEMORY_SIZE) = {0}; /* 128 Bytes, 128 bytes aligned */
-#endif
 
 volatile static bool receivedata = false, sidwriting = false;
+/**
+ * @brief Check whether data has been received from a USB host
+ *
+ * @return bool current receivedata state
+ */
 volatile bool is_receivedata(void) { return receivedata; };
+/**
+ * @brief Set the received-data flag
+ *
+ * @param bool state
+ */
 volatile void set_receivedata(bool state) { receivedata = state; };
+/**
+ * @brief Check whether a SID write is currently in progress
+ *
+ * @return bool current sidwriting state
+ */
 volatile bool is_sidwriting(void) { return sidwriting; };
+/**
+ * @brief Set the SID-writing-in-progress flag
+ *
+ * @param bool state
+ */
 volatile void set_sidwriting(bool state) { sidwriting = state; };;
 volatile uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
 volatile uint8_t *cdc_itf = 0, *wusb_itf = 0;
@@ -82,31 +97,42 @@ volatile bool sid_change_unacknowledged = true;
 const bool detected_sid_change = false;
 #endif
 
-/* Cynthcart emulator */
-#if defined(ONBOARD_EMULATOR)
-#include <emudore_emulator.h>
-volatile bool emulator_running = false;
-volatile bool starting_emulator = false;
-volatile bool stopping_emulator = false;
-#endif /* ONBOARD_EMULATOR */
-
 /* SID player */
 #if defined(ONBOARD_SIDPLAYER)
 #include <usplayer.h>
 volatile bool sidplayer_init = false;
 volatile bool sidplayer_start = false;
 volatile bool sidplayer_playing = false;
+/**
+ * @brief Check whether the onboard SID player is currently playing
+ *
+ * @return bool current sidplayer_playing state
+ */
 volatile bool is_sidplayerplaying(void) { return sidplayer_playing; };
 volatile bool sidplayer_stop = false;
 volatile bool sidplayer_next = false;
 volatile bool sidplayer_prev = false;
-uint8_t * sidfile = NULL; /* Temporary buffer to store incoming data */
-volatile int sidfile_size = 0;
 volatile char tuneno = 0;
 volatile bool is_prg = false; /* Default to SID file */
 volatile uint32_t playtime = 0;
 volatile uint32_t maxplaytime = 300000; /* 5 minutes in milliseconds */
+/* Cynthcart, via USBSID-Player's MC68B50 ACIA */
+#if defined(ONBOARD_CYNTHCART)
+#include <cynthcart_embedded.h>
+volatile bool emulator_running = false;
+volatile bool starting_emulator = false;
+volatile bool stopping_emulator = false;
 #else
+volatile bool emulator_running = false;
+#endif /* ONBOARD_CYNTHCART */
+#else
+/**
+ * @brief Check whether the onboard SID player is currently playing
+ *
+ * @note Stub used when ONBOARD_SIDPLAYER is not compiled in; always false
+ *
+ * @return bool always false
+ */
 volatile bool is_sidplayerplaying(void) { return false; };
 #endif /* ONBOARD_SIDPLAYER */
 
@@ -134,7 +160,12 @@ static const tusb_desc_webusb_url_t desc_url =
 
 /* UTILS */
 
-/* Log reset reason */
+/**
+ * @brief Log the reason for the last chip reset over the debug channel
+ *
+ * Reads the platform reset-cause register (VREG_AND_CHIP_RESET on RP2040,
+ * POWMAN chip_reset on RP2350) and prints which bit(s) caused the reset.
+ */
 void reset_reason(void)
 {
 #if PICO_RP2040
@@ -164,7 +195,12 @@ void reset_reason(void)
 
 /* SETUP */
 
-/* Initialise debug logging if enabled */
+/**
+ * @brief Initialise debug logging if enabled
+ *
+ * Sets up UART stdio for debug output when USBSID_UART is compiled in;
+ * no-op otherwise.
+ */
 void init_logging(void)
 {
 #if defined(USBSID_UART)
@@ -219,6 +255,19 @@ void webserial_write(volatile uint8_t * itf, uint32_t n)
 
 /* BUFFER HANDLING */
 
+/**
+ * @brief Perform a single write step from sid_buffer and advance the cursor
+ *
+ * Called repeatedly by buffer_task to walk sid_buffer in steps of 2 (plain
+ * write: register, value) or 4 (cycled write: register, value, cycle count)
+ * bytes, issuing one cycled_write_operation per call. Keeps its walk index
+ * in a function-local static so successive calls continue where the last
+ * one left off.
+ *
+ * @param int top
+ * @param int step
+ * @return int 1 when the buffer index wrapped back to the start (done), 0 otherwise
+ */
 int __no_inline_not_in_flash_func(do_buffer_tick)(int top, int step)
 {
   static int i = 1;
@@ -235,6 +284,12 @@ int __no_inline_not_in_flash_func(do_buffer_tick)(int top, int step)
   return 0;
 }
 
+/**
+ * @brief Drive do_buffer_tick until the whole incoming buffer has been written
+ *
+ * @param int n_bytes
+ * @param int step
+ */
 void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
 {
   int state = 0;
@@ -244,7 +299,21 @@ void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
   } while (state != 1);
 }
 
-/* Process received usb data */
+/**
+ * @brief Process received USB data and dispatch it to the SID bus
+ *
+ * Decodes the command/subcommand/byte-count header from sid_buffer[0] and
+ * routes to the appropriate handler: CYCLED_WRITE and WRITE issue one or
+ * more cycled_write_operation calls (single write inline, multi-byte via
+ * buffer_task), READ performs a single cycled_read_operation and replies
+ * over the originating interface, and COMMAND dispatches to the various
+ * SID/config/MCU control subcommands (PAUSE, MUTE, RESET_SID, CONFIG,
+ * RESET_MCU, BOOTLOADER, etc). Incoming data is dropped while the bus is
+ * in reset state, except for COMMAND, CYCLED_READ and DELAY_CYCLES.
+ *
+ * @param volatile uint8_t * itf
+ * @param volatile uint32_t * n
+ */
 void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volatile uint32_t * n)
 {
   set_vu_action(); /* Keep that shiny Vu blinking! */
@@ -381,20 +450,34 @@ SIDCHANGEDETECTED:;
 
 /* USB CALLBACKS */
 
+/**
+ * @brief TinyUSB callback fired when the device is mounted by the host
+ */
 void tud_mount_cb(void)
 {
   /* usDBG("[%s]\n", __func__); */
   usNFO("[CDC] Mount\n");
 }
 
+/**
+ * @brief TinyUSB callback fired when the device is unmounted by the host
+ *
+ * Clears the received-data flag and resets dtype/rtype to the "none" type.
+ */
 void tud_umount_cb(void)
 {
   set_receivedata(false), dtype = rtype = ntype;
   /* usDBG("[%s]\n", __func__); */
   usNFO("[CDC] Unmount\n");
-  disable_sid();  /* NOTICE: Testing if this is causing the random lockups */
 }
 
+/**
+ * @brief TinyUSB callback fired when the host suspends the bus
+ *
+ * Clears the received-data flag and resets dtype/rtype to the "none" type.
+ *
+ * @param bool remote_wakeup_en
+ */
 void tud_suspend_cb(bool remote_wakeup_en)
 {
   /* (void) remote_wakeup_en; */
@@ -403,6 +486,9 @@ void tud_suspend_cb(bool remote_wakeup_en)
   set_receivedata(false), dtype = rtype = ntype;
 }
 
+/**
+ * @brief TinyUSB callback fired when the host resumes the bus
+ */
 void tud_resume_cb(void)
 {
   /* usDBG("[%s]\n", __func__); */
@@ -411,31 +497,22 @@ void tud_resume_cb(void)
 
 /* USB MIDI CLASS TASK & CALLBACKS */
 
-void midi_task(void) /* Disabled in loop ~ keeping for optional later use */
-{ /* Same as the callback routine */
-  if (tud_midi_n_mounted(MIDI_ITF)) {
-    while (tud_midi_n_available(MIDI_ITF, MIDI_CABLE)) {  /* Loop as long as there is data available */
-      set_receivedata(true);
-      uint32_t available = tud_midi_n_stream_read(MIDI_ITF, MIDI_CABLE, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
-      process_stream(midimachine.usbstreambuffer, available);
-    }
-    /* Clear usb buffer after use ~ Disabled due to prematurely cut off tunes */
-    /* memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer)); */
-    return;
-  }
-  return;
-}
-
+/**
+ * @brief TinyUSB callback fired when MIDI data is available on an interface
+ *
+ * Drains all complete 4-byte MIDI packets from the given interface and
+ * hands each to process_usb_midi_packet.
+ *
+ * @param uint8_t itf
+ */
 void tud_midi_rx_cb(uint8_t itf)
 {
   if (tud_midi_n_mounted(itf)) {
-    while (tud_midi_n_available(itf, MIDI_CABLE)) {  /* Loop as long as there is data available */
+    uint8_t packet[4];
+    while (tud_midi_n_packet_read(itf, packet)) {  /* Loop as long as there are full packets available */
       set_receivedata(true);
-      uint32_t available = tud_midi_n_stream_read(itf, MIDI_CABLE, midimachine.usbstreambuffer, MAX_BUFFER_SIZE);  /* Reads all available bytes at once */
-      process_stream(midimachine.usbstreambuffer, available);
+      process_usb_midi_packet(packet);
     }
-    /* Clear usb buffer after use ~ Disabled due to prematurely cut off tunes */
-    /* memset(midimachine.usbstreambuffer, 0, count_of(midimachine.usbstreambuffer)); */
     return;
   }
   return;
@@ -444,8 +521,14 @@ void tud_midi_rx_cb(uint8_t itf)
 
 /* USB CDC CLASS TASKS & CALLBACKS */
 
-/* Read from host to device */
 #ifndef USE_CDC_CALLBACK
+/**
+ * @brief Poll the CDC interface for available data and process it
+ *
+ * Same as the tud_cdc_rx_cb callback routine, used instead of it when
+ * USE_CDC_CALLBACK is not defined. Reads available bytes into read_buffer,
+ * copies them into sid_buffer, and hands off to process_buffer.
+ */
 void cdc_task(void)
 { /* Same as the callback routine */
   if (tud_cdc_n_connected(CDC_ITF)) {
@@ -464,6 +547,15 @@ void cdc_task(void)
 }
 #endif
 
+/**
+ * @brief TinyUSB callback fired when CDC data is available from the host
+ *
+ * Read from host to device. No need to check available bytes for reading.
+ * Reads up to MAX_BUFFER_SIZE bytes into read_buffer, copies them into
+ * sid_buffer, and hands off to process_buffer.
+ *
+ * @param uint8_t itf
+ */
 void tud_cdc_rx_cb(uint8_t itf)
 { /* No need to check available bytes for reading */
 #ifdef USE_CDC_CALLBACK
@@ -484,6 +576,14 @@ void tud_cdc_rx_cb(uint8_t itf)
   return;
 }
 
+/**
+ * @brief TinyUSB callback fired when the CDC "wanted char" is received
+ *
+ * @note debug logging left disabled here to avoid possible uart spam
+ *
+ * @param uint8_t itf
+ * @param char wanted_char
+ */
 void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char)
 {
   (void)itf;
@@ -491,12 +591,29 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char)
   /* usDBG("[%s]\n", __func__); */  /* Disabled due to possible uart spam */
 }
 
+/**
+ * @brief TinyUSB callback fired when a queued CDC transmit completes
+ *
+ * @note debug logging left disabled here to avoid uart spam
+ *
+ * @param uint8_t itf
+ */
 void tud_cdc_tx_complete_cb(uint8_t itf)
 {
   (void)itf;
   /* usDBG("[%s]\n", __func__); */  /* Disabled due to uart spam */
 }
 
+/**
+ * @brief TinyUSB callback fired when the CDC line state (DTR/RTS) changes
+ *
+ * Sets the received-data flag when DTR indicates a terminal connected,
+ * clears it when DTR indicates disconnect.
+ *
+ * @param uint8_t itf
+ * @param bool dtr
+ * @param bool rts
+ */
 void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
 {
   /* (void) itf; */
@@ -515,6 +632,12 @@ void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
   }
 }
 
+/**
+ * @brief TinyUSB callback fired when the CDC line coding changes
+ *
+ * @param uint8_t itf
+ * @param cdc_line_coding_t const* p_line_coding
+ */
 void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* p_line_coding)
 {
   /* (void)itf; */
@@ -523,6 +646,12 @@ void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* p_line_coding)
     itf, (int)p_line_coding->bit_rate, p_line_coding->stop_bits, p_line_coding->parity, p_line_coding->data_bits);
 }
 
+/**
+ * @brief TinyUSB callback fired when a CDC break condition is sent
+ *
+ * @param uint8_t itf
+ * @param uint16_t duration_ms
+ */
 void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 {
   /* (void)itf; */
@@ -534,6 +663,14 @@ void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 /* WEBUSB VENDOR CLASS TASKS & CALLBACKS */
 
 #ifndef USE_VENDOR_CALLBACK
+/**
+ * @brief Poll the WebUSB vendor interface for available data and process it
+ *
+ * Same as the tud_vendor_rx_cb callback routine, used instead of it when
+ * USE_VENDOR_CALLBACK is not defined. If the fifo buffer is disabled this
+ * function has no use. Reads available bytes into read_buffer, copies them
+ * into sid_buffer, and hands off to process_buffer.
+ */
 void vendor_task(void)
 { /* Same as the callback routine */
   /* If the fifo buffer is disabled, this function has no use */
@@ -550,7 +687,19 @@ void vendor_task(void)
 }
 #endif
 
-/* Read from host to device */
+/**
+ * @brief TinyUSB callback fired when WebUSB vendor data is available
+ *
+ * Read from host to device. With the fifo buffer disabled the buffer
+ * contains the newest incoming data; with the fifo buffer enabled the
+ * buffer contains data from the previous read. The vendor class has no
+ * connect check built in, so web_serial_connected is used as a makeshift
+ * check.
+ *
+ * @param uint8_t itf
+ * @param uint8_t const* buffer
+ * @param uint16_t bufsize
+ */
 void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
 {
   /* With the fifo buffer disabled the buffer contains the newest incoming data */
@@ -562,7 +711,7 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
       wusb_itf = &itf; /* Since there's only 1 vendor interface, we know it's 0 */
       set_receivedata(true), dtype = wusb, rtype = wusb;
       webread = bufsize;
-      // /* No need to flush since we have no fifo */
+      /* Flush the fifo */
       tud_vendor_n_read_flush(*wusb_itf);
       memcpy(sid_buffer, buffer, bufsize);
       process_buffer(wusb_itf, &webread);
@@ -574,13 +723,34 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
   return;
 }
 
+/**
+ * @brief TinyUSB callback fired when a queued vendor transmit completes
+ *
+ * @param uint8_t itf
+ * @param uint32_t sent_bytes
+ */
 void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
 {
   (void)itf;
   usNFO("[VDR] TX %lu\n", sent_bytes);
 }
 
-/* Handle incoming vendor and webusb data */
+/**
+ * @brief Handle incoming vendor and WebUSB control transfer requests
+ *
+ * Only the CONTROL_STAGE_SETUP stage is handled; other stages are
+ * acknowledged with no action. Handles the CDC-style SET_CONTROL_LINE_STATE
+ * class request (0x22) used by WebSerial to signal connect/disconnect,
+ * the WebUSB landing-page URL vendor request (returns desc_url on first
+ * boot or when configuration confirmation/SID-change acknowledgement is
+ * pending), and the Microsoft OS 2.0 compatible descriptor vendor request.
+ * Any other request stalls the endpoint.
+ *
+ * @param uint8_t rhport
+ * @param uint8_t stage
+ * @param tusb_control_request_t const * request
+ * @return bool true if the request was handled/acknowledged, false to stall
+ */
 bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const * request)
 {
   usNFO("[VDR] XFER stage:%x, rhport:%x, bRequest:0x%x, wValue:%d, wIndex:%x, wLength:%x, bmRequestType:%x, type:%x, recipient:%x, direction:%x\n",
@@ -645,8 +815,12 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
 
 /* MAIN */
 
-/* Multicore sync using atomic memory (avoids semaphore spin locks AND
- * FIFO which is consumed by flash_safe_execute IRQ handler)
+/**
+ * @brief Core 1 entry point: boot sync with core0, then the core1 main loop
+ *
+ * Multicore sync using atomic memory (avoids semaphore spin locks and the
+ * hardware FIFO, which is consumed by the flash_safe_execute IRQ handler).
+ * Boot sequence:
  *
  * Core 0 -> launch core 1
  * Core 0 -> poll for SYNC_CORE1_STAGE1
@@ -664,6 +838,13 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
  * Core 0 -> set SYNC_CORE0_STAGE2
  * Core 0 -> enter while loop
  * Core 1 -> enter while loop
+ *
+ * After sync, the main loop runs the LED runner, drains the SID test queue,
+ * drains the MIDI event ring (midi_engine_task), and drives the onboard
+ * SID player / Cynthcart emulator state machines when those features are
+ * compiled in.
+ *
+ * @note runs on core 1, never returns
  */
 void core1_main(void)
 {
@@ -741,22 +922,37 @@ void core1_main(void)
       }
     }
 
+    /* Drain the MIDI event ring; this is where the SID bus writes for MIDI
+     * input now happen, off the USB callback on core0 */
+#ifdef ONBOARD_CYNTHCART
+    if __us_likely(!emulator_running) {
+#endif
+      midi_engine_task();
+#ifdef ONBOARD_CYNTHCART
+    }
+#endif
+
 #ifdef ONBOARD_SIDPLAYER
-    if (sidplayer_init) {
+    if (sidplayer_init && !emulator_running) {
       sidplayer_init = false;
       sidplayer_start = false;
       sidplayer_playing = false;
       offload_ledrunner = true;
+      /* REVERT NOTE: this used to be load_prg(sidfile, sidfile_size, false) /
+       * load_sidtune(sidfile, sidfile_size, tuneno) followed by
+       * free(sidfile) - the file lived in a firmware-owned buffer filled by
+       * config.c's UPLOAD_SID_DATA case. That buffer is gone: config.c now
+       * streams straight into usplayer's own tune buffer as each packet
+       * arrives (usplayer_upload_start()/_feed()), and these two calls just
+       * finish what was already fed in, no buffer or size to pass. */
       if (is_prg) {
-        load_prg(sidfile, sidfile_size, false); /* Load PRG without auto looping */
+        usplayer_upload_finish_prg(false); /* Load PRG without auto looping */
       } else {
-        load_sidtune(sidfile, sidfile_size, tuneno);
+        usplayer_upload_finish_tune(tuneno);
       }
       sidplayer_start = true;
-      free(sidfile);
-      sidfile = NULL;
     }
-    if (sidplayer_start) {
+    if (sidplayer_start  && !emulator_running) {
       sidplayer_init = false;
       sidplayer_start = false;
       sidplayer_playing = true;
@@ -766,30 +962,30 @@ void core1_main(void)
         start_sidplayer(false); /* No auto loop */
       }
     }
-    if (sidplayer_stop) {
+    if (sidplayer_stop  && !emulator_running) {
       stop_sidplayer();
       sidplayer_stop = false;
       sidplayer_playing = false;
       offload_ledrunner = true;
     }
-    if __us_unlikely (sidplayer_next && !sidplayer_playing) {
+    if __us_unlikely ((sidplayer_next && !sidplayer_playing) && !emulator_running) {
       next_subtune();
       sleep_us(20000);
       sidplayer_next = false;
       sidplayer_playing = true;
     }
-    if __us_unlikely (!sidplayer_playing && sidplayer_prev) {
+    if __us_unlikely ((!sidplayer_playing && sidplayer_prev) && !emulator_running) {
       previous_subtune();
       sidplayer_prev = false;
       sidplayer_playing = true;
     }
-    if __us_likely(sidplayer_playing) {
+    if __us_likely(sidplayer_playing && !emulator_running) {
       loop_sidplayer();
       playtime = usplayer_playtime_ms();
       if __us_unlikely(sidplayer_next || sidplayer_prev) {
         sidplayer_playing = false;
       }
-      if __us_unlikely(playtime >= maxplaytime) {
+      if __us_unlikely((playtime >= maxplaytime) && !emulator_running) {
         sidplayer_stop = true;
         /* Deinit all sidplayer variables */
         sidplayer_init = false;
@@ -799,16 +995,17 @@ void core1_main(void)
     }
 #endif /* ONBOARD_SIDPLAYER */
 
-#ifdef ONBOARD_EMULATOR
-    if (!emulator_running && starting_emulator) {
+#if defined(ONBOARD_CYNTHCART)
+    if ((!emulator_running && starting_emulator) && !sidplayer_playing) {
       starting_emulator = false;
       emulator_running = true;
+      offload_ledrunner = true;
       start_cynthcart();
     }
-    if (emulator_running && !starting_emulator) {
+    if ((emulator_running && !starting_emulator) && !sidplayer_playing) {
       run_cynthcart();
     }
-#endif /* ONBOARD_EMULATOR */
+#endif /* ONBOARD_CYNTHCART */
 
 #ifdef WRITE_DEBUG  /* Only run this queue when needed */
     if (is_receivedata()) {
@@ -826,6 +1023,22 @@ void core1_main(void)
   return;
 }
 
+/**
+ * @brief Firmware entry point: boot core0, launch core1, then the IO task loop
+ *
+ * Sets the system clock speed, initialises TinyUSB (kept disconnected from
+ * the host until hardware is ready), launches core1 and runs the core0 side
+ * of the two-stage multicore boot sync (see core1_main), loads and applies
+ * the persisted config, sets up the SID clock, bus, PIO, DMA, VU, MIDI,
+ * ASID and SID state detection, runs default-config/socket-config
+ * verification, then allows the host to enumerate via tud_connect(). Never
+ * returns; the final while(1) drives tud_task_ext plus the CDC/vendor
+ * polling tasks and the LED runner.
+ *
+ * @note runs on core 0
+ *
+ * @return int never actually returns; present for the standard C signature
+ */
 int main()
 {
   /* Set system clockspeed */
@@ -875,6 +1088,8 @@ int main()
 
   /* Load config before init of USBSID settings ~ NOTE: This cannot be run from Core 1! */
   load_config(&usbsid_config);
+  verify_midiconfig_offset();  /* must run before anything ever touches the MIDI flash partition */
+
   /* Apply saved config to used vars */
   err = apply_config(true); /* At boot */
   if (err != CFG_OK) {
@@ -945,6 +1160,11 @@ int main()
   usBOOT("Setup DMA channels\n");
   setup_dmachannels();
 
+  /* Claim the bus spinlock before core1 is released to its main loop, so it
+   * exists before anything could contend on it */
+  usBOOT("Setup bus lock\n");
+  bus_lock_init();
+
   /* Start the VU */
   usBOOT("Initialise Vu\n");
   init_vu();
@@ -983,12 +1203,13 @@ int main()
 
   {
     usNFO("\n");
-#ifdef ONBOARD_EMULATOR
-    usDBG("Firmware is compiled with Cynthcart support\n");
-#endif
-#ifdef ONBOARD_SIDPLAYER
+#if defined(ONBOARD_SIDPLAYER)
     usDBG("Firmware is compiled with onboard SID player\n");
-#endif
+#if defined(ONBOARD_CYNTHCART)
+    usDBG("Firmware is compiled with Cynthcart support\n");
+#endif /* ONBOARD_CYNTHCART */
+#endif /* ONBOARD_SIDPLAYER */
+
     if (!detected_sid_change) {
       usDBG("%s v%s Started successfully\n\n", us_product, project_version);
     } else {
@@ -996,6 +1217,14 @@ int main()
       usWRN("Please verify socket configuration before further use!\n\n");
     }
   }
+
+  /* cfg.numsids is authoritative by now (detect_default_config() /
+   * verify_socket_config() above); midi_config_init() (during midi_init(),
+   * earlier in this same boot sequence) ran before that and could only
+   * guess at MAX_SIDS. The host has not been allowed to enumerate yet
+   * (tud_connect() is still ahead), so there is no MIDI traffic this could
+   * race against. */
+  midi_config_sync_poly_limits();
 
   /* Signal Core 1 to enter main loop (sync point 2) */
   usBOOT("<CORE 0> Signaling core1 ~ 2\n");

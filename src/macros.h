@@ -109,6 +109,14 @@
 #define __us_unlikely(x)     (__builtin_expect(!!(x), 0))
 #endif
 
+/* Compiler attributes */
+#ifndef __us_unused
+#define __us_unused          __attribute__ ((unused))
+#endif
+#ifndef __us_deprecated
+#define __us_deprecated      __attribute__ ((unused))
+#endif
+
 
 #ifdef __cplusplus
  }

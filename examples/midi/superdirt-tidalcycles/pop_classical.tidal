@@ -1,0 +1,69 @@
+-- USBSID-Pico SuperDirt demo 1/6: "Sunday Drive" - I-V-vi-IV pop/classical loop
+-- 3 SIDs, 3 channels, 3 factory patches (0-15), no config tool needed.
+--
+-- Ported 1:1 from ../strudel/pop_classical.strudel.js - see that file for
+-- the full musical/firmware commentary.
+--
+-- Channel map: this firmware's stock default gives channel 1 all 12 pool
+-- slots (every SID, full polyphony) and channels 2/3/4 one SID each - but
+-- this board's config has been changed from that default, so here channels
+-- 1/2/3 map one-SID-each instead. Check your own board's channel config
+-- before assuming either mapping.
+--
+-- SIDs reset to silent registers on boot/reset and expect an explicit
+-- volume CC before anything is audible - that's what the ccn 7 / ccv 127
+-- lines below are for, sent once per channel before the tune starts.
+--
+-- Patch choices (repo/src/midi_patch.c factory bank):
+--   3  Bass            - sawtooth, punchy decay, already low-passed
+--   5  Organ           - triangle, slight attack, full sustain (good pad)
+--   1  Sawtooth lead    - plain, clear, good for a singable melody line
+
+-- CC_ANOF (All Notes Off, CC 123) is pool-wide, not channel-scoped - one
+-- send silences every held SID voice AND every held FMOpl voice
+-- (all_notes_off() in midi_handler.c calls midi_fmopl_all_notes_off()
+-- internally). Sent first so a note stuck from earlier testing/a previous
+-- song doesn't keep ringing under this one. Channel byte is required by the
+-- MIDI message shape but doesn't matter for this particular CC.
+once $ ccn 123 # ccv 127 # s "usbsidpico" # midichan 1  -- All Notes Off (SID + FMOpl), normalized 1 -> 127
+
+-- CC_FMEN (CC 88) is sticky per-channel firmware state - if a channel was
+-- ever set to target the FMOpl chip (manual CC testing, or one of the
+-- FMOpl demo songs), it stays that way until told otherwise. Reset
+-- channels 1/2/3 to SID here rather than assuming the board's current state.
+do
+  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 1  -- Reset channel 1 to SID (CC_FMEN off)
+  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 2  -- Reset channel 2 to SID (CC_FMEN off)
+  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 3  -- Reset channel 3 to SID (CC_FMEN off)
+  -- CC_ARPE/CC_UNIS are sticky too (same as CC_FMEN) - a previous demo
+  -- (e.g. big_top_showcase leaves channel 3's arp ON) would otherwise
+  -- hijack this song's note input on that channel.
+  once $ ccn 12 # ccv 0 # s "usbsidpico" # midichan 1  -- arp off ch1
+  once $ ccn 12 # ccv 0 # s "usbsidpico" # midichan 2  -- arp off ch2
+  once $ ccn 12 # ccv 0 # s "usbsidpico" # midichan 3  -- arp off ch3
+  once $ ccn 41 # ccv 0 # s "usbsidpico" # midichan 1  -- unison off ch1
+  once $ ccn 41 # ccv 0 # s "usbsidpico" # midichan 2  -- unison off ch2
+  once $ ccn 41 # ccv 0 # s "usbsidpico" # midichan 3  -- unison off ch3
+  once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 1 # progNum 3  -- SID1: Bass
+  once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 2 # progNum 5  -- SID2: Organ pad
+  once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 3 # progNum 1  -- SID3: Sawtooth lead
+
+-- setcps 0.5 -- uncomment and tune to taste - slower suits this one
+
+-- Bass: root note under each chord, one per cycle
+d1 $ note "<c2 g2 a2 f2>"
+  # s "usbsidpico" # midichan 1
+
+-- Chords: sustained triad under the melody. Root-position triads - Strudel's
+-- chord() names are lowercased and given a ' before the (also lowercased)
+-- chord type for Tidal's mini-notation.
+d2 $ n "<c'maj g'maj a'min f'maj>"
+  # s "usbsidpico" # midichan 2
+
+-- Melody: four-note arpeggio per chord, common-tone voice leading between
+-- chords (c4 carries over Am->F, e4 carries over C->Am) so the line moves
+-- smoothly instead of jumping around
+d3 $ note "<[e4 g4 c5 e5] [d4 g4 b4 d5] [c4 e4 a4 c5] [c4 f4 a4 c5]>"
+  # s "usbsidpico" # midichan 3
+
+-- To stop: hush

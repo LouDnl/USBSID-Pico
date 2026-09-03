@@ -37,7 +37,7 @@ set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
 string(TIMESTAMP MAGIC_SMOKE "%Y%m%d")  # Auto generate dated version
-set(FWVERSION "0.7.6")
+set(FWVERSION "0.8.0")
 set(PROJECT_VERSION "${FWVERSION}-${MAGIC_SMOKE}")  # Generate compile version
 
 ### Want a cookie?
@@ -55,7 +55,7 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(USBIO_DEBUGGING 0)      # Enable debugging in usbsid.c
   set(GPIOBUS_DEBUGGING 0)    # Enable debugging in gpio.c
   set(MIDI_DEBUGGING 0)       # Enable debugging in midi.c
-  set(MIDIVOICE_DEBUGGING 1)  # Enable debugging in midi.c
+  set(MIDIVOICE_DEBUGGING 0)  # Enable debugging in midi.c ~ usMVCE/usMDAT fire on every message
   set(ASID_DEBUGGING 1)       # Enable debugging in acid.c and asid_buffer.c
   set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
   set(SIDWRITES_DEBUGGING 0)  # Enable logging of SID writes one core 2
@@ -63,9 +63,14 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(ENABLE_PROFILING 0)     # Experimental!
 endif()
 
-### Enable / Disable build with embedded emulator for Midi
-set(ONBOARD_EMULATOR 0 CACHE STRING "ONBOARD_EMULATOR")
+### Enable / Disable build with USBSID-Player for tune playback and/or Cynthcart
 set(ONBOARD_SIDPLAYER 0 CACHE STRING "ONBOARD_SIDPLAYER")
+### Run Cynthcart through the player's own MC68B50 ACIA. Requires ONBOARD_SIDPLAYER=1.
+### REVERT NOTE: this used to be an alternative to ONBOARD_EMULATOR, a standalone
+### emudore-based emulator (repo/lib/emulator + lib/emudore-embedded), which is
+### gone now that Cynthcart runs through the player instead - see git history
+### for that option and its compilation block if it's ever needed again.
+set(ONBOARD_CYNTHCART 0 CACHE STRING "ONBOARD_CYNTHCART")
 
 ### Enable/ Disable build with PIO Uart on unused pins 26/27
 set(USE_PIO_UART 0)
@@ -102,11 +107,17 @@ set(CMAKE_MESSAGE_LOG_LEVEL ${BUILD_DEBUGGING})
 message(DEBUG "LOG_LEVEL is ${CMAKE_MESSAGE_LOG_LEVEL}")
 
 message(DEBUG "Starting compilation of ${PRODUCT_STRING} firmware version ${PROJECT_VERSION}")
-if(ONBOARD_EMULATOR EQUAL 1)
-  message(STATUS "Firmware is built with ONBOARD_EMULATOR")
+
+### ONBOARD_CYNTHCART runs inside the player, so it needs one
+if(ONBOARD_CYNTHCART EQUAL 1 AND NOT ONBOARD_SIDPLAYER EQUAL 1)
+  message(FATAL_ERROR "ONBOARD_CYNTHCART requires ONBOARD_SIDPLAYER=1 (it runs inside the player).")
 endif()
+
 if(ONBOARD_SIDPLAYER EQUAL 1)
   message(STATUS "Firmware is built with ONBOARD_SIDPLAYER")
+endif()
+if(ONBOARD_CYNTHCART EQUAL 1)
+  message(STATUS "Firmware is built with ONBOARD_CYNTHCART")
 endif()
 
 
@@ -374,6 +385,13 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/bus.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi_handler.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi_queue.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi_engine.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi_voice.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi_config.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi_patch.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi_arp_table.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi_fmopl.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid_buffer.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sysex.c
@@ -480,52 +498,17 @@ if(ONBOARD_SIDPLAYER EQUAL 1)
     ${TARGET_INCLUDE_DIRS}
     ${USPLAYER_INCLUDE_DIRS}
   )
-endif()
 
-### Embedded emulator compilation additions
-if(ONBOARD_EMULATOR EQUAL 1)
-  set(COMPILE_OPTS ${COMPILE_OPTS} -DEMBEDDED=1)
-  add_compile_definitions(ONBOARD_EMULATOR=1)
-  set(EMULATOR_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emulator)
-  if(NOT ${EMUDIR} STREQUAL "")
-    set(EMUDORE_LIST_DIR ${EMUDIR})
-  else()
-    set(EMUDORE_LIST_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/emudore-embedded)
+  ### Cynthcart through the player's MC68B50 ACIA (see cmake/usbsid-player.cmake)
+  if(ONBOARD_CYNTHCART EQUAL 1)
+    add_compile_definitions(ONBOARD_CYNTHCART=1)
+    set(SOURCEFILES ${SOURCEFILES} ${USPLAYER_CYNTHCART_SOURCES})
+    set(TARGET_INCLUDE_DIRS ${TARGET_INCLUDE_DIRS} ${USPLAYER_CYNTHCART_INCLUDE_DIRS})
+    foreach(FILENAME ${FILENAMES})
+      list(APPEND FILENAMES_cc "${FILENAME}_cc")
+    endforeach()
+    set(FILENAMES ${FILENAMES_cc})
   endif()
-  message(DEBUG "EMUDORE_LIST_DIR is set to ${EMUDORE_LIST_DIR}")
-
-  ### Adjust filenames for user interpretation
-  foreach(FILENAME ${FILENAMES})
-    list(APPEND FILENAMES_tmp "${FILENAME}_em")
-  endforeach()
-  set(FILENAMES ${FILENAMES_tmp})
-
-  set(SOURCEFILES
-    ${SOURCEFILES}
-    ${EMULATOR_LIST_DIR}/emudore_emulator.c
-    ${EMULATOR_LIST_DIR}/interface.cpp
-    ${EMUDORE_LIST_DIR}/src/sidfile.cpp
-    ${EMUDORE_LIST_DIR}/src/cpu.cpp
-    ${EMUDORE_LIST_DIR}/src/memory.cpp
-    ${EMUDORE_LIST_DIR}/src/c64.cpp
-    ${EMUDORE_LIST_DIR}/src/cia1.cpp
-    ${EMUDORE_LIST_DIR}/src/cia2.cpp
-    ${EMUDORE_LIST_DIR}/src/io.cpp
-    ${EMUDORE_LIST_DIR}/src/vic.cpp
-    ${EMUDORE_LIST_DIR}/src/sidadapter.cpp
-    ${EMUDORE_LIST_DIR}/src/pla.cpp
-    ${EMUDORE_LIST_DIR}/src/cart.cpp
-    ${EMUDORE_LIST_DIR}/src/cart/MC68B50.cpp
-  )
-  set(TARGET_INCLUDE_DIRS
-    ${TARGET_INCLUDE_DIRS}
-    ${EMULATOR_LIST_DIR}
-    ${EMULATOR_LIST_DIR}/roms
-    ${EMUDORE_LIST_DIR}/src
-    ${EMUDORE_LIST_DIR}/src/cart
-  )
-  set(PICO_CXX_ENABLE_EXCEPTIONS 1)
-
 endif()
 
 ### PIO Uart compilation additions
@@ -713,7 +696,20 @@ message(TRACE "Compile time include dirs:")
 message(TRACE "${TARGET_INCLUDE_DIRS}")
 
 ### Compile targets
+# FW_VERSION_INT/PCB_VERSION_INT below get emitted as bare (unquoted) numeric
+# -D defines, so the C compiler parses them as C integer literals - any
+# literal starting with "0" is octal there, and octal digits only run 0-7.
+# "0.8.0" collapses to "080", which broke the very first time a MAJOR
+# version of 0 met a MINOR/PATCH digit of 8 or 9 (every version before this
+# happened to concatenate to all-0-7 digits, so this never came up). Strip
+# leading zeros so the literal can never be mistaken for octal, regardless
+# of platform version - "080" -> "80" (still stays a valid, comparable
+# integer for the PCB_VERSION_INT >= NN checks throughout src/).
 string(REPLACE "." "" FWVER_INT "${FWVERSION}")
+string(REGEX REPLACE "^0+" "" FWVER_INT "${FWVER_INT}")
+if(FWVER_INT STREQUAL "")
+  set(FWVER_INT "0")
+endif()
 foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSIONS)
   # set filename
   set(BUILD ${FILENAME})
@@ -725,7 +721,14 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   # executable
   add_executable(${BUILD} ${SOURCEFILES})
   # BUILD TYPES
+  # Same octal-literal trap as FWVER_INT above - not hit yet (1.0/1.3/1.5
+  # never start with "0"), but stripped for the same reason so it can't
+  # silently reappear if a PCB version ever does.
   string(REPLACE "." "" PCBVER_INT "${PCBVERSION}")
+  string(REGEX REPLACE "^0+" "" PCBVER_INT "${PCBVER_INT}")
+  if(PCBVER_INT STREQUAL "")
+    set(PCBVER_INT "0")
+  endif()
   if(PICOTYPE STREQUAL "RGB")
     target_compile_definitions(${BUILD} PRIVATE USBSID USBSID_PRODUCT="${BUILD_VERSION}" USE_RGB=1 PCB_VERSION="${PCBVERSION}" PCB_VERSION_INT=${PCBVER_INT} FW_VERSION_INT=${FWVER_INT})
   else()

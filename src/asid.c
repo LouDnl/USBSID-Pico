@@ -127,7 +127,19 @@ void asid_init(void)
   return;
 }
 
-/* Pling, plong, ploink!? */
+/**
+ * @brief Decode and write an ASID FMOpl SysEx message to the FMOpl chip
+ *
+ * Unpacks the 7-bit-masked, MSB-encoded ASID payload into a flat
+ * `fm_registers` array, then alternately writes address/data byte pairs to
+ * the configured FMOpl SID's OPL address and data ports via
+ * cycled_write_operation() (10 cycle delay per write). Drops the message
+ * if no FMOpl SID is configured (`cfg.fmopl_sid` not in 1..4).
+ *
+ * @note assumes buffer bytes 0-2 of the original SysEx are not included
+ *
+ * @param uint8_t* buffer
+ */
 void handle_asid_fmoplmessage(uint8_t* buffer)
 { /* Assumes byte 0-2 are not included in the buffer */
   uint8_t ndata_in_buffer = (buffer[0] + 1) << 1;
@@ -176,7 +188,7 @@ void handle_asid_fmoplmessage(uint8_t* buffer)
  * @param uint8_t* buffer ~ the buffer to process
  * @param int size        ~ the size of the buffer
  */
-void handle_complete_asid_buffer(uint8_t sid, uint8_t* buffer, int size)
+void __us_deprecated handle_complete_asid_buffer(uint8_t sid, uint8_t* buffer, int size)
 { /* Assumes byte 0-2 are included in the buffer and skips these */
   (void)size;  /* Stop calling me fat, I'm just big boned! */
   unsigned int reg = 0;
@@ -208,7 +220,7 @@ void handle_complete_asid_buffer(uint8_t sid, uint8_t* buffer, int size)
  * @param uint8_t sid     ~ the sidnumber
  * @param uint8_t* buffer ~ the buffer to process
  */
-void handle_asid_message(uint8_t sid, uint8_t* buffer)
+void __us_deprecated handle_asid_message(uint8_t sid, uint8_t* buffer)
 { /* Assumes byte 0-2 are not included in the buffer */
   unsigned int reg = 0;
   for (uint8_t mask = 0; mask < 4; mask++) {  /* no more then 4 masks */
@@ -394,6 +406,17 @@ void handle_asid_envmessage(uint8_t* buffer)
   return;
 }
 
+/**
+ * @brief Decode and log an ASID SID chip info SysEx message
+ *
+ * Maps the received SIDTYPE field (buffer[1]: 0 or 1 map to a known chip
+ * type, any other value maps to unknown) and logs it via sid_type_name().
+ * The decoded type is not currently applied to any state.
+ *
+ * @note assumes buffer bytes 0-2 of the original SysEx are not included
+ *
+ * @param uint8_t* buffer
+ */
 void handle_asid_typemessage(uint8_t* buffer)
 { /* SID type is only logged and not used for now */
   /* Incoming buffer skips first 3 bytes and
@@ -406,9 +429,23 @@ void handle_asid_typemessage(uint8_t* buffer)
   return;
 }
 
-/* Spy vs Spy ? */
+/**
+ * @brief Top level ASID SysEx message dispatcher
+ *
+ * Entry point for incoming ASID protocol messages: dispatches on
+ * buffer[2] to play start/stop, write order timing config
+ * (handle_asid_writeorder_config()), environment (handle_asid_envmessage()),
+ * SID chip info (handle_asid_typemessage()), register writes for SID 1-4
+ * (handle_writeordered_asid_message()), and FMOpl (handle_asid_fmoplmessage()).
+ * No-op while a reset is in progress or ASID is disabled in config.
+ *
+ * @param uint8_t* buffer
+ * @param int size
+ */
 void decode_asid_message(uint8_t* buffer, int size)
 {
+  if __us_unlikely(get_reset_state()) return;
+  if __us_unlikely(!usbsid_config.Asid.enabled) return;
   static uint32_t rate; /* Tracks the rate of ASID messages */
   switch(buffer[2]) {
     case 0x4C:  /* Play start */

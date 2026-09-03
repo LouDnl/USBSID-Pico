@@ -57,8 +57,7 @@ extern volatile uint32_t rgb_value;
 void setup_dmachannels(void);
 void setup_vu_dma(void);
 void clear_dma_channels(void);
-void stop_dma_channels(void);
-void start_dma_channels(void);
+void abort_dma_bustransfers(void);
 void unclaim_dma_channels(void);
 
 

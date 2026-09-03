@@ -305,6 +305,7 @@ bool read_skpico_version(uint8_t base_address)
  * @brief Read configuration from a SIDKick-pico at supplied address
  *
  * @param uint8_t base_address
+ * @param uint8_t profile
  */
 void read_skpico_configuration(uint8_t base_address, uint8_t profile)
 {
@@ -352,8 +353,8 @@ void read_skpico_configuration(uint8_t base_address, uint8_t profile)
 
 /**
  * @brief Change Public Domain SID type
- * This requires a 5 second reset hold
- * to switch to and or from 6581/8580
+ *
+ * This requires a 5 second reset hold to switch to and/or from 6581/8580.
  */
 void reset_switch_pdsid_type(void)
 {
@@ -373,8 +374,10 @@ void reset_switch_pdsid_type(void)
   return;
 }
 
-/** BUG: Inconsistent results when reading
+/**
  * @brief Read PDSID configured type
+ *
+ * @note BUG: Inconsistent results when reading
  *
  * @param uint8_t base_address
  * @return uint8_t pdsid type 0 = 6581, 1 = 8580
@@ -574,6 +577,13 @@ void read_armsid_configuration(uint8_t base_address)
   return;
 }
 
+/**
+ * @brief Read configuration from a SIDEmu device at supplied address
+ *
+ * @note Not yet implemented, function body is a stub
+ *
+ * @param uint8_t base_address
+ */
 void read_sidemu_configuration(uint8_t base_address)
 { /* TODO: Finish */
   return;
@@ -611,6 +621,20 @@ void set_sidemu_sidtype(uint8_t base_address, uint8_t type)
   return;
 }
 
+/**
+ * @brief Read chip configuration for the given command into an output buffer
+ *
+ * Allocates a scratch buffer, dispatches to the matching chip-specific
+ * configuration reader (currently only READ_FPGASID), then copies the
+ * assembled buffer into chip_config_r and frees the scratch buffer.
+ *
+ * @note Only READ_FPGASID is implemented, other commands fall through with an empty buffer
+ *
+ * @param uint8_t base_address
+ * @param int command
+ * @param uint8_t * chip_config_r
+ * @return bool always true
+ */
 bool read_chip_configuration(uint8_t base_address, int command, uint8_t * chip_config_r)
 { /* TODO: Finish */
 
@@ -643,6 +667,14 @@ bool read_chip_configuration(uint8_t base_address, int command, uint8_t * chip_c
   return true;
 }
 
+/**
+ * @brief Write chip configuration for the given command
+ *
+ * @note Not yet implemented, function body is a stub that always returns false
+ *
+ * @param int command
+ * @return bool always false
+ */
 bool write_chip_configuration(int command)
 { /* TODO: Finish */
 

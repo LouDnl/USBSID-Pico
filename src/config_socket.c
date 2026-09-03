@@ -38,6 +38,7 @@
 
 
 /* Pre declarations */
+static SocketPreset detect_current_preset(void);
 ConfigError validate_config(void);
 Socket default_socket(int id);
 
@@ -56,7 +57,6 @@ void set_socketconfig_logging(bool enabled)
   return;
 }
 
-#if defined(ONBOARD_EMULATOR)
 /**
  * @brief Helper function for retrieving the number of SID's configured
  *
@@ -66,7 +66,6 @@ uint8_t get_numsids(void)
 {
   return cfg.numsids;
 }
-#endif /* ONBOARD_EMULATOR */
 
 /**
  * @brief Returns the FMOpl SID number
@@ -286,7 +285,7 @@ ConfigError apply_detection_results(const DetectionResult *det)
 /**
  * @brief Verifies detection results on socket change activity only
  *
- * @param det
+ * @param DetectionResult *det
  * @return ConfigError
  */
 ConfigError verify_socket_detection_results(const DetectionResult *det)
@@ -460,6 +459,9 @@ SOCKTWO:;
     }
   }
 
+  /* Set current matching preset in config */
+  usbsid_config.last_preset = detect_current_preset();
+
   return CFG_OK;
 }
 
@@ -501,7 +503,6 @@ void flip_sockets(void)
  * @brief Helper funtion to apply requested socket preset
  *
  * @param SocketPreset preset
- * @return ConfigError
  */
 static void apply_socket_preset(SocketPreset preset)
 {
@@ -567,7 +568,6 @@ static SocketPreset detect_current_preset(void)
  * @brief Apply requested preset only if not already active
  *
  * @param SocketPreset preset
- * @param bool at_boot
  * @return ConfigError
  */
 static ConfigError apply_preset(SocketPreset preset)
@@ -700,7 +700,7 @@ void socket_config_fallback(void)
  * @brief Autodetection for sock chip change
  * @note Any change _will_ lock USBSID untill verification
  *
- * @return * ConfigError
+ * @return ConfigError CFG_OK when no change detected, otherwise the detected change/error code
  */
 ConfigError detect_socket_change(void)
 {
@@ -845,8 +845,6 @@ void verify_socket_config(void)
   /* Clear DMA channels and PIO bus afterwards */
   clear_dma_channels();
 
-  /* Set current matching preset in config */
-  usbsid_config.last_preset = detect_current_preset();
 #endif
   return;
 }

@@ -188,7 +188,7 @@ void toggle_audio_switch(void)
  * @brief Set the audio switch to on or off
  * @note only applicable for PCB v1.3
  *
- * @param boolean switch state
+ * @param bool state (false == off, true == on)
  */
 void set_audio_switch(bool state)
 { /* Set the SPST switch */

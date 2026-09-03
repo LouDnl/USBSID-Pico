@@ -37,6 +37,11 @@
 #include "logging.h"
 
 
+/**
+ * @brief Read the RP2040/RP2350 flash unique ID and return it as a 64 bit value
+ *
+ * @return uint64_t the board's unique ID
+ */
 uint64_t mcu_get_unique_id(void)
 {
   static_assert(sizeof(pico_unique_board_id_t) == sizeof(uint64_t), "pico_unique_board_id_t is not 64 bits (but is cast to uint64_t)");
@@ -45,6 +50,13 @@ uint64_t mcu_get_unique_id(void)
   return *((uint64_t*)(id.id));
 };
 
+/**
+ * @brief Reboot the MCU via the watchdog
+ *
+ * Sleeps briefly first to let commands issued right before the reset
+ * settle or finish, then triggers a watchdog reboot and spins forever
+ * waiting for the reset to take effect.
+ */
 void mcu_reset(void)
 {
   usNFO("\n[MCU] Reset Pico\n");
@@ -54,6 +66,13 @@ void mcu_reset(void)
   while(1);
 }
 
+/**
+ * @brief Reboot the MCU straight into the USB bootloader (BOOTSEL mode)
+ *
+ * Calls reset_usb_boot with no activity GPIO pin and both the USB Mass
+ * Storage and PICOBOOT interfaces enabled, same as a cold boot into
+ * BOOTSEL.
+ */
 void mcu_jump_to_bootloader(void)
 {
   /* \param usb_activity_gpio_pin_mask 0 No pins are used as per a cold boot. Otherwise a single bit set indicating which

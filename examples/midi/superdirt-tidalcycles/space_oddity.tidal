@@ -1,0 +1,163 @@
+-- USBSID-Pico SuperDirt demo: "Space Oddity" (2SID) - Markus Jentsch's
+-- (c0zmo) 2019 2SID cover, opening 6 bars, transcribed from a disassembly
+-- of the original .sid tune.
+--
+-- How this was extracted, and why differently from lazy_jones.tidal: this
+-- is a real compiled tracker-engine tune (GoatTracker-style, jump table at
+-- $1000/$1003/$1006/$1009, orderlist+pattern+instrument tables), not a
+-- hand-rolled linear frequency table like Lazy Jones - there's no simple
+-- byte-table to read by eye. So instead of reading the disassembly, this
+-- was actually EXECUTED: a small NMOS 6502 emulator (built for this) loaded
+-- the whole $1000-$2D8F memory image from the .asm dump, called Init ($1000)
+-- once, then called Play ($1003) 1200 times in a row exactly like a real
+-- PSID player does - once per emulated PAL frame - snapshotting both SID
+-- chips' registers after every call. That gives the ACTUAL register writes
+-- the tracker engine produces, without needing to understand its internal
+-- pattern format at all.
+--
+-- The tune uses two SID chips at $D400 and $D500 (grepped the whole file
+-- for every $D4xx/$D5xx reference to confirm - no guessing). Each chip's 3
+-- voices were reconstructed by watching for the tracker's own hard-restart
+-- trick: it briefly sets TEST+GATE with no waveform bit (resets the
+-- oscillator), then one frame later sets GATE+the real waveform bits - so
+-- "note-on" is detected as the frame the waveform bits *first* appear
+-- while gated, not the raw gate 0->1 edge (that fires one frame early on
+-- the test-bit prep and would misread every note as having no waveform).
+--
+-- Tempo: unlike Lazy Jones (a bespoke minimal player with a non-obvious
+-- internal call rate that needed ear-tuning), this is a standard PSID -
+-- Play is driven at exactly 1 call per PAL frame (50Hz) by construction,
+-- same convention any reference player uses, so there's no guessing here.
+-- The register trace lands on a clean, exact grid: 22 frames/row (440ms),
+-- 8 rows/bar (3.52s), and the 6 bars below repeat exactly at bar 6 (where
+-- the source data itself moves into its next section, ~21s in) - so this
+-- loops as a genuinely clean unit, not an arbitrary cut.
+--
+-- Voice mapping: SID-A's 3 voices -> channel 1 (this board's SID1), SID-B's
+-- 3 voices -> channel 2 (SID2), one Tidal pattern slot per physical voice
+-- (d1-d3 = SID-A voices 1-3, d4-d6 = SID-B voices 1-3) all sharing their
+-- channel - the firmware's own 3-voice polyphonic allocator places each
+-- channel's simultaneous notes onto that SID's 3 real oscillators, same as
+-- every chord-voice in the other demos here.
+--
+-- Simplification: the real tune gives each of the 3 voices on a chip its
+-- own independent ADSR/waveform/pulse-width; this firmware's CC model has
+-- ONE shared timbre per MIDI channel, not per physical voice (see every
+-- other demo here - it's a project-wide constraint, not new to this file).
+-- So each channel uses ONE representative timbre: channel 1 = SID-A voice
+-- 1's envelope (matches the long-held bass/pad character that dominates
+-- that channel - voices 2/3 are close variants, attack/decay 0, sustain
+-- 15, release 8, pulse ~19% duty); channel 2 = SID-B voices 2/3's envelope,
+-- which is an EXACT match for both of them (attack/decay 0, sustain 8,
+-- release 12, pulse ~6% duty) - voice 1 there is a rare one-off event, not
+-- worth compromising the other two for. No filter CCs sent: SID-B never
+-- uses its filter at all, and SID-A only routes voice 1 through a very
+-- gentle low-pass (cutoff ~48/2047) - a small, easily-skipped detail.
+-- SID-A voice 3 (d3) also holds its last note (b4) through bars 4-5 rather
+-- than truly ringing on from bar 3 with no retrigger (what the real chip
+-- does) - simplest way to keep the pad audible on Tidal's per-step model
+-- without new mechanics; it drops one passing ornament note (a bar-3 grace
+-- note) for the same reason.
+--
+-- No new firmware patch was added for this - same reasoning as
+-- lazy_jones.tidal: the timbre is built live from CC rather than baked
+-- into midi_patch.c's factory bank.
+--
+-- CC map used here (repo/src/midi_defs.h): CC_ANOF=123, CC_FMEN=88,
+-- CC_ARPE=12, CC_UNIS=41, CC_LFOD=3, CC_LFO2D=15, CC_TRIA=23, CC_PULS=21,
+-- CC_ATT=17, CC_DEC=18, CC_SUS=19, CC_REL=29, CC_PWM=1.
+--
+-- Uses the "usbsidpico" MIDI destination (a virtual MIDI-usbsidpico port), not
+-- the direct "usbsidpico" one.
+
+once $ ccn 123 # ccv 127 # s "usbsidpico" # midichan 1  -- All Notes Off (SID + FMOpl), normalized 1 -> 127
+
+do
+  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 1  -- Reset channel 1 to SID (CC_FMEN off)
+  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 2  -- Reset channel 2 to SID (CC_FMEN off)
+  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 3  -- Reset channel 3 to SID (CC_FMEN off)
+  -- CC_ARPE/CC_UNIS/CC_LFOD/CC_LFO2D are all sticky per-channel state - see
+  -- pop_classical.tidal / lazy_jones.tidal for why these get reset every time.
+  once $ ccn 12 # ccv 0 # s "usbsidpico" # midichan 1  -- arp off ch1
+  once $ ccn 12 # ccv 0 # s "usbsidpico" # midichan 2  -- arp off ch2
+  once $ ccn 41 # ccv 0 # s "usbsidpico" # midichan 1  -- unison off ch1
+  once $ ccn 41 # ccv 0 # s "usbsidpico" # midichan 2  -- unison off ch2
+  once $ ccn 3  # ccv 0 # s "usbsidpico" # midichan 1  -- LFO1 depth off ch1
+  once $ ccn 3  # ccv 0 # s "usbsidpico" # midichan 2  -- LFO1 depth off ch2
+  once $ ccn 15 # ccv 0 # s "usbsidpico" # midichan 1  -- LFO2 depth off ch1
+  once $ ccn 15 # ccv 0 # s "usbsidpico" # midichan 2  -- LFO2 depth off ch2
+-- Channel 1 timbre = SID-A voice 1's real envelope/waveform/PW.
+  once $ ccn 23 # ccv 0   # s "usbsidpico" # midichan 1  -- CC_TRIA off ch1
+  once $ ccn 21 # ccv 127 # s "usbsidpico" # midichan 1  -- CC_PULS on ch1
+  once $ ccn 17 # ccv 0   # s "usbsidpico" # midichan 1  -- CC_ATT: 0
+  once $ ccn 18 # ccv 0   # s "usbsidpico" # midichan 1  -- CC_DEC: 0
+  once $ ccn 19 # ccv 127 # s "usbsidpico" # midichan 1  -- CC_SUS: 15/15
+  once $ ccn 29 # ccv 68  # s "usbsidpico" # midichan 1  -- CC_REL: 8/15
+  once $ ccn 1  # ccv 24  # s "usbsidpico" # midichan 1  -- CC_PWM: ~19% duty
+-- Channel 2 timbre = SID-B voices 2/3's real envelope/waveform/PW (exact
+-- match for both).
+  once $ ccn 23 # ccv 0   # s "usbsidpico" # midichan 2  -- CC_TRIA off ch2
+  once $ ccn 21 # ccv 127 # s "usbsidpico" # midichan 2  -- CC_PULS on ch2
+  once $ ccn 17 # ccv 0   # s "usbsidpico" # midichan 2  -- CC_ATT: 0
+  once $ ccn 18 # ccv 0   # s "usbsidpico" # midichan 2  -- CC_DEC: 0
+  once $ ccn 19 # ccv 68  # s "usbsidpico" # midichan 2  -- CC_SUS: 8/15
+  once $ ccn 29 # ccv 102 # s "usbsidpico" # midichan 2  -- CC_REL: 12/15
+  once $ ccn 1  # ccv 8   # s "usbsidpico" # midichan 2  -- CC_PWM: ~6% duty
+-- Volume - SIDs boot silent and need this before anything is audible.
+  once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 1
+  once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 2
+
+-- setcps (1/42.24)  -- exact: 12 bars * 8 rows/bar * 22 frames/row / 50 PAL fps
+setcps (1/21.12)  -- exact: 6 bars * 8 rows/bar * 22 frames/row / 50 PAL fps
+
+-- Bars 6-11 (~21-42s, the "chorus"): SID-A voice 3 and SID-B voice 3 both
+-- switch to a fast sub-row gate-pulse/tremolo effect there (retriggering
+-- every 32-44 frames, not a clean multiple of the 22-frame row - GCD of the
+-- observed deltas is 2 frames, i.e. not really a "grid" at all, more a
+-- continuous hardware texture). Reproducing that as discrete MIDI retriggers
+-- would just sound like coarse stutter, not the smooth SID tremolo it
+-- actually is, so both voices are folded down to their held pitch per bar
+-- here instead - same "don't force real detail through a mechanism that
+-- can't carry it" call as bars 4-5's simplification above. Every other
+-- voice's real bar-level movement (the chord progression, the melody) is
+-- unaffected and fully real.
+
+do
+  resetCycles
+-- SID-A (channel 1): 3 voices, each its own Tidal slot, all sharing the
+-- SID1 physical chip via the firmware's 3-voice pool allocator.
+-- Voice 1: bass/pad, one held note per bar - the tune's harmonic root.
+  d1 $ note "[f2 e2 f2 e2 f2 e2 c2 e2 c2 e2 a2 fs2]"
+    # legato 1
+    # s "usbsidpico" # midichan 1
+  -- Voice 2: high pad, same one-per-bar rhythm as voice 1, a fifth-ish above.
+  d2 $ note "[a5 g5 a5 g5 a5 g5 e5 e5 e5 e5 e5 fs5]"
+    # legato 1
+    # s "usbsidpico" # midichan 1
+  -- Voice 3: mid pad, one note per bar (bars 4-5 hold the bar-3 note rather
+  -- than truly ringing through unretriggered - see the header note; bars
+  -- 6-11 are the folded-down tremolo effect described above).
+  d3 $ note "[c5 b4 c5 b4 b4 b4 g4 g4 g4 g4 a4 a4]"
+    # legato 1
+    # s "usbsidpico" # midichan 1
+  -- SID-B (channel 2): 3 voices, same idea, on the SID2 physical chip.
+  -- Bars 0-5 keep their real per-row arpeggio timing (48 steps); bars 6-11
+  -- are coarser (6 steps) - both voices are much sparser/held there for
+  -- real, not a resolution cut - see the nested-bracket note above.
+  -- Voice 1: a rare one-off swell in bars 0-5, a steady pulse every other
+  -- bar in bars 6-11.
+  d4 $ note "[[~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ f5 ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~] [c4 ~ c4 ~ c4 ~]]"
+    # legato 1
+    # s "usbsidpico" # midichan 2
+  -- Voice 2: the arpeggio in bars 0-5 (bar 4 a 3-pluck fill, bar 5 a
+  -- 2-pluck variation - both real); a held note per bar in bars 6-11.
+  d5 $ note "[[~ a4 ~ ~ a5 ~ ~ ~ ~ g4 ~ ~ g5 ~ ~ ~ ~ a4 ~ ~ a5 ~ ~ ~ ~ g4 ~ ~ g5 ~ ~ ~ f4 ~ c5 ~ a5 ~ ~ ~ ~ g4 ~ d5 ~ ~ ~ ~] [e4 e4 e4 e4 e4 fs4]]"
+    # legato 1
+    # s "usbsidpico" # midichan 2
+  -- Voice 3: the second arpeggio line in bars 0-5, a third below voice 2;
+  -- the folded-down tremolo pitch per bar in bars 6-11.
+  d6 $ note "[[f4 ~ ~ e5 ~ ~ ~ ~ e4 ~ ~ d5 ~ ~ ~ ~ f4 ~ ~ e5 ~ ~ ~ ~ e4 ~ ~ d5 ~ ~ ~ ~ ~ a4 ~ e5 ~ ~ ~ ~ e4 ~ b4 ~ g5 ~ ~ ~] [c5 b4 c5 b4 c5 d5]]"
+    # legato 1
+    # s "usbsidpico" # midichan 2
+
+-- To stop: hush

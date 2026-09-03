@@ -54,6 +54,12 @@ uint sm_rgbled, offset_rgbled;
 #endif /* PICO_DEFAULT_LED_PIN */
 
 
+/**
+ * @brief Set the up vu statemachines and dma, runs only once
+ *
+ * @note sm_pwmled and sm_rgbled are never released
+ *
+ */
 void setup_vu(void)
 {
 #if defined(PICO_DEFAULT_LED_PIN)  /* Cannot use VU on PicoW :( */
@@ -105,6 +111,10 @@ void setup_vu(void)
   return;
 }
 
+/**
+ * @brief Set the up pio c64 bus
+ *
+ */
 void setup_piobus(void)
 {
   uint32_t pico_hz = clock_get_hz(clk_sys);
@@ -193,6 +203,17 @@ void clear_bus_fifos(void)
   return;
 }
 
+/**
+ * @brief Restart and re-synchronise the bus PIO statemachines
+ *
+ * Restarts the control, data and delay statemachines (leaving the PHI1
+ * clock statemachine untouched to avoid glitching the SID clock) and, on
+ * RP2350, also synchronises the clock dividers. Clears the stale bus
+ * handshake IRQ flags afterwards, and unless called at boot also clears
+ * the bus fifos and resyncs the bus program counters via bus_resync().
+ *
+ * @param bool at_boot
+ */
 void sync_pios(bool at_boot)
 { /* Sync PIO's */
   usNFO("\n");
@@ -229,6 +250,13 @@ void sync_pios(bool at_boot)
   return;
 }
 
+/**
+ * @brief Recalculate and re-apply the bus and SID clock dividers from the current config
+ *
+ * Reads clk_sys, derives the bus and SID clock frequencies from
+ * usbsid_config.clock_rate, and pushes the new clock dividers to the
+ * clock, control, data, delay and cycle counter statemachines.
+ */
 void restart_bus_clocks(void)
 {
   usNFO("\n");
@@ -257,6 +285,12 @@ void restart_bus_clocks(void)
   return;
 }
 
+/**
+ * @brief Disable and release the cycle counter, delay, databus and control bus statemachines
+ *
+ * Disables each statemachine, removes its PIO program and unclaims the
+ * statemachine slot. Does not touch the PHI1 clock statemachine.
+ */
 void stop_pios(void)
 {
   /* disable counter */
@@ -278,8 +312,13 @@ void stop_pios(void)
   return;
 }
 
-/* Init nMHz square wave output */
-void init_sidclock(void)
+/**
+ * @brief Init nMHz square wave output
+ *
+ * @note local function, sm_clock gets claimed and never released
+ *
+ */
+static void init_sidclock(void)
 {
   uint32_t pico_hz = clock_get_hz(clk_sys);
   sidclock_frequency = (float)pico_hz / usbsid_config.clock_rate / 2;
@@ -302,7 +341,17 @@ void init_sidclock(void)
   return;
 }
 
-/* Start verification, detect and init sequence of SID clock */
+/**
+ * @brief Start verification, detect and init sequence of SID clock
+ *
+ * Verifies the configured clock rate is in bounds, then on PCB version
+ * 1.0 detects whether an external crystal is driving PHI1: if not, PHI1
+ * is disabled as a GPIO and the internal SID clock is initialised via
+ * init_sidclock(); if an external clock is detected, external_clock is
+ * set and clock_rate falls back to CLOCK_DEFAULT (1MHz). On any other
+ * PCB version, PHI1 is disabled as a GPIO and the internal clock is
+ * always initialised.
+ */
 void setup_sidclock(void)
 {
   /* Verify the clockrare in the config is not out of bounds */
@@ -331,8 +380,12 @@ void setup_sidclock(void)
 
 }
 
-/* De-init nMHz square wave output */
-void deinit_sidclock(void)
+/**
+ * @brief De-init nMHz square wave output
+ *
+ * NOTE: The sidclock should actually never be disabled
+ */
+static void __us_deprecated deinit_sidclock(void)
 {
   usDBG("SID Clock deinitialise\n");
   clock_program_deinit(bus_pio, sm_clock, offset_clock, clock_program);

@@ -78,18 +78,28 @@ function setLED(connected) {
 function initTabs() {
   const tabs   = document.querySelectorAll('.c64-tab');
   const panels = document.querySelectorAll('.c64-panel');
+  function activateTab(target, updateHash) {
+    const tab = document.querySelector('.c64-tab[data-tab="' + target + '"]');
+    if (!tab) return false;
+    tabs.forEach(t => t.classList.remove('active'));
+    panels.forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    const panel = document.getElementById('panel-' + target);
+    if (panel) panel.classList.add('active');
+    if (updateHash) history.replaceState(null, '', '#' + target);
+    return true;
+  }
   tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      const target = tab.dataset.tab;
-      tabs.forEach(t => t.classList.remove('active'));
-      panels.forEach(p => p.classList.remove('active'));
-      tab.classList.add('active');
-      const panel = document.getElementById('panel-' + target);
-      if (panel) panel.classList.add('active');
-    });
+    tab.addEventListener('click', () => activateTab(tab.dataset.tab, true));
   });
-  /* Activate first tab */
-  if (tabs.length) tabs[0].click();
+  window.addEventListener('hashchange', () => {
+    activateTab(location.hash.slice(1), false);
+  });
+  /* Activate tab from URL hash, else first tab */
+  const initial = location.hash.slice(1);
+  if (!initial || !activateTab(initial, false)) {
+    if (tabs.length) tabs[0].click();
+  }
 }
 
 /* Device connection */

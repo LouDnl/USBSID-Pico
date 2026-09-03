@@ -1,0 +1,277 @@
+;
+; USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board
+; for interfacing one or two MOS SID chips and/or hardware SID emulators over
+; (WEB)USB with your computer, phone or ASID supporting player
+;
+; cynthcart.ins
+; This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
+; File author: LouD
+;
+; Copyright (c) 2024-2026 LouD
+;
+; This program is free software: you can redistribute it and/or modify
+; it under the terms of the GNU General Public License as published by
+; the Free Software Foundation, version 2.
+;
+; This program is distributed in the hope that it will be useful, but
+; WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+; General Public License for more details.
+;
+; You should have received a copy of the GNU General Public License
+; along with this program. If not, see <http://www.gnu.org/licenses/>.
+;
+
+; ----------------------------------------------------------------------
+
+.Patch Names
+
+[USBSID-Pico Patch]
+0=00 Default
+1=01 Sawtooth lead
+2=02 Pulse lead
+3=03 Bass
+4=04 Pluck
+5=05 Organ
+6=06 Filtered lead
+7=07 Slow pad
+8=08 Noise hit
+9=09 Reed
+10=10 Sync lead
+11=11 Ring mod lead
+12=12 Vibrato lead
+13=13 Wah pad
+14=14 Wide bass
+15=15 Bright pluck
+16=16 User 1
+17=17 User 2
+18=18 User 3
+19=19 User 4
+20=20 User 5
+21=21 User 6
+22=22 User 7
+23=23 User 8
+24=24 User 9
+25=25 User 10
+26=26 User 11
+27=27 User 12
+28=28 User 13
+29=29 User 14
+30=30 User 15
+31=31 User 16
+
+[USBSID-Pico FMOpl Patch]
+0=00 Organ
+1=01 Electric piano
+2=02 Bass
+3=03 Brass
+4=04 Bell
+5=05 Pad
+6=06 User 1
+7=07 User 2
+8=08 User 3
+9=09 User 4
+10=10 User 5
+11=11 User 6
+12=12 User 7
+13=13 User 8
+14=14 User 9
+15=15 User 10
+16=16 User 11
+17=17 User 12
+18=18 User 13
+19=19 User 14
+20=20 User 15
+21=21 User 16
+22=22 User 17
+23=23 User 18
+24=24 User 19
+25=25 User 20
+26=26 User 21
+27=27 User 22
+28=28 User 23
+29=29 User 24
+30=30 User 25
+31=31 User 26
+
+[Cynthcart Patch]
+0=00 SW BASS
+1=01 GRITTY BASS
+2=02 PORTAMENTO 5THS
+3=03 SAW PORTAMENTO
+4=04 PULSE 5THS
+5=05 PULSE HIGH PORT
+6=06 TRIANGLE HIGH LONG
+7=07 TRIANGLE DROP
+8=08 SID EXPLOSION
+9=09 MUTE
+10=10 FILTER BASS
+11=11 SWEEP ARP
+12=12 PLUCK ARP
+13=13 SLOW ARP
+14=14 FILTER STACK 1
+15=15 FILTER STACK 2
+16=16 PULSAR
+17=17 VIBRATO LEAD
+18=18 SLOW RISE
+19=19 BENDING ECHO
+20=20 6-VOICE SAW
+21=21 ARP LEAD
+22=22 LASER BASS
+23=23 TROMBONE BLAST
+24=24 NOISY SQUARE ARP
+25=25 TRIANGLE SYNC
+26=26 MONO SYNC ECHO
+27=27 CLEAN SAWTOOTH
+28=28 CLEAN TRIANGLE
+29=29 CLEAN SQUARE
+30=30 SAWTOOTH BASS
+
+
+; ----------------------------------------------------------------------
+
+.Note Names
+
+; ----------------------------------------------------------------------
+
+.Controller Names
+
+
+[USBSID-Pico Midi Control]
+
+;Core note/pitch
+28=Note frequency for manual input
+1=Pulse Width Modulation (Modulation wheel)
+
+;Waveform select
+20=Noise waveform
+21=Pulse waveform
+22=Sawtooth waveform
+23=Triangle waveform
+
+;Voice control bits
+24=Test bit
+25=Ring modulator bit
+26=Sync bit
+27=Gate bit
+
+;Envelope (ADSR)
+17=Attack
+18=Decay
+19=Sustain
+29=Release (moved off 0x14, collided with CC_NOIS)
+
+;Default values=Chip related
+32=Filter Frequency Cutoff
+33=Filter resonance
+34=Filter voice 1
+35=Filter voice 2
+36=Filter voice 3
+37=Filter external
+48=Voice 3 disconnect
+49=High pass
+50=Band pass
+51=Low pass
+7=Channel Volume
+
+;Default values=Phase 4 modulation and timing
+0=LFO waveform
+2=LFO rate
+3=LFO depth
+4=LFO destination
+13=LFO 2 waveform
+14=LFO 2 rate
+15=LFO 2 depth
+16=LFO 2 destination
+5=Portamento time
+6=Arpeggiator mode
+10=Arpeggiator rate
+11=Arpeggiator octave range
+12=Arpeggiator enable
+30=Arpeggiator table select
+
+;Default CC values=SID / Voice selection
+104=Select SID 1
+105=Select SID 2
+106=Select SID 3
+107=Select SID 4
+108=Select Voice 1
+109=Select Voice 2
+110=Select Voice 3
+
+;Default CC values=custom commands
+111=Turn on polyfonic for current SID
+119=Gate auto enabled on noteon note off
+8=Enable copy voice mode
+9=Enable copy SID mode (moved off 0x18, collided with CC_TEST)
+40=Link/Unlink voice
+56=Link/Unlink SID
+72=Velocity Mode
+
+; other per-voice-shape override CC
+41=Unison mode on/off
+42=Unison detune spread
+88=Target this channel at the FMOpl chip instead of a SID
+
+;Midi related=Fixed values
+120=All Sound Off
+121=Reset All Controllers
+123=All Notes Off
+126=Mono Mode On=Poly off & all notes off
+127=Poly Mode On=Mono off & all notes off
+
+;Cynthcart related _FIXED_ CC values
+85=Enable Cynthcart
+86=Disable Cynthcart
+87=Reset Cynthcart
+
+;Unused values=Midi related
+255=Bank Select MSB
+255=Bank Select LSB
+255=Modulation wheel
+255=Modulation wheel LSB
+
+[USBSID Cynthcart Control]
+0=Filter Resonance
+1=Filter Cutoff (wheel)
+2=Select Voice Mode
+3=Select Modulation Mode
+4=Attack
+5=Release
+6=Pulse Width
+7=Master Volume
+8=Tremolo Depth
+9=Tremolo Speed
+13=Osc Waveform (all voices)
+14=Osc Waveform (voice 2 only)
+15=Osc Waveform (voice 3 only)
+85=Start Cynthcart
+86=Stop Cynthcart
+87=Reset Cynthcart
+
+; ----------------------------------------------------------------------
+
+.RPN Names
+
+; ----------------------------------------------------------------------
+
+.NRPN Names
+
+; ----------------------------------------------------------------------
+
+.Instrument Definitions
+
+; VMPK's .ins parser only supports one Control= per instrument, not one per
+; bank (Control[N]= errors as "Unknown .Instrument Definitions entry") -
+; unlike Patch[N]=, which is bank-indexed. So both banks below share the
+; same Control: dropdown, USBSID-Pico Midi Control - while playing Cynthcart
+; patches (bank 1), several of the same CC numbers are reinterpreted
+; differently by Cynthcart itself; see the [USBSID Cynthcart Control]
+; section above for the actual meaning those CCs take on in that mode.
+[USBSID-Pico]
+Patch[0]=USBSID-Pico Patch
+Patch[1]=USBSID-Pico FMOpl Patch
+; Bank MSB 0 starts at 0
+Patch[2]=Cynthcart Patch
+; Bank MSB 1 starts at 128
+Control=USBSID-Pico Midi Control

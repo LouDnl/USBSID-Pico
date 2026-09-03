@@ -73,9 +73,10 @@ tusb_desc_device_t const desc_device =
     .bNumConfigurations = 0x01
 };
 
-/* Descriptor callback
- * Invoked when received GET DEVICE DESCRIPTOR
- * Application return pointer to descriptor
+/**
+ * @brief TinyUSB descriptor callback, invoked when GET DEVICE DESCRIPTOR is received
+ *
+ * @return uint8_t const* pointer to the static `desc_device` descriptor
  */
 uint8_t const * tud_descriptor_device_cb(void)
 {
@@ -160,7 +161,11 @@ uint8_t const desc_bos[] =
   TUD_BOS_MS_OS_20_DESCRIPTOR(MS_OS_20_DESC_LEN, VENDOR_REQUEST_MICROSOFT)
 };
 
-/* BOS Descriptor callback */
+/**
+ * @brief TinyUSB BOS descriptor callback, required for WebUSB
+ *
+ * @return uint8_t const* pointer to the static `desc_bos` descriptor
+ */
 uint8_t const * tud_descriptor_bos_cb(void)
 {
   return desc_bos;
@@ -199,10 +204,14 @@ TU_VERIFY_STATIC(sizeof(desc_ms_os_20) == MS_OS_20_DESC_LEN, "Incorrect size");
 
 extern uint8_t const desc_ms_os_20[];
 
-/* Device descriptor configuration callback
- * Invoked when received GET CONFIGURATION DESCRIPTOR
- * Application return pointer to descriptor
- * Descriptor contents must exist long enough for transfer to complete
+/**
+ * @brief TinyUSB descriptor callback, invoked when GET CONFIGURATION DESCRIPTOR is received
+ *
+ * @note the returned descriptor contents must exist long enough for the
+ *       transfer to complete
+ *
+ * @param uint8_t index unused, only a single configuration is supported
+ * @return uint8_t const* pointer to the static `desc_fs_configuration` descriptor
  */
 uint8_t const * tud_descriptor_configuration_cb(uint8_t index)
 {
@@ -249,9 +258,22 @@ static const char * const string_desc_arr[] =
 #define MAXIMUM_DESCRIPTOR_STRING_ELEMENT_COUNT 32
 static uint16_t _desc_str[MAXIMUM_DESCRIPTOR_STRING_ELEMENT_COUNT];
 
-/* Descriptor string callback
- * Invoked when received GET STRING DESCRIPTOR request
- * Application return pointer to descriptor, whose contents must exist long enough for transfer to complete
+/**
+ * @brief TinyUSB descriptor callback, invoked when GET STRING DESCRIPTOR is received
+ *
+ * Index 0 returns the supported language id. Index 3 is special-cased to
+ * build the USB serial number from the 64-bit MCU unique id, encoded as 16
+ * hex nibbles. Any other in-range index is looked up in `string_desc_arr`
+ * and converted from ASCII to UTF-16 (capped at
+ * `MAXIMUM_DESCRIPTOR_STRING_ELEMENT_COUNT - 1` characters). Out-of-range
+ * indices return NULL.
+ *
+ * @note the returned buffer (`_desc_str`) is static and reused; the caller
+ *       must be done with one transfer before this is called again
+ *
+ * @param uint8_t index
+ * @param uint16_t langid unused
+ * @return uint16_t const* pointer to the static `_desc_str` buffer, or NULL
  */
 uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 {

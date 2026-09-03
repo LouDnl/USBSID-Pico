@@ -106,7 +106,7 @@ void init_rgb(void)
 }
 
 /**
- * @brief Init the Vu
+ * @brief Init the Vu, runs only once
  *
  */
 void init_vu(void)

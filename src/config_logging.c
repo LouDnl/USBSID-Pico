@@ -37,6 +37,7 @@
  *
  * @param uint8_t *buf
  * @param size_t len
+ * @param bool newline print a leading newline before the buffer dump
  */
 void print_cfg(const uint8_t *buf, size_t len, bool newline)
 {

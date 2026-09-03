@@ -48,6 +48,8 @@ SID type also controls the filter capacitor setting, the 8580 digiboost resistor
 - 8580 means automatic digiboost and 22nF filter capacitors +
 - 6581 means no digiboost, shunt resistor enabled and 470pF filter capacitors +
 
+Socket voltage control on v1.5+ is more than just the automatic 9v/12v selection above - power to both SID sockets can also be fully switched off and back on again, independent of SID type, through the configtool or firmware settings.
+
 
 == RaspberryPi Pico placement orientation
 In the PCB overview image at the top of this document there are 2 ways from which you can get what direction the Pico boards needs to be placed. +
@@ -56,7 +58,7 @@ The `Pin 1` marking, the little square around the solder pad at the outer edge o
 
 
 == Optional Pico placements
-The USBSID-Pico v1.3 PCB has the option for you to solder your Pico directly to the PCB using the Pico's castelated edges. +
+The USBSID-Pico v1.5 PCB has the option for you to solder your Pico directly to the PCB using the Pico's castelated edges. +
 This creates more space and can be useful if you want to use a SID clone like FPGASID in socket 1.
 
 
@@ -83,11 +85,20 @@ _(markings are on the bottom of the PCB)_
 
 == UART pins
 Optional header for UART pins. +
-_(markings are on the bottom of the PCB)_
+_(markings are on the bottom of the PCB)_ +
+*NOTE:* The `USE_PIO_UART` firmware build option (PIO UART on GPIO 26/27) is not available on v1.5+ boards, those GPIO pins are used for socket voltage control instead.
+
+
+== Audio switch
+Same digital audio switch IC as on v1.3, carried forward unchanged. Switching from mono (both SID chips play over left and right) to Stereo (SID1 over the left channel and SID2 over the right channel) and back is handled by the firmware through settings or automatically by supported players. +
+The jumperless v1.5 design has no physical `SW` pin for manual switching - this is configured entirely through the firmware/configtool.
 
 
 [%always]
 <<<
+
+== Volume daughterboard
+An optional Volume daughterboard is available for independent left/right channel volume control. It is plug and play compatible with v1.5+ boards - see the `USBSID-Volume-daughterboard` manual for details.
 
 == PCB bottom overview
 .Click image for larger view

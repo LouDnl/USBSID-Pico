@@ -40,6 +40,7 @@
 void        set_socketconfig_logging(bool enabled);
 ConfigError validate_config(void);
 void        socket_config_fallback(void);
+uint8_t     get_numsids(void);
 int         verify_fmopl_sidno(void);
 bool        set_fmopl_sidno(int sidno);
 void        apply_fmopl_config(RuntimeCFG *rt);
