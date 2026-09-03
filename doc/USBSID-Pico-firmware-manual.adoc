@@ -49,6 +49,8 @@ Firmware naming suited for the pico 1 always start with `usbsidpico-` +
 `usbsidpico-rgb-v1.X.uf2` for black clone rp2040 Pico boards with RGB LED onboard. +
 `usbsidpico_w-v1.X.uf2` for regular green rp2040 PicoW boards.
 
+**NOTE!** Due to the hardware limitations of the RP2040, highly demanding, cycle-exact SID tunes (dense per-cycle register writes, e.g. some digi/sample tunes) may not play at full speed on Pico1 or Pico1_w boards. Use a Pico2 or Pico2_w (rp2350) board for these tunes. +
+
 === Naming examples for the rp2350 Pico2
 Firmware naming suited for the pico 2 always start with `usbsidpico2-` +
 `usbsidpico2-v1.X.uf2` for regular green rp2350 Pico2 boards. +

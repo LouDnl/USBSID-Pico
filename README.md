@@ -161,6 +161,7 @@ Any questions about or support with USBSID-Pico can be asked
 
 **Firmware/Software**
 * Switching on readmode and then switching it off again without restarting the PCB and Vice _will_ result in distorted audio  
+* Highly demanding, cycle-exact SID tunes (dense per-cycle register writes, e.g. some digi/sample tunes) may not play at full speed on Pico1 or Pico1_w (RP2040) boards, due to the board's hardware limitations. Pico2 or Pico2_w (RP2350) is recommended for these tunes.  
 
 
 # Project status

@@ -27,6 +27,7 @@ Starting with firmware version v0.6.0-BETA firmwares ending with `_sp` have an e
 For example `usbsidpico2-v1.0_sp.uf2`, `usbsidpico2-v1.3-rgb_sp.uf2` or `usbsidpico2-v1.5_sp.uf2` +
 This USBSID-Player is still in active development and some tunes might not work or play at all. +
 The embedded USBSID-Player requires more then 256KB RAM, which is why it is primarily built and tested for rp2350 Pico2 boards, but `_sp` firmwares are also built for rp2040 Pico1 boards. +
+**NOTE!** Due to the hardware limitations of the RP2040, highly demanding, cycle-exact SID tunes (dense per-cycle register writes, e.g. some digi/sample tunes) may not play at full speed on Pico1 or Pico1_w boards. Use a Pico2 or Pico2_w (rp2350) board for these tunes. +
 **WARNING!** Whenever the USBSID-Player is used the Pico MCU is overclocked to 250MHz, regardless of Pico type. Passive cooling _might/could_ be needed. +
 Cynthcart runs through the embedded USBSID-Player - see the `USBSID-Pico-Cynthcart-manual` file for more information. +
 
