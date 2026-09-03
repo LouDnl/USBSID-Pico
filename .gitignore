@@ -82,6 +82,7 @@
 !examples/midi
 !examples/midi/strudel
 !examples/midi/superdirt-tidalcycles
+!examples/midi/tools
 !examples/midi/vmpk
 !examples/Cynthcart-Ninja_VST
 !resources
@@ -103,8 +104,12 @@
 !examples/config-tool-web/SID/genlist.bb
 !examples/config-tool-web/websid/*.js
 !examples/config-tool-web/websid/*.wasm
+!examples/midi/arp_table_examples.md
+!examples/midi/midibox_sid_presets.md
 !examples/midi/strudel/*.js
 !examples/midi/superdirt-tidalcycles/*.scd
 !examples/midi/superdirt-tidalcycles/*.tidal
+!examples/midi/tools/*.py
+!examples/midi/tools/*.txt
 !examples/midi/vmpk/uspico.ins
 !examples/midi/vmpk/vpmk.extra_controllers.conf
