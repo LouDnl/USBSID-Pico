@@ -1,6 +1,23 @@
 # Changelog
 Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on version changes
 
+#### Version: 0.8.0
+* Add full MIDI implementation overhaul: dedicated flash-backed MIDI config storage, MIDI engine/handler/queue/voice/patch/arp table modules, MIDI clock control, sid bus spinlock
+* Add FMOpl (OPL2/3) MIDI control, fixes and new config item support
+* Add MIDI patch and arpeggiator table examples, MIDI example tools (CC controller, patch editor), VMPK/Strudel/TidalCycles MIDI examples
+* Migrate embedded Cynthcart to run through the onboard USBSID-Player instead of the old emudore-based path, new `_cc` firmware variant
+* Add embedded USBSID-Player support for Pico and Pico W (rp2040) builds, previously Pico 2 / Pico 2 W only
+* Deprecate and remove "Adorable" onboard C64 emulator (emudore) support
+* Fix SIDs getting disabled on USB dismount
+* Fix `last_preset` config setting for all PCB versions
+* Guard ASID writes during reset and while ASID is disabled
+* Fix stale DMA functions
+* Add overclock warning (250MHz) to README and manuals for firmwares using the embedded USBSID-Player or Cynthcart
+* Fix compilation error caused by octal-looking version numbers
+* Update GitHub and GitLab CI build workflows
+* Update firmware, Cynthcart, PCB v1.0/v1.3/v1.5, Configtool and Player manuals
+* Add docstrings across source, add extra compiler attributes
+
 #### Version: 0.7.7
 * Fix board -> host WebUSB writes to be 64 bytes
 * Add mute/clear so OPL audio won't linger
