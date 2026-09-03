@@ -60,11 +60,13 @@ Starting with firmware version v0.6.0-BETA firmwares ending with `_sp` have an e
 For example `usbsidpico2-v1.0_sp.uf2` or `usbsidpico2-v1.3-rgb_sp.uf2` +
 This USBSID-Player is still in active development and some tunes might not work or play at all. +
 The embedded USBSID-Player requires more then 256KB RAM and an overclocked CPU which makes this firmware only available for rp2350 Pico2 boards. +
+**WARNING!** Whenever the USBSID-Player is used the Pico MCU is overclocked to 250MHz, regardless of Pico type. Passive cooling _might/could_ be needed. +
 See the `USBSID-Player-manual` file for more information.
 
 === Firmwares with Cynthcart embedded
 Starting with firmware version v0.8.0 firmwares ending with `_cc` can start Cynthcart with CC commands. +
 For example `usbsidpico-v1.0_sp_cc.uf2` or `usbsidpico2-rgb-v1.3_sp_cc.uf2` +
+**WARNING!** Cynthcart runs through the embedded USBSID-Player, so the same 250MHz overclock (regardless of Pico type) and possible need for passive cooling applies here too. +
 See the `USBSID-Pico-Cynthcart-manual` file for more information.
 
 

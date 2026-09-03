@@ -221,6 +221,8 @@ See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for driver insta
 # Firmware
 See the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on what's changed and previous releases.  
 
+**WARNING!** Whenever the embedded USBSID-Player or Cynthcart is used, the Pico MCU is overclocked to 250MHz, regardless of Pico type (rp2040 or rp2350). Passive cooling _might/could_ be needed.  
+
 ### Configuring your board's firmware
 Use the new official [USBSID-Configtool](https://github.com/LouDnl/USBSID-Configtool) to configure your board.  
 Downloads are available in the [releases](https://github.com/LouDnl/USBSID-Configtool/releases) section of the tools githubpage.  
