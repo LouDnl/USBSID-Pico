@@ -10,7 +10,6 @@
 
 # extensions anywhere in the repo
 !*.adoc
-!*.html
 !*.ini
 !*.jpg
 !*.mp3
@@ -96,6 +95,7 @@
 !examples/Cynthcart-Ninja_VST/**
 
 # specific files in specified directories
+!examples/config-tool-web/index.html
 !examples/config-tool-web/*.js
 !examples/config-tool-web/*.css
 !examples/config-tool-web/lib/*.js
