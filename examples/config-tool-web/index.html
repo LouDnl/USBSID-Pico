@@ -52,6 +52,7 @@
     <button class="c64-tab" data-tab="regs">Registers</button>
     <button class="c64-tab" data-tab="config">Config</button>
     <button class="c64-tab" data-tab="about">About</button>
+    <button class="c64-tab" data-tab="blog">Blog</button>
     <button class="c64-tab-link" onclick="window.open('https://github.com/LouDnl/USBSID-Pico','_blank')" title="Open USBSID-Pico GitHub repository">GitHub</button>
     <button class="c64-tab-link" onclick="window.open('https://github.com/LouDnl/USBSID-Pico/releases','_blank')" title="Open USBSID-Pico releases page">Firmware</button>
   </div>
@@ -660,6 +661,636 @@
       </p>
     </div>
   </div><!-- /panel-about -->
+
+  <div id="panel-blog" class="c64-panel">
+    <div class="c64-box">
+      <div class="c64-blog-title">
+        USBSID-Pico: Bridging Real Commodore 64 Sound to Modern USB
+        <div class="c64-date-author">20260903 - LouD</div>
+      </div>
+      <p><a target="_blank" href="https://www.youtube.com/watch?v=nh0SxO1y6I0"><img src="https://img.youtube.com/vi/nh0SxO1y6I0/0.jpg" width="75%"></a>
+        <sup>Click for video</sup>
+      </p>
+      <p>For many of us retro enthusiasts, the Commodore 64’s MOS Technology SID chip (6581 and 8580) is regarded as one
+        of the most iconic sound chips in audio history.<br>
+        (Modern) Software emulation gets close, but nothing truly replaces the analog filters and warm distortion of
+        real vintage hardware.</p>
+      <p>I am <a target="_blank" href="https://github.com/LouDnl">LouD</a> (short for loudness) and I created
+        <strong>USBSID-Pico</strong> to bridge real SID silicon directly to modern workstations, phones, and media
+        players over USB (CDC/WebUSB/WebSerial), MIDI, ASID and in the future possibly WiFi and Bluetooth.<br>
+        Powered by the Raspberry Pi Pico microcontroller series (rp2040 and rp2350), the board acts as a flexible
+        controller for up to two (and soon four) physical SID chips or modern hardware replacements.</p>
+      <!-- <p>For those of you curious as to how I got this handle/nickname</p> -->
+      <p>What follows is my journey (as far as I remember) and attempt at creating a project build log detailing the
+        start and evolution from early prototypes to the open-source hardware powering the retro audio experience for
+        (at least some) enthusiasts today.</p>
+      <br>
+      <div class="c64-box-title" id="index">
+        Index
+      </div>
+      <ul class="c64-blog-index">
+        <li><a href="#the-before">The before</a></li>
+        <li><a href="#the-project">The project</a></li>
+        <li><a href="#firmware">Firmware</a></li>
+        <li><a href="#software">Software</a></li>
+        <li><a href="#sid's-and-hardware-replacements">SID's and hardware replacements</a></li>
+        <li><a href="#art">Art</a></li>
+        <li><a href="#press-mentions">Press &amp; Mentions</a></li>
+        <li><a href="#wrapping-up">Wrapping up</a></li>
+      </ul>
+      <br>
+      <div class="c64-box-title" id="the-before">
+        The before
+      </div>
+      <p>For as long as I can remember I have been interested in how things work.<br>
+        From the first Commodore 64 my parents bought, the first XT PC we owned at home, to the first Pentium PC I
+        bought when I was a teenager, up until today (and beyond) where I work as software engineer.<br>
+        Tech fascinates me, so when I have the option I like to pry it open, find out how it works and put it back
+        together with "improvements" not caring (at first) if it still works.<br>
+        I'm not much of a musician but do like to listen to all kinds of music, including chiptunes of course ;-)</p>
+      <p>Inspired by my older brother who repairs Commodore 64s among other things, a new project idea popped into my
+        head. I wanted to see if I could create a SID playing device to listen to the SID tunes I already listened to on
+        my computer and maybe even play them through a real SID chip.</p>
+      <p>Around February/March of 2024 I came across a github repo that let you create a SID player based on a Raspberry
+        Pi Pico called <a target="_blank" href="https://github.com/henrikenblom/SIDPod">SIDPod</a>.<br>
+        I liked how simple it seemed to use a microcontroller to play SID files so of course I had to build it.<br>
+        <img src="images/blog/20240301_sidpod.jpg" alt="">
+        <sup>SIDPod testbuild</sup></p>
+      <p>The way of adding more SID files to SIDPod's flash made me try and add an SDCard to the already great design,
+        this resulted in <a target="_blank" href="https://github.com/LouDnl/SIDPod-SDCard">SIDPod-SDCard</a>.<br>
+        <img src="images/blog/20240317_sidpodsdcard.jpg" alt="">
+        <sup>SIDPod-SDCard testbuilds</sup></p>
+      <p>In early April 2024 still not satisfied by the results I found
+        <a target="_blank" href="https://github.com/tobozo/ESP32-SIDView">ESP32-SIDView</a>.<br>
+        This seemed like a nice replacement SID player for SIDPod with the added benefit of supporting real SID chips!<br>
+        Building one was the logical next step, but since I did not own any real SID's at that time I had to find one.<br>
+        <a target="_blank" href="https://github.com/frntc/SIDKICK-pico">SIDKICK-pico</a> was the first SID replacement I found, no
+        schematics, but orderable.<br>
+        Having some hobby level experience in hardware reverse engineering I recreated a schematic and figured out the
+        Pico to DIP-28 pinout so I could use it on a breadboard.<br>
+        <img src="images/blog/20240403_ESP32-SIDView.jpg" alt="">
+        <sup>ESP32-SIDView testbuild</sup></p>
+      <p>Not being satisfied with the spaghetti you can see in the picture above, I had to tidy things up a bit.<br>
+        <img src="images/blog/20240407_ESP32-SIDView_tidy.jpg" alt="">
+        <sup>ESP32-SIDView tidy testbuild</sup></p>
+      <p>Having some issues getting ESP32-SIDView to work, I contacted its developer
+        <a target="_blank" href="https://github.com/tobozo">tobozo</a> through GitHub. We exchanged countless messages about this
+        project on GitHub. We later moved to a different platform and continued talking (and still do) about his and my
+        project(s), coding, cats, daily life etc. This one GitHub issue lead to a - if I may say so - great digital
+        friendship.</p>
+      <p>In the meantime I also found <a target="_blank" href="https://github.com/gianlucag/SidBerry">SidBerry</a>. A linux based console
+        application for playing SID tunes via the Raspberry Pi's (not Pico) GPIO pins.<br>
+        <img src="images/blog/20240407_SidBerry.jpg" alt="">
+        <sup>RPI breadboard extension with SKPico</sup></p>
+      <p>SidBerry with Raspberry Pi is what in early May of 2024 eventually led to the creation of FTDI USBSID, my first
+        try at creating a USB controlled SID device. To do this I used a
+        <a target="_blank" href="https://github.com/arm8686/FT2232HL-Board">FTDI FT223HL</a> breakout board I already owned for reverse
+        engineering.<br>
+        Somewhere in between I acquired a v0.1 SIDKICK-pico and 2 half broken MOS6581's.<br>
+        <img src="images/blog/20240502_FTDIUSBSID.jpg" alt="">
+        <sup>FTDI USBSID</sup></p>
+      <p>Creating your own hardware supporting board meant also creating software support.<br>
+        Reminiscing about that, here are the links:</p>
+      <ul>
+        <li><a target="_blank" href="https://github.com/LouDnl/SidBerry/tree/b53fc092ab34bf39ff06d2e8d2aaac02f5c7c377">FTDI version of SidBerry</a></li>
+        <li><a target="_blank" href="https://github.com/LouDnl/vice-svn-mirror-usbsid/tree/Vice-3.8-FTDIUSBSID">FTDI version of Vice 3.8</a></li>
+      </ul>
+      <br>
+      <div class="c64-box-title" id="the-project">
+        The project
+      </div>
+      <p>Using the FTDI breakout board came with a lot of limitations.<br>
+        It wasn't a microcontroller, so all the GPIO writes and input/output switching had to be done in the driver and
+        using the FTDI ecosystem wasn't really something I enjoyed.</p>
+      <p>By the end of May 2024 having had enough of these limitations is what led up to creating
+        <a target="_blank" href="https://github.com/LouDnl/USBSID-Pico">USBSID-Pico</a>, or actually called PicoUSBSID at that time. A
+        perfboard version with support for a single SID.<br>
+        <img src="images/blog/20240529_PicoUSBSID.jpg" alt="">
+        <sup>PicoUSBSID single SID version</sup></p>
+      <p>Halfway through June of 2024, I added dual SID support to the same perfboard.<br>
+        <img src="images/blog/20240621_PicUSBSID_DualSID.jpg" alt="">
+        <sup>PicoUSBSID dual SID version</sup></p>
+      <p>With the continued support and encouragement of <a target="_blank" href="https://github.com/tobozo">tobozo</a> (thanks m8) the
+        first actual USBSID-Pico v0.1 board came to life that lead up to the first v1.0 board.</p>
+      <p>What followed has been an incredible journey of creativity, acquiring new skills, improving existing skills,
+        learning new things and making new friends (and enemies?).<br>
+        I talked to and met so many new people and groups, that it is almost impossible to name them all here but I have
+        tried to name at least a few that inspired me in the credits at the end.</p>
+      <p><strong>Key Technical Highlights (v1.0):</strong></p>
+      <ul>
+        <li>Dual-SID fixed voltage socket support (6581 or 8580 MOS chip alongside hardware replacements like Swinke SID,
+          FPGASID, and ARMSID).</li>
+        <li>Multi-protocol connectivity via native USB, WebUSB (browser playback), USB-MIDI, and ASID stream protocols.</li>
+        <li>Cross-platform support spanning Windows, macOS, Linux, Android, and AmigaOS.</li>
+        <li>OSHWA Open Source Hardware Certification (<a target="_blank" href="https://certification.oshwa.org/nl000035.html">NL000035</a>).</li>
+        <li>Schematic and PCB designs made available open-source via the
+          <a target="_blank" href="https://github.com/LouDnl/USBSID-Pico">github repo</a> and via
+          <a target="_blank" href="https://www.pcbway.com/project/shareproject/USBSID_Pico_c99c9748.html">PCBWay</a> to enable community
+          self-assembly.</li>
+      </ul>
+      <p><strong>v1.3 Upgrades:</strong></p>
+      <ul>
+        <li><strong>Mixed SID Setups:</strong> Allows simultaneous mixing of different chip generations (e.g., pairing a
+          12V 6581 in socket 1 with a 9V 8580 in socket 2).</li>
+        <li><strong>Hardware Audio switching:</strong> Added digital switch to toggle between mono and true stereo (Socket
+          1 over left, Socket 2 over right) output directly on the board.</li>
+        <li>OSHWA Open Source Hardware Certification (<a target="_blank" href="https://certification.oshwa.org/nl000045.html">NL000045</a>).</li>
+        <li>Schematic and PCB designs made available open-source via the
+          <a target="_blank" href="https://github.com/LouDnl/USBSID-Pico">github repo</a> and via
+          <a target="_blank" href="https://www.pcbway.com/project/shareproject/USBSID_Pico_v1_3_05f2b88e.html">PCBWay</a> to enable
+          community self-assembly.</li>
+      </ul>
+      <p><strong>v1.5 Upgrades:</strong></p>
+      <ul>
+        <li><strong>100% Jumperless Voltage Control:</strong> Automatically senses and sets correct supply voltages (9V vs
+          12V) based on the seated chip, protecting rare SID silicon from overvoltage damage.</li>
+        <li><strong>Automatic switching:</strong> Based on the socket voltage, the filter capacitors, audio shunt resistor
+          and digiboost resistor are automatically enabled and disabled.</li>
+        <li><strong>Expanded Footprint:</strong> Slightly widened board dimensions to accommodate optional dual
+          <strong>ZIF (Zero Insertion Force) sockets</strong>.</li>
+        <li><strong>Better compatibility:</strong> Generous spacing added to fit larger hardware replacements like the
+          FPGASID without mechanical interference.</li>
+        <li><strong>Upgraded Audio protection:</strong> Extra audio input protection by added pulldown resistors when no
+          plug is in the audio jack and added ESD diodes on the audio input.</li>
+        <li>Schematic made available via the <a target="_blank" href="https://github.com/LouDnl/USBSID-Pico">github repo</a> to enable
+          community self repair.</li>
+      </ul>
+      <p><strong>Pro Roadmap Features (undecided):</strong></p>
+      <ul>
+        <li>Quad-SID support (sockets for <strong>4 hardware SID chips</strong>).</li>
+        <li>High-grade audio routing and lower noise floor for studio recording.</li>
+        <li>Dedicated MIDI input port</li>
+      </ul>
+      <div class="c64-blog-h2">
+        Hardware timeline
+      </div>
+      <p>So many things have happened since I started this project. To give you an idea of the (hardware) development
+        process starting at v0.1, here is a summarised timeline.</p>
+      <ul>
+        <li>May 2024: Single SID perfboard version.</li>
+        <li>June 2024: Dual SID perfboard version.</li>
+        <li>July 2024: v0.1<br>
+          Unreleased iteration<br>
+          <img src="images/blog/20240710_empty_USBSIDv0.1.jpg" alt="">
+          <img src="images/blog/20240712_USBSIDv0.1.jpg" alt=""></li>
+        <li>August 2024: v0.2<br>
+          Unreleased iteration with revised audio output.<br>
+          <img src="images/blog/20240801_empty_USBSIDv0.2.jpg" alt="">
+          <img src="images/blog/20240802_USBSIDv0.2.jpg" alt=""></li>
+        <li>October 2024: v1.0<br>
+          After several printed circuit board iterations, <strong>USBSID-Pico v1.0</strong> is officially launched.<br>
+          <img src="images/blog/20241016_empty_USBSIDv1.0.jpg" alt="">
+          <img src="images/blog/20241016_USBSIDv1.0.png" alt=""></li>
+        <li>February 2025: v1.1<br>
+          Discarded iteration.</li>
+        <li>March 2025: v1.2<br>
+          Unreleased iteration.</li>
+        <li>April 2025: v1.3<br>
+          Official release of v1.3 hardware revision with mixed SID type support and refined audio configuration options
+          based on community feedback.<br>
+          <img src="images/blog/20250403_empty_USBSIDv1.3.png" alt="">
+          <img src="images/blog/20250416_USBSIDv1.3.jpg" alt=""></li>
+        <li>March 2026: v1.4<br>
+          Unreleased iteration.</li>
+        <li>July 2026: v1.5<br>
+          Official release of v1.5 hardware revision that transforms board usability by eliminating dangerous manual
+          jumper configurations and adds more board space for optional ZIF sockets.<br>
+          <img src="images/blog/20260708_empty_USBSIDv1.5.png" alt="">
+          <img src="images/blog/20260614_USBSIDv1.5.jpg" alt=""></li>
+        <li>Volume daughterboard<br>
+          An optional accessory PCB, plug and play on v1.5+ boards (needs a small mod on v1.3), controlling left and
+          right audio volume independently. It has its own hardware revision line and is licensed CC BY-SA 4.0.</li>
+        <li>Cases<br>
+          Community-designed cases exist for every PCB revision, from cartridge-style enclosures to a dual-board
+          Commodore 64 case, all collected in the repo's <code>cases/</code> directory.</li>
+        <li>Late 2026 / Early 2027: USBSID-Pro Development (Target)<br>
+          Work is currently underway on <strong>USBSID-Pro</strong>, designed specifically for musicians, audio
+          producers, and SID chiptune purists.</li>
+      </ul>
+      <br>
+      <div class="c64-box-title" id="firmware">
+        Firmware
+      </div>
+      <p>Developing new and unique PCBs to seat microcontrollers logically requires you to develop the firmware for said
+        microcontrollers as well.<br>
+        After having chosen a microcontroller you want to use, you actually need to get some experience with its SDK.
+        This comes with pros and cons; you need to do a deep dive into the SDK of said microcontroller but also narrows
+        your view in relation to other microcontrollers. Or at least, this is my experience, mostly because time is
+        precious and you cannot do everything at once ;-)</p>
+      <div class="c64-blog-h2">
+        Dual Core, Two Jobs
+      </div>
+      <p>Before diving into the clock and bus tricks, it helps to know how the two ARM cores on the Pico actually split
+        the work.<br>
+        Core 0 <em>always</em> handles everything USB-related: CDC, WebUSB, MIDI, plus config management.<br>
+        Core 1 on the other hand has multiple jobs, it runs the MIDI engine, the onboard emulator for SID play or
+        Cynthcart when required, the SID tests if triggered by the user and handles the VU when not doing any of the
+        other tasks. When Core 1 is busy handling the onboard emulator the VU is offloaded to Core 0.<br>
+        Both cores can do SID bus writes because the actual writes are handed off to the DMA/PIO that do the
+        timing-critical work described below.<br>
+        Balancing the tasks between the two cores and relying on the DMA/PIO is what lets USB traffic, MIDI processing,
+        or a config save happen without ever touching the cycle-accurate bus timing. If they shared a core, a badly
+        timed USB interrupt could jitter the SID clock, exactly the problem the PIO offloading below is solving in the
+        first place.</p>
+      <div class="c64-blog-h2">
+        Technical Deep Dive: Precision SID Clocking & Bus Management via rp2040/rp2350 PIO
+      </div>
+      <p>The primary challenge when controlling vintage MOS sound hardware over USB is <strong>timing precision</strong>.
+        The MOS 6581 and 8580 SID chips do not utilize an asynchronous register interface; they rely on a strict phase
+        clock to drive their internal switched-capacitor analog filters, voice envelope generators, and
+        digital-to-analog converters.</p>
+      <p>Any jitter or frequency drift on the SID clock line results in audible tuning drift, harsh filter stepping, or
+        broken sample playback (Digiplay).</p>
+      <p>To solve this without sacrificing system responsiveness, <strong>USBSID-Pico</strong> leverages the hardware
+        <strong>Programmable I/O (PIO)</strong> state machines and Direct Memory Access (DMA) built into the Raspberry
+        Pi Pico series (rp2040 and rp2350).</p>
+      <div class="c64-blog-h3">
+        1. Generating a Low-Jitter 1 MHz System Clock
+      </div>
+      <p>In standard PAL Commodore 64 computers, the SID clock runs at <strong>0.985248 MHz</strong> (or
+        <strong>1.022727 MHz</strong> for NTSC systems). Modern USB controllers often approximate this using CPU
+        bit-banging or standard PWM generators, but CPU interrupts from USB traffic can cause cycle slippage.</p>
+      <p>USBSID-Pico delegates master clock generation entirely to a dedicated PIO state machine:<br>
+        <img src="images/blog/clock_generation_diagram.png" alt=""></p>
+      <ul>
+        <li><strong>Jitter Elimination:</strong> Because PIO state machines operate independently of the ARM Cortex cores,
+          the clock signal remains completely cycle-accurate regardless of heavy USB packet transfers, MIDI processing,
+          or configuration tasks running on the CPU.</li>
+        <li><strong>Flexible Frequency Control:</strong> The PIO fractional clock divider allows the clock output to be
+          configured on the fly. The firmware can seamlessly generate a standard 1.000 MHz square wave, lock precisely
+          to PAL/NTSC C64 frequencies, or scale the clock for custom hardware replacements.</li>
+        <li><strong>External Clock Fallback:</strong> On v1.0 boards, if an external oscillator is present (e.g., via
+          jumper select), the PIO state machine can dynamically switch to read and pass through the external signal.</li>
+      </ul>
+      <div class="c64-blog-h3">
+        2. Cycle-Exact Bus Synchronization with DMA
+      </div>
+      <p>Beyond driving the main clock, writing values to a real SID chip requires adhering to precise timing windows
+        relative to PHI2. A register write requires setting up the <strong>Address Bus (A₀-A₅)</strong>,
+        <strong>Data Bus (D₀-D₇)</strong>, and pulling <strong>Chip Select (C̅S̅)</strong> and
+        <strong>Write Enable (W̅E̅)</strong> low for specific duration windows during the high phase of PHI2.</p>
+      <p>USBSID-Pico combines the <strong>PIO state machines with DMA buffers</strong> to achieve deterministic
+        low-latency bus cycles, resulting in only a single clock cycle overhead:</p>
+      <ol>
+        <li><strong>Buffer Queuing:</strong> Register write packets (from WebUSB, ASID, or USB-MIDI) are placed into DMA
+          buffers almost directly from the USB stack.</li>
+        <li><strong>Bus Control:</strong> PIO state machine two controls the RW, and two C̅S̅ pins.</li>
+        <li><strong>Parallel Pin Mapping:</strong> A third PIO state machine handles the 8-bit data bus and 6-bit address
+          bus simultaneously using mapped <code>SET</code> and <code>OUT</code> pin targets in a single clock cycle.</li>
+        <li><strong>Dead-Time & Setup Time Control:</strong> The fourth state machine program inserts exact cycle delays (<code>[delay]</code>
+          pre-ops) between asserting C̅S̅<br>
+          and driving data by triggering PIO-specific interrupts that assert the two state machines above, guaranteeing
+          that chip setup times and hold times are satisfied without stalling the main processor.</li>
+      </ol>
+      <p><img src="images/blog/buswritediagram.png" alt=""></p>
+      <p>One gotcha worth mentioning: all this only holds up at <code>-O3</code>. Drop the optimization level and the
+        compiler generates just enough extra overhead around the DMA/PIO handoff to reintroduce timing slack, which
+        shows up as broken sample playback in the embedded SID player and Cynthcart. So <code>-O3</code> isn't a
+        "nice-to-have" for this firmware; it's load-bearing.</p>
+      <p>
+        Cycle-accurate you say? Prove it!
+        <a target="_blank" href="https://www.youtube.com/watch?v=z4dil3tpabU">
+          <img src="https://img.youtube.com/vi/z4dil3tpabU/2.jpg" alt="Wonderland XIII">
+        </a>
+        <sup>Wonderland XIII ending by Censor Design (2016)</sup>
+        <sup>(Played with MOS6582 on USBSID-Pico)<sup>
+      </p>
+      <div class="c64-blog-h3">
+        3. VU Meter Feedback
+      </div>
+      <p>Not everything in the firmware is about getting bytes onto the SID bus correctly, sometimes you also just want
+        the board to look alive.<br>
+        The onboard LED (Pico/Pico 2) and, on the black clone boards with an onboard WS2812, the RGB LED, both act as a
+        VU meter driven off the SID1 (default) voice data, calculated straight from the register writes going through.
+        Which voices feed the calculation is configurable, so you can tune it to taste.</p>
+      <div class="c64-blog-h3">
+        4. Automatic SID Model Detection
+      </div>
+      <p>Not every socket gets told what's plugged into it, most of the time the firmware has to figure it out on its
+        own. Real 6581 and 8580 chips (and most clones that bother to emulate the quirk) behave slightly differently
+        around their envelope/waveform generator internals when you poke certain test bit sequences into the voice
+        registers and read back what comes out of the oscillator/envelope readback register.<br>
+        These aren't documented behaviors, they're quirks the C64 scene worked out and shared decades ago (methods like
+        the ones on codebase64.net, and the detection routine from 1541 Ultimate's SID cart player). USBSID-Pico runs a
+        few of these probes back to back per socket at boot (and on socket reconfiguration), cross-checks the results
+        against each other since a single probe can misfire, and falls back through multiple detection methods until
+        it's confident whether it's looking at a 6581, an 8580, or something it can't identify. Get this wrong and the
+        firmware would apply the wrong voltage/filter assumptions to a chip that can't take it, so it's not just a
+        nice-to-have feature.</p>
+      <div class="c64-blog-h3">
+        5. Turning MIDI Into SID Register Writes
+      </div>
+      <p>MIDI notes don't map onto SID registers by themselves. Someone has to decide what "note on, channel 3, velocity
+        100" actually means in terms of frequency registers, gate bits, and envelope settings, and then get those writes
+        onto the bus in time to sound right.<br>
+        The MIDI handler keeps a per-channel voice allocation table so incoming notes get assigned to a free SID voice
+        slot, tracks note on/off and velocity, and layers an arpeggiator on top that steps through held notes on its own
+        timer, calling the same note on/off path a human playing key by key would trigger. ASID messages come in through
+        a completely different transport (MIDI vs a raw byte stream) but funnel into the same underlying register write
+        path once decoded, so the bus timing code described above doesn't need to know or care which protocol asked for
+        the write.</p>
+      <div class="c64-blog-h3">
+        6. One USB Device, Several Personalities
+      </div>
+      <p>From the host's point of view, USBSID-Pico shows up as a single USB device, but under the hood it's a composite
+        of several TinyUSB interfaces stitched together with Interface Association Descriptors: a CDC interface for the
+        custom SID protocol, a MIDI interface, and a Vendor (WebUSB) interface, all sharing one physical connection.
+        Depending on the firmware build there can be extra CDC channels tucked in as well, one used for telemetry,
+        another that exposes a plain USB UART.<br>
+        Getting a composite device like that to enumerate cleanly across Windows, macOS, Linux, and Android, each with
+        their own opinions about driver binding for multi-interface USB devices, turned out to be its own small
+        adventure that doesn't show up anywhere in the SID bus code but ate plenty of debugging time all the same.</p>
+      <div class="c64-blog-h3">
+        7. Config That Survives a Power Cycle
+      </div>
+      <p>The board remembers its settings (which sockets are enabled, address ranges, clock speed, voltage mode, VU
+        source, and more) across power cycles without running a filesystem. Flash is split at the linker level into a
+        firmware region and a separate persistent storage region (the split is sized per platform in the rp2040 and
+        rp2350 linker scripts), so writing a config update can never accidentally overwrite running code, and a firmware
+        update never has to touch, or wipe, your saved config.</p>
+      <br>
+      <div class="c64-box-title" id="software">
+        Software
+      </div>
+      <p>When you create something new and shiny that requires the (hard) work of others to work, you need to prove
+        yourself and your product worthy of integration into their holy grail. Very understandable.<br>
+        Adding the first support for any application that is not your own requires you to learn the codebase and
+        understand the coding rules the developer(s) of that application follow.<br>
+        This is by itself a complete journey I am not going into here, below is the (current) list of (official/forked)
+        applications that have support for USBSID-Pico.</p>
+      <div class="c64-blog-h2">
+        The list with supporting applications for USBSID-Pico
+      </div>
+      <p><sub>I probably missed some of them</sub></p>
+      <ul>
+        <li><a target="_blank" href="https://github.com/LouDnl/USBSID-Player">USBSID-Player (cli)</a> my own command line SID player,
+          plays PSID/RSID/PRG/P00 files straight through the board without needing a full emulator
+          <ul>
+            <li><a target="_blank" href="https://deepsid.chordian.net/">deepsid (website)</a> by Chordian, play SID files straight via
+              WebUSB (Chrome), WebSerial (Chrome/Firefox) or ASID (WebMidi), no install needed</li>
+            <li><a target="_blank" href="https://hippoplayer.se/WB.html">Hippoplayer (website)</a> multi format chiptune/module player
+              with USBSID-Pico output support via WebUSB (Chrome) or WebSerial (Chrome/Firefox)</li>
+            <li><a target="_blank" href="https://usbsid.loudai.nl/">USBSID Web config (website)</a> my web based config tool, also doubles
+              as a quick WebUSB (Chrome), WebSerial (Chrome/Firefox) and ASID (WebMidi) test player for your board</li>
+          </ul>
+        </li>
+        <li><a target="_blank" href="https://sourceforge.net/projects/vice-emu/">Vice (3.10+)</a> the C64 emulator, x64sc supports up to 4
+          SIDs through USBSID-Pico</li>
+        <li><a target="_blank" href="https://sourceforge.net/projects/jsidplay2/files/jsidplay2/4.13/">JSidplay2 (v4.13+)</a> Java based
+          SID player and C64 emulator, up to 3 SIDs</li>
+        <li><a target="_blank" href="https://sourceforge.net/projects/deniseemu/">Denise (v2.7+)</a> Amiga emulator with SID playback
+          support, up to 4 SIDs</li>
+        <li><a target="_blank" href="https://github.com/libsidplayfp/">(lib)sidplayfp (v2.16+)</a> the SID playback library (and its
+          player) that a lot of other tools build on, up to 3 SIDs</li>
+        <li><a target="_blank" href="https://acid64.com/download">Acid64 Pro (v4.4.0+)</a> Windows only commercial SID player, up to 3
+          SIDs</li>
+        <li><a target="_blank" href="https://github.com/sandlbn/Phosphor/releases">Phosphor (any version)</a> cross platform SID player,
+          up to 4 SIDs</li>
+        <li><a target="_blank" href="https://github.com/Chordian/sidfactory2">sidfactory2 (release 20260308+)</a> chiptune
+          tracker/composer for writing your own SID tunes, MIDI/ASID output</li>
+        <li><a target="_blank" href="https://github.com/LouDnl/GTUltra-USBSID">GTUltra (fork)</a> my fork of GoatTracker Ultra with
+          USBSID-Pico support baked in</li>
+        <li><a target="_blank" href="https://github.com/LouDnl/SidBerry">SidBerry (fork)</a> command line SID player for Linux and
+          Windows, up to 4 SIDs (Windows build is a bit buggy)</li>
+        <li><a target="_blank" href="https://github.com/erique/playsid.library">Amiga playsid</a> brings real SID playback to the Amiga
+          through USBSID-Pico</li>
+        <li><a target="_blank" href="https://inesid.fazibear.me/">IneSID (website)</a> by Fazibear, ASID (WebMidi) playback in your
+          browser</li>
+        <li><a target="_blank" href="https://csdb.dk/release/?id=259243">TrueSID</a> a Python based graphical SID player built on
+          JSIDPlay2/sidplayfp</li>
+        <li><a target="_blank" href="https://github.com/LouDnl/RetroDebugger">RetroDebugger (fork)</a> unofficial support, up to 4 SIDs</li>
+        <li><a target="_blank" href="https://sourceforge.net/projects/sid-wizard/">SID-Wizard</a> for making your own chiptunes through
+          Vice or RetroDebugger</li>
+      </ul>
+      <div class="c64-blog-h2">
+        Project spawns
+      </div>
+      <p>As with adding support to applications of others, your hardware project usually has you spawning all sorts of
+        custom software/repo's for said project.<br>
+        The hardware needed a driver, this spawned the
+        <a target="_blank" href="https://github.com/LouDnl/USBSID-Pico-driver">USBSID-Pico-driver</a> repo which contains the official
+        driver written in C++ and Java, plus a mirror of the driver used in Vice.<br>
+        Because the board has configurable features, the
+        <a target="_blank" href="https://github.com/LouDnl/USBSID-Pico/tree/master/examples/config-tool">CLI Configtool</a> was spawned.<br>
+        To accommodate for the less tech savvy users, the
+        <a target="_blank" href="https://github.com/LouDnl/USBSID-Pico/tree/master/examples/config-tool-web">Web Configtool</a> got
+        spawned.<br>
+        Some users would actually like a dedicated deskop application (GUI), spawning
+        <a target="_blank" href="https://github.com/LouDnl/USBSID-Configtool">USBSID-Configtool</a> written in my dayjob language
+        <a target="_blank" href="https://www.clojure.org/">Clojure</a>.<br>
+        I wanted a more direct way to test SID play on the board while also adding support as embedded SID player
+        <a target="_blank" href="https://github.com/LouDnl/USBSID-Player">USBSID-Player</a> got spawned.<br>
+        But having an embedded SID player means you need a way to actually beam the SID tunes to the board,
+        <a target="_blank" href="https://github.com/LouDnl/USBSID-Pico/tree/master/examples/send_sid">CLI SendSID</a> was spawned.<br>
+        In earlier firmware versions I spawned <a target="_blank" href="https://github.com/LouDnl/emudore-embedded">Adorable</a> that
+        added an embedded version of Cynthcart. This spawn was an adapted version of
+        <a target="_blank" href="https://github.com/marioballano/emudore">emudore</a>.</p>
+      <p>Not every bit of software support came from me though.<br>
+        <a target="_blank" href="https://github.com/sandlbn">sandlbn</a> wrote and maintains a full
+        <a target="_blank" href="https://github.com/sandlbn/USBSID-Pico-Rust-driver">Rust driver</a> for USBSID-Pico, completely on his
+        own initiative, which was pretty great to wake up to one day.<br>
+        <a target="_blank" href="https://github.com/WilfredC64">WilfredC64</a> also made a Rust implementation for USBSID-Pico
+        specifically for <a target="_blank" href="https://www.acid64.com/">Acid64 Pro</a>.<br>
+        Raros also built a custom Cynthcart VST for Windows to go along with the embedded Cynthcart firmware, you'll
+        find it and his notes in the
+        <a target="_blank" href="https://github.com/LouDnl/USBSID-Pico/tree/master/examples/Cynthcart-Ninja_VST">repo</a>.<br>
+        And of course none of this USB plumbing would work half as well without
+        <a target="_blank" href="https://github.com/hathach/tinyusb">TinyUSB</a>, which the firmware leans on for the whole USB stack.</p>
+      <br>
+      <div class="c64-box-title" id="sid's-and-hardware-replacements">
+        SID's and hardware replacements
+      </div>
+      <div class="c64-blog-h2">
+        The good
+      </div>
+      <p>During this project my collection of SID chips and hardware replacements kept growing, and still grows.<br>
+        Any new hardware replacement that catches my eye is a new <em>take my money</em>.<br>
+        Not only because I like to support the creator, but moreover that I want to add support for it to USBSID-Pico.<br>
+        I admit that not all hardware replacements that I own are bought. Some are donated and/or traded for one of my
+        boards, something I am always open to discuss!</p>
+      <div class="c64-blog-h2">
+        The bad
+      </div>
+      <p>I try to handle all my real SID chips with care and mostly use hardware replacements when doing the many
+        firmware tests I do for USBSID-Pico. But I must admit that even I haven't always been careful enough, resulting
+        in a fried SID (or two). And no, it doesn't smell nice; it's hot to the touch and doesn't taste like chicken!</p>
+      <div class="c64-blog-h2">
+        The owned
+      </div>
+      <p>In no particular order, here are the SIDs that I own and have tested/use with USBSID-Pico.</p>
+      <ul>
+        <li>MOS6581 ~ several different types</li>
+        <li>MOS6582 ~ the 8580 wannabe</li>
+        <li>MOS8580 ~ several different types</li>
+        <li>SIDKICK-pico v0.1</li>
+        <li>SIDKICK-pico SKpico2350DAC ~ Ultimate64 version</li>
+        <li>FPGASID</li>
+        <li>SIDEmu</li>
+        <li>ARMSID</li>
+        <li>ARM2SID</li>
+        <li>BACKSID v1</li>
+        <li>PDSID</li>
+        <li>SwinSID</li>
+      </ul>
+      <br>
+      <div class="c64-box-title" id="art">
+        Art
+      </div>
+      <p>I'm a big fan of retro and pixel art, thus having some special art on the bottom of each board couldn't be
+        skipped (and my friend tobozo forced me to add some).</p>
+      <div class="c64-img-grid">
+        <img src="images/blog/v1.0-bottom.png" alt="">
+        <img src="images/blog/v1.2-bottom.png" alt="">
+        <img src="images/blog/v1.3b-bottom.png" alt="">
+        <img src="images/blog/v1.5-bottom.png" alt="">
+      </div>
+      <div class="c64-blog-h2">
+        Swag
+      </div>
+      <p>What can a product be without fanboy swag? The marvelous
+        <a target="_blank" href="https://bsky.app/profile/greyandslate.bsky.social">greyandslate</a> offered to create some great
+        t-shirt designs for <em>free!</em> after I asked him about creating something. How's that for exposure! The
+        shirts are for sale in his <a target="_blank" href="https://smallrun.net/shop/grey-and-slate-haberdashers">Smallrun shop</a>.<br>
+        <div class="c64-img-grid">
+          <img src="images/blog/tshirt_board.png" alt="">
+          <img src="images/blog/tshirt_logo.png" alt="">
+          <img src="images/blog/tshirt_logo_sids.png" alt="">
+          <img src="images/blog/tshirt_logo_board.png" alt="">
+        </div>
+      </p>
+      <br>
+      <div class="c64-box-title" id="press-mentions">
+        Press & Mentions
+      </div>
+      <p>USBSID-Pico has popped up in a few places I didn't expect, always a nice surprise.</p>
+      <ul>
+        <li>HVSC (High Voltage SID Collection) news mentioned it a few times:
+          <a target="_blank" href="https://hvsc.c64.org/download/files/news/20250628.txt">June 2025</a>,
+          <a target="_blank" href="https://hvsc.c64.org/download/files/news/20251225.txt">December 2025</a>, and
+          <a target="_blank" href="https://hvsc.c64.org/download/files/news/20260628.txt">June 2026</a></li>
+        <li>Mingo's Commodore Blog wrote it up in
+          <a target="_blank" href="https://mingos-commodoreblog.blogspot.com/2026/08/usbsid-c64-sound-am-pc-per-usb.html">two</a>
+          <a target="_blank" href="https://mingos-commodoreblog.blogspot.com/2026/08/usbsid-c64-sound-am-pc-per-usb-teil-2.html">parts</a></li>
+        <li>Listed on <a target="_blank" href="https://acid64.com/links/">acid64's links page</a></li>
+        <li>The Vice support started life as an actual
+          <a target="_blank" href="https://sourceforge.net/p/vice-emu/patches/400/">SourceForge patch ticket</a></li>
+        <li><a target="_blank" href="https://www.commodore-news.com/news/item/13514/de/mobile">Commodore News</a> covered it too</li>
+        <li>And a couple more video mentions worth a watch: <a target="_blank" href="https://www.youtube.com/watch?v=cxKkJI4Pe6M">one</a>,
+          <a target="_blank" href="https://youtu.be/vIECnBv2_oE">two</a></li>
+        <li>It's also apparently notable enough to get a line on
+          <a target="_blank" href="https://en.wikipedia.org/wiki/MOS_Technology_6581">Wikipedia's MOS 6581 page</a> (under "Hardware
+          using the SID chip"), and its own page on both
+          <a target="_blank" href="https://www.c64-wiki.com/wiki/USBSID-Pico">c64-wiki.com</a> and
+          <a target="_blank" href="https://www.c64-wiki.de/wiki/USBSID-Pico">c64-wiki.de</a></li>
+      </ul>
+      <p>If you're searching around for more, "usbsid" and "usbsid-pico" turn up most of it.</p>
+      <br>
+      <div class="c64-box-title" id="wrapping-up">
+        Wrapping up
+      </div>
+      <p>If you run into trouble or just want to talk shop, the <a target="_blank" href="https://discord.gg/zG2rxXuT2g">Discord</a> is
+        where most of the day to day happens,
+        <a target="_blank" href="https://github.com/LouDnl/USBSID-Pico/discussions">GitHub Discussions</a> works too if you prefer that.
+        And if you're curious what's cooking next, the
+        <a target="_blank" href="https://github.com/users/LouDnl/projects/1">project board</a> is kept reasonably up to date.</p>
+      <p>Or if you want to see (and hear) more of the board in action, my
+        <a target="_blank" href="https://www.youtube.com/@LouDnl/videos">YouTube channel</a> has plenty of demo videos, and there's a
+        growing pile more on the
+        <a target="_blank" href="https://github.com/LouDnl/USBSID-Pico/blob/master/SHOWCASE.md">SHOWCASE page</a> of the main repo.</p>
+      <p>Here's a picture of my cat :-)<br>
+        <img src="images/blog/cat.png" alt=""></p>
+      <div class="c64-blog-h2">
+        Note
+      </div>
+      <p>When doing research for something you want to create you often come across similar projects that look like your
+        idea but are not quite the same.<br>
+        For me this has always inspired me to do what I do and of course sneak some previously proven ways of doing
+        things into my own projects.<br>
+        So while being a unique project, USBSID-Pico <em>does</em> relate to other great projects.</p>
+      <div class="c64-blog-h2">
+        Special thanks
+      </div>
+      <p>I want to thank <a target="_blank" href="https://github.com/tobozo">tobozo</a> for your continued support!<br>
+        And my gratitude goes to <a target="_blank" href="https://github.com/spotUP">spotUP</a> for his persistence and believing in the
+        project from the start!<br>
+        <a target="_blank" href="https://www.youtube.com/lukhashdotcom">LukHash</a> and
+        <a target="_blank" href="https://www.youtube.com/Nordischsound">Nordischsound</a> for their free promotion of USBSID-Pico.<br>
+        <a target="_blank" href="https://github.com/WilfredC64">WilfredC64</a> and
+        <a target="_blank" href="https://www.instagram.com/heyniels">Niels</a> whom I both met at
+        <a target="_blank" href="https://commodore.hcc.nl/">HCC Commodore Club</a> who have been a great support and early adopters!<br>
+        <a target="_blank" href="https://github.com/GideonZ">Gideon</a> for tips on going jumperless and is also a member at the same club.<br>
+        All other members of <a target="_blank" href="https://commodore.hcc.nl/">HCC Commodore Club</a>.</p>
+      <div class="c64-blog-h2">
+        Credits
+      </div>
+      <p>I find that giving credit to other developers for their great projects is required, so in no particular order:</p>
+      <ul>
+        <li><a target="_blank" href="https://github.com/frntc">frntc</a> ~ SIDKICK-pico</li>
+        <li><a target="_blank" href="https://www.fpgasid.de/the-team#h.p_ID_58">andi6510</a> ~ FPGASID</li>
+        <li><a target="_blank" href="https://sidemuboard.blogspot.com/">DaemonPig</a> ~ SIDEmu</li>
+        <li><a target="_blank" href="https://github.com/stg">stg</a> ~ SIDBlaster USB</li>
+        <li><a target="_blank" href="https://github.com/gh0stless">gh0stless</a> ~ SIDBlaster USB Tic-Tac-Edition</li>
+        <li><a target="_blank" href="https://codeberg.org/CBMretro">CBMretro</a> ~ SIDBlaster USB Nano</li>
+        <li><a target="_blank" href="http://hacks.slashdirt.org/hw/exsid/">Thibaut Varène</a> ~ ExSID and ExSID+</li>
+        <li><a target="_blank" href="https://github.com/twistedelectrons">Twisted Electrons</a> ~ TherapSID</li>
+        <li><a target="_blank" href="https://github.com/SensoriumEmbedded">Sensorium Embedded</a> ~ TeensyROM</li>
+        <li><a target="_blank" href="https://github.com/PaulSlocum">PaulSlocum</a> ~ Cynthcart</li>
+        <li><a target="_blank" href="https://github.com/kenchis">kenchis</a> ~ Jsidplay2</li>
+        <li><a target="_blank" href="https://www.wothke.ch/">Jürgen Wothke</a> ~ webSID</li>
+        <li><a target="_blank" href="https://github.com/piciji">PiCiJi</a> ~ Denise</li>
+        <li><a target="_blank" href="https://vice-emu.sourceforge.io/vice_18.html#SEC572">The Vice Team</a></li>
+        <li><a target="_blank" href="https://github.com/erique">erique</a> and <a target="_blank" href="https://github.com/koobo">koobo</a> ~ Amiga
+          playsid</li>
+        <li><a target="_blank" href="https://github.com/Chordian">Chordian</a> ~ deepsid</li>
+        <li><a target="_blank" href="https://bsky.app/profile/greyandslate.bsky.social">greyandslate</a> ~ Swag!</li>
+        <li><a target="_blank" href="https://github.com/sandlbn">sandlbn</a> ~ Rust driver</li>
+        <li>Raros ~ Cynthcart Ninja VST</li>
+        <li><a target="_blank" href="https://inesid.fazibear.me/">Fazibear</a> ~ IneSID</li>
+        <li><a target="_blank" href="https://github.com/hathach">hathach</a> and the
+          <a target="_blank" href="https://github.com/hathach/tinyusb">TinyUSB</a> project</li>
+        <li><a target="_blank" href="https://github.com/GideonZ">Gideon</a> ~ 1541Ultimate</li>
+      </ul>
+      <div class="c64-blog-h2">
+        Links
+      </div>
+      <p>All links from the text:</p>
+      <ul>
+        <li><a target="_blank" href="https://github.com/henrikenblom/SIDPod">SIDPod</a></li>
+        <li><a target="_blank" href="https://github.com/LouDnl/SIDPod-SDCard">SIDPod-SDCard</a></li>
+        <li><a target="_blank" href="https://github.com/tobozo/ESP32-SIDView">ESP32-SIDView</a></li>
+        <li><a target="_blank" href="https://github.com/gianlucag/SidBerry">SidBerry</a></li>
+        <li><a target="_blank" href="https://github.com/frntc/SIDKICK-pico">SIDKICK-pico</a></li>
+        <li><a target="_blank" href="https://github.com/arm8686/FT2232HL-Board">FTDI FT223HL</a></li>
+        <li><a target="_blank" href="https://github.com/LouDnl/SidBerry/tree/b53fc092ab34bf39ff06d2e8d2aaac02f5c7c377">FTDI version of SidBerry</a></li>
+        <li><a target="_blank" href="https://github.com/LouDnl/vice-svn-mirror-usbsid/tree/Vice-3.8-FTDIUSBSID">FTDI version of Vice 3.8</a></li>
+        <li><a target="_blank" href="https://github.com/marioballano/emudore">emudore</a></li>
+        <li><a target="_blank" href="https://github.com/LouDnl/emudore-embedded">Adorable</a></li>
+        <li><a target="_blank" href="https://certification.oshwa.org/nl000035.html">v1.0 OSHWA NL000035</a></li>
+        <li><a target="_blank" href="https://certification.oshwa.org/nl000045.html">v1.3 OSHWA NL000045</a></li>
+        <li><a target="_blank" href="https://hackaday.io/project/205136-usbsid-pico">Hackaday project page</a></li>
+        <li><a target="_blank" href="https://www.youtube.com/@LouDnl/videos">YouTube channel</a></li>
+        <li><a target="_blank" href="https://github.com/sandlbn/USBSID-Pico-Rust-driver">Rust driver</a></li>
+        <li><a target="_blank" href="https://discord.gg/zG2rxXuT2g">Discord</a></li>
+        <li><a target="_blank" href="https://github.com/LouDnl/USBSID-Pico/discussions">GitHub Discussions</a></li>
+        <li><a target="_blank" href="https://github.com/users/LouDnl/projects/1">Project board</a></li>
+        <li><a target="_blank" href="https://github.com/LouDnl/USBSID-Pico">USBSID-Pico</a></li>
+        <li><a target="_blank" href="https://github.com/LouDnl/USBSID-Pico-driver">USBSID-Pico-driver</a></li>
+        <li><a target="_blank" href="https://github.com/LouDnl/USBSID-Configtool">USBSID-Configtool</a></li>
+      </ul>
+      <div class="c64-blog-h2">
+        Disclaimer
+      </div>
+      <p>I do this stuff in my free time for my enjoyment.<br>
+        Since I like to share my joy in creating this with everyone I try my best to provide a working PCB and Firmware.<br>
+        I am in no way an electronics engineer and can give <strong>no guarantees</strong> that this stuff does not
+        break or damage your hardware, computer, phone, or whatever you try to hook it up to.<br>
+        Be sure to take great care when inserting any real MOS SID chips into the board.<br>
+        While everything has been tested with real chips, this is in no way a guarantee that nothing could go wrong.<br>
+        Use of this board and firmware at your own risk!<br>
+        I am in no way responsible for your damaged hardware.<br>
+        That being said, have fun!</p>
+    </div>
+  </div><!-- /panel-blog -->
 
 
   <!-- ╔═ FOOTER ════════════════════════════════════════╗ -->
