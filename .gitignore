@@ -80,7 +80,10 @@
 !examples/send_sid
 !examples/hardsid-sidblaster
 !examples/udev-rules
-!examples/vmpk
+!examples/midi
+!examples/midi/strudel
+!examples/midi/superdirt-tidalcycles
+!examples/midi/vmpk
 !examples/Cynthcart-Ninja_VST
 !resources
 
@@ -90,7 +93,6 @@
 !examples/config-tool-web_old/**
 !examples/hardsid-sidblaster/**
 !examples/udev-rules/**
-!examples/vmpk/**
 !examples/Cynthcart-Ninja_VST/**
 
 # specific files in specified directories
@@ -101,3 +103,8 @@
 !examples/config-tool-web/SID/genlist.bb
 !examples/config-tool-web/websid/*.js
 !examples/config-tool-web/websid/*.wasm
+!examples/midi/strudel/*.js
+!examples/midi/superdirt-tidalcycles/*.scd
+!examples/midi/superdirt-tidalcycles/*.tidal
+!examples/midi/vmpk/uspico.ins
+!examples/midi/vmpk/vpmk.extra_controllers.conf
