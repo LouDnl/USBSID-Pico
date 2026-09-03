@@ -113,3 +113,6 @@
 !examples/midi/tools/*.txt
 !examples/midi/vmpk/uspico.ins
 !examples/midi/vmpk/vpmk.extra_controllers.conf
+
+# Ignore txt files unless specified (at the end so it's always ignored)
+*.txt
