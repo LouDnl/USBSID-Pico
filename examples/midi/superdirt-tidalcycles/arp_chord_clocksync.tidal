@@ -1,0 +1,70 @@
+-- USBSID-Pico SuperDirt demo 5/6: "Frame Rate" - a classic C64 SID "arp chord"
+-- driven by a real MIDI clock, not the firmware's free-running arpeggiator.
+--
+-- Ported 1:1 from ../strudel/arp_chord_clocksync.strudel.js - see that file
+-- for the full frame-rate/arp-timing writeup. *96 -> *96 needed no
+-- reinterpretation here (Tidal's own docs confirm the pulses-per-cycle
+-- meaning, unlike Strudel's which don't).
+--
+-- Background: a real SID only has 3 real voices, so C64 music faking a
+-- chord on one voice cycles rapidly through its notes (root/3rd/5th) at
+-- roughly the video frame rate (50Hz PAL / 60Hz NTSC) so it reads as one
+-- sustained chord rather than a rippling arpeggio - see e.g.
+-- https://www.lemon64.com/forum/viewtopic.php?t=65987. This firmware's own
+-- arpeggiator (repo/src/midi_handler.c, arp_tick()) has TWO speed modes:
+--   - free-running (no MIDI clock present): hard-capped at 0.5-20 steps/sec
+--     - nowhere near fast enough for the real frame-rate trick.
+--   - MIDI-clock-synced: divides the incoming clock into 8 steps, 24 pulses
+--     (a whole note) down to 1 pulse - and 1 pulse, at a normal tempo, DOES
+--     reach the real 45-60Hz range. This demo drives that path specifically.
+--
+-- This uses the "usbsidpico" MIDI destination (a virtual MIDI-usbsidpico port),
+-- not the direct "usbsidpico" one. Route that port to the board yourself
+-- (e.g. via your OS's MIDI patchbay / ALSA aconnect) same as the original
+-- Strudel demo assumed for 'Midi Through Port-0'.
+
+-- CC_ANOF (All Notes Off, CC 123) - pool-wide, silences any stuck note from
+-- earlier testing before this song's own state gets set up.
+once $ ccn 123 # ccv 127 # s "usbsidpico" # midichan 0  -- normalized 1 -> 127
+
+-- Reset channels to plain SID targeting (CC_FMEN off) - same hygiene as
+-- every other demo here, in case FMOpl targeting was left on from testing.
+do
+  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 0
+  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 1
+  once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 0 # progNum 0  -- SID1: Default patch (plain triangle) - the arp voice
+  once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 1 # progNum 3  -- SID2: Bass
+-- Arpeggiator setup on channel 1 - this is what actually turns held chord
+-- notes into the fast note-cycling trick, see CC map in the MIDI manual.
+  once $ ccn 6  # ccv 0   # s "usbsidpico" # midichan 0  -- CC_ARPM: Up (cycle root->3rd->5th->repeat), normalized 0.0 -> 0
+  once $ ccn 11 # ccv 0   # s "usbsidpico" # midichan 0  -- CC_ARPO: 0 extra octaves - stay inside the triad, the classic effect, normalized 0.0 -> 0
+  once $ ccn 10 # ccv 127 # s "usbsidpico" # midichan 0  -- CC_ARPR: fastest MIDI-clock division (1 pulse), normalized 1.0 -> 127 - only matters once a clock is present
+  once $ ccn 12 # ccv 127 # s "usbsidpico" # midichan 0  -- CC_ARPE: arp on for channel 1, normalized 1 -> 127 - notes now feed the arp's held pattern instead of sounding directly
+
+-- setcps 0.53 -- ~128 BPM (1 cycle = 4 beats: cps = BPM/240). At 128 BPM,
+-- 24 MIDI clock pulses/quarter note works out to ~19.5ms/pulse - a 1-pulse
+-- arp division lands at ~51Hz, squarely in the real PAL/NTSC frame-rate
+-- zone this demo is built to demonstrate. Slower tempos drop below it,
+-- faster tempos push past 60Hz - listen and retune to taste.
+
+-- The MIDI clock itself - must keep running for the firmware's clock-synced
+-- arp path to activate at all; stop the "midiclock" pattern (below) and the
+-- arp instantly falls back to its free-running 20Hz ceiling instead.
+do
+  once $ midicmd "start" # s "usbsidpico"
+  p "midiclock" $ midicmd "midiClock*96" # s "usbsidpico"
+
+-- The arp chord: a sustained held triad per chord, one per cycle - long
+-- enough (a full cycle each) for many fast arp steps to audibly cycle
+-- through and read as one held chord, not a rippling run. Root-position
+-- triads.
+d1 $ n "<a'min e'min f'maj g'maj>"
+  # s "usbsidpico" # midichan 0
+
+-- Bass: plain, not arpeggiated, grounds the progression underneath.
+d2 $ note "<a2(1,2) e2(1,2) f2(1,2) g2(1,2)>"
+  # s "usbsidpico" # midichan 1
+
+-- To stop: hush (also silences the midiclock pattern; send
+-- `once $ midicmd "stop" # s "usbsidpico"` if your MIDI clock receiver needs an
+-- explicit Stop message rather than just clock ticks ceasing)

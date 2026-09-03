@@ -1,0 +1,129 @@
+-- USBSID-Pico SuperDirt demo: "Lazy Jones (remix)" - a transcription of the
+-- first four sections of Pex Tufvesson's (Mahoney) Lazy_Jones_remix.sid,
+-- reconstructed straight from a disassembly of the original .sid tune.
+--
+-- How this was extracted: the tune's play routine ($C030) is about as
+-- minimal as a SID player gets - no instrument table, no ADSR-per-note,
+-- just two raw frequency-pair tables (voice 1 at $D400/$D401, voice 2 at
+-- $D407/$D408) walked 4 bytes at a time (lo1,hi1,lo2,hi2), with a hard
+-- gate-restart (CONTR = 0x20 then 0x21, i.e. gate-off then
+-- gate-on-with-sawtooth) on EVERY step regardless of whether the pitch
+-- changed. That hard-restart-every-step trick is the whole "machine gun"
+-- Lazy Jones sound: voice 1 alternates a note with its own octave
+-- (b2/b3/b2/b3...) while voice 2 carries the real melody/arpeggio - both
+-- driven by the exact same envelope (ATTDEC=$66, i.e. attack 6/decay 6;
+-- SUSREL is never written at all, so it stays at the SID's post-reset 0 -
+-- sustain 0, release 0. Every note you hear is the attack+decay transient,
+-- kept alive only by being retriggered every single step).
+--
+-- The two tables run from $C100 to $CB7F (2688 bytes = 672 steps, ~161s at
+-- this tune's step rate) before the routine loops back to $C100. What's
+-- below is steps 0-127 - four 32-step sections (a call-response riff, then
+-- three chromatically-shifting variations) - decoded from each 16-bit SID
+-- frequency register back to Hz (register * 985248 PAL clock / 16777216)
+-- and rounded to the nearest MIDI note. Still a loop of an excerpt, not
+-- the full 161-second piece.
+--
+-- Tempo: the routine advances the tables once every 12 calls of the play
+-- routine ($03E3, decremented every call, reloaded to 12). No CIA timer
+-- is ever programmed in this file (grepped for $DC00-$DC0F, found nothing),
+-- so Play is driven at whatever rate the player calls it - nominally 50Hz
+-- PAL, which is what the setcps below was first derived from (12/50s =
+-- 240ms/step) but measured audibly slower than the real tune. Bumped here
+-- to 200ms/step (matches a 60Hz call rate) - if it's still off, the real
+-- number is whatever the reference player's actual call rate is; tell me
+-- the right ratio (e.g. "another 10% faster") and I'll retune setcps
+-- rather than guess again.
+--
+-- Sync/tuning bug fix: the previous version of this file didn't reset
+-- CC_LFOD/CC_LFO2D (LFO depth, both LFOs) or pitch-bend range on channels
+-- 1/2. Those are sticky per-channel state exactly like CC_FMEN/CC_ARPE/
+-- CC_UNIS (see pop_classical.tidal) - if big_top_showcase.tidal ran
+-- earlier and left channel 2's vibrato LFO (CC_LFOD, depth 38) turned on,
+-- every note on this file's channel 2 would get continuously pitch-
+-- modulated, which reads as "goes out of tune" and, since the wobble
+-- desyncs channel 2's apparent pitch from channel 1's static one, also as
+-- "not playing at the same time." Wrapping the once-block in `do` doesn't
+-- touch this - `do` only batches OSC sends together, it has no effect on
+-- per-channel config state. Explicit LFO-depth-off added below, same
+-- hygiene as the arp/unison resets.
+--
+-- No new firmware patch was added for this - the exact envelope is built
+-- live from CC (waveform + ADSR CCs) below rather than baked into
+-- midi_patch.c's factory bank.
+--
+-- Channel map: channel 1 = SID1 (voice 1, octave-doubled bass), channel 2 =
+-- SID2 (voice 2, melody/arp) - matches every other demo in this folder. If
+-- your board's channel config differs, adjust the midichan values below.
+--
+-- CC map used here (repo/src/midi_defs.h): CC_ANOF=123, CC_FMEN=88,
+-- CC_ARPE=12, CC_UNIS=41, CC_LFOD=3, CC_LFO2D=15, CC_TRIA=23, CC_SAWT=22,
+-- CC_ATT=17, CC_DEC=18, CC_SUS=19, CC_REL=29.
+--
+-- Uses the "usbsidpico" MIDI destination (a virtual MIDI-usbsidpico port), not
+-- the direct "usbsidpico" one.
+
+once $ ccn 123 # ccv 127 # s "usbsidpico" # midichan 1  -- All Notes Off (SID + FMOpl), normalized 1 -> 127
+
+do
+  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 1  -- Reset channel 1 to SID (CC_FMEN off)
+  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 2  -- Reset channel 2 to SID (CC_FMEN off)
+  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 3  -- Reset channel 3 to SID (CC_FMEN off)
+  -- CC_ARPE/CC_UNIS/CC_LFOD/CC_LFO2D are all sticky per-channel state - a
+  -- previous demo could otherwise hijack or detune this song's notes, same
+  -- reasoning as every other demo here (see pop_classical.tidal). This is
+  -- the fix for the "goes out of tune" / "not playing together" report.
+  once $ ccn 12 # ccv 0 # s "usbsidpico" # midichan 1  -- arp off ch1
+  once $ ccn 12 # ccv 0 # s "usbsidpico" # midichan 2  -- arp off ch2
+  once $ ccn 41 # ccv 0 # s "usbsidpico" # midichan 1  -- unison off ch1
+  once $ ccn 41 # ccv 0 # s "usbsidpico" # midichan 2  -- unison off ch2
+  once $ ccn 3  # ccv 0 # s "usbsidpico" # midichan 1  -- LFO1 depth off ch1
+  once $ ccn 3  # ccv 0 # s "usbsidpico" # midichan 2  -- LFO1 depth off ch2
+  once $ ccn 15 # ccv 0 # s "usbsidpico" # midichan 1  -- LFO2 depth off ch1
+  once $ ccn 15 # ccv 0 # s "usbsidpico" # midichan 2  -- LFO2 depth off ch2
+-- Build the "hard-restart pluck" timbre from raw CC, both channels
+-- identical - matches the original's shared envelope on both voices.
+-- Both channels boot on the default patch (triangle, sustain full), so
+-- switch the waveform bit explicitly: sawtooth on, triangle off.
+  once $ ccn 23 # ccv 0   # s "usbsidpico" # midichan 1  -- CC_TRIA off ch1
+  once $ ccn 22 # ccv 127 # s "usbsidpico" # midichan 1  -- CC_SAWT on ch1
+  once $ ccn 17 # ccv 51  # s "usbsidpico" # midichan 1  -- CC_ATT: 6/15
+  once $ ccn 18 # ccv 51  # s "usbsidpico" # midichan 1  -- CC_DEC: 6/15
+  once $ ccn 19 # ccv 0   # s "usbsidpico" # midichan 1  -- CC_SUS: 0
+  once $ ccn 29 # ccv 0   # s "usbsidpico" # midichan 1  -- CC_REL: 0
+  once $ ccn 23 # ccv 0   # s "usbsidpico" # midichan 2  -- CC_TRIA off ch2
+  once $ ccn 22 # ccv 127 # s "usbsidpico" # midichan 2  -- CC_SAWT on ch2
+  once $ ccn 17 # ccv 51  # s "usbsidpico" # midichan 2  -- CC_ATT: 6/15
+  once $ ccn 18 # ccv 51  # s "usbsidpico" # midichan 2  -- CC_DEC: 6/15
+  once $ ccn 19 # ccv 0   # s "usbsidpico" # midichan 2  -- CC_SUS: 0
+  once $ ccn 29 # ccv 0   # s "usbsidpico" # midichan 2  -- CC_REL: 0
+-- Volume - SIDs boot silent and need this before anything is audible.
+  once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 1
+  once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 2
+
+-- Tempo, ear-tuned against the real .sid: 2000ms/step (stepMs=1000 through
+-- the formula below, halved again by `slow 2` on both voices) - much
+-- slower than the ASM's own $03E3=12 frame-divider would suggest at a
+-- nominal 50Hz call rate (240ms/step). Reference playback clearly isn't
+-- running this routine at a plain 1-call-per-PAL-frame rate; not chasing
+-- that discrepancy further since ear-matched trumps derived-from-code
+-- here. stepMs stays the one number to nudge if it drifts again.
+do
+  let stepMs = 1000
+  setcps (1000 / (128 * stepMs))
+
+do
+  resetCycles
+-- Voice 1: the "machine gun" - same pitch class hard-restarted an octave
+-- apart every step, verbatim from $C100, steps 0-127.
+  d1 $ slow 2 $ note "[b2 b3 b2 b3 b2 b3 b2 b3 b2 b3 b2 b3 b2 b3 b2 b3 e3 e4 e3 e4 fs3 fs4 fs3 fs4 b2 b3 b2 b3 b2 b3 b2 b3 as3 as4 as3 as4 as3 as4 as3 as4 fs3 fs4 fs3 fs4 fs3 fs4 fs3 fs4 as3 as4 as3 as4 as3 as4 as3 as4 cs4 cs5 cs4 cs5 cs4 cs5 cs4 cs5 as3 as4 as3 as4 as3 as4 as3 as4 cs4 cs5 cs4 cs5 cs4 cs5 cs4 cs5 f3 f4 f3 f4 f3 f4 f3 f4 f3 f4 f3 f4 f3 f4 f3 f4 gs3 gs4 gs3 gs4 gs3 gs4 gs3 gs4 f3 f4 f3 f4 f3 f4 f3 f4 gs3 gs4 gs3 gs4 gs3 gs4 gs3 gs4 f3 f4 f3 f4 f3 f4 f3 f4]"
+    # legato 1
+    # s "usbsidpico" # midichan 1
+-- Voice 2: the real melody/arpeggio line underneath the machine-gun bass,
+-- same 128 steps, same source table.
+  d2 $ slow 2 $ note "[c3 b4 d5 e5 fs5 c4 c3 c4 c3 b4 d5 e5 fs5 g5 fs5 d5 e5 e4 f3 e4 d5 fs4 fs5 b4 b2 c4 c3 c4 c3 c4 c3 c4 as4 as4 b3 cs5 b3 c5 b3 as4 cs5 fs4 g3 fs4 g3 fs4 g3 fs4 as4 as4 b3 cs5 b3 c5 b3 as4 f4 cs5 cs4 cs5 cs4 cs5 cs4 cs5 f5 f5 ds5 cs5 ds5 f5 b3 as4 cs6 gs5 f5 ds5 f5 ds5 cs4 f5 f3 f4 f3 f4 f3 f4 f5 c5 f3 f4 c5 f4 f3 f4 f3 f4 gs4 gs4 as4 c5 c5 cs5 c5 as4 f4 f4 gs4 f4 as4 f4 f3 f4 gs4 gs4 as4 c5 c5 cs5 c5 as4 f4 f4 gs4 f4 f5 as4 f5 as5]"
+    # legato 1
+    # s "usbsidpico" # midichan 2
+
+-- To stop: hush
+resetCycles
