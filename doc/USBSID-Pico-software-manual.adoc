@@ -18,9 +18,10 @@ toc::[]
 include::disclaimer.adoc[]
 
 == Supported platforms
+For configuring your board itself (not the software listed below), see the `USBSID-Configtool-manual` file for the GUI tool, or the `USBSID-Pico-firmware-manual` file for the command line `cfg_usbsid` tool. +
 _In active development_ +
-*Linux:* Vice, JSidplay2, SidplayFp, RetroDebugger, SidBerry, USB Midi, WebUSB & ASID (in webbrowser) SID Play +
-*Windows:* Vice, JSidplay2, SidBerry, USB Midi, WebUSB & ASID (in webbrowser) SID Play +
+*Linux:* Vice, JSidplay2, Denise, SidplayFp, RetroDebugger, SidBerry, USB Midi, WebUSB & ASID (in webbrowser) SID Play +
+*Windows:* Vice, JSidplay2, Denise, SidBerry, USB Midi, WebUSB & ASID (in webbrowser) SID Play +
 *Android:* USB Midi, WebUSB & ASID (in webbrowser) SID Play +
 *Amiga:* PlaySID library
 

@@ -19,7 +19,8 @@ include::disclaimer.adoc[]
 
 
 == About
-What is there to say, you can configure your board with this tool and it is self explanatory.
+What is there to say, you can configure your board with this tool and it is self explanatory. +
+Prefer the command line? A CLI config tool (`cfg_usbsid`) is also available - see the `USBSID-Pico-firmware-manual` file for its usage.
 
 
 == Screens

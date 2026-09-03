@@ -107,6 +107,9 @@ Ground and S1 as labeled
 == 14. Reset button
 image:images/v1.0/reset-button-smaller.png[title=Reset button]
 
+== Volume daughterboard
+An optional Volume daughterboard is available for independent left/right channel volume control. It is _not_ tested with v1.0 PCB's and requires an extra ground mod - see the `USBSID-Volume-daughterboard` manual for details.
+
 == License
 include::license-software.adoc[]
 
