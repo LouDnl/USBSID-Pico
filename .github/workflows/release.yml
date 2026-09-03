@@ -106,6 +106,22 @@ jobs:
               withcynthcart: 0,
             }
           - {
+              buildname: Pico_SIDplayer,
+              directory: pico_sp,
+              pico_board: pico,
+              pico_platform: rp2040,
+              withsidplayer: 1,
+              withcynthcart: 0,
+            }
+          - {
+              buildname: Pico_SIDplayer_Cynthcart,
+              directory: pico_sp_cc,
+              pico_board: pico,
+              pico_platform: rp2040,
+              withsidplayer: 1,
+              withcynthcart: 1,
+            }
+          - {
               buildname: Pico_W,
               directory: picow,
               pico_board: pico_w,
@@ -114,17 +130,25 @@ jobs:
               withcynthcart: 0,
             }
           - {
-              buildname: Pico2,
-              directory: pico2,
-              pico_board: pico2,
-              pico_platform: rp2350-arm-s,
-              withsidplayer: 0,
+              buildname: Pico_W_SIDplayer,
+              directory: picow_sp,
+              pico_board: pico_w,
+              pico_platform: rp2040,
+              withsidplayer: 1,
               withcynthcart: 0,
             }
           - {
-              buildname: Pico2_W,
-              directory: pico2w,
-              pico_board: pico2_w,
+              buildname: Pico_W_SIDplayer_Cynthcart,
+              directory: picow_sp_cc,
+              pico_board: pico_w,
+              pico_platform: rp2040,
+              withsidplayer: 1,
+              withcynthcart: 1,
+            }
+          - {
+              buildname: Pico2,
+              directory: pico2,
+              pico_board: pico2,
               pico_platform: rp2350-arm-s,
               withsidplayer: 0,
               withcynthcart: 0,
@@ -138,24 +162,32 @@ jobs:
               withcynthcart: 0,
             }
           - {
-              buildname: Pico2_W_SIDplayer,
-              directory: pico2_w_sp,
-              pico_board: pico2_w,
-              pico_platform: rp2350-arm-s,
-              withsidplayer: 1,
-              withcynthcart: 0,
-            }
-          - {
-              buildname: Pico2_Cynthcart,
-              directory: pico2_cc,
+              buildname: Pico2_SIDplayer_Cynthcart,
+              directory: pico2_sp_cc,
               pico_board: pico2,
               pico_platform: rp2350-arm-s,
               withsidplayer: 1,
               withcynthcart: 1,
             }
           - {
-              buildname: Pico2_W_Cynthcart,
-              directory: pico2_w_cc,
+              buildname: Pico2_W,
+              directory: pico2w,
+              pico_board: pico2_w,
+              pico_platform: rp2350-arm-s,
+              withsidplayer: 0,
+              withcynthcart: 0,
+            }
+          - {
+              buildname: Pico2_W_SIDplayer,
+              directory: pico2w_sp,
+              pico_board: pico2_w,
+              pico_platform: rp2350-arm-s,
+              withsidplayer: 1,
+              withcynthcart: 0,
+            }
+          - {
+              buildname: Pico2_W_SIDplayer_Cynthcart,
+              directory: pico2w_sp_cc,
               pico_board: pico2_w,
               pico_platform: rp2350-arm-s,
               withsidplayer: 1,
