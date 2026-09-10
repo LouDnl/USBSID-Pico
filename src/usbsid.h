@@ -52,35 +52,6 @@ extern volatile uint8_t *cdc_itf, *wusb_itf;
 /* CPU and SID timing */
 extern volatile double cpu_mhz, cpu_us, sid_hz, sid_mhz, sid_us;
 
-/* Emulator flags from usbsid.c */
-#if defined(ONBOARD_CYNTHCART)
-extern volatile bool
-  emulator_running,
-  starting_emulator,
-  stopping_emulator;
-#endif /* ONBOARD_CYNTHCART */
-
-/* SID player flags from usbsid.c */
-#if defined(ONBOARD_SIDPLAYER)
-extern volatile bool
-  sidplayer_init,
-  sidplayer_start,
-  sidplayer_playing,
-  sidplayer_stop,
-  sidplayer_next,
-  sidplayer_prev;
-/* REVERT NOTE: `sidfile` (calloc'd staging buffer) and `sidfile_size`
- * (the announced size from UPLOAD_SID_SIZE) used to live here and get
- * passed to load_prg()/load_sidtune(). Removed: UPLOAD_SID_DATA now feeds
- * usplayer's own tune buffer directly via usplayer_upload_feed(), so there
- * is nothing left to stage or size here. See config.c's UPLOAD_SID_* cases
- * and usplayer.h's "Streaming upload" block. */
-extern volatile char tuneno;
-extern volatile bool is_prg;
-extern volatile uint32_t playtime, maxplaytime;
-#endif /* ONBOARD_SIDPLAYER */
-extern volatile bool is_sidplayerplaying(void); /* Always returns false if no sidplayer available */
-
 /* Runtime flags intercore changeable */
 extern volatile bool offload_ledrunner;
 /* Runtime flags intercore read only */

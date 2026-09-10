@@ -90,12 +90,8 @@ extern uint32_t ADDR_PERSISTENT[];
 /* Default config offset in flash memory */
 #define FLASH_CONFIG_OFFSET (FLASH_PERSISTENT_OFFSET + ((FLASH_PERSISTENT_SIZE / 4) * 3))
 
-/* MIDI expansion: its own partition, directly after Config's, added by the
- * linker script rather than derived a second independent way in C. Both
- * ADDR_CONFIG (linker) and FLASH_CONFIG_OFFSET (the macro above, computed
- * from PICO_FLASH_SIZE_BYTES at compile time) describe the same address by
- * construction; verify_midiconfig_offset() in config.c checks that at boot
- * so the two never quietly drift apart. */
+/* MIDI expansion has its own linker script defined
+ * persistent section after the config one */
 extern uint32_t ADDR_CONFIG[];
 extern uint32_t ADDR_MIDICONFIG[];
 /* Set by verify_midiconfig_offset() at boot; midi_config_save()/load() must

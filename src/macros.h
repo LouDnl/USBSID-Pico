@@ -116,6 +116,9 @@
 #ifndef __us_deprecated
 #define __us_deprecated      __attribute__ ((unused))
 #endif
+#ifndef __us_noreturn
+#define __us_noreturn        __attribute__ ((noreturn))
+#endif
 
 
 #ifdef __cplusplus

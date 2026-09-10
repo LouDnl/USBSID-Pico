@@ -32,6 +32,7 @@
 #include <dma.h>
 #include <logging.h>
 #include <sid.h>
+#include <sid_player.h>
 #include <vu.h>
 
 #include "vu.pio.h"      /* Vu LED handler */

@@ -204,14 +204,9 @@ static void fmopl_write_instrument(uint8_t base, uint8_t slot, const opl_instrum
   return;
 }
 
-/* --- Per-MIDI-channel state -------------------------------------------------
- * What CC_FMEN/Program Change/CC_VOL/CC_PWM (mod wheel)/pitch bend touch.
- * Everything else about an FMOpl-targeted channel (transpose, LFO, arp, ...)
- * is still not wired to OPL, so this is still a much smaller surface than
- * midi_channel_cfg_t. `bend_range` is
- * deliberately NOT duplicated here: midi_channels[channel].bend_range
- * already exists and is channel-scoped regardless of what the channel
- * targets, reused as-is (repo/src/midi_config.h). */
+/* Per-MIDI-channel state touched by CC_FMEN/Program Change/CC_VOL/CC_PWM/
+ * pitch bend. LFO/arp/transpose are not wired to OPL yet. bend_range is
+ * not duplicated here, midi_channels[channel].bend_range is reused as-is. */
 typedef struct {
   uint8_t instrument;   /* index into fmopl_patches[] */
   uint8_t volume;       /* 0-127, CC_VOL - live: rewrites TL on every held voice, not just new notes */
@@ -311,45 +306,20 @@ static void fmopl_apply_live_attenuation(uint8_t channel)
   return;
 }
 
-/* --- Clock-scaled MIDI-note -> (block, Fnum) table -------------------------
- * Mirrors build_note_table()'s own reasoning in midi_handler.c: build once
- * once at init, not per note-on. Uses floating point deliberately, same
- * tradeoff build_note_table() makes (there: fixed-point good enough; here:
- * OPL2's own Fnum formula needs an exponential, and this only ever runs
- * once, not in any audio-rate path) - vu.c already links <math.h> in this
- * exact build.
- *
- * CORRECTED 2026-08-20, confirmed on real hardware: this used to scale the
- * board's own configurable SID clock rate (cfg.clock_rate, ~1MHz) down for
- * Fnum, on the theory that the FMOpl chip shares the same PIO-generated PHI
- * clock every SID socket gets. It doesn't - the user reported every FMOpl
- * note sounding roughly two octaves too high, exactly what dividing by a
- * ~1MHz clock instead of OPL2's real ~3.58MHz produces (Fnum comes out
- * ~3.58x too large for a given pitch). A SID's ~1MHz PHI2 bus clock and an
- * OPL2's internal FM timing are different clock domains entirely; a clone
- * chip sharing a SID socket almost certainly carries its own crystal for
- * the OPL core and only shares the data/address/chip-select lines
- * clear_fmopl_registers_at_addr() already uses - not the clock line. Fixed
- * to the real, standard OPL2 crystal frequency below, same constant every
- * OPL2 chip, clone, and piece of OPL2 software (trackers, DOS games, ...)
- * assumes; no longer tied to the board's SID clock at all. */
+/* Clock-scaled MIDI-note -> (block, Fnum) table, built once at init (not
+ * per note-on). Floating point is deliberate, same tradeoff
+ * build_note_table() makes in midi_handler.c; vu.c already links <math.h>.
+ * FMOPL_CLOCK_HZ is the real OPL2 crystal, independent of cfg.clock_rate -
+ * a clone's OPL core has its own crystal, it doesn't share the SID PHI
+ * clock line. */
 #define FMOPL_NOTE_COUNT 128
 #define FMOPL_CLOCK_HZ 3579545u  /* standard OPL2 crystal (NTSC colorburst x4) - compiled-in default */
 static uint8_t  fmopl_block_table[FMOPL_NOTE_COUNT];
 static uint16_t fmopl_fnum_table[FMOPL_NOTE_COUNT];
 
-/* Runtime override (SYSEX_FMOPL_SET_CLOCK, 0x26 - see sysex.c), 0 = use
- * FMOPL_CLOCK_HZ. Exists because the compiled-in default, though verified
- * against both the general OPL2 spec and SIDKick-pico's own emulator
- * source (frntc/SIDKick-pico, fmopl.c/SKpico.c - it hardcodes the exact
- * same 3579545), still measured wrong on real hardware even after that fix
- * landed - something about a specific clone's actual realised clock isn't
- * fully explained by its own source alone. Rather than guess more constants
- * remotely, this lets it be tuned by ear per board/clone without a
- * firmware rebuild, and whatever value is found to actually work should
- * get folded back into FMOPL_CLOCK_HZ (or a per-clone-type table) once
- * known - this override is a debugging tool, not the intended long-term
- * mechanism for supporting multiple OPL clone types. */
+/* Runtime override (SYSEX_FMOPL_SET_CLOCK, 0x26, sysex.c), 0 = use
+ * FMOPL_CLOCK_HZ. Debugging/tuning knob for per-board clock variance not
+ * explained by the compiled-in default alone. */
 static uint32_t fmopl_clock_override = 0;
 
 /**
@@ -720,10 +690,7 @@ void midi_fmopl_pitch_bend(uint8_t channel, uint8_t lsb, uint8_t msb)
  */
 void midi_fmopl_set_clock(uint32_t hz)
 {
-  /* See fmopl_clock_override's own comment: a debugging/tuning knob, not
-   * the intended long-term way to support multiple OPL clone types. 0
-   * resets to the compiled-in FMOPL_CLOCK_HZ default. */
-  fmopl_clock_override = hz;
+  fmopl_clock_override = hz;  /* 0 resets to the compiled-in FMOPL_CLOCK_HZ default */
   build_fmopl_note_table();
   usMIDI("[FMOPL] Clock override -> %u Hz%s\n", fmopl_effective_clock(), hz ? "" : " (default)");
 

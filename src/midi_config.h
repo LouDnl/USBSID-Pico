@@ -219,22 +219,14 @@ void midi_config_init(void);
 uint16_t midi_channel_effective_mask(uint8_t channel);
 
 
-/* --- Flash persistence ----------------------------------------------------
- *
- * A fixed magic distinct from MAGIC_SMOKE (which is the build date, see
- * globals.h - tying to it would wipe the MIDI blob on every rebuild) plus a
- * version and a CRC32 over everything after the CRC field. `sequence` is a
- * monotonic counter, never a wrapping 0-15 slot index: on load, every one
- * of the 16 sector slots is scanned unconditionally (a fixed 16 iterations,
- * never an open-ended "keep scanning while it looks valid" loop) and the
- * highest-sequence slot that also passes magic+size+crc is the one that
- * gets loaded. Only a magic, size, or CRC failure falls back to defaults -
- * matching PLAN.md's requirement - and is what actually distinguishes "old
- * but valid" from "garbage", rather than a slot's own claimed position
- * (which cannot tell an old written value from a fresh one after the ring
- * has wrapped once; Config's own load loop uses a variant of that weaker
- * scheme, unrelated existing code, not touched here).
- * -------------------------------------------------------------------- */
+/* Flash persistence: fixed magic distinct from MAGIC_SMOKE (the build
+ * date, globals.h - tying to it would wipe the MIDI blob on every
+ * rebuild), plus version and a CRC32 over everything after the CRC field.
+ * `sequence` is a monotonic counter, not a wrapping slot index: on load,
+ * all 16 sector slots are scanned and the highest-sequence slot that also
+ * passes magic+size+crc is loaded. Only magic/size/CRC failure falls back
+ * to defaults - a slot's claimed position alone can't distinguish old
+ * valid data from garbage once the ring has wrapped. */
 
 #define MIDI_CONFIG_MAGIC   0x4D494431u  /* 'MID1', fixed, independent of MAGIC_SMOKE */
 #define MIDI_CONFIG_VERSION 3  /* 2: arp_tables[] added to the blob and

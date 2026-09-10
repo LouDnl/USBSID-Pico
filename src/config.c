@@ -45,6 +45,7 @@
 
 /* SID player */
 #if defined(ONBOARD_SIDPLAYER)
+#include <sid_player.h>
 #include <usplayer.h>
 static int sidbytes_received = 0;
 static bool receiving_sidfile = 0;
@@ -63,7 +64,6 @@ const char __in_flash("us_vars") *us_product = USBSID_PRODUCT;
 /* Declare local variables */
 /* 0x15 (16) max before starting at 0 flash sector erase */
 static uint8_t config_saveid = 0;
-bool midiconfig_offset_ok = false;  /* set by verify_midiconfig_offset(), see config.h */
 /* 256 Bytes MAX == FLASH_PAGE_SIZE (Max storage size is 4096 bytes == FLASH_SECTOR_SIZE) */
 static uint8_t config_array[FLASH_PAGE_SIZE] = {0};
 /* 12 bytes and counting */
@@ -78,6 +78,8 @@ static int cfg_read_writes = 0;
 uint8_t * data_buffer = NULL;
 /* Well, how big is it? */
 volatile int data_buffer_size = 0;
+/* Is it ok? */
+bool midiconfig_offset_ok = false;
 
 
 /**
@@ -98,151 +100,6 @@ void write_back_data(size_t buffersize)
   return;
 }
 
-/**
- * @brief Set the onboard SID player maxplaytime
- *
- * Combines 4x uint8_t from the buffer into a single uint32_t and sets
- * maxplaytime: buffer[1..4] = { FF000000, 00FF0000, 0000FF00, 000000FF } -> 0xFFFFFFFF
- *
- * @param uint8_t * buffer buffer[5] = { CMD, FF000000, 00FF0000, 0000FF00, 000000FF }
- */
-void set_maxplaytime(uint8_t * buffer)
-{
-#if defined(ONBOARD_SIDPLAYER)
-  maxplaytime = ((buffer[1] << 24) | (buffer[2] << 16) | (buffer[3] << 8) | buffer[4]);
-  double maxtimeplayed = maxplaytime / 1000.0; /* Force floating-point division by using 1000.0 */
-  int minutes = (int)(maxtimeplayed / 60); /* Get total whole minutes */
-  double secs = maxtimeplayed - (minutes * 60); /* Get remaining seconds with decimals */
-  usCFG("Max playtime set to ms: %u, maxtimeplayed: %f. Max playtime: %02d:%05.2f\n",
-    maxplaytime, maxtimeplayed, minutes, secs
-  );
-#endif
-  return;
-}
-
-/**
- * @brief Get the onboard SID player current playtime
- *
- * Writes the uint32_t playtime cut into 4x uint8_t, i.e.
- * { FF000000, 00FF0000, 0000FF00, 000000FF }, to the requesting endpoint.
- *
- * @note Does not return anything, writes the buffer directly
- */
-void get_playtime(void)
-{
-#if defined(ONBOARD_SIDPLAYER)
-  if (sidplayer_playing) {
-    playtime = usplayer_playtime_ms();
-  }
-  memset(write_buffer_p, 0, 64);
-  write_buffer_p[0] = (uint8_t)((playtime >> 24) & 0xFF);
-  write_buffer_p[1] = (uint8_t)((playtime >> 16) & 0xFF);
-  write_buffer_p[2] = (uint8_t)((playtime >> 8) & 0xFF);
-  write_buffer_p[3] = (uint8_t)(playtime & 0xFF);
-  write_back_data(4);
-
-  double timeplayed = playtime / 1000.0; /* Force floating-point division by using 1000.0 */
-  int minutes = (int)(timeplayed / 60); /* Get total whole minutes */
-  double secs = timeplayed - (minutes * 60); /* Get remaining seconds with decimals */
-  usCFG("Playtime in ms: %u/%u, timeplayed: %f. Playtime: %02d:%05.2f\n",
-    playtime, maxplaytime, timeplayed, minutes, secs
-  );
-#endif
-  return;
-}
-
-/**
- * @brief Hold one onboard SID player voice of one SID silent while the
- *        tune keeps playing
- *
- * buffer[4] = { CMD, chip, voice, mute }: chip is 1 to 4, voice is 1 to 3,
- * mute is 0 or 1, any higher value in any field discards the command
- * completely.
- *
- * @note use chip = 0, voice = 0, mute 1 or 0 to mute or unmute all
- * @note chip = 0, voice = !0 or too high numbers are invalid combinations
- *
- * @param uint8_t * buffer
- */
-void set_mutestate(uint8_t * buffer)
-{
-#if defined(ONBOARD_SIDPLAYER)
-  if ((buffer[1] == 0 && buffer[2] > 1) /* all chips, no voices specified */
-      || (buffer[1] > 4) /* chip */
-      || (buffer[2] > 3) /* voice */
-      || (buffer[3] > 1) /* mute */) {
-    usWRN("Invalid chip (%u)/ voice (%u)/ mute (%u) combination!\n",
-      buffer[1], buffer[2], buffer[3]);
-    return;
-  }
-
-  uint8_t chip  = buffer[1];
-  uint8_t voice = buffer[2];
-  bool mute = buffer[3];
-
-  if (chip == 0 && voice == 0) {
-    usCFG("%s all chips & all voices\n",
-      (mute ? "Muting" : "Unmuting"));
-    for (int s = 1; s < 5; s++) {
-      usCFG("  Chip %d\n", s);
-      usplayer_set_chip_mute(s, mute);
-      for (int v = 1; v < 4; v++) {
-        usNFO(" Voice %d", v);
-        usplayer_set_voice_mute(s, v, mute);
-      }
-      usNFO("\n");
-    }
-  } else if (voice == 0) {
-    usCFG("%s chip %u\n",
-      (mute ? "Muting" : "Unmuting"), chip);
-      usplayer_set_chip_mute(chip, mute);
-  } else {
-    usCFG("%s voice %u on chip %u\n",
-      (mute ? "Muting" : "Unmuting"), chip, voice);
-    usplayer_set_voice_mute(chip, voice, mute);
-  }
-  return;
-#endif
-}
-
-/**
- * @brief Get the onboard SID player mute state of all chips and voices
- *
- * Writes { uint8_t chips, uint8_t chip1, uint8_t chip2, uint8_t chip3,
- * uint8_t chip4 } to the requesting endpoint, where the chips byte packs
- * per-chip mute bits and each chipN byte packs its 3 voice mute bits
- * (0b111 = voices 3, 2, 1).
- *
- * @note does not return anything, writes the buffer directly
- */
-void get_mutestate(void)
-{
-#if defined(ONBOARD_SIDPLAYER)
-  uint8_t chips = 0, chip1 = 0, chip2 = 0, chip3 = 0, chip4 = 0;
-  if (sidplayer_playing) {
-    chips = usplayer_chip_mute();
-    chip1 = usplayer_voice_mute(1);
-    chip2 = usplayer_voice_mute(2);
-    chip3 = usplayer_voice_mute(3);
-    chip4 = usplayer_voice_mute(4);
-  }
-  memset(write_buffer_p, 0, 64);
-  write_buffer_p[0] = chips;
-  write_buffer_p[1] = chip1;
-  write_buffer_p[2] = chip2;
-  write_buffer_p[3] = chip3;
-  write_buffer_p[4] = chip4;
-  write_back_data(5);
-
-  usCFG("SID player mute state\n");
-  usCFG("  CHIPS :%04b\n", chips);
-  usCFG("  CHIP 1:%03b\n", chip1);
-  usCFG("  CHIP 2:%03b\n", chip2);
-  usCFG("  CHIP 3:%03b\n", chip3);
-  usCFG("  CHIP 4:%03b\n", chip4);
-  return;
-#endif
-}
 
 /**
  * @brief Returns true if either of the variables is true
@@ -1890,18 +1747,17 @@ int return_clockrate(void)
 /**
  * @brief Change the SID clock rate to the given clockrates table entry
  *
- * No-op if an external clock is in use or the clockrate is locked, or if
- * the requested rate already matches the current one. Otherwise updates
- * `clock_rate`/`refresh_rate`/`raster_rate` and the derived `sid_hz`/
- * `sid_mhz`/`sid_us` cycled-write timing variables, then aborts in-flight
- * DMA bus transfers and restarts the bus clocks/PIOs.
+ * No-op if an external/locked clock, or already at the requested rate.
  *
  * @param int n_clock index into the `clockrates` table
- * @param bool suspend_sids when true, disables the SIDs (RES low) before
- *        the clock change and re-enables/unmutes them afterwards
+ * @param bool suspend_sids disable/unmute SIDs around the clock change
  */
 void apply_clockrate(int n_clock, bool suspend_sids)
 {
+  if (n_clock < 0 || n_clock >= (int)count_of(clockrates)) {
+    usCFG("apply_clockrate: index %d out of range, ignoring\n", n_clock);
+    return;
+  }
   if (!usbsid_config.external_clock) {
     if (!usbsid_config.lock_clockrate) {
       if (clockrates[n_clock] != usbsid_config.clock_rate) {
@@ -1922,7 +1778,8 @@ void apply_clockrate(int n_clock, bool suspend_sids)
           clock_get_hz(clk_sys), cpu_mhz, cpu_us);
         usCFG("  C64 SID Clock @ %.0f Hz, %.6f MHz, %.4f uS\n",
           sid_hz, sid_mhz, sid_us);
-        /* Start clock set */
+        /* bus_heavy_op_begin()/_end() bracket this DMA/PIO restart, see bus.h. */
+        bus_heavy_op_begin();
         abort_dma_bustransfers();
         restart_bus_clocks();
         sync_pios(false);
@@ -1930,6 +1787,7 @@ void apply_clockrate(int n_clock, bool suspend_sids)
           usCFG("Enable SID's and UnMute\n");
           enable_sid(true);
         }
+        bus_heavy_op_end();
         // ISSUE: WHEN THE BUS IS RESTARTED THE CRACKLING ON CYCLE EXACT TUNES IS IMMENSE!
         // THIS IS AFTER PAL -> NTSC -> PAL
         // restart_bus();

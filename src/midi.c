@@ -43,6 +43,7 @@
 
 #if defined(ONBOARD_CYNTHCART)
 #include <usbsid.h> /* emulator variables */
+#include <sid_player.h> /* emulator variables */
 #include <cynthcart_embedded.h> /* Cynthcart ~ USBSID-Player */
 queue_t cynthcart_queue;
 #endif /* ONBOARD_CYNTHCART */

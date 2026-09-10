@@ -889,7 +889,7 @@ DetectionResult detect_all(void)
  * @param bool at_boot
  * @return ConfigError CFG_OK on success, otherwise the error from applying detection results or config
  */
-ConfigError sid_auto_detect(bool at_boot)
+static ConfigError sid_auto_detect_impl(bool at_boot)
 {
 #if PCB_VERSION_INT >= 15
   /* Set base voltages, only does anything if PCB version is >= v1.5 */
@@ -941,6 +941,22 @@ ConfigError sid_auto_detect(bool at_boot)
   voltage_state_off(); /* Turn off regulators after detection routine */
 #endif
   return CFG_OK;
+}
+
+/**
+ * @brief Handles chip and SID detection and configuration changes
+ * @note Wraps sid_auto_detect_impl() with bus_heavy_op_begin()/_end()
+ * (bus.h) so it always runs despite the impl's several early returns.
+ *
+ * @param bool at_boot
+ * @return * ConfigError
+ */
+ConfigError sid_auto_detect(bool at_boot)
+{
+  bus_heavy_op_begin();
+  ConfigError result = sid_auto_detect_impl(at_boot);
+  bus_heavy_op_end();
+  return result;
 }
 
 /**

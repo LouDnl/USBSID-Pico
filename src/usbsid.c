@@ -43,7 +43,13 @@
 #include <midi_handler.h>
 #include <asid.h>
 #include <logging.h>
-
+#if defined(ONBOARD_SIDPLAYER)
+#include <sid_player.h>
+#include <usplayer.h>
+#if defined(ONBOARD_CYNTHCART)
+#include <cynthcart_embedded.h>
+#endif
+#endif
 
 /* Declare variables ~ Do not change order to keep memory alignment! */
 uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);  /* 64 Bytes, 128 bytes aligned */
@@ -96,45 +102,6 @@ volatile bool sid_change_unacknowledged = true;
 #else
 const bool detected_sid_change = false;
 #endif
-
-/* SID player */
-#if defined(ONBOARD_SIDPLAYER)
-#include <usplayer.h>
-volatile bool sidplayer_init = false;
-volatile bool sidplayer_start = false;
-volatile bool sidplayer_playing = false;
-/**
- * @brief Check whether the onboard SID player is currently playing
- *
- * @return bool current sidplayer_playing state
- */
-volatile bool is_sidplayerplaying(void) { return sidplayer_playing; };
-volatile bool sidplayer_stop = false;
-volatile bool sidplayer_next = false;
-volatile bool sidplayer_prev = false;
-volatile char tuneno = 0;
-volatile bool is_prg = false; /* Default to SID file */
-volatile uint32_t playtime = 0;
-volatile uint32_t maxplaytime = 300000; /* 5 minutes in milliseconds */
-/* Cynthcart, via USBSID-Player's MC68B50 ACIA */
-#if defined(ONBOARD_CYNTHCART)
-#include <cynthcart_embedded.h>
-volatile bool emulator_running = false;
-volatile bool starting_emulator = false;
-volatile bool stopping_emulator = false;
-#else
-volatile bool emulator_running = false;
-#endif /* ONBOARD_CYNTHCART */
-#else
-/**
- * @brief Check whether the onboard SID player is currently playing
- *
- * @note Stub used when ONBOARD_SIDPLAYER is not compiled in; always false
- *
- * @return bool always false
- */
-volatile bool is_sidplayerplaying(void) { return false; };
-#endif /* ONBOARD_SIDPLAYER */
 
 /* Queues */
 queue_t sidtest_queue;
@@ -316,6 +283,7 @@ void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
  */
 void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volatile uint32_t * n)
 {
+  bus_try_claim(BUS_OWNER_USB); /* USB always wins the claim, see bus.c */
   set_vu_action(); /* Keep that shiny Vu blinking! */
   uint8_t command = ((sid_buffer[0] & PACKET_TYPE) >> 6);
   uint8_t subcommand = (sid_buffer[0] & COMMAND_MASK);
@@ -521,22 +489,24 @@ void tud_midi_rx_cb(uint8_t itf)
 
 /* USB CDC CLASS TASKS & CALLBACKS */
 
-#ifndef USE_CDC_CALLBACK
+#if 0
 /**
  * @brief Poll the CDC interface for available data and process it
+ * NOTE: Deprecated but kept as historical information
  *
- * Same as the tud_cdc_rx_cb callback routine, used instead of it when
- * USE_CDC_CALLBACK is not defined. Reads available bytes into read_buffer,
- * copies them into sid_buffer, and hands off to process_buffer.
+ * Same as the tud_cdc_rx_cb callback routine. Used in the Core0 main
+ * loop if tud_cdc_rx_cb is not defined.
+ * Reads available bytes into read_buffer, copies them into sid_buffer
+ * and hands off to process_buffer.
  */
-void cdc_task(void)
+void __us_deprecated cdc_task(void)
 { /* Same as the callback routine */
-  if (tud_cdc_n_connected(CDC_ITF)) {
-    if (tud_cdc_n_available(CDC_ITF) > 0) {
-      cdc_itf = CDC_ITF;
+  if (tud_cdc_n_connected(CDC_ITF1)) {
+    if (tud_cdc_n_available(CDC_ITF1) > 0) {
+      cdc_itf = CDC_ITF1;
       set_receivedata(true), dtype = cdc, rtype = cdc;
-      cdcread = tud_cdc_n_read(CDC_ITF, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
-      tud_cdc_n_read_flush(CDC_ITF);
+      cdcread = tud_cdc_n_read(CDC_ITF1, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
+      tud_cdc_n_read_flush(CDC_ITF1);
       memcpy(sid_buffer, read_buffer, cdcread);
       process_buffer(cdc_itf, &cdcread);
       return;
@@ -558,9 +528,8 @@ void cdc_task(void)
  */
 void tud_cdc_rx_cb(uint8_t itf)
 { /* No need to check available bytes for reading */
-#ifdef USE_CDC_CALLBACK
-  if __us_likely(itf == CDC_ITF) {
-    if (tud_cdc_n_available(CDC_ITF)) {
+  if __us_likely((itf == CDC1_ITF) || (itf == CDC2_ITF)) {
+    if (tud_cdc_n_available(itf)) {
       cdc_itf = &itf;
       set_receivedata(true), dtype = cdc, rtype = cdc;
       cdcread = tud_cdc_n_read(*cdc_itf, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
@@ -570,9 +539,6 @@ void tud_cdc_rx_cb(uint8_t itf)
       return;
     }
   }
-#else
-  (void)itf;
-#endif
   return;
 }
 
@@ -662,16 +628,17 @@ void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 
 /* WEBUSB VENDOR CLASS TASKS & CALLBACKS */
 
-#ifndef USE_VENDOR_CALLBACK
+#if 0
 /**
  * @brief Poll the WebUSB vendor interface for available data and process it
+ * NOTE: Deprecated but kept as historical information
  *
- * Same as the tud_vendor_rx_cb callback routine, used instead of it when
- * USE_VENDOR_CALLBACK is not defined. If the fifo buffer is disabled this
- * function has no use. Reads available bytes into read_buffer, copies them
- * into sid_buffer, and hands off to process_buffer.
+ * Same as the tud_vendor_rx_cb callback routine, used in main loop instead
+ * of interrupt callback. If the fifo buffer is disabled this function has
+ * no use. Reads available bytes into read_buffer, copies them into sid_buffer,
+ * and hands off to process_buffer.
  */
-void vendor_task(void)
+void __us_deprecated vendor_task(void)
 { /* Same as the callback routine */
   /* If the fifo buffer is disabled, this function has no use */
   if (web_serial_connected) {
@@ -706,7 +673,6 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
   /* If the fifo buffer is enabled the buffer contains data from the previous read */
 
   /* vendor class has no connect check, so we use a makeshift check */
-#ifdef USE_VENDOR_CALLBACK
   if __us_likely(itf == WUSB_ITF && web_serial_connected) {
       wusb_itf = &itf; /* Since there's only 1 vendor interface, we know it's 0 */
       set_receivedata(true), dtype = wusb, rtype = wusb;
@@ -717,9 +683,6 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
       process_buffer(wusb_itf, &webread);
     return;
   }
-#else
-  (void)itf;
-#endif
   return;
 }
 

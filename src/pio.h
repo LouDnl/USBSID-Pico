@@ -49,18 +49,19 @@
 
 /* NOTICE: PIO & Statemachine usage
  * PIO0 ~ bus_pio
- * SM0: sm_clock   - PHI1 SID clock (clock.pio / pio.c)
- * SM1: sm_control - Bus control write and data read (bus_control.pio / pio.c)
- * SM2: sm_data    - Data and address bus write (bus_control.pio / pio.c)
- * SM3: sm_delay   - Delay cycle counter interrupt for bus SM1 & SM2 (bus_control.pio / pio.c)
+ * SM0: sm_clock   - (fixed) PHI1 SID clock (clock.pio / pio.c)
+ * SM1: sm_control - (fixed) Bus control write and data read (bus_control.pio / pio.c)
+ * SM2: sm_data    - (fixed) Data and address bus write (bus_control.pio / pio.c)
+ * SM3: sm_delay   - (fixed) Delay cycle counter interrupt for bus SM1 & SM2 (bus_control.pio / pio.c)
  * PIO1 ~ led_pio & clkcnt_pio
- * SM0: Buffer raster cycle counter (ASID) (bus_control.pio / asid_buffer.c)
- * SM1: sm_pwmled  - LED PWM control (Non Wifi boards only, unused otherwise) (vu.pio)
- * SM2: sm_rgbled  - RGB LED control (as LED but for RGB Boards only, unused otherwise) (vu_rgb.pio)
- * SM3: sm_clkcnt  - PHI1 Clock cycle counter (cycle_counter.pio)
+ * On the pico_w the BT & WiFi (when used) is offloaded to this PIO, with automatic free SM assignment
+ * SM0: sm_buffer  - (fixed) Buffer raster cycle counter (ASID) (bus_control.pio / asid_buffer.c)
+ * SM1: sm_pwmled  - (variable) LED PWM control (Non Wifi boards only, unused otherwise) (vu.pio)
+ * SM2: sm_rgbled  - (variable) RGB LED control (as LED but for RGB Boards only, unused otherwise) (vu_rgb.pio)
+ * SM3: sm_clkcnt  - (fixed) PHI1 Clock cycle counter (cycle_counter.pio)
  * PIO2 (rp2350 only!)
- * On the pico2_w the BT & WiFi (when used) is offloaded to this PIO, unknown is what SM it uses
- * SM0: Uart RX (uart_rx.pio / uart.c)
+ * On the pico2_w the BT & WiFi (when used) is offloaded to this PIO, with automatic free SM assignment
+ * SM0: sm_uartrx  - (fixed) Uart RX (uart_rx.pio / uart.c) // ISSUE: The SM number is not defined, it's initialised static
  * SM1:
  * SM2:
  * SM3:
