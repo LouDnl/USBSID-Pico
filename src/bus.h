@@ -43,6 +43,16 @@ uint16_t cycled_delayed_write_operation(uint8_t address, uint8_t data, uint16_t 
 void     cycled_write_operation(uint8_t address, uint8_t data, uint16_t cycles);
 uint8_t  cycled_read_operation(uint8_t address, uint16_t cycles);
 
+/* Bus ownership traffic controller for multi-transport access */
+typedef enum {
+  BUS_OWNER_NONE = 0,
+  BUS_OWNER_USB,
+  BUS_OWNER_NET,
+  BUS_OWNER_PLAYER,
+  BUS_OWNER_MIDI
+} bus_owner_t;
+
+
 /* Functions from bus.c */
 void     bus_lock_init(void);
 void     restart_bus(void);
@@ -50,7 +60,20 @@ int      bus_drain(void);
 void     bus_resync(void);
 uint32_t clockcycles(void);
 void     clockcycle_delay(uint32_t n_cycles);
+bool    bus_try_claim(bus_owner_t who);  /* true if `who` now owns the bus */
+void    bus_touch(bus_owner_t who);      /* refresh idle timer */
+void    bus_release(bus_owner_t who);
+bus_owner_t bus_current_owner(void);
 
+/* Heavy-operation exclusion, separate from the ownership arbiter above -
+ * bus_current_owner() can't be reused since BUS_OWNER_USB never releases.
+ * Dedicated flag set only around apply_clockrate(), sid_auto_detect() and
+ * reset_sid()/reset_sid_registers(), which corrupt concurrent cyw43
+ * SPI/DMA activity; see usbsid.c's core 0 loop for the matching
+ * cyw43_arch_poll()/net_wifi_update() skip. */
+void    bus_heavy_op_begin(void);
+void    bus_heavy_op_end(void);
+bool    bus_heavy_op_active(void);
 
 #ifdef __cplusplus
   }

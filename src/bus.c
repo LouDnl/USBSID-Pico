@@ -28,6 +28,7 @@
 #include <logging.h>
 #include <config.h>
 #include <gpio_defs.h>
+#include <bus.h>
 #include <pio.h>
 #include <dma.h>
 #include <vu.h>
@@ -40,10 +41,9 @@
 /* Both bus handshake flags in one write (write 1 to clear) */
 #define BUS_IRQ_MASK ((1u << PIO_IRQ0) | (1u << PIO_IRQ1))
 
-/* Bounded spin for `bus_drain`
- * A single in flight operation can hold the pipeline for up to
- * 65535 PHI1 cycles (~66ms @1MHz), so the bound needs to exceed that
- * by a good margin before we call the pipeline stuck */
+/* Bounded spin for `bus_drain`. A single in-flight operation can hold the
+ * pipeline for up to 65535 PHI1 cycles (~66ms @1MHz); bound set well above
+ * that. */
 #define BUS_DRAIN_TIMEOUT 2000000u
 
 /* DMA bus data variables */
@@ -51,21 +51,11 @@ volatile static uint8_t control_word, read_data;
 volatile static uint16_t delay_word;
 volatile static uint32_t data_word, dir_mask;
 
-/* Bus lock.
- *
- * `control_word` / `data_word` / `delay_word` above, the four shared DMA
- * channels they feed, and `sid_memory[]` are written by every operation
- * below. Until the MIDI engine moved onto core1 (see midi_engine.c), core0
- * was the only writer and this was safe by convention. It no longer is:
- * core1 already writes the bus when `ONBOARD_SIDPLAYER` is running, and now
- * does so for MIDI too, so overlap between the two cores is routine rather
- * than theoretical.
- *
- * A claimed hardware spinlock, not a software one: `spin_lock_blocking()`
- * also disables interrupts for the critical section's duration, which is
- * exactly the handful of cycles it takes to set the shared words and kick
- * the DMA trigger. The blocking wait itself only happens if the other core
- * is mid write, which is rare and short. */
+/* Bus lock: guards control_word/data_word/delay_word, the four shared DMA
+ * channels, and sid_memory[] - written from both cores now (core1 runs
+ * ONBOARD_SIDPLAYER and MIDI). Hardware spinlock, not software:
+ * spin_lock_blocking() disables interrupts for the few cycles it takes to
+ * set the words and kick the DMA trigger. */
 static spin_lock_t *bus_spinlock = NULL;
 
 /**
@@ -90,7 +80,7 @@ void bus_lock_init(void)
  */
 inline static int __not_in_flash_func(set_bus_bits)(uint8_t address, bool write)
 {
-  /* usCFG("[BUS BITS]$%02X:%02X ", address, data); */
+  /* usBUS("[BUS BITS]$%02X:%02X ", address, data); */
   if __us_likely(write) {
     control_word = 0b111000;
     dir_mask = 0b1111111111111111;  /* Always OUT never IN */
@@ -126,7 +116,7 @@ inline static int __not_in_flash_func(set_bus_bits)(uint8_t address, bool write)
       break;
   }
   data_word = (dir_mask << 16) | data_word;
-  /* usCFG("$%02X:%02X $%04X 0b%032b $%04X 0b%016b\n",
+  /* usBUS("$%02X:%02X $%04X 0b%032b $%04X 0b%016b\n",
     address, data, data_word, data_word, control_word, control_word); */
   return 1;
 }
@@ -511,7 +501,7 @@ uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, ui
  */
 void restart_bus(void)
 {
-  usDBG("Restarting BUS\n");
+  usBUS("Restarting BUS\n");
   /* unclaim all dma channels */
   unclaim_dma_channels();
   /* stop all pio's */
@@ -523,7 +513,7 @@ void restart_bus(void)
   setup_vu_dma(); /* Unclaimed in unclaim dma channels */
   /* sync pios */
   sync_pios(false);
-  usDBG("Finished restarting BUS\n");
+  usBUS("Finished restarting BUS\n");
   return;
 }
 
@@ -561,4 +551,137 @@ void clockcycle_delay(uint32_t n_cycles)
     end = clockcycles();
   } while ((uint32_t)(end - now) < n_cycles);
   return;
+}
+
+
+/* The Bus Traffic Controller lives here */
+
+/* Idle timeout in milliseconds - 750ms before owner considered inactive */
+#define BUS_OWNER_IDLE_MS 750
+
+/* Owner tracking - volatile for cross-core access */
+static volatile bus_owner_t current_owner = BUS_OWNER_NONE;
+static volatile uint32_t last_touch_time_ms = 0;
+
+/**
+ * @brief Try to claim the bus for a given owner
+ *
+ * USB always wins on claim (force flag) to preserve existing behavior.
+ * Other owners must wait until idle timeout expires or explicit release.
+ *
+ * @param who owner attempting to claim
+ * @return true if claim succeeded, false if bus held by another owner
+ */
+bool bus_try_claim(bus_owner_t who) {
+  uint32_t irq = spin_lock_blocking(bus_spinlock);
+
+  if (who == BUS_OWNER_USB) {
+    /* USB always wins - force claim */
+    current_owner = who;
+    last_touch_time_ms = time_us_64() / 1000;
+    spin_unlock(bus_spinlock, irq);
+    return true;
+  }
+
+  if (current_owner == BUS_OWNER_NONE || current_owner == who) {
+    /* Bus is free, or `who` already owns it - claim/refresh it */
+    current_owner = who;
+    last_touch_time_ms = time_us_64() / 1000;
+    spin_unlock(bus_spinlock, irq);
+    return true;
+  }
+
+  /* Check if current owner has been idle long enough */
+  uint32_t now_ms = time_us_64() / 1000;
+  if ((now_ms - last_touch_time_ms) > BUS_OWNER_IDLE_MS) {
+    /* Idle timeout expired - steal the bus */
+    current_owner = who;
+    last_touch_time_ms = now_ms;
+    spin_unlock(bus_spinlock, irq);
+    return true;
+  }
+
+  /* Bus still held by active owner */
+  spin_unlock(bus_spinlock, irq);
+  return false;
+}
+
+/**
+ * @brief Touch the current owner to refresh idle timer
+ *
+ * Call this periodically while actively using the bus.
+ * Prevents automatic ownership transfer during long operations.
+ *
+ * @param who owner touching (must be current owner)
+ */
+void bus_touch(bus_owner_t who) {
+  uint32_t irq = spin_lock_blocking(bus_spinlock);
+  if (who == current_owner || who == BUS_OWNER_USB) {
+    last_touch_time_ms = time_us_64() / 1000;
+  }
+  spin_unlock(bus_spinlock, irq);
+}
+
+/**
+ * @brief Release the bus for the given owner
+ *
+ * Call this when done using the bus to allow other owners to claim it.
+ *
+ * @param who owner releasing the bus
+ */
+void bus_release(bus_owner_t who) {
+  uint32_t irq = spin_lock_blocking(bus_spinlock);
+  if (who == current_owner) {
+    current_owner = BUS_OWNER_NONE;
+  }
+  spin_unlock(bus_spinlock, irq);
+}
+
+/**
+ * @brief Get the current bus owner
+ *
+ * @return current owner, or BUS_OWNER_NONE if bus is free
+ */
+bus_owner_t bus_current_owner(void) {
+  uint32_t irq = spin_lock_blocking(bus_spinlock);
+  bus_owner_t owner = current_owner;
+  spin_unlock(bus_spinlock, irq);
+  return owner;
+}
+
+/* Heavy-operation exclusion - see the comment on these in bus.h. A counter
+ * rather than a bool so a heavy op that itself calls another heavy op
+ * (e.g. sid_auto_detect() internally touching apply_clockrate()-adjacent
+ * code) can't have the inner op's end() prematurely clear the flag while
+ * the outer op is still running. */
+static volatile int heavy_op_depth = 0;
+
+/**
+ * @brief Enter a heavy-operation section (see bus.h)
+ */
+void bus_heavy_op_begin(void) {
+  uint32_t irq = spin_lock_blocking(bus_spinlock);
+  heavy_op_depth++;
+  spin_unlock(bus_spinlock, irq);
+}
+
+/**
+ * @brief Leave a heavy-operation section (see bus.h)
+ */
+void bus_heavy_op_end(void) {
+  uint32_t irq = spin_lock_blocking(bus_spinlock);
+  if (heavy_op_depth > 0) heavy_op_depth--;
+  spin_unlock(bus_spinlock, irq);
+}
+
+/**
+ * @brief Check whether a heavy-operation section is currently active
+ *
+ * @return true if a heavy operation is in progress
+ */
+bool bus_heavy_op_active(void) {
+  uint32_t irq = spin_lock_blocking(bus_spinlock);
+  bool active = heavy_op_depth > 0;
+  spin_unlock(bus_spinlock, irq);
+  return active;
 }
