@@ -105,16 +105,9 @@
 #define MIN_CYCLES 6  /* 10 cycles for non cycled writes when in sequence */
 #endif
 
-#ifndef USE_CDC_CALLBACK
-#define USE_CDC_CALLBACK 1  /* Force CDC callback use over cdc_task */
-#endif
-
-#ifndef USE_VENDOR_CALLBACK
-#define USE_VENDOR_CALLBACK 1  /* Force Vendor callback use over vendor_task */
-#endif
-
 /* Global USB definitions */
-#define CDC_ITF 0
+#define CDC1_ITF 0
+#define CDC2_ITF 1
 #define MIDI_ITF 0
 #define WUSB_ITF 0
 #define MIDI_CABLE 0
