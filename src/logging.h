@@ -77,27 +77,35 @@ do {                   \
 #define usERR(fmt, ...) __DBG("[ERROR] " fmt __VA_OPT__(,) __VA_ARGS__) /* Error logging, cannot be turned off */
 #define usWRN(fmt, ...) __DBG("[WARNING] " fmt __VA_OPT__(,) __VA_ARGS__) /* Warning logging, cannot be turned off */
 
-#ifdef USBSID_DEBUG
-#define usDBG(fmt, ...) __DBG("[DBG] " fmt __VA_OPT__(,) __VA_ARGS__)
-#define usSID(fmt, ...) __DBG("[SID] " fmt __VA_OPT__(,) __VA_ARGS__)
-#else
-#define usDBG(...) ((void)0)
-#define usSID(...) ((void)0)
-#endif
-
 #ifdef USBSID_BOOTLOG
 #define usBOOT(fmt, ...) __DBG("[BOOT] " fmt __VA_OPT__(,) __VA_ARGS__)
 #else
 #define usBOOT(...) ((void)0)
 #endif
 
-#ifdef CONFIG_DEBUG
-#define usCFG(fmt, ...)  __DBG("[CFG] " fmt __VA_OPT__(,) __VA_ARGS__)
+#ifdef USBSID_DEBUG
+#define usDBG(fmt, ...)  __DBG("[DBG] " fmt __VA_OPT__(,) __VA_ARGS__)
+#define usSID(fmt, ...)  __DBG("[SID] " fmt __VA_OPT__(,) __VA_ARGS__)
 #define usBUS(fmt, ...)  __DBG("[BUS] " fmt __VA_OPT__(,) __VA_ARGS__)
+#define usMIDI(fmt, ...) __DBG("[MIDI] " fmt __VA_OPT__(,) __VA_ARGS__)
+#else
+#define usDBG(...)  ((void)0)
+#define usSID(...)  ((void)0)
+#define usBUS(...)  ((void)0)
+#define usMIDI(...) ((void)0)
+#endif
+
+#ifdef CONFIG_DEBUG /* And pico internals debugging */
+#define usCFG(fmt, ...)  __DBG("[CFG] " fmt __VA_OPT__(,) __VA_ARGS__)
+#define usPIN(fmt, ...)  __DBG("[GPIO] " fmt __VA_OPT__(,) __VA_ARGS__)
+#define usPIO(fmt, ...)  __DBG("[PIO] " fmt __VA_OPT__(,) __VA_ARGS__)
+#define usDMA(fmt, ...)  __DBG("[DMA] " fmt __VA_OPT__(,) __VA_ARGS__)
 #define usSOCK(fmt, ...) __DBG("[SOCK] " fmt __VA_OPT__(,) __VA_ARGS__)
 #else
 #define usCFG(...)  ((void)0)
-#define usBUS(...)  ((void)0)
+#define usPIN(...)  ((void)0)
+#define usPIO(...)  ((void)0)
+#define usDMA(...)  ((void)0)
 #define usSOCK(...) ((void)0)
 #endif
 
@@ -120,10 +128,8 @@ do {                   \
 #endif
 
 #ifdef MIDI_DEBUG
-#define usMIDI(fmt, ...) __DBG("[MIDI] " fmt __VA_OPT__(,) __VA_ARGS__)
 #define usMCMD(...) __DBG(__VA_ARGS__)
 #else
-#define usMIDI(...) ((void)0)
 #define usMCMD(...) ((void)0)
 #endif
 
@@ -139,6 +145,24 @@ do {                   \
 #define usASID(fmt, ...) __DBG("[ASID] " fmt __VA_OPT__(,) __VA_ARGS__)
 #else
 #define usASID(...) ((void)0)
+#endif
+
+#ifdef USE_WIFI
+#define usWFI(fmt, ...) __DBG("[WIFI] " fmt __VA_OPT__(,) __VA_ARGS__)
+#else
+#define usWFI(...) ((void)0)
+#endif
+
+#ifdef USE_BLUETOOTH
+#define usBTH(fmt, ...) __DBG("[BT] " fmt __VA_OPT__(,) __VA_ARGS__)
+#else
+#define usBTH(...) ((void)0)
+#endif
+
+#ifdef USE_NSD
+#define usNSD(fmt, ...) __DBG("[NSD] " fmt __VA_OPT__(,) __VA_ARGS__)
+#else
+#define usNSD(...) ((void)0)
 #endif
 
 
