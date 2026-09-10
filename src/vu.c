@@ -226,11 +226,16 @@ void __no_inline_not_in_flash_func(led_breathe_task)(void)
 
 /**
  * @brief Blinky blinky on SID change :D
- * Auto loops Core2 when SID has changed
+ * Auto loops Core1 when SID has changed
+ * Runs on Core0 when pico_w or pico2_w
  *
  */
 void __no_inline_not_in_flash_func(led_fast_blink)(void)
 {
+#if defined(CYW43_WL_GPIO_LED_PIN)
+  /* Return if Core0 is not the caller when pico_w or pico2_w */
+  if (get_core_num() != 0) return;
+#endif
   if (to_us_since_boot(get_absolute_time()) - us_now < BLINK_INTV) {
     /* do nothing */
     return;

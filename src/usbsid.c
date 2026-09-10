@@ -43,12 +43,27 @@
 #include <midi_handler.h>
 #include <asid.h>
 #include <logging.h>
+#ifdef USE_WIFI
+#include <net_wifi.h>
+#include <net_wifi_config.h>
+#endif
+#ifdef USE_NSD
+#include <nsd.h>
+#endif
 #if defined(ONBOARD_SIDPLAYER)
 #include <sid_player.h>
 #include <usplayer.h>
 #if defined(ONBOARD_CYNTHCART)
 #include <cynthcart_embedded.h>
 #endif
+#endif
+
+#if !defined(USE_WIFI) && defined(USE_BLUETOOTH)
+/**
+ * @brief Stub function when using bluetooth but not wifi
+ *
+ */
+void net_wifi_update(void) { return; }
 #endif
 
 /* Declare variables ~ Do not change order to keep memory alignment! */

@@ -107,6 +107,51 @@ extern bool midiconfig_offset_ok;
 /* Max config size = 256 Bytes == FLASH_PAGE_SIZE (FLASH_SECTOR_SIZE / 16 config saves) */
 #define CONFIG_SIZE (FLASH_SECTOR_SIZE / 16)
 
+/* WiFi credentials live in their own page, well away from Config: Config's
+ * full contents are serialised back to the host by read_config() (any
+ * WebUSB page could read it), and a PSK must never travel that path.
+ *
+ * Persistent region layout (usbsidpico-rp2040/-rp2350/-rp2350b.ld):
+ *   quarter 0-2 - free
+ *   quarter 3   - ADDR_CONFIG (16 x 256B slots), then ADDR_MIDICONFIG (16 x 4K slots, 64KB)
+ * FLASH_WIFI_OFFSET below sits at quarter index 2, inside the unclaimed
+ * first three quarters. */
+#define FLASH_WIFI_OFFSET (FLASH_PERSISTENT_OFFSET + ((FLASH_PERSISTENT_SIZE / 4) * 2))
+/* Same 16-slot wear-levelling shape as Config (CONFIG_SIZE/MIDICONFIG_SAVE_SLOTS) */
+#define WIFICONFIG_SAVE_SLOTS 16
+#define WIFICONFIG_SIZE       (FLASH_SECTOR_SIZE / 16) /* 256B page, same as Config */
+
+typedef struct WifiConfig {
+  uint32_t magic;             /* MAGIC_SMOKE, same wipe-on-rebuild semantics as Config */
+  uint8_t  version;
+  uint8_t  save_id;           /* 16-slot wear levelling, mirrors load_config()/save_config() */
+  char     ssid[33];
+  char     psk[64];           /* NEVER serialised back to the host, see read_config() */
+  char     hostname[24];      /* discovery + LWIP_NETIF_HOSTNAME, default "USBSID-Pico" */
+  uint16_t nsd_port;          /* default 6581 */
+  struct {
+    bool wifi_enabled      : 1;
+    bool nsd_enabled       : 1;
+    bool bt_nsd_enabled    : 1;
+    bool discovery_enabled : 1;
+  } flags;
+} WifiConfig;
+
+#define WIFICONFIG_DEFAULT_INIT { \
+  .magic = MAGIC_SMOKE, \
+  .version = 1, \
+  .save_id = 0, \
+  .ssid = {0}, \
+  .psk = {0}, \
+  .hostname = "USBSID-Pico", \
+  .nsd_port = 6581, \
+  .flags = { \
+    .wifi_enabled = false, \
+    .nsd_enabled = true, \
+    .bt_nsd_enabled = false, \
+    .discovery_enabled = true, \
+  }, \
+}
 
 /* USBSID-Pico config struct */
 typedef struct SIDChip {
@@ -366,6 +411,20 @@ enum
   SAVE_MIDI_STATE  = 0x61,
   RESET_MIDI_STATE = 0x63,
 
+  /* Network SID Device (WiFi/Bluetooth) provisioning. Only meaningfully
+   * handled when USE_WIFI or USE_BLUETOOTH is compiled in; a plain
+   * pico/pico2 build replies ERROR (see handle_config_request()). */
+  WIFI_STATUS      = 0x70,  /* Returns {link_up, session_active} */
+  WIFI_SET_SSID    = 0x71,  /* buffer[1] = length, buffer[2..] = SSID bytes */
+  WIFI_SET_PSK     = 0x72,  /* buffer[1] = length, buffer[2..] = PSK bytes, write-only */
+  WIFI_SET_HOSTNAME= 0x73,  /* buffer[1] = length, buffer[2..] = hostname bytes */
+  WIFI_ENABLE      = 0x74,  /* buffer[1] = 0/1 */
+  NSD_ENABLE       = 0x75,  /* buffer[1] = 0/1 */
+  NSD_SET_PORT     = 0x76,  /* buffer[1..2] = port, big-endian */
+  WIFI_APPLY       = 0x77,  /* Persist wifi_cfg to flash and apply live */
+  WIFI_FORGET      = 0x78,  /* Erase stored credentials */
+  BT_NSD_ENABLE    = 0x79,  /* buffer[1] = 0/1 */
+
   USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
   US_PCB_VERSION   = 0x81,  /* Read PCB version */
   US_FEATURES      = 0x82,  /* Read USBSID compiled features */
@@ -488,30 +547,32 @@ enum {
  *   76543210
  * 0b00000000
  * 0 = Pico type: 0 Pico1, 1 Pico2
- * 1 = Wifi / Bluetooth onboard: 0 No, 1 Yes
+ * 1 = Unused
  * 2 = RGB LED onboard: 0 No, 1 Yes
- * 3 = PIO Uart
- * 4 = Unused
- * 5 = Unused
+ * 3 = PIO Uart: 0 No, 1 Yes
+ * 4 = Wifi onboard: 0 No, 1 Yes
+ * 5 = Bluetooth onboard: 0 No, 1 Yes
  * 6 = Embedded Cynthcart: 0 No, 1 Yes
  * 7 = Embedded SID player: 0 No, 1 Yes
  */
 static const uint8_t us_features = (
-  0
+  0b00000000 /* 0 */
 #if defined(PICO_RP2350)
   | (1 << 0)
 #endif
-#if defined(USE_BLUETOOTH) || defined(USE_WIFI)
-  | (1 << 1)
-#endif
+  /* 1 Unused */
 #if defined(USE_RGB)
   | (1 << 2)
 #endif
 #if defined(USE_PIO_UART)
   | (1 << 3)
 #endif
-  /* 4 Unused */
-  /* 5 Unused */
+#if defined(USE_WIFI)
+  | (1 << 4)
+#endif
+#if defined(USE_BLUETOOTH)
+  | (1 << 5)
+#endif
 #if defined(ONBOARD_CYNTHCART)
   | (1 << 6)
 #endif
@@ -519,6 +580,14 @@ static const uint8_t us_features = (
   | (1 << 7)
 #endif
 );
+
+static const bool is_rp2350     = (us_features & 0b00000001);
+static const bool has_rgb_vu    = (us_features & 0b00000100);
+static const bool has_pio_uart  = (us_features & 0b00001000);
+static const bool has_wifi      = (us_features & 0b00010000);
+static const bool has_bluetooth = (us_features & 0b00100000);
+static const bool has_cynthcart = (us_features & 0b01000000);
+static const bool has_sidplayer = (us_features & 0b10000000);
 
 /* Global variables from config.c */
 extern Config        usbsid_config;
@@ -530,6 +599,7 @@ extern const char    *project_version;
 extern const char    *pcb_version;
 
 /* Functions from config.c */
+void        write_back_data(size_t buffersize);
 bool        config_unacknowledged(void);
 void        load_config(Config *config);
 void        verify_midiconfig_offset(void);
@@ -545,6 +615,8 @@ void        save_load_config(void);
 void        save_load_apply_config(bool at_boot);
 void        verify_clockrate(void);
 
+/* Stray config moved to net_wifi_config but needed here */ // TODO: Move to correct header
+extern WifiConfig wifi_cfg;
 
 #ifdef __cplusplus
   }
