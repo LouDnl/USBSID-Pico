@@ -433,15 +433,17 @@ void __not_in_flash_func(buffer_irq_handler)(void)
     // if (current_diff > (diff_size + (28 * 4))) {  // Ensure we keep diff_size bytes after reading
     /* Only consume if we have enough data AND will stay above minimum */
     if (current_diff > diff_size) {  // Ensure we keep diff_size bytes after reading
+      bool bus_claimed = bus_try_claim(BUS_OWNER_MIDI); /* USB still wins if it's active, see bus.c */
       for (size_t pos = 0; pos < 28; pos++) {
         uint8_t reg = ring_get();
         uint8_t val = ring_get();
         uint8_t c_hi = ring_get();
         uint8_t c_lo = ring_get();
-        if (reg != 0xffu) {
+        if (reg != 0xffu && bus_claimed) {
           cycled_write_operation(reg,val,(c_hi<<8|c_lo));
         }
       }
+      if (bus_claimed) bus_release(BUS_OWNER_MIDI);
     }
   }
 
