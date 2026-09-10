@@ -791,10 +791,235 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
 }
 
 
-/* MAIN */
+/* MAIN LOOPS */
 
 /**
- * @brief Core 1 entry point: boot sync with core0, then the core1 main loop
+ * @brief Core0 loop de loop.
+ * Runs the following tasks in a while loop:
+ * - TinyUSB polling task
+ * - LED runner when core 1 is busy
+ * - LED fast blink for v1.5+ boards
+ * - WiFi/Bluetooth polling
+ *
+ * @note Runs on core 0, never returns.
+ *
+ *
+ */
+void __us_noreturn core0_loop(void)
+{
+  while (1) {
+    tud_task_ext(0, false);  /* equals tud_task(); timout_ms already at 0 and is _always_ discarded in osal_none.h */
+    #if 0
+    cdc_task();  /* Only use this if no callbacks */
+    #endif
+    #if 0
+    vendor_task();  /* Only use this if buffering and fifo are enabled */
+    #endif
+
+    if (offload_ledrunner) {
+      led_runner();
+    }
+
+    #if (defined(USE_WIFI) || defined(USE_BLUETOOTH)) && (PCB_VERSION_INT >= 15)
+    /* On pico_w and pico2_w the LED is controlled via the WiFi module and
+     * the wifi SPI control expects single threaded calling. This forces the
+     * firmware to blink via Core0 */
+    if (detected_sid_change) led_fast_blink();
+    #endif
+
+    #if defined(USE_WIFI)
+    /* LED tracks actual WiFi connection status
+     * - off while disconnected/connecting
+     * - on only once actually associated with an IP
+     * Skipped while detected_sid_change is true so it never fights led_fast_blink()'s
+     * priority indicator over the same GPIO.
+     * Only touches the GPIO on an actual state change, not every loop tick
+     * - it's a real SPI transaction to the CYW43439
+     * - always runs on this core so there's no cross-core race */
+    if (!detected_sid_change) {
+      static bool wifi_led_on = false;
+      bool want_on = usbsid_config.LED.enabled && net_wifi_is_connected();
+      if (want_on != wifi_led_on) {
+        wifi_led_on = want_on;
+        cyw43_arch_gpio_put(BUILTIN_LED, wifi_led_on);
+      }
+    }
+    #endif
+
+    /* Poll the cyw43/update the station state machine, unconditionally */
+    #if defined(USE_BLUETOOTH)
+    if (!bus_heavy_op_active()) {
+      cyw43_arch_poll();
+      #if defined(USE_WIFI)
+      net_wifi_update();
+      #endif
+    }
+    #endif
+  }
+
+  /* Point of no return, this should never be reached */
+  __builtin_unreachable();
+}
+
+/**
+ * @brief Core1 loop de loop
+ * @note Runs on core 1, never returns.
+ * Runs the following tasks in a while loop:
+ * - LED runner
+ * - SID test event queue
+ * - Midi engine event queue
+ * - Network SID Device event queue
+ * - Embedded USBSID-Player
+ * - Embedded Cynthcart
+ * - Write queue debug logging
+ *
+ */
+void __us_noreturn core1_loop(void)
+{
+  while(1) {
+    /* No continue if in reset */
+    if __us_unlikely(get_reset_state()) continue;
+
+    /* Blinky blinky? Maybe warning? */
+    if (!offload_ledrunner) {
+      led_runner();
+    }
+
+    #if PCB_VERSION_INT >= 15
+    /* No continue if warning */
+    if __us_unlikely(detected_sid_change) continue;
+    #endif
+
+    /* Drain the SID test queue when runnign tests */
+    if __us_unlikely(running_tests) {
+      sidtest_queue_entry_t s_entry;
+      if (queue_try_remove(&sidtest_queue, &s_entry)) {
+        s_entry.func(s_entry.s, s_entry.t, s_entry.wf);
+      }
+    }
+
+    /* Drain the MIDI event ring.
+     * Core1 handles SID bus writes for MIDI input
+     * so USB callbacks on Core0 are not interrupted
+     */
+    #ifdef ONBOARD_CYNTHCART
+    /* Skip if embedded Cynthcart is running  */
+    if __us_likely(!emulator_running) {
+    #endif
+      midi_engine_task();
+    #ifdef ONBOARD_CYNTHCART
+    }
+    #endif
+
+    #ifdef USE_NSD
+    /* Drain the NSD write ring.
+     * Core1 handles SID bus writes for NSD input.
+     * The WiFi/Bluetooth transports are polled from core 0.
+     */
+    nsd_drain_task();
+    #endif
+
+    /* The Embedded SID player is completely run by Core1 and
+     * is mutually exclusive with Cynthcart.
+     * There can be only 1 ;-)
+     */
+    #ifdef ONBOARD_SIDPLAYER
+    if (sidplayer_init && !emulator_running) {
+      sidplayer_init = false;
+      sidplayer_start = false;
+      sidplayer_playing = false;
+      offload_ledrunner = true;
+      if (is_prg) {
+        usplayer_upload_finish_prg(false); /* Load PRG without auto looping */
+      } else {
+        usplayer_upload_finish_tune(tuneno);
+      }
+      sidplayer_start = true;
+    }
+    if (sidplayer_start  && !emulator_running) {
+      sidplayer_init = false;
+      sidplayer_start = false;
+      sidplayer_playing = true;
+      if (!is_prg) {
+        init_sidplayer(); /* Initialise */
+        usplayer_set_sid_config(cfg.numsids,cfg.sids_one,cfg.sids_two,cfg.fmopl_sid); /* Provide board SID config */
+        start_sidplayer(false); /* No auto loop */
+      }
+    }
+    if (sidplayer_stop  && !emulator_running) {
+      stop_sidplayer();
+      sidplayer_stop = false;
+      sidplayer_playing = false;
+      offload_ledrunner = true;
+    }
+    if __us_unlikely ((sidplayer_next && !sidplayer_playing) && !emulator_running) {
+      next_subtune();
+      sleep_us(20000);
+      sidplayer_next = false;
+      sidplayer_playing = true;
+    }
+    if __us_unlikely ((!sidplayer_playing && sidplayer_prev) && !emulator_running) {
+      previous_subtune();
+      sidplayer_prev = false;
+      sidplayer_playing = true;
+    }
+    if __us_likely(sidplayer_playing && !emulator_running) {
+      if (bus_try_claim(BUS_OWNER_PLAYER)) { /* USB still wins if it's active, see bus.c */
+        loop_sidplayer(); /* INFO: Cycle exact tunes are too demanding to play nice on rp2040 */
+        bus_release(BUS_OWNER_PLAYER);
+      }
+      playtime = usplayer_playtime_ms();
+      if __us_unlikely(sidplayer_next || sidplayer_prev) {
+        sidplayer_playing = false;
+      }
+      if __us_unlikely((playtime >= maxplaytime) && !emulator_running) {
+        sidplayer_stop = true;
+        /* Deinit all sidplayer variables */
+        sidplayer_init = false;
+        sidplayer_start = false;
+        /* Reset max playtime back to 5 minutes in milliseconds */
+        maxplaytime = 300000;
+      }
+    }
+    /* The Cynthcart emulation uses the Embedded SID player as
+     * platform to run on. It is only available if the player is
+     * also compiled in as feature.
+     */
+    #ifdef ONBOARD_CYNTHCART
+    if ((!emulator_running && starting_emulator) && !sidplayer_playing) {
+      starting_emulator = false;
+      emulator_running = true;
+      offload_ledrunner = true;
+      start_cynthcart();
+    }
+    if ((emulator_running && !starting_emulator) && !sidplayer_playing) {
+      if (bus_try_claim(BUS_OWNER_PLAYER)) { /* USB still wins if it's active, see bus.c */
+        run_cynthcart();
+        bus_release(BUS_OWNER_PLAYER);
+      }
+    }
+    #endif /* ONBOARD_CYNTHCART */
+    #endif /* ONBOARD_SIDPLAYER */
+
+    #ifdef WRITE_DEBUG  /* Only run this queue when needed */
+    if (is_receivedata()) {
+      writelogging_queue_entry_t l_entry;
+      if (queue_try_remove(&logging_queue, &l_entry)) {
+        usDBG("[CORE2 %5u] [WRITE %c:%02d/%02d] $%02X:%02X %u\n",
+          queue_get_level(&logging_queue),
+          l_entry.dtype, l_entry.n, l_entry.s,
+          l_entry.reg, l_entry.val, l_entry.cycles);
+      }
+    }
+    #endif
+  }
+
+  /* Point of no return, this should never be reached */
+  __builtin_unreachable();
+}
+
+
+/** MAIN INIT
  *
  * Multicore sync using atomic memory (avoids semaphore spin locks and the
  * hardware FIFO, which is consumed by the flash_safe_execute IRQ handler).
@@ -822,7 +1047,18 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
  * SID player / Cynthcart emulator state machines when those features are
  * compiled in.
  *
- * @note runs on core 1, never returns
+ */
+
+/**
+ * @brief Core 1 entry point: boot sync with core0, then the core1 main loop
+ *
+ * - Enables core to be locked when saving to flash
+ * - Initialises SID test and Write debug queues
+ * - Initialises PIO Uart
+ * -
+ *
+ * @note runs on core 1, hands control over to `core1_loop` after init.
+ *
  */
 void core1_main(void)
 {
@@ -844,22 +1080,23 @@ void core1_main(void)
   }
   __dmb();  /* Data Memory Barrier after read */
 
-  /* Init queues */
-  queue_init(&sidtest_queue, sizeof(sidtest_queue_entry_t), 1);  /* 1 entry deep */
-#ifdef WRITE_DEBUG  /* Only init this queue when needed */
-  queue_init(&logging_queue, sizeof(writelogging_queue_entry_t), 16384);  /* 16384 entries deep so we don't skip any writes */
-#endif
+  /* Init SID test queue, a single entry deep */
+  queue_init(&sidtest_queue, sizeof(sidtest_queue_entry_t), 1);
+  #ifdef WRITE_DEBUG  /* Only init this queue when needed */
+  /* Init Write logging queue, 16384 entries deep so we don't skip any writes */
+  queue_init(&logging_queue, sizeof(writelogging_queue_entry_t), 16384);
+  #endif
 
   /* Initialise PIO Uart */
-#ifdef USE_PIO_UART
+  #ifdef USE_PIO_UART
   init_uart();
-#endif
+  #endif
 
-  /* Initialise Bluetooth Uart */
-#ifdef USE_BLUETOOTH
-  extern void setup_bluetooth();
-  setup_bluetooth();
-#endif
+  // /* Initialise Bluetooth Uart */
+  // #ifdef USE_BLUETOOTH
+  // extern void setup_bluetooth();
+  // setup_bluetooth();
+  // #endif
 
   /* Signal Core 0 we're ready (sync point 2) */
   usBOOT("<CORE 1> Signaling core0 ready ~ 2\n");
@@ -876,168 +1113,45 @@ void core1_main(void)
   }
   __dmb();  /* Data Memory Barrier after read */
 
-  while (1) {
+  core1_loop();
 
-    if __us_unlikely(get_reset_state()) continue;
-
-    /* Blinky blinky? */
-    if (!offload_ledrunner) {
-      led_runner();
-#ifdef USE_BLUETOOTH
-      cyw43_arch_poll();
-#endif
-    }
-
-#if PCB_VERSION_INT >= 15
-    if __us_unlikely(detected_sid_change) continue;
-#endif
-
-    /* Check SID test queue */
-    if __us_unlikely(running_tests) {
-      sidtest_queue_entry_t s_entry;
-      if (queue_try_remove(&sidtest_queue, &s_entry)) {
-        s_entry.func(s_entry.s, s_entry.t, s_entry.wf);
-      }
-    }
-
-    /* Drain the MIDI event ring; this is where the SID bus writes for MIDI
-     * input now happen, off the USB callback on core0 */
-#ifdef ONBOARD_CYNTHCART
-    if __us_likely(!emulator_running) {
-#endif
-      midi_engine_task();
-#ifdef ONBOARD_CYNTHCART
-    }
-#endif
-
-#ifdef ONBOARD_SIDPLAYER
-    if (sidplayer_init && !emulator_running) {
-      sidplayer_init = false;
-      sidplayer_start = false;
-      sidplayer_playing = false;
-      offload_ledrunner = true;
-      /* REVERT NOTE: this used to be load_prg(sidfile, sidfile_size, false) /
-       * load_sidtune(sidfile, sidfile_size, tuneno) followed by
-       * free(sidfile) - the file lived in a firmware-owned buffer filled by
-       * config.c's UPLOAD_SID_DATA case. That buffer is gone: config.c now
-       * streams straight into usplayer's own tune buffer as each packet
-       * arrives (usplayer_upload_start()/_feed()), and these two calls just
-       * finish what was already fed in, no buffer or size to pass. */
-      if (is_prg) {
-        usplayer_upload_finish_prg(false); /* Load PRG without auto looping */
-      } else {
-        usplayer_upload_finish_tune(tuneno);
-      }
-      sidplayer_start = true;
-    }
-    if (sidplayer_start  && !emulator_running) {
-      sidplayer_init = false;
-      sidplayer_start = false;
-      sidplayer_playing = true;
-      if (!is_prg) {
-        init_sidplayer(); /* WARNING: Does not work on rp2040, insufficient memory! */
-        usplayer_set_sid_config(cfg.numsids,cfg.sids_one,cfg.sids_two,cfg.fmopl_sid);
-        start_sidplayer(false); /* No auto loop */
-      }
-    }
-    if (sidplayer_stop  && !emulator_running) {
-      stop_sidplayer();
-      sidplayer_stop = false;
-      sidplayer_playing = false;
-      offload_ledrunner = true;
-    }
-    if __us_unlikely ((sidplayer_next && !sidplayer_playing) && !emulator_running) {
-      next_subtune();
-      sleep_us(20000);
-      sidplayer_next = false;
-      sidplayer_playing = true;
-    }
-    if __us_unlikely ((!sidplayer_playing && sidplayer_prev) && !emulator_running) {
-      previous_subtune();
-      sidplayer_prev = false;
-      sidplayer_playing = true;
-    }
-    if __us_likely(sidplayer_playing && !emulator_running) {
-      loop_sidplayer();
-      playtime = usplayer_playtime_ms();
-      if __us_unlikely(sidplayer_next || sidplayer_prev) {
-        sidplayer_playing = false;
-      }
-      if __us_unlikely((playtime >= maxplaytime) && !emulator_running) {
-        sidplayer_stop = true;
-        /* Deinit all sidplayer variables */
-        sidplayer_init = false;
-        sidplayer_start = false;
-        maxplaytime = 300000; /* Reset max playtime on boundary crossing back to 5 minutes in milliseconds */
-      }
-    }
-#endif /* ONBOARD_SIDPLAYER */
-
-#if defined(ONBOARD_CYNTHCART)
-    if ((!emulator_running && starting_emulator) && !sidplayer_playing) {
-      starting_emulator = false;
-      emulator_running = true;
-      offload_ledrunner = true;
-      start_cynthcart();
-    }
-    if ((emulator_running && !starting_emulator) && !sidplayer_playing) {
-      run_cynthcart();
-    }
-#endif /* ONBOARD_CYNTHCART */
-
-#ifdef WRITE_DEBUG  /* Only run this queue when needed */
-    if (is_receivedata()) {
-      writelogging_queue_entry_t l_entry;
-      if (queue_try_remove(&logging_queue, &l_entry)) {
-        usDBG("[CORE2 %5u] [WRITE %c:%02d/%02d] $%02X:%02X %u\n",
-          queue_get_level(&logging_queue),
-          l_entry.dtype, l_entry.n, l_entry.s, l_entry.reg, l_entry.val, l_entry.cycles);
-      }
-    }
-#endif
-
-  }
   /* Point of no return, this should never be reached */
   return;
 }
 
 /**
- * @brief Firmware entry point: boot core0, launch core1, then the IO task loop
+ * @brief Firmware entry point: boot core0, launch core1, then IO task loop
  *
- * Sets the system clock speed, initialises TinyUSB (kept disconnected from
- * the host until hardware is ready), launches core1 and runs the core0 side
- * of the two-stage multicore boot sync (see core1_main), loads and applies
- * the persisted config, sets up the SID clock, bus, PIO, DMA, VU, MIDI,
- * ASID and SID state detection, runs default-config/socket-config
- * verification, then allows the host to enumerate via tud_connect(). Never
- * returns; the final while(1) drives tud_task_ext plus the CDC/vendor
- * polling tasks and the LED runner.
+ * - Sets the system clock speed
+ * - Initialises TinyUSB (kept disconnected from the host until hardware is ready)
+ * - Launches core1 and runs the core0 side of the two-stage multicore boot sync (see core1_main)
+ * - Loads and appliesthe persisted config(s)
+ * - Sets up the SID clock, bus, PIO, DMA, VU, MIDI, ASID and SID state detection
+ * - Runs default-config/socket-config verification
+ * - Finally allows the host to enumerate via tud_connect()
  *
- * @note runs on core 0
+ * @note runs on core 0, hands control over to `core0_loop` after init.
  *
  * @return int never actually returns; present for the standard C signature
  */
 int main()
 {
   /* Set system clockspeed */
-#if PICO_RP2040
-#if ONBOARD_SIDPLAYER
-  /* System clock overclocked @ 250MHz */
-  set_sys_clock_khz(250000, true); /* Boo fucking hoo, still too slow!! */
-#else
-  /* System clock @ MAX SPEED!! ARRRR 200MHz */
-  set_sys_clock_khz(200000, true);
-#endif /* ONBOARD_SIDPLAYER */
-#elif PICO_RP2350 /* #endif PICO_RP2040 */
-  /* Onboard SID player requires atleast 200MHz! */
-#if ONBOARD_SIDPLAYER
-  /* System clock @ 250MHz */
-  set_sys_clock_khz(250000, true);
-#else
-  /* System clock @ 150MHz */
-  set_sys_clock_pll(1500000000, 5, 2);
-#endif /* ONBOARD_SIDPLAYER */
-#endif /* PICO_RP2350 */
+  #if (defined(ONBOARD_SIDPLAYER) && ONBOARD_SIDPLAYER) \
+    || (defined(USE_WIFI) && USE_WIFI) \
+    || (defined(USE_BLUETOOTH) && USE_BLUETOOTH)
+    /* System clock overclocked @ 250MHz */
+    set_sys_clock_khz(250000, true); /* Boo fucking hoo, still too slow for rp2040!! */
+  #else /* Set default speeds if non of the above */
+    #if PICO_RP2040
+    /* System clock @ MAX SPEED!! ARRRR 200MHz */
+    set_sys_clock_khz(200000, true);
+    #elif PICO_RP2350
+    /* System clock @ 150MHz */
+    // set_sys_clock_pll(1500000000, 5, 2);
+    set_sys_clock_khz(150000, true);
+    #endif
+  #endif
 
   /* Init TinyUSB */
   tusb_rhport_init_t dev_init = {
@@ -1066,7 +1180,9 @@ int main()
 
   /* Load config before init of USBSID settings ~ NOTE: This cannot be run from Core 1! */
   load_config(&usbsid_config);
-  verify_midiconfig_offset();  /* must run before anything ever touches the MIDI flash partition */
+
+  /* must run before anything ever touches the MIDI flash partition */
+  verify_midiconfig_offset();
 
   /* Apply saved config to used vars */
   err = apply_config(true); /* At boot */
@@ -1114,17 +1230,17 @@ int main()
   usBOOT("Initializing C64 bus\n");
   init_bus_control();
 
-#if PCB_VERSION_INT >= 15
   /* Init voltage control */
+  #if PCB_VERSION_INT >= 15
   usBOOT("Initializing voltage control\n");
   init_vccvdd_control();
-#endif
+  #endif
 
-#if PCB_VERSION_INT >= 13
   /* Init audio switch */
+  #if PCB_VERSION_INT >= 13
   usBOOT("Initializing audio switch\n");
   init_audio_switch();
-#endif
+  #endif
 
   /* Init PIO */
   usBOOT("Setup PIO bus\n");
@@ -1155,39 +1271,74 @@ int main()
   usBOOT("Initialise ASID\n");
   asid_init();
 
+  /* Initialise Bluetooth Uart */
+  #ifdef USE_BLUETOOTH
+  extern void setup_bluetooth();
+  setup_bluetooth();
+  #endif
+
+  /* Init WiFi network interface */
+  #ifdef USE_WIFI
+  net_wifi_init();
+  /* Run exactly once, unconditionally, on core 0 at boot.*/
+  start_wifi();
+  #endif
+
   /* Init SID states */
   usBOOT("Init SID states\n");
-  init_sid_states(); /* NOTE: Detecting SID types require 9v to be enabled for all MOS SID types */
+  init_sid_states(); /* INFO: Detecting SID types require 9v to be enabled for all MOS SID types */
 
   /* Check for default config bit */
-#if PCB_VERSION_INT >= 15
+  #if PCB_VERSION_INT >= 15
   /* Only run autodetect sequence if not already waiting for confirmation */
   if (!usbsid_config.need_confirmation) {
     detect_default_config(); /* Saves config, always */
   }
-#else
+  #else
   detect_default_config(); /* Saves config, always */
-#endif
+  #endif
 
   /* No need to reset SID registers or resetting the SID's
-     at this point on boot on pre v1.4 boards */
-
-#if PCB_VERSION_INT >= 15
+   * at this point during boot on (released) pre v1.5 boards
+   */
+  #if PCB_VERSION_INT >= 15
   verify_socket_config();
-#endif
-  /* Print config once at end of boot routine
-     detected_sid_change is always false on pre v1.5 boards */
+  #endif
+
+
+  /* cfg.numsids is authoritatively set by detect_default_config() /
+   * verify_socket_config() during boot.
+   * midi_config_init() during midi_init() in the boot sequence ran
+   * before that and does not know MAX_SIDS yet. The host has not
+   * been allowed to enumerate yet, tud_connect() runs just before the
+   * main loop, so there is no MIDI traffic this could race against.
+   */
+  midi_config_sync_poly_limits();
+
+  /* Print config once at end of boot routine.
+   * detected_sid_change is always false on pre v1.5 boards
+   */
   if (!detected_sid_change) print_config();
 
-  {
+  { /* Separate code block */
     usNFO("\n");
-#if defined(ONBOARD_SIDPLAYER)
-    usDBG("Firmware is compiled with onboard SID player\n");
-#if defined(ONBOARD_CYNTHCART)
-    usDBG("Firmware is compiled with Cynthcart support\n");
-#endif /* ONBOARD_CYNTHCART */
-#endif /* ONBOARD_SIDPLAYER */
+    usDBG("Firmware for %s compiled with:\n",
+      (is_rp2350 ? "rp2350" : "rp2040"));
+    #ifdef PICO_DEFAULT_LED_PIN
+    usDBG("  - LED Vu meter\n");
+    if (has_rgb_vu)    usDBG("  - RGB LED Vu meter\n");
+    #else
+    usDBG("  - LED Status indicator\n");
+    #endif
+    if (has_pio_uart)  usDBG("  - PIO Uart\n");
+    if (has_wifi)      usDBG("  - WiFi\n");
+    if (has_bluetooth) usDBG("  - Bluetooth\n");
+    if (has_cynthcart) usDBG("  - Embedded Cynthcart\n");
+    if (has_sidplayer) usDBG("  - Embedded USBSID-Player\n");
+  }
 
+  { /* Separate code block */
+    usNFO("\n");
     if (!detected_sid_change) {
       usDBG("%s v%s Started successfully\n\n", us_product, project_version);
     } else {
@@ -1195,14 +1346,6 @@ int main()
       usWRN("Please verify socket configuration before further use!\n\n");
     }
   }
-
-  /* cfg.numsids is authoritative by now (detect_default_config() /
-   * verify_socket_config() above); midi_config_init() (during midi_init(),
-   * earlier in this same boot sequence) ran before that and could only
-   * guess at MAX_SIDS. The host has not been allowed to enumerate yet
-   * (tud_connect() is still ahead), so there is no MIDI traffic this could
-   * race against. */
-  midi_config_sync_poly_limits();
 
   /* Signal Core 1 to enter main loop (sync point 2) */
   usBOOT("<CORE 0> Signaling core1 ~ 2\n");
@@ -1214,22 +1357,7 @@ int main()
   if (!tud_connect()) usERR("!! USB CONNECTION ERROR !!");
 
   /* Loop IO tasks forever */
-  while (1) {
-    tud_task_ext(0, false);  /* equals tud_task(); timout_ms already at 0 and is _always_ discarded in osal_none.h */
-#ifndef USE_CDC_CALLBACK
-    cdc_task();  /* Only use this if no callbacks */
-#endif
-#ifndef USE_VENDOR_CALLBACK
-    vendor_task();  /* Only use this if buffering and fifo are enabled */
-#endif
-
-    if (offload_ledrunner) {
-      led_runner();
-#ifdef USE_BLUETOOTH
-      cyw43_arch_poll();
-#endif
-    }
-  }
+  core0_loop();
 
   /* Point of no return, this should never be reached */
   return 0;
