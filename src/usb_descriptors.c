@@ -91,25 +91,22 @@ enum
   ITF_NUM_MIDI,
   ITF_NUM_MIDI_STREAMING,  /* This has to be here, even if not used! */
   ITF_NUM_VENDOR,
-  #ifdef USB_PRINTF
-  ITF_NUM_CDC_2,
-  ITF_NUM_CDC_DATA_2,
-  #endif
+  ITF_NUM_CDC_2,      /* WebSerial */
+  ITF_NUM_CDC_DATA_2, /* WebSerial */
   ITF_NUM_TOTAL
 };
 
 /* Endpoint config constants */
-#define EPNUM_CDC_NOTIF   0x81
-#define EPNUM_CDC_OUT     0x02
-#define EPNUM_CDC_IN      0x82
-#define EPNUM_MIDI_OUT    0x03
-#define EPNUM_MIDI_IN     0x83
-#define EPNUM_VENDOR_OUT  0x04
-#define EPNUM_VENDOR_IN   0x84
-#ifdef USB_PRINTF
-#define EPNUM_CDC2_NOTIF  0x85
-#define EPNUM_CDC2_OUT    0x06
-#define EPNUM_CDC2_IN     0x86
+#define EPNUM_CDC_NOTIF   0x81 /* CDC libusb/WinUSB (Linux+MacOs/Windows) */
+#define EPNUM_CDC_OUT     0x02 /* CDC libusb/WinUSB (Linux+MacOs/Windows) */
+#define EPNUM_CDC_IN      0x82 /* CDC libusb/WinUSB (Linux+MacOs/Windows) */
+#define EPNUM_MIDI_OUT    0x03 /* Midi Out (unused) */
+#define EPNUM_MIDI_IN     0x83 /* Midi In (+ ASID) */
+#define EPNUM_VENDOR_OUT  0x04 /* Vendor/WebUSB */
+#define EPNUM_VENDOR_IN   0x84 /* Vendor/WebUSB */
+#define EPNUM_CDC2_NOTIF  0x85 /* WebSerial */
+#define EPNUM_CDC2_OUT    0x06 /* WebSerial */
+#define EPNUM_CDC2_IN     0x86 /* WebSerial */
 #endif
 
 #define USBD_CDC_CMD_MAX_SIZE         8
@@ -138,7 +135,9 @@ uint8_t const desc_fs_configuration[] =
   // Interface number, string index, EP Out & IN address, EP size
   TUD_VENDOR_DESCRIPTOR(ITF_NUM_VENDOR, 6, EPNUM_VENDOR_OUT, EPNUM_VENDOR_IN, USBD_VENDOR_IN_OUT_MAX_SIZE),
 
-  #ifdef USB_PRINTF
+  // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
+  TUD_CDC_DESCRIPTOR(ITF_NUM_CDC_2, 7, EPNUM_CDC2_NOTIF, USBD_CDC_CMD_MAX_SIZE, EPNUM_CDC2_OUT, EPNUM_CDC2_IN, USBD_CDC_IN_OUT_MAX_SIZE),
+
   // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
   TUD_CDC_DESCRIPTOR(ITF_NUM_CDC_2, 4, EPNUM_CDC2_NOTIF, USBD_CDC_CMD_MAX_SIZE, EPNUM_CDC2_OUT, EPNUM_CDC2_IN, USBD_CDC_IN_OUT_MAX_SIZE),
   #endif
@@ -241,6 +240,7 @@ static const char * const string_desc_arr[] =
     "USBSID-Pico Data",          // 4: CDC Interface
     "USBSID-Pico Midi",          // 5: Midi Interface
     "USBSID-Pico WebUSB",        // 6: WebUSB Vendor Interface
+    "USBSID-Pico WebSerial",     // 8: CDC Interface
 };
 
 /* automatically update if an additional string is later added to the table */

@@ -105,9 +105,9 @@
 
 //------------- CLASS -------------//
 #ifdef USB_PRINTF
-#define CFG_TUD_CDC              2
+#define CFG_TUD_CDC              3
 #else
-#define CFG_TUD_CDC              1
+#define CFG_TUD_CDC              2
 #endif
 #define CFG_TUD_MSC              0
 #define CFG_TUD_HID              0
@@ -127,7 +127,9 @@
 
 // Vendor FIFO size of TX and RX
 // If not configured vendor endpoints will not be buffered
-// For buffering it's better to to define USE_VENDOR_CALLBACK 1 in globals.h
+// For buffering define tud_vendor_rx_cb in usbsid.c
+// For non buffering use vendor_task in the Core0 main loop
+// Current javascript driver _requires_ buffering + MacOs desktop uses this endpoint as CDC
 #define CFG_TUD_VENDOR_RX_BUFSIZE 64  /* Set to 0 to disable buffering (the fifo is not used) */
 #define CFG_TUD_VENDOR_TX_BUFSIZE 64  /* Set to 0 to disable buffering (the fifo is not used) */
 
