@@ -37,7 +37,7 @@ set(PROJECT_NAME usbsidpico)
 set(PROJECT_MANUFACTURER "LouD")
 set(PRODUCT_STRING "USBSID-Pico")
 string(TIMESTAMP MAGIC_SMOKE "%Y%m%d")  # Auto generate dated version
-set(FWVERSION "0.8.0")
+set(FWVERSION "0.8.1")
 set(PROJECT_VERSION "${FWVERSION}-${MAGIC_SMOKE}")  # Generate compile version
 
 ### Want a cookie?
@@ -60,35 +60,27 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
   set(SIDWRITES_DEBUGGING 0)  # Enable logging of SID writes one core 2
   set(EMULATOR_DEBUGGING 1)   # Enable debugging in emulator
+  set(BT_DIAG_DEBUGGING 0)    # Enable verbose per-HCI-event logging in bluetooth.c ~ floods UART, causes audible lag while playing
   set(ENABLE_PROFILING 0)     # Experimental!
 endif()
 
 ### Enable / Disable build with USBSID-Player for tune playback and/or Cynthcart
 set(ONBOARD_SIDPLAYER 0 CACHE STRING "ONBOARD_SIDPLAYER")
-### Run Cynthcart through the player's own MC68B50 ACIA. Requires ONBOARD_SIDPLAYER=1.
-### REVERT NOTE: this used to be an alternative to ONBOARD_EMULATOR, a standalone
-### emudore-based emulator (repo/lib/emulator + lib/emudore-embedded), which is
-### gone now that Cynthcart runs through the player instead - see git history
-### for that option and its compilation block if it's ever needed again.
+### Enable / Disable build with Cynthcart emulation, requires ONBOARD_SIDPLAYER=1.
 set(ONBOARD_CYNTHCART 0 CACHE STRING "ONBOARD_CYNTHCART")
 
-### Enable/ Disable build with PIO Uart on unused pins 26/27
+### Enable / Disable build with PIO Uart on unused pins 26/27
 set(USE_PIO_UART 0)
 
-### Enable/ Disable build with Bluetooth on rp2350_w
+### Enable / Disable build with Bluetooth on rp2350_w
 set(ENABLE_BLUETOOTH 0 CACHE STRING "ENABLE_BLUETOOTH")
+
+### Enable / Disable build with WiFi Network SID Device (NSD) support on _w boards
+set(ENABLE_WIFI 0 CACHE STRING "ENABLE_WIFI")
 
 ### Enable/ Disable build with CDC telemetry port (pico2 with sidplayer only!)
 set(ENABLE_TELEMETRY 0 CACHE STRING "ENABLE_TELEMETRY")
 
-### Information on the use of CDC callback
-## This is turned on/off by changing USE_CDC_CALLBACK in globals.h
-
-### Information on the use of Vendor buffer
-## This is turned on/off by setting both vendor buffer size
-## defines in tusb_config.h
-# CFG_TUD_VENDOR_TX_BUFSIZE
-# CFG_TUD_VENDOR_RX_BUFSIZE
 
 
 #######################################
@@ -102,31 +94,63 @@ set(ENABLE_TELEMETRY 0 CACHE STRING "ENABLE_TELEMETRY")
 # rp2040 will bug out complaining about assembly calls not being available
 # rp2350 will bug out on PICO_USE_SW_SPIN_LOCK not being available
 
+# Define ANSI Color Escapes (Using native CMake brackets for character escapes)
+string(ASCII 27 Esc)
+set(ColorReset  "${Esc}[m")
+set(ColorBold   "${Esc}[1m")
+set(Red         "${Esc}[31m")
+set(Green       "${Esc}[32m")
+set(Yellow      "${Esc}[33m")
+set(Blue        "${Esc}[34m")
+set(Magenta     "${Esc}[35m")
+set(Cyan        "${Esc}[36m")
+
 ### Build steps log level
 set(CMAKE_MESSAGE_LOG_LEVEL ${BUILD_DEBUGGING})
-message(DEBUG "LOG_LEVEL is ${CMAKE_MESSAGE_LOG_LEVEL}")
+message(DEBUG "${Green}${ColorBold}LOG_LEVEL${ColorReset} is ${Yellow}${ColorBold}${CMAKE_MESSAGE_LOG_LEVEL}${ColorReset}")
 
-message(DEBUG "Starting compilation of ${PRODUCT_STRING} firmware version ${PROJECT_VERSION}")
+message(DEBUG "Starting compilation of ${Yellow}${ColorBold}${PRODUCT_STRING}${ColorReset} firmware version ${Yellow}${ColorBold}${PROJECT_VERSION}${ColorReset}")
 
 ### ONBOARD_CYNTHCART runs inside the player, so it needs one
 if(ONBOARD_CYNTHCART EQUAL 1 AND NOT ONBOARD_SIDPLAYER EQUAL 1)
-  message(FATAL_ERROR "ONBOARD_CYNTHCART requires ONBOARD_SIDPLAYER=1 (it runs inside the player).")
+  message(FATAL_ERROR "${Green}ONBOARD_CYNTHCART${ColorReset} requires ${Read}ONBOARD_SIDPLAYER=1${ColorReset} (it runs inside the player).")
 endif()
+
+### Generate feature list for logging
+set(FEATURE_LIST)
 
 if(ONBOARD_SIDPLAYER EQUAL 1)
-  message(STATUS "Firmware is built with ONBOARD_SIDPLAYER")
+  list(APPEND FEATURE_LIST "${Cyan}${ColorBold}SID Player${ColorReset}")
 endif()
 if(ONBOARD_CYNTHCART EQUAL 1)
-  message(STATUS "Firmware is built with ONBOARD_CYNTHCART")
+  list(APPEND FEATURE_LIST "${Cyan}${ColorBold}Cynthcart${ColorReset}")
+endif()
+if(ENABLE_WIFI EQUAL 1)
+  list(APPEND FEATURE_LIST "${Cyan}${ColorBold}WiFi${ColorReset}")
+endif()
+if(ENABLE_BLUETOOTH EQUAL 1)
+  list(APPEND FEATURE_LIST "${Cyan}${ColorBold}Bluetooth${ColorReset}")
+endif()
+if(USE_PIO_UART EQUAL 1)
+  list(APPEND FEATURE_LIST "${Cyan}${ColorBold}PIO Uart${ColorReset}")
+endif()
+if(ENABLE_TELEMETRY EQUAL 1)
+  list(APPEND FEATURE_LIST "${Cyan}${ColorBold}Telemetry${ColorReset}")
 endif()
 
+### Replace the semi colon in the list (This will not work: list(JOIN FEATURE_LIST ", " FEATURE_STRING))
+string(REPLACE ";" ", " FEATURE_STRING "${FEATURE_LIST}")
+
+### Set the list variable with colors, yay \o/
+set(BUILD_FEATURES "${Green}${ColorBold}Build additional features:${ColorReset} ${FEATURE_STRING}")
 
 ### Optimization and debugging
 # remember that enabling debugging and disabling optimizations
 # will weird out tune playing and reading from and writing to
-# SKPico will stop functioning
-# *3 is required for onboard siplayer but could cause desync
-# with DMA read_address and chain_to()
+# SKPico will stop functioning. *3 is also required for
+# onboard sidplayer/cynthcart.
+# If any desync issues arise with DMA read_address and chain_to()
+# this "could" be the cause
 set(DEBUG_SYMBOLS 0)      # 0 default, 1 debug symbols & debug build enabled
 set(DEBUGGING 0)          # 0 default, 1~3 equals -g1~3
 set(OPTIMIZATIONS 3)      # 3 default, 3 ~ -O1 for debugging
@@ -136,27 +160,26 @@ set(ANALYSE_STACKUSAGE 0) # 0 default, 1 enabled, 0 disabled
 
 ### Target board pico, pico_w, pico2
 if(DEFINED PICO_BOARD)
-  message(STATUS "PICO_BOARD is defined as ${PICO_BOARD}")
+  message(STATUS "${Green}${ColorBold}PICO_BOARD${ColorReset} is defined as ${Yellow}${ColorBold}${PICO_BOARD}${ColorReset}")
 else()
-  message(WARNING "PICO_BOARD not defined, defaulting to 'pico'")
+  message(WARNING "${Green}${ColorBold}PICO_BOARD${ColorReset not defined, defaulting to ${Yellow}'pico'${ColorReset}")
   set(PICO_BOARD pico)
 endif()
 
 ### Target platform rp2040, rp2350 (rp2350-arm-s)
 if(DEFINED PICO_PLATFORM)
-  message(STATUS "PICO_PLATFORM is defined as ${PICO_PLATFORM}")
+  message(STATUS "${Green}${ColorBold}PICO_PLATFORM${ColorReset} is defined as ${Yellow}${ColorBold}${PICO_PLATFORM}${ColorReset}")
 else()
   if(DEFINED PICO_BOARD)
     if(PICO_BOARD STREQUAL "pico2")
       set(PICO_PLATFORM rp2350-arm-s)
-      message(STATUS "PICO_PLATFORM not defined, board is ${PICO_BOARD} setting PICO_PLATFORM to ${PICO_PLATFORM}")
+      message(STATUS "${Green}${ColorBold}PICO_PLATFORM${ColorReset} not defined, board is ${Green}${ColorBold}${PICO_BOARD}${ColorReset} setting ${Green}${ColorBold}PICO_PLATFORM${ColorReset} to ${Yellow}${PICO_PLATFORM}${ColorReset}")
     endif()
   else()
-    message(WARNING "PICO_PLATFORM not defined, defaulting to 'rp2040'")
+    message(WARNING "${Green}${ColorBold}PICO_PLATFORM${ColorReset} not defined, defaulting to ${Yellow}${ColorBold}'rp2040'${ColorReset}")
     set(PICO_PLATFORM rp2040)
   endif()
 endif()
-
 
 ### Header validation check
 if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/src/globals.h)
@@ -192,10 +215,10 @@ else()
   return()
 endif()
 
-# ### Compilers to use
+### Compilers to use
 if(${PICO_PLATFORM} MATCHES rp2040)
   set(PICO_COMPILER pico_arm_cortex_m0plus_gcc)
-elseif(${PICO_PLATFORM} MATCHES rp2350)
+elseif(${PICO_PLATFORM} MATCHES rp2350-arm-s)
   set(PICO_COMPILER pico_arm_cortex_m33_gcc)
 else()
   set(PICO_COMPILER pico_arm_gcc)  # required for mem_ops on rp2040
@@ -256,12 +279,14 @@ elseif(OPTIMIZATIONS EQUAL 3)
   set(O_OPT -O3)
 endif()
 
+### Log compilation errors as warnings?
 if(WARNINGS_ONLY EQUAL 1)
   set(W_OPT
     -Wall
     -Wextra
     -Wunused
   )
+### Log warnings as errors
 else()
   set(W_OPT
     -Werror
@@ -296,6 +321,7 @@ set(COMPILE_OPTS PRIVATE
   -Wl,--wrap=puts
 )
 
+### Stack usage debugging
 if(ANALYSE_STACKUSAGE EQUAL 1)
   set(COMPILE_OPTS
     ${COMPILE_OPTS}
@@ -325,7 +351,7 @@ list(APPEND FILENAMES
   ${PROJECT_FILENAME}-v1.3
   ${PROJECT_FILENAME}-v1.5
 )
-list(APPEND PICOTYPES
+list(APPEND LEDTYPES
   "LED"
   "LED"
   "LED"
@@ -341,7 +367,7 @@ if(${PICO_BOARD} STREQUAL "pico" OR ${PICO_BOARD} STREQUAL "pico2")
     ${PROJECT_FILENAME}-v1.3-rgb
     ${PROJECT_FILENAME}-v1.5-rgb
   )
-  list(APPEND PICOTYPES
+  list(APPEND LEDTYPES
     "RGB"
     "RGB"
     "RGB"
@@ -363,10 +389,10 @@ if(${PICO_BOARD} STREQUAL "weact_studio_rp2350b_core")
   set(PROJECT_PRODUCT "${PRODUCT_STRING}Pro_rp2350b")
   set(PROJECT_FILENAME "${PROJECT_NAME}pro_rp2350b")
   set(FILENAMES)
-  set(PICOTYPES)
+  set(LEDTYPES)
   set(PCBVERSIONS)
   list(APPEND FILENAMES ${PROJECT_FILENAME}-v1.0)
-  list(APPEND PICOTYPES "PRO")
+  list(APPEND LEDTYPES "PRO")
   list(APPEND PCBVERSIONS "1.0")
 endif()
 
@@ -398,6 +424,7 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/sid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid_cloneconfig.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid_detection.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/sid_player.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid_tests.c
   ${CMAKE_CURRENT_LIST_DIR}/src/mcu.c
   ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c
@@ -413,26 +440,13 @@ set(TARGET_INCLUDE_DIRS PRIVATE
 
 ### Embedded player stuffs
 if(ONBOARD_SIDPLAYER EQUAL 1)
-  ## Empty by default, deliberately. Giving this a default value makes it never
-  ## empty, which silently kills the lib/usbsid-player branch below, and that
-  ## is the branch CI actually wants: it checks the player out to exactly that
-  ## path, so the build should work without EMUDIR being passed at all.
+  ## Empty by default for Github workflows.
   set(EMUDIR "" CACHE STRING "Path to the USBSID-Player checkout")
-  # NOTICE: SIDPLAYER REQUIRES FULL OPTIMIZATIONS!!
-  # NOTE TO SELF: -O3 is already set in COMPILE_OPTS and applied via target_compile_options()
+  # NOTICE: SIDPLAYER REQUIRES FULL -O3 OPTIMIZATIONS!!
   # NOTE TO SELF: Do NOT use set(CMAKE_CXX_FLAGS ...) here as it strips Pico SDK architecture flags!
-  ## Set sidplayer list directory
-  ## USBSID-Player lives in player-repo, next to this one in the workspace.
-  ## EMUDIR wins, then lib/usbsid-player if it has been checked out there, then
-  ## the sibling checkout.
+  ## Set USBSID-Player list directory
+  ## If set EMUDIR wins, then lib/usbsid-player, then local build checkout
   if(NOT EMUDIR STREQUAL "")
-    ## A relative EMUDIR is ambiguous, and it fails in a way that reads like a
-    ## different fault. `if(EXISTS)` resolves a relative path against the
-    ## working directory while `include()` resolves it against the including
-    ## file's directory, so `cmake -S master -DEMUDIR=master/lib/usbsid-player`
-    ## passes the existence check below and then fails the include with
-    ## "could not find requested file", having looked in master/master/lib.
-    ## Resolve it here and carry an absolute path from this point on.
     if(IS_ABSOLUTE "${EMUDIR}")
       set(USPLAYER_LIST_DIR "${EMUDIR}")
     else()
@@ -473,15 +487,7 @@ if(ONBOARD_SIDPLAYER EQUAL 1)
   endforeach()
   set(FILENAMES ${FILENAMES_tmp})
 
-  ### The player brings its own file list, include paths and psiddrv target.
-  ### See player-repo/docs/EMBEDDED.md for what it exports and what the
-  ### firmware is expected to call at runtime.
-  ###
-  ### Two things the old player needed and this one does not:
-  ###   PICO_CXX_ENABLE_EXCEPTIONS  it is built -fno-exceptions -fno-rtti and
-  ###                               never throws, so the unwind tables would be
-  ###                               flash spent on nothing
-  ###   RCUTILS_NO_64_ATOMIC        nothing in it uses atomics
+  ## The player brings its own file list, include paths and psiddrv target.
   include(${USPLAYER_LIST_DIR}/cmake/usbsid-player.cmake)
 
   set(COMPILE_OPTS ${COMPILE_OPTS} -DEMBEDDED=1)
@@ -551,26 +557,107 @@ set(TARGET_LL
   tinyusb_board
 )
 
-### Bluetooth control for _w boards
-if(ENABLE_BLUETOOTH EQUAL 1)
-  if(${PICO_BOARD} STREQUAL "pico2_w")
+### Only pico_w and pico2_w have the CYW43439 chip
+set(USBSID_W_BOARD 0)
+if(${PICO_BOARD} STREQUAL "pico_w" OR ${PICO_BOARD} STREQUAL "pico2_w")
+  set(USBSID_W_BOARD 1)
+endif()
+
+### Add _w libs and/or configure WiFi and Bluetooth for pico_w and pico2_w
+set(WIFIBT_TARGET_PIO 0)
+if(USBSID_W_BOARD)
+
+  ## Network SID Device
+  if((ENABLE_WIFI EQUAL 1) OR (ENABLE_BLUETOOTH EQUAL 1))
+    set(SOURCEFILES
+      ${SOURCEFILES}
+      ${CMAKE_CURRENT_LIST_DIR}/src/nsd.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/net_ring.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/net_wifi_config.c  # Config required either way
+    )
+    add_compile_definitions(USE_NSD=1)
+  endif()
+
+  ## WiFi (TCP + UDP discovery) transport, plus the cyw43/lwIP link
+  if(ENABLE_WIFI EQUAL 1)
+    set(SOURCEFILES
+      ${SOURCEFILES}
+      ${CMAKE_CURRENT_LIST_DIR}/src/net_wifi.c
+    )
+    add_compile_definitions(USE_WIFI=1)
+    add_compile_definitions(NSD_DEFAULT_PORT=6581)
+  endif()
+
+  ## Bluetooth
+  if(ENABLE_BLUETOOTH EQUAL 1)
     set(SOURCEFILES
       ${SOURCEFILES}
       ${CMAKE_CURRENT_LIST_DIR}/src/bluetooth.c
     )
+    add_compile_definitions(USE_BLUETOOTH=1)
+  endif()
 
+  ## Link Poll mode
+  # WiFi & Bluetooh + filename extension definition
+  set(FILENAME_EXTENSION)
+  if((ENABLE_WIFI EQUAL 1) AND (ENABLE_BLUETOOTH EQUAL 1))
+    set(TARGET_LL
+      ${TARGET_LL}
+        pico_cyw43_arch_lwip_poll
+        pico_btstack_classic
+        pico_btstack_cyw43
+    )
+    set(FILENAME_EXTENSION "_netwb")
+  # Bluetooth
+  elseif((ENABLE_BLUETOOTH EQUAL 1) AND NOT (ENABLE_WIFI EQUAL 1))
     set(TARGET_LL
       ${TARGET_LL}
       pico_cyw43_arch_none  # Select 'none', 'background', or 'rtos' architecture
       pico_btstack_classic  # Main stack for Classic SPP Bluetooth
       pico_btstack_cyw43    # Ties BTstack to the onboard CYW chip
     )
+    set(FILENAME_EXTENSION "_netb")
+  # WiFi
+  elseif((ENABLE_WIFI EQUAL 1) AND NOT (ENABLE_BLUETOOTH EQUAL 1))
+    set(TARGET_LL
+      ${TARGET_LL}
+      pico_cyw43_arch_lwip_poll  # Polled from core 0, see net_wifi.c
+      pico_lwip_nosys            # Provides the sys_arch.h NO_SYS=1 needs
+    )
+    set(FILENAME_EXTENSION "_netw")
+  # If neither but still a _w board we require a librarie to control the LED
+  elseif(NOT (ENABLE_WIFI EQUAL 1) AND NOT (ENABLE_BLUETOOTH EQUAL 1))
+    set(TARGET_LL
+      ${TARGET_LL}
+      pico_cyw43_arch_none  # Select 'none', 'background', or 'rtos' architecture
+    )
+  endif()
 
-    set(BT_TARGET_PIO 2)    # Use rp2350 pio2
-    add_compile_definitions(USE_BLUETOOTH=1)
+  ## The WiFi/BT chip communicates SPI via a PIO so we need to define
+  if((ENABLE_WIFI EQUAL 1) OR (ENABLE_BLUETOOTH EQUAL 1))
+    # What Pio to target
+    if(${PICO_PLATFORM} MATCHES rp2350-arm-s)
+      set(WIFIBT_TARGET_PIO 2)
+    else()
+      set(WIFIBT_TARGET_PIO 1)
+    endif()
+
+    # Enable the primary print macro for the CYW43 Wi-Fi driver
+    add_compile_definitions(CYW43_PRINTF_ENABLED=1)
+    # Enable detailed verbose logging, informational logs, and warning tracking
+    add_compile_definitions(CYW43_LOGIC_DEBUG=1)
+    # Enable lwIP Network Stack Debugging
+    add_compile_definitions(LWIP_DEBUG=1)
+
+    ### Add filename for build type
+    foreach(FILENAME ${FILENAMES})
+      list(APPEND FILENAMES_net "${FILENAME}${FILENAME_EXTENSION}")
+    endforeach()
+    set(FILENAMES ${FILENAMES_net})
   endif()
 endif()
 
+### Enable Profiling
 if(ENABLE_PROFILING EQUAL 1)
   add_compile_definitions(ENABLE_PROFILING=1)
   # set(COMPILE_OPTS
@@ -592,9 +679,15 @@ if(ENABLE_PROFILING EQUAL 1)
   # pico_enable_stdio_semihosting(${CMAKE_PROJECT_NAME} ENABLED)
 endif()
 
+### Enable Telemetry and update the filenames if needed
 if(ENABLE_TELEMETRY EQUAL 1)
   if(${PICO_BOARD} STREQUAL "pico2" OR ${PICO_BOARD} STREQUAL "pico2_w")
     add_compile_definitions(USE_TELEMETRY=1)
+    ### Add filename id
+    foreach(FILENAME ${FILENAMES})
+      list(APPEND FILENAMES_telemetry "${FILENAME}_tl")
+    endforeach()
+    set(FILENAMES ${FILENAMES_telemetry})
   endif()
 endif()
 
@@ -618,7 +711,7 @@ project(${PROJECT_NAME} C CXX ASM)
 ### init sdk
 pico_sdk_init()
 
-# Explicitely force pioasm to complete before any firmware targets on clean builds
+### Explicitely force pioasm to complete before any firmware targets on clean builds
 if(TARGET pioasmBuild)
   set(PIOASM_DEPENDENCY pioasmBuild)
 endif()
@@ -676,6 +769,9 @@ if(USBSID_DEBUGGING EQUAL 1)
   if(EMULATOR_DEBUGGING EQUAL 1)
     add_compile_definitions(EMUDEBUG=1)
   endif()
+  if(BT_DIAG_DEBUGGING EQUAL 1)
+    add_compile_definitions(BT_DIAG_DEBUG=1)
+  endif()
 endif()
 
 ### It escapes every damn time!
@@ -695,46 +791,77 @@ message(TRACE "${SOURCEFILES}")
 message(TRACE "Compile time include dirs:")
 message(TRACE "${TARGET_INCLUDE_DIRS}")
 
-### Compile targets
-# FW_VERSION_INT/PCB_VERSION_INT below get emitted as bare (unquoted) numeric
-# -D defines, so the C compiler parses them as C integer literals - any
-# literal starting with "0" is octal there, and octal digits only run 0-7.
-# "0.8.0" collapses to "080", which broke the very first time a MAJOR
-# version of 0 met a MINOR/PATCH digit of 8 or 9 (every version before this
-# happened to concatenate to all-0-7 digits, so this never came up). Strip
-# leading zeros so the literal can never be mistaken for octal, regardless
-# of platform version - "080" -> "80" (still stays a valid, comparable
-# integer for the PCB_VERSION_INT >= NN checks throughout src/).
+### Compile versions
+# Strip leading zeros so the literal can never be mistaken for octal.
+# Any literal starting with "0" is parsed as octal, octal digits only run 0-7.
+# Version 0.8.0 threw an octal compilation error.
 string(REPLACE "." "" FWVER_INT "${FWVERSION}")
 string(REGEX REPLACE "^0+" "" FWVER_INT "${FWVER_INT}")
 if(FWVER_INT STREQUAL "")
   set(FWVER_INT "0")
 endif()
-foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSIONS)
+
+### Local build logic
+string(FIND "${CMAKE_CURRENT_LIST_DIR}" "USBSID-Pico-dev" SUBSTRING_INDEX)
+if(NOT SUBSTRING_INDEX EQUAL -1)
+  message(STATUS "${Cyan}${ColorBold}Build is local, forcing single linker pool${ColorReset}")
+  # Force linker to a single build pool for logical memory usage output
+  set_property(GLOBAL PROPERTY JOB_POOLS link_pool=1)
+  # Set CMake to use this pool for all link targets
+  set(CMAKE_JOB_POOL_LINK link_pool)
+endif()
+
+### Build loop
+foreach(FILENAME LEDTYPE PCBVERSION IN ZIP_LISTS FILENAMES LEDTYPES PCBVERSIONS)
+
   # set filename
   set(BUILD ${FILENAME})
+  # set build version
   set(BUILD_VERSION "")
   string(CONCAT BUILD_VERSION ${PROJECT_PRODUCT} " v" ${PCBVERSION})
-  message(DEBUG "Building ${FILENAME} with PICOTYPE=${PICOTYPE} and MAGIC_SMOKE=${MAGIC_SMOKE}")
-  message(DEBUG "Set USB manufacturer: ${USBSID_MANUFACTURER}")
-  message(DEBUG "Set USB product: ${BUILD_VERSION}")
+
+  # Build logging
+  message(DEBUG "Building ${Yellow}${ColorBold}${FILENAME}${ColorReset} with LEDTYPE=${Yellow}${ColorBold}${LEDTYPE}${ColorReset} and MAGIC_SMOKE=${Yellow}${ColorBold}${MAGIC_SMOKE}${ColorReset}")
+  if(FEATURE_LIST)
+    message(STATUS ${BUILD_FEATURES})
+  endif()
+  message(DEBUG "Set USB manufacturer: ${Yellow}${ColorBold}${USBSID_MANUFACTURER}${ColorReset}")
+  message(DEBUG "Set USB product: ${Yellow}${ColorBold}${BUILD_VERSION}${ColorReset}")
+
   # executable
   add_executable(${BUILD} ${SOURCEFILES})
-  # BUILD TYPES
-  # Same octal-literal trap as FWVER_INT above - not hit yet (1.0/1.3/1.5
-  # never start with "0"), but stripped for the same reason so it can't
-  # silently reappear if a PCB version ever does.
+
+  # Build types (with octal build error fix)
   string(REPLACE "." "" PCBVER_INT "${PCBVERSION}")
   string(REGEX REPLACE "^0+" "" PCBVER_INT "${PCBVER_INT}")
   if(PCBVER_INT STREQUAL "")
     set(PCBVER_INT "0")
   endif()
-  if(PICOTYPE STREQUAL "RGB")
-    target_compile_definitions(${BUILD} PRIVATE USBSID USBSID_PRODUCT="${BUILD_VERSION}" USE_RGB=1 PCB_VERSION="${PCBVERSION}" PCB_VERSION_INT=${PCBVER_INT} FW_VERSION_INT=${FWVER_INT})
-  else()
-    target_compile_definitions(${BUILD} PRIVATE USBSID USBSID_PRODUCT="${BUILD_VERSION}" PCB_VERSION="${PCBVERSION}" PCB_VERSION_INT=${PCBVER_INT} FW_VERSION_INT=${FWVER_INT})
+
+  # Default build definitions
+  target_compile_definitions(${BUILD} PRIVATE USBSID
+    USBSID_PRODUCT="${BUILD_VERSION}"
+    PCB_VERSION="${PCBVERSION}"
+    PCB_VERSION_INT=${PCBVER_INT}
+    FW_VERSION_INT=${FWVER_INT}
+  )
+
+  # RGB board definition
+  if(LEDTYPE STREQUAL "RGB")
+    target_compile_definitions(${BUILD} PRIVATE USBSID
+    USE_RGB=1
+    )
   endif()
-  # pio addition
+
+  # WiFi / Bluetooth definitions
+  if (USBSID_W_BOARD AND ((ENABLE_BLUETOOTH EQUAL 1) OR (ENABLE_WIFI EQUAL 1)))
+    # Redirect the CYW43 wireless driver off PIO0 (the SID bus)
+    target_compile_definitions(${BUILD} PRIVATE
+      CYW43_SPI_PIO_PREFERRED_PIO=${WIFIBT_TARGET_PIO}
+    )
+  endif()
+
+  # pio headers to compile
   pico_generate_pio_header(${BUILD} ${PIO_BUS})
   pico_generate_pio_header(${BUILD} ${PIO_CLOCK})
   pico_generate_pio_header(${BUILD} ${PIO_VU})
@@ -742,23 +869,27 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
   pico_generate_pio_header(${BUILD} ${PIO_UART})
   endif()
   pico_generate_pio_header(${BUILD} ${PIO_COUNTER})
-  if(PICOTYPE STREQUAL "RGB")
+  if(LEDTYPE STREQUAL "RGB")
     pico_generate_pio_header(${BUILD} ${PIO_RGB})
   endif()
+
   # rsiddrv dependency for sidplayer
   if(ONBOARD_SIDPLAYER EQUAL 1)
     add_dependencies(${BUILD} RSIDDriver)
   endif()
+
   # force pioasm to build first on clean builds
   if(DEFINED PIOASM_DEPENDENCY)
     add_dependencies(${BUILD} ${PIOASM_DEPENDENCY})
   endif()
+
   # source files to compile
   target_sources(${BUILD} PUBLIC ${SOURCEFILES})
+  # compile options
   target_compile_options(${BUILD} ${COMPILE_OPTS})
-  target_link_options(${BUILD} PRIVATE -Xlinker --print-memory-usage)
+
   # memory map linkers
-  if(${PICO_PLATFORM} MATCHES rp2350)
+  if(${PICO_PLATFORM} MATCHES rp2350-arm-s)
     if(${PICO_BOARD} STREQUAL "weact_studio_rp2350b_core")
       message(TRACE "Memmap linker, platform ${PICO_PLATFORM} MATCHES rp2350b")
       target_compile_definitions(${BUILD} PRIVATE USBSID PICO_EMBED_XIP_SETUP=1)
@@ -772,26 +903,22 @@ foreach(FILENAME PICOTYPE PCBVERSION IN ZIP_LISTS FILENAMES PICOTYPES PCBVERSION
     message(TRACE "Memmap linker, platform ${PICO_PLATFORM} EQUALS rp2040")
     set_target_properties(${BUILD} PROPERTIES PICO_TARGET_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/src/usbsidpico-rp2040.ld)
   endif()
+
   # tell the linker what libraries to link
   target_link_libraries(${BUILD} ${TARGET_LL})
-  if ((ENABLE_BLUETOOTH EQUAL 1) AND (${PICO_BOARD} STREQUAL "pico2_w"))
-    # Redirect the CYW43 wireless driver to use the third PIO block (PIO2)
-    target_compile_definitions(${BUILD} PRIVATE
-        CYW43_SPI_PIO_PREFERRED_PIO=${BT_TARGET_PIO}
-    )
-  elseif(PICO_CYW43_SUPPORTED AND NOT (ENABLE_BLUETOOTH EQUAL 1))
-    target_link_libraries(${BUILD} pico_cyw43_arch_none)
-  endif()
+  # link options
+  target_link_options(${BUILD} PRIVATE -Xlinker --print-memory-usage)
+
   # target usbsid types
   target_include_directories(${BUILD} ${TARGET_INCLUDE_DIRS})
   pico_set_program_name(${BUILD} "USBSID-Pico")
   pico_set_program_version(${BUILD} "${PROJECT_VERSION}")
+
   # create map/bin/hex/uf2 file in addition to ELF.
   pico_add_extra_outputs(${BUILD})
+
   # enable uart output, disable usb output
   pico_enable_stdio_uart(${BUILD} 1)  # essentialy the same as LL pico_stdio_uart
   pico_enable_stdio_usb(${BUILD} 0)
-if(${PICO_BOARD} STREQUAL "pico2_w")
-  pico_add_extra_outputs(${BUILD})
-endif()
+
 endforeach()
