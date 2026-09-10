@@ -150,15 +150,15 @@ void init_audio_switch(void)
  */
 int detect_clocksignal(void)
 {
-  usCFG("[DETECT CLOCK] START\n");
+  usPIN("Start external clock signal detection\n");
   int c = 0, r = 0;
   gpio_init(PHI1);
   gpio_set_pulls(PHI1, false, true);
   for (int i = 0; i < 20; i++) {
     r |= c = (read_bus(0) & bPIN(PHI1)) >> PHI1;
   }
-  usCFG("[RESULT] %d: %s\n", r, (r == 0 ? "INTERNAL CLOCK" : "EXTERNAL CLOCK"));
-  usCFG("[DETECT CLOCK] END\n");
+  usPIN("Result: %d: %s\n", r, (r == 0 ? "INTERNAL CLOCK" : "EXTERNAL CLOCK"));
+  usPIN("End external clock signal detection\n");
   return r;  /* 1 if clock detected */
 }
 
@@ -173,10 +173,10 @@ void toggle_audio_switch(void)
   if (!usbsid_config.lock_audio_sw) {
     int audio_state = (read_bus(1) & bPIN(AU_SW)) >> AU_SW; /* Pinpoint current audio switch state */
     audio_state ^= 1;
-    usCFG("Toggle audio switch to: %d (%s)\n", (int)audio_state, monostereo_str((int)audio_state));
+    usPIN("Toggle audio switch to: %d (%s)\n", (int)audio_state, monostereo_str((int)audio_state));
     tPIN(AU_SW);  /* toggle mono <-> stereo */
   } else {
-    usCFG("Audio switch is locked at %d (%s), toggle not applied\n",
+    usPIN("Audio switch is locked at %d (%s), toggle not applied\n",
       (int)usbsid_config.stereo_en, monostereo_str((int)usbsid_config.stereo_en));
     return;
   }
@@ -194,12 +194,12 @@ void set_audio_switch(bool state)
 { /* Set the SPST switch */
 #if PCB_VERSION_INT >= 13
   if (!usbsid_config.lock_audio_sw) {
-    usCFG("Set audio switch to: %d (%s)\n", (int)state, monostereo_str((int)state));
+    usPIN("Set audio switch to: %d (%s)\n", (int)state, monostereo_str((int)state));
     if (state) {
       sPIN(AU_SW);       /* set   mono <-> stereo pin */
     } else cPIN(AU_SW);  /* clear mono <-> stereo pin */
   } else {
-    usCFG("Audio switch is locked at %d (%s), requested change to %d (%s) ignored\n",
+    usPIN("Audio switch is locked at %d (%s), requested change to %d (%s) ignored\n",
       (int)usbsid_config.stereo_en, monostereo_str((int)usbsid_config.stereo_en), state, monostereo_str((int)state));
     return;
   }
@@ -219,11 +219,11 @@ void set_SID5v_state(bool state)
 #if PCB_VERSION_INT >= 15
   r_state = (read_bus(1) & bPIN(SIDVCC_EN)) >> SIDVCC_EN;
   if (state == r_state) {
-    /* usCFG("SID 5v is already at state '%s', requested: '%s', state change ignored.\n",
+    /* usPIN("SID 5v is already at state '%s', requested: '%s', state change ignored.\n",
       (r_state ? "on" : "off"), (state ? "on" : "off")); */
     return;
   } else {
-    usCFG("SID 5v from '%s' to '%s'\n",
+    usPIN("SID 5v from '%s' to '%s'\n",
       (r_state ? "on" : "off"), (state ? "on" : "off"));
     if (state) {
       sPIN(SIDVCC_EN);
@@ -247,11 +247,11 @@ void set_SIDhv_state(bool state)
 #if PCB_VERSION_INT >= 15
   r_state = (read_bus(1) & bPIN(SIDHV_EN)) >> SIDHV_EN;
   if (state == r_state) {
-    /* usCFG("SID hv is already at state '%s', requested: '%s', state change ignored.\n",
+    /* usPIN("SID hv is already at state '%s', requested: '%s', state change ignored.\n",
       (r_state ? "on" : "off"), (state ? "on" : "off")); */
     return;
   } else {
-    usCFG("SID hv from '%s' to '%s'\n",
+    usPIN("SID hv from '%s' to '%s'\n",
       (r_state ? "on" : "off"), (state ? "on" : "off"));
     if (state) {
       sPIN(SIDHV_EN);
@@ -275,11 +275,11 @@ void set_SID1_highvoltage(bool state)
 #if PCB_VERSION_INT >= 15
   r_state = (read_bus(1) & bPIN(HV1_SEL)) >> HV1_SEL;
   if (state == r_state) {
-    /* usCFG("SID1 hv is already at state '%s', requested: '%s', state change ignored.\n",
+    /* usPIN("SID1 hv is already at state '%s', requested: '%s', state change ignored.\n",
       (r_state ? "12v" : "9v"), (state ? "12v" : "9v")); */
     return;
   } else {
-    usCFG("SID1 hv from '%s' to '%s'\n",
+    usPIN("SID1 hv from '%s' to '%s'\n",
       (r_state ? "12v" : "9v"), (state ? "12v" : "9v"));
     if (state) {
       sPIN(HV1_SEL);
@@ -303,11 +303,11 @@ void set_SID2_highvoltage(bool state)
 #if PCB_VERSION_INT >= 15
   r_state = (read_bus(1) & bPIN(HV2_SEL)) >> HV2_SEL;
   if (state == r_state) {
-    /* usCFG("SID2 hv is already at state '%s', requested: '%s', state change ignored.\n",
+    /* usPIN("SID2 hv is already at state '%s', requested: '%s', state change ignored.\n",
       (r_state ? "12v" : "9v"), (state ? "12v" : "9v")); */
     return;
   } else {
-    usCFG("SID2 hv from '%s' to '%s'\n",
+    usPIN("SID2 hv from '%s' to '%s'\n",
       (r_state ? "12v" : "9v"), (state ? "12v" : "9v"));
     if (state) {
       sPIN(HV2_SEL);
@@ -394,7 +394,7 @@ void set_base_voltages(uint16_t wait_ms)
 {
 #if PCB_VERSION_INT >= 15
   if (get_pin_states() != 0b0011) {
-    usCFG("Setting default base voltages\n");
+    usPIN("Setting default base voltages\n");
     cPIN(RES);
     voltage_state_off();
     set_SID1_highvoltage(false); /* Set SID1 hv to 9v */
@@ -404,7 +404,7 @@ void set_base_voltages(uint16_t wait_ms)
     sleep_ms(wait_ms);
     sPIN(RES);
   } else {
-    usCFG("Base voltages already at default state\n");
+    usPIN("Base voltages already at default state\n");
     cPIN(RES);
     sleep_ms(wait_ms);
     sPIN(RES);

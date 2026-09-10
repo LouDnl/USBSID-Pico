@@ -66,7 +66,7 @@ volatile uint32_t rgb_value = 0;
 void setup_dmachannels(void)
 { /* NOTE: Do not manually assign DMA channels, this causes a Panic on the PicoW */
   usNFO("\n");
-  usCFG("Init DMA Channels\n");
+  usDMA("Init DMA Channels\n");
 
   /* NOTICE: DMA read address is disabled for now, it is causing confirmed desync on the rp2040 (rp2350 seems to works, but needs improving) */
   /* NOTICE: DMA chaining on rp2350 causes desync with cycled writes, probably due to RP2350-E8 */
@@ -180,10 +180,10 @@ void setup_dmachannels(void)
   }
 #endif
 #if PICO_RP2350
-  usCFG("  DMA Channels claimed C:%d TX:%d RX:%d D:%d CNT:%d\n",
+  usDMA("  DMA Channels claimed C:%d TX:%d RX:%d D:%d CNT:%d\n",
     dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay, dma_counter);
 #else
-  usCFG("  DMA Channels claimed C:%d TX:%d RX:%d D:%d CNTA:%d CNTB:%d\n",
+  usDMA("  DMA Channels claimed C:%d TX:%d RX:%d D:%d CNTA:%d CNTB:%d\n",
     dma_tx_control, dma_tx_data, dma_rx_data, dma_tx_delay, dma_counter, dma_counter_chain);
 #endif
 

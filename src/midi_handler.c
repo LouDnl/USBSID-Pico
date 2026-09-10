@@ -109,7 +109,7 @@ static void build_note_table(void)
     note_table[i] = (uint16_t)(v > 0xFFFF ? 0xFFFF : v);
   }
   note_table_clock = rate;
-  usNFO("[MIDI] Note table built for %u Hz\n", rate);
+  usMIDI("Note table built for %u Hz\n", rate);
   return;
 }
 
@@ -584,7 +584,7 @@ static void apply_patch_to_channel(uint8_t channel, uint8_t patch_index)
   ch->unison_detune = p->unison_detune;
   ch->patch       = patch_index;
 
-  usNFO("[PATCH] ch%d -> patch %d\n", channel, patch_index);
+  usMIDI("[PATCH] ch%d -> patch %d\n", channel, patch_index);
   return;
 }
 
@@ -645,7 +645,7 @@ void midi_handler_capture_patch(uint8_t channel, uint8_t patch_index)
   p->unison_enabled = (ch->flags & MIDI_CH_UNISON) ? 1 : 0;
   p->unison_detune  = ch->unison_detune;
 
-  usNFO("[PATCH] ch%d captured -> patch %d\n", channel, patch_index);
+  usMIDI("[PATCH] ch%d captured -> patch %d\n", channel, patch_index);
   return;
 }
 
@@ -675,7 +675,7 @@ static void set_sid_override(uint8_t channel, uint8_t cc, uint8_t value)
   else if (cc == CC.CC_SID2) ch->sid_override = 1;
   else if (cc == CC.CC_SID3) ch->sid_override = 2;
   else if (cc == CC.CC_SID4) ch->sid_override = 3;
-  usNFO("[SID OVERRIDE] ch%d -> %d\n", channel, ch->sid_override);
+  usMIDI("[SID OVERRIDE] ch%d -> %d\n", channel, ch->sid_override);
   return;
 }
 
@@ -697,7 +697,7 @@ static void set_voice_override(uint8_t channel, uint8_t cc, uint8_t value)
   if (cc == CC.CC_VCE1) ch->voice_override = 0;
   else if (cc == CC.CC_VCE2) ch->voice_override = 1;
   else if (cc == CC.CC_VCE3) ch->voice_override = 2;
-  usNFO("[VOICE OVERRIDE] ch%d -> %d\n", channel, ch->voice_override);
+  usMIDI("[VOICE OVERRIDE] ch%d -> %d\n", channel, ch->voice_override);
   return;
 }
 
@@ -848,7 +848,7 @@ static void set_unison_enable(uint8_t channel, uint8_t cc, uint8_t value)
   midi_channel_cfg_t *ch = &midi_channels[channel];
   if (value >= 64) ch->flags = (uint8_t)(ch->flags | MIDI_CH_UNISON);
   else             ch->flags = (uint8_t)(ch->flags & (uint8_t)~MIDI_CH_UNISON);
-  usNFO("[CC_UNIS] ch%d unison %s\n", channel, (ch->flags & MIDI_CH_UNISON) ? "on" : "off");
+  usMIDI("[CC_UNIS] ch%d unison %s\n", channel, (ch->flags & MIDI_CH_UNISON) ? "on" : "off");
   return;
 }
 /**
@@ -929,7 +929,7 @@ static void set_handler(uint8_t channel, uint8_t cc, uint8_t value)
     bool now = (value == 127 ? true : value == 0 ? false : !was);
     if (now) ch->flags = (uint8_t)(ch->flags | toggles[i].flag_bit);
     else ch->flags = (uint8_t)(ch->flags & (uint8_t)~toggles[i].flag_bit);
-    usNFO("[%s] ch%d From %d To %d\n", toggles[i].name, channel, was, now);
+    usMIDI("[%s] ch%d From %d To %d\n", toggles[i].name, channel, was, now);
     return;
   }
 
@@ -940,14 +940,14 @@ static void set_handler(uint8_t channel, uint8_t cc, uint8_t value)
     bool was_poly = (ch->poly_limit > 1);
     bool now_poly = (value == 127 ? true : value == 0 ? false : !was_poly);
     ch->poly_limit = (uint8_t)(now_poly ? full : 1);
-    usNFO("[CC_SPLY] ch%d poly_limit -> %d\n", channel, ch->poly_limit);
+    usMIDI("[CC_SPLY] ch%d poly_limit -> %d\n", channel, ch->poly_limit);
     return;
   }
 
   if (cc == CC.CC_MONO || cc == CC.CC_POLY) {
     uint8_t full = mask_popcount(midi_channel_effective_mask(channel));
     ch->poly_limit = (cc == CC.CC_MONO) ? 1 : full;
-    usNFO("[%s] ch%d poly_limit -> %d, silencing this channel's held notes\n",
+    usMIDI("[%s] ch%d poly_limit -> %d, silencing this channel's held notes\n",
           (cc == CC.CC_MONO ? "CC_MONO" : "CC_POLY"), channel, ch->poly_limit);
     release_channel_voices(channel);
     return;
@@ -1622,7 +1622,7 @@ static void set_arp_enable(uint8_t channel, uint8_t cc, uint8_t value)
     ch->arp_held_count = 0;
     ch->flags = (uint8_t)(ch->flags & (uint8_t)~MIDI_CH_ARP_ENABLED);
   }
-  usNFO("[CC_ARPE] ch%d arpeggiator %s\n", channel, now ? "on" : "off");
+  usMIDI("[CC_ARPE] ch%d arpeggiator %s\n", channel, now ? "on" : "off");
   return;
 }
 
@@ -1865,11 +1865,11 @@ static void assign_func_ptr(const char *name, uint8_t cc, cc_handler_t f_ptr)
   if __us_unlikely(cc > MIDI_CC_MAX) {
     /* Catches the 0xFF placeholders in the default map, which would otherwise
      * run off the end of cc_func_ptr_array[128] */
-    usNFO("[MIDI][CC] %s is 0x%02X, out of range, not registered\n", name, cc);
+    usMIDI("[MIDI][CC] %s is 0x%02X, out of range, not registered\n", name, cc);
     return;
   }
   if __us_unlikely(cc_func_ptr_array[cc] != NULL) {
-    usNFO("[MIDI][CC] %s wants CC %d which is already bound, refusing\n", name, cc);
+    usMIDI("[MIDI][CC] %s wants CC %d which is already bound, refusing\n", name, cc);
     return;
   }
   cc_func_ptr_array[cc] = f_ptr;
@@ -2005,7 +2005,7 @@ static void apply_default_volume(void)
  */
 void midi_processor_init(void)
 {
-  usNFO("[MIDI] Handler init\n");
+  usMIDI("Handler init\n");
 
   memcpy(&CC, &midi_ccvalues_defaults, sizeof(midi_ccvalues));
 
@@ -2089,7 +2089,7 @@ static void handle_control_change(uint8_t channel, uint8_t *buffer, int size)
   }
 
   if (cc_func_ptr_array[cc] != NULL) {
-    usNFO("[MIDI] [CHANNEL] %02d [CC] 0x%02X -> %02x\n", channel, cc, value);
+    usMIDI(" [CHANNEL] %02d [CC] 0x%02X -> %02x\n", channel, cc, value);
     cc_func_ptr_array[cc](channel, cc, value);
   }
   return;

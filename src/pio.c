@@ -121,14 +121,14 @@ void setup_piobus(void)
   busclock_frequency = (float)pico_hz / (usbsid_config.clock_rate * 32) / 2;  /* Clock frequency is 8 times the SID clock */
 
   usNFO("\n");
-  usDBG("BUS Clock initialisation\n");
-  usDBG("  Pico Clock @ %luMHz\n",
+  usPIO("BUS Clock initialisation\n");
+  usPIO("  Pico Clock @ %luMHz\n",
     (pico_hz / 1000 / 1000));
-  usDBG("  BUS clock divisor = %.2f\n",
+  usPIO("  BUS clock divisor = %.2f\n",
     busclock_frequency);
-  usDBG("  BUS Clock @ %.2f\n",
+  usPIO("  BUS Clock @ %.2f\n",
     (float)pico_hz / busclock_frequency / 2);
-  usDBG("  C64 SID Clock = %d\n",
+  usPIO("  C64 SID Clock = %d\n",
     (int)usbsid_config.clock_rate);
   stdio_flush();
 
@@ -218,7 +218,7 @@ void sync_pios(bool at_boot)
 { /* Sync PIO's */
   usNFO("\n");
 #if PICO_PIO_VERSION == 0
-  usDBG("Restarting PIO's (Pico & Pico_w)\n");
+  usPIO("Restarting PIO's (Pico & Pico_w)\n");
   /* NOTE: `pio_sm_restart` takes a statemachine number and not a mask,
      the previous `pio_sm_restart(bus_pio, 0b1111)` wrote CTRL bit 19,
      which is reserved, so nothing was ever restarted here.
@@ -226,7 +226,7 @@ void sync_pios(bool at_boot)
      it glitches the SID clock */
   pio_restart_sm_mask(bus_pio, 0b1110);
 #elif PICO_PIO_VERSION > 0  /* NOTE: rp2350 only */
-  usDBG("Synchronise PIO's (Pico2 & Pico2_w)\n");
+  usPIO("Synchronise PIO's (Pico2 & Pico2_w)\n");
   /* stdio_flush is required here because pio_clkdiv_restart_sm_multi_mask
      (RP2350-only) briefly disrupts UART interrupt handling mid-transmission.
      Flush ensures buffer empty before PIO operations.*/
@@ -260,7 +260,7 @@ void sync_pios(bool at_boot)
 void restart_bus_clocks(void)
 {
   usNFO("\n");
-  usDBG("Re-initialise clocks\n");
+  usPIO("Re-initialise clocks\n");
   uint32_t pico_hz = clock_get_hz(clk_sys);
   busclock_frequency = (float)pico_hz / (usbsid_config.clock_rate * 32) / 2;  /* Clock frequency is 8 times the SID clock */
   sidclock_frequency = (float)pico_hz / usbsid_config.clock_rate / 2;
@@ -270,17 +270,17 @@ void restart_bus_clocks(void)
   pio_sm_set_clkdiv(bus_pio, sm_delay, busclock_frequency);
   pio_sm_set_clkdiv(clkcnt_pio, sm_clkcnt, busclock_frequency);
 
-  usDBG("  Pico Clock @ %luMHz\n",
+  usPIO("  Pico Clock @ %luMHz\n",
     (pico_hz / 1000 / 1000));
-  usDBG("  BUS clock divisor = %.2f\n",
+  usPIO("  BUS clock divisor = %.2f\n",
     busclock_frequency);
-  usDBG("  BUS Clock @ %.2f\n",
+  usPIO("  BUS Clock @ %.2f\n",
     ((float)pico_hz / busclock_frequency / 2));
-  usDBG("  SID clock divisor = %.2f\n",
+  usPIO("  SID clock divisor = %.2f\n",
     sidclock_frequency);
-  usDBG("  SID Clock @ %.2f\n",
+  usPIO("  SID Clock @ %.2f\n",
     ((float)pico_hz / sidclock_frequency / 2));
-  usDBG("  C64 SID Clock = %d\n",
+  usPIO("  C64 SID Clock = %d\n",
     (int)usbsid_config.clock_rate);
   return;
 }
@@ -324,14 +324,14 @@ static void init_sidclock(void)
   sidclock_frequency = (float)pico_hz / usbsid_config.clock_rate / 2;
 
   usNFO("\n");
-  usDBG("SID Clock initialisation\n");
-  usDBG("  Pico Clock @ %luMHz\n",
+  usPIO("SID Clock initialisation\n");
+  usPIO("  Pico Clock @ %luMHz\n",
     (pico_hz / 1000 / 1000));
-  usDBG("  SID clock divisor = %.2f\n",
+  usPIO("  SID clock divisor = %.2f\n",
     sidclock_frequency);
-  usDBG("  SID Clock @ %.2f\n",
+  usPIO("  SID Clock @ %.2f\n",
     ((float)pico_hz / sidclock_frequency / 2));
-  usDBG("  C64 SID Clock = %d\n",
+  usPIO("  C64 SID Clock = %d\n",
     (int)usbsid_config.clock_rate);
   offset_clock = pio_add_program(bus_pio, &clock_program);
   sm_clock = 0;  /* PIO0 SM0 */
@@ -387,7 +387,7 @@ void setup_sidclock(void)
  */
 static void __us_deprecated deinit_sidclock(void)
 {
-  usDBG("SID Clock deinitialise\n");
+  usPIO("SID Clock deinitialise\n");
   clock_program_deinit(bus_pio, sm_clock, offset_clock, clock_program);
 
   return;

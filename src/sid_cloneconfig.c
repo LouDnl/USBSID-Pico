@@ -71,19 +71,19 @@ static void print_fpgasid_sidconfig(int slot, int sidno, uint8_t * configarray)
   int addr3 = ((configarray[1] & 0b1) == 1 ? 3 : 4);
   int addr = ((addr1 + addr2 + addr3) == 12 ? 0 : 4);
 
-  usCFG("\n");
-  usCFG("FPGASID configuration of slot %s and SID %d\n", slots[slot], sidno);
+  usSID("\n");
+  usSID("FPGASID configuration of slot %s and SID %d\n", slots[slot], sidno);
   if (sidno == 1) {
-    usCFG("  Output mode    = %s\n", outputmode[outp]);
-    usCFG("  SID2 addresses = %s%s%s%s\n", sid2addr[addr], sid2addr[addr1], sid2addr[addr2], sid2addr[addr3]);
+    usSID("  Output mode    = %s\n", outputmode[outp]);
+    usSID("  SID2 addresses = %s%s%s%s\n", sid2addr[addr], sid2addr[addr1], sid2addr[addr2], sid2addr[addr3]);
   }
-  usCFG("  ExtIn source   = %s\n", extinsource[extin]);
-  usCFG("  Register read  = %s\n", readback[readb]);
-  usCFG("  Register delay = %s\n", regdelay[regd]);
-  usCFG("  Mixed wavform  = %s\n", mixedwave[mixw]);
-  usCFG("  Crunchy DAC    = %s\n", crunchydac[crunch]);
-  usCFG("  Analog filter  = %s\n", filtermode[fltr]);
-  usCFG("  DigiFIX values = %02x\n", configarray[0]);
+  usSID("  ExtIn source   = %s\n", extinsource[extin]);
+  usSID("  Register read  = %s\n", readback[readb]);
+  usSID("  Register delay = %s\n", regdelay[regd]);
+  usSID("  Mixed wavform  = %s\n", mixedwave[mixw]);
+  usSID("  Crunchy DAC    = %s\n", crunchydac[crunch]);
+  usSID("  Analog filter  = %s\n", filtermode[fltr]);
+  usSID("  DigiFIX values = %02x\n", configarray[0]);
 
   return;
 }
@@ -113,7 +113,7 @@ void read_fpgasid_configuration(uint8_t base_address)
   static uint8_t sid_two_b[3];
 
   usNFO("\n");
-  usCFG("Reading FPGASID configuration from address $%02x\n", base_address);
+  usSID("Reading FPGASID configuration from address $%02x\n", base_address);
   /* Enable diag mode */
   cycled_write_operation((0x19 + base_address), 0xEE, 6);  /* Write magic cookie Hi */
   cycled_write_operation((0x1A + base_address), 0xAB, 6);  /* Write magic cookie Lo */
@@ -165,30 +165,30 @@ void read_fpgasid_configuration(uint8_t base_address)
   cycled_write_operation((0x1A + base_address), 0x0, 6);   /* Clear magic cookie Lo */
 
   if (!read_config) {
-    usCFG("FPGASID Diagnostic result:\n");
-    usCFG("  Identifier:        %04X (FPGASID)\n", fpgasid_id);
-    usCFG("  CPLD Revision:     %02X\n", cpld);
-    usCFG("  FPGA Revision:     %02X\n", fpga);
-    usCFG("  PCA Revision:      %02X\n", pca);
-    usCFG("  Unique identifier: %02X%02X%02X%02X%02X%02X%02X%02X\n",
+    usSID("FPGASID Diagnostic result:\n");
+    usSID("  Identifier:        %04X (FPGASID)\n", fpgasid_id);
+    usSID("  CPLD Revision:     %02X\n", cpld);
+    usSID("  FPGA Revision:     %02X\n", fpga);
+    usSID("  PCA Revision:      %02X\n", pca);
+    usSID("  Unique identifier: %02X%02X%02X%02X%02X%02X%02X%02X\n",
       unique_id[0], unique_id[1], unique_id[2], unique_id[3],
       unique_id[4], unique_id[5], unique_id[6], unique_id[7]);
-    usCFG("  Clock frequency:   %.3fμs\n", frequency);
-    usCFG("  Select pins:       %02X\n", select_pins);
-    usCFG("  Index config A:    %02X\n", idxa);
-    usCFG("    SID 1 A:         %02X%02X%02X\n",
+    usSID("  Clock frequency:   %.3fμs\n", frequency);
+    usSID("  Select pins:       %02X\n", select_pins);
+    usSID("  Index config A:    %02X\n", idxa);
+    usSID("    SID 1 A:         %02X%02X%02X\n",
       sid_one_a[0], sid_one_a[1], sid_one_a[2]);
-    usCFG("    SID 2 A:         %02X%02X%02X\n",
+    usSID("    SID 2 A:         %02X%02X%02X\n",
       sid_two_a[0], sid_two_a[1], sid_two_a[2]);
-    usCFG("    Filterbias A\n");
-    usCFG("      SID1/SID2:     %02x\n", flta);
-    usCFG("  Index config B:    %02X\n", idxb);
-    usCFG("    SID 1 B:         %02X%02X%02X\n",
+    usSID("    Filterbias A\n");
+    usSID("      SID1/SID2:     %02x\n", flta);
+    usSID("  Index config B:    %02X\n", idxb);
+    usSID("    SID 1 B:         %02X%02X%02X\n",
       sid_one_b[0], sid_one_b[1], sid_one_b[2]);
-    usCFG("    SID 2 B:         %02X%02X%02X\n",
+    usSID("    SID 2 B:         %02X%02X%02X\n",
       sid_two_b[0], sid_two_b[1], sid_two_b[2]);
-    usCFG("    Filterbias B\n");
-    usCFG("      SID1/SID2:     %02x\n", fltb);
+    usSID("    Filterbias B\n");
+    usSID("      SID1/SID2:     %02x\n", fltb);
 
     print_fpgasid_sidconfig(0, 1, sid_one_a);
     print_fpgasid_sidconfig(0, 2, sid_two_a);
@@ -232,28 +232,28 @@ void read_fpgasid_configuration(uint8_t base_address)
 static void print_skpico_configuration(bool is_u64fw, uint8_t * configarray)
 {
   usNFO("\n");
-  usCFG("SIDKICK-pico configuration:\n");
+  usSID("SIDKICK-pico configuration:\n");
   for (size_t i = 0; i < 64; i++) {
     if (i >= 4 && i <= 7) continue;
     if (i >= 13 && i <= 56) continue;
     if (i == 62 || i == 63) continue;
     if (i == 0 || i == 8) {
-      usCFG("  [%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_sid_types) ? (char*)sid_types[configarray[i]] : (char*)error_type[0]);
+      usSID("  [%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_sid_types) ? (char*)sid_types[configarray[i]] : (char*)error_type[0]);
       continue;
     }
     if (i == 10 && !is_u64fw) {
-      usCFG("  [%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_sid2_address) ? (char*)sid2_address[configarray[i]] : (char*)error_type[0]);
+      usSID("  [%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_sid2_address) ? (char*)sid2_address[configarray[i]] : (char*)error_type[0]);
       continue;
     }
     if ((i == 10 || i == 11) && is_u64fw) {
-      usCFG("  [%02ld] %s: %02X ~ Ultimate64\n", i, u64_names[i-10], configarray[i]);
+      usSID("  [%02ld] %s: %02X ~ Ultimate64\n", i, u64_names[i-10], configarray[i]);
       continue;
     }
     if (i == 59) {
-      usCFG("  [%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_clock_speed) ? (char*)clock_speed[configarray[i]] : (char*)error_type[0]);
+      usSID("  [%02ld] %s: %02X ~ %s\n", i, config_names[i], configarray[i], (configarray[i] < s_clock_speed) ? (char*)clock_speed[configarray[i]] : (char*)error_type[0]);
       continue;
     }
-    usCFG("  [%02ld] %s: %02X\n", i, config_names[i], configarray[i]);
+    usSID("  [%02ld] %s: %02X\n", i, config_names[i], configarray[i]);
   }
 
   return;
@@ -269,7 +269,7 @@ static void print_skpico_configuration(bool is_u64fw, uint8_t * configarray)
 bool read_skpico_version(uint8_t base_address)
 {
   usNFO("\n");
-  usCFG("Reading SIDKick-pico version @ $%02x\n", base_address);
+  usSID("Reading SIDKick-pico version @ $%02x\n", base_address);
 
   const char skpico_correction = 0x60;  /* { 0x70, 0x69, 0x63, 0x6F } */
 
@@ -292,7 +292,7 @@ bool read_skpico_version(uint8_t base_address)
 
   /* Finalize version string */
   memcpy(&skpico_version[0], &skpico_version_result, 32);
-  usCFG("  SIDKick-pico version: %.36s (skpico_v: %d is_u64fw: %s)\n", skpico_version, skpico_v, (is_u64fw ? "true" : "false"));
+  usSID("  SIDKick-pico version: %.36s (skpico_v: %d is_u64fw: %s)\n", skpico_version, skpico_v, (is_u64fw ? "true" : "false"));
 
   /* Clear used arrays after use */
   memset(skpico_version_result, 0xff, 32);
@@ -325,8 +325,8 @@ void read_skpico_configuration(uint8_t base_address, uint8_t profile)
     cycled_write_operation((select_profile[0] + base_address), 0, 6);
   }
 
-  usCFG("\n");
-  usCFG("Reading SIDKick-pico configuration @ $%02x\n", base_address);
+  usSID("\n");
+  usSID("Reading SIDKick-pico configuration @ $%02x\n", base_address);
 
   /* Extend config mode */
   sleep_us(10);
@@ -358,16 +358,16 @@ void read_skpico_configuration(uint8_t base_address, uint8_t profile)
  */
 void reset_switch_pdsid_type(void)
 {
-  usCFG("Switching PDSID SID type with reset pin\n");
+  usSID("Switching PDSID SID type with reset pin\n");
   set_reset_state(true); // reset_state = 1;
   set_paused_state(false); // paused_state = 0;
   clear_volume_state(); // memset(volume_state, 0, 4);
   clear_sid_memory(); // memset(sid_memory, 0, count_of(sid_memory));
-  usCFG("  RST pin low\n");
+  usSID("  RST pin low\n");
   cPIN(RES); // gpio_put(RES, 0);
-  usCFG("  Sleep 6 seconds\n");
+  usSID("  Sleep 6 seconds\n");
   sleep_ms(6000);
-  usCFG("  RST pin high\n");
+  usSID("  RST pin high\n");
   sPIN(RES); // gpio_put(RES, 1);
   set_reset_state(false); // reset_state = 0;
 
@@ -446,9 +446,9 @@ void print_backsid_version(uint8_t base_address)
   uint8_t hwrev = cycled_read_operation((base_address + BACKSID_RD), 6); /* Read hardware revision */
 
   usNFO("\n");
-  usCFG("Reading BackSID version @ $%02x]\n", base_address);
-  usCFG("  BackSID version:   %d%d%d\n", major, minor, patch);
-  usCFG("  Hardware revision: %d\n", hwrev);
+  usSID("Reading BackSID version @ $%02x]\n", base_address);
+  usSID("  BackSID version:   %d%d%d\n", major, minor, patch);
+  usSID("  Hardware revision: %d\n", hwrev);
   return;
 }
 
@@ -462,18 +462,18 @@ void print_backsid_filter_type(uint8_t base_address)
 {
   bool again = false;
   usNFO("\n");
-  usCFG("Reading BackSID filters @ $%02x]\n", base_address);
+  usSID("Reading BackSID filters @ $%02x]\n", base_address);
 again:;
   cycled_write_operation((base_address + BACKSID_REG), BACKSID_FLT, 6);         /* Set filter register */
   sleep_ms(33); /* 2 jiffies of 16,8ms each */
   uint8_t filter_type = cycled_read_operation((base_address + BACKSID_RD), 6); /* Read filter type */
-  usCFG("  Filters read RAW: %u\n", filter_type);
+  usSID("  Filters read RAW: %u\n", filter_type);
   if (!again) {
     again = true;
     if (filter_type >= 3) again = false; /* Incorrect result, read again! */
     goto again; /* Read twice */
   }
-  usCFG("  Filters type: %u = %s\n", filter_type, backsid_filters[filter_type]);
+  usSID("  Filters type: %u = %s\n", filter_type, backsid_filters[filter_type]);
   return;
 }
 
@@ -488,9 +488,9 @@ void set_backsid_filter_type(uint8_t base_address, uint8_t type)
 {
   uint8_t type_set = ((type >= 3) ? 0 : type); /* Failsafe defaults to 6581 */
   usNFO("\n");
-  usCFG("Settings BackSID Filters:\n");
-  usCFG("  requested: %u\n", type);
-  usCFG("  actual:    %u = %s\n",
+  usSID("Settings BackSID Filters:\n");
+  usSID("  requested: %u\n", type);
+  usSID("  actual:    %u = %s\n",
     type_set, backsid_filters[type_set]);
   /* LDX #$03  ~ 2 cycles */
   /* STX $d41b ~ 4 cycles */
@@ -517,7 +517,7 @@ void set_backsid_filter_type(uint8_t base_address, uint8_t type)
  */
 void read_armsid_configuration(uint8_t base_address)
 {
-  usCFG("Read ARM(2)SID configuration @ $%02x\n", base_address);
+  usSID("Read ARM(2)SID configuration @ $%02x\n", base_address);
   cycled_write_operation((ARMSID_W1 + base_address),ARMSID_S,6); /* $1d -> 0x53 'S' */
   // sleep_us(10);
   cycled_write_operation((ARMSID_W2 + base_address),ARMSID_I,6); /* $1e -> 0x49 'I' */
@@ -555,7 +555,7 @@ void read_armsid_configuration(uint8_t base_address)
   sleep_ms(10);
 
   uint8_t v1 = cycled_read_operation((ARMSID_R1 + base_address), 4); /* $1b */
-  // sleep_us(10);
+  sleep_us(10);
   uint8_t v2 = cycled_read_operation((ARMSID_R2 + base_address), 4); /* $1c */
   int v = v1 * 256 + v2;
 
@@ -570,9 +570,11 @@ void read_armsid_configuration(uint8_t base_address)
   // sleep_us(10);
   uint8_t q = cycled_read_operation((ARMSID_R2 + base_address), 4); /* $1c */
 
-  usCFG("Current ARMSID settings\n");
-  usCFG("  Chip: %c5xx FW: %d.%d Filt: %b %b  (Voltage = %d mV (%d %d))\n",
+  usSID("Current ARMSID settings\n");
+  usSID("  Chip: %c5xx FW: %d.%d Filt: %b %b  (Voltage = %d mV (%d %d))\n",
     chip, vh, vl, p, q, v, v1, v2);
+
+  cycled_write_operation((ARMSID_W1 + base_address), 0, 6); /* $1d -> Exit config */
 
   return;
 }
@@ -597,21 +599,21 @@ void read_sidemu_configuration(uint8_t base_address)
  */
 void set_sidemu_sidtype(uint8_t base_address, uint8_t type)
 { /* TODO: Finish */
-  usCFG("SIDEmu enable config mode\n");
+  usSID("SIDEmu enable config mode\n");
   /* Enable config mode */
   cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_1,6); /* #66 */
   clockcycle_delay(SIDEMU_WAIT_CYCLES);
   cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_2,6); /* #69 */
   clockcycle_delay(SIDEMU_WAIT_CYCLES);
 
-  usCFG("SIDEmu write command #$%02x without result\n", type);
+  usSID("SIDEmu write command #$%02x without result\n", type);
   /* Command without result :) */
   cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_OFFS_CMD,6); /* #$ff */
   clockcycle_delay(SIDEMU_WAIT_CYCLES);
   cycled_write_operation((SIDEMU_CFG_DATA + base_address),type,6); /* type */
   clockcycle_delay(SIDEMU_WAIT_CYCLES);
 
-  usCFG("SIDEmu disable config mode\n");
+  usSID("SIDEmu disable config mode\n");
   /* Disable config mode */
   cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_1,6); /* #66 */
   clockcycle_delay(SIDEMU_WAIT_CYCLES);

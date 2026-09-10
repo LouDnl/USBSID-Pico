@@ -406,7 +406,7 @@ static void build_fmopl_note_table(void)
     double freq = 440.0 * pow(2.0, ((double)n - 69.0) / 12.0);  /* A4 = MIDI note 69 = 440 Hz */
     fmopl_freq_to_block_fnum(freq, &fmopl_block_table[n], &fmopl_fnum_table[n]);
   }
-  usNFO("[FMOPL] Note table built (%u Hz OPL2 clock)\n", fmopl_effective_clock());
+  usMIDI("[FMOPL] Note table built (%u Hz OPL2 clock)\n", fmopl_effective_clock());
   return;
 }
 
@@ -485,7 +485,7 @@ void midi_fmopl_init(void)
   uint8_t base = fmopl_base_address();
   clear_fmopl_registers_at_addr(base);
   opl_write(base, OPL_REG_TEST, BIT_5);  /* enable per-operator waveform-select registers */
-  usNFO("[FMOPL] Init done, chip at SID%d (base 0x%02x)\n", cfg.fmopl_sid, base);
+  usMIDI("[FMOPL] Init done, chip at SID%d (base 0x%02x)\n", cfg.fmopl_sid, base);
   return;
 }
 
@@ -580,7 +580,7 @@ void midi_fmopl_program_change(uint8_t channel, uint8_t program)
    * out-of-range program number onto some other patch. */
   if (program >= MIDI_FMOPL_PATCH_COUNT) return;
   fmopl_channels[channel].instrument = program;
-  usNFO("[FMOPL] ch%d -> patch %d\n", channel, program);
+  usMIDI("[FMOPL] ch%d -> patch %d\n", channel, program);
   return;
 }
 
@@ -602,7 +602,7 @@ void midi_fmopl_program_change(uint8_t channel, uint8_t program)
 void midi_fmopl_capture_patch(uint8_t channel, uint8_t patch_index)
 {
   fmopl_patches[patch_index] = fmopl_patches[fmopl_channels[channel].instrument];
-  usNFO("[FMOPL] ch%d instrument %d captured -> patch %d\n", channel,
+  usMIDI("[FMOPL] ch%d instrument %d captured -> patch %d\n", channel,
         fmopl_channels[channel].instrument, patch_index);
   return;
 }
@@ -624,7 +624,7 @@ void midi_fmopl_set_target(uint8_t channel, uint8_t value)
   if (now == was) return;
   if (now) ch->flags = (uint8_t)(ch->flags | MIDI_CH_TARGET_FMOPL);
   else ch->flags = (uint8_t)(ch->flags & (uint8_t)~MIDI_CH_TARGET_FMOPL);
-  usNFO("[CC_FMEN] ch%d target FMOpl -> %d\n", channel, now);
+  usMIDI("[CC_FMEN] ch%d target FMOpl -> %d\n", channel, now);
   return;
 }
 
@@ -725,7 +725,7 @@ void midi_fmopl_set_clock(uint32_t hz)
    * resets to the compiled-in FMOPL_CLOCK_HZ default. */
   fmopl_clock_override = hz;
   build_fmopl_note_table();
-  usNFO("[FMOPL] Clock override -> %u Hz%s\n", fmopl_effective_clock(), hz ? "" : " (default)");
+  usMIDI("[FMOPL] Clock override -> %u Hz%s\n", fmopl_effective_clock(), hz ? "" : " (default)");
 
   if (!cfg.fmopl_enabled) return;
   uint8_t base = fmopl_base_address();

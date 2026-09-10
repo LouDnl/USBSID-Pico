@@ -112,7 +112,7 @@ static volatile bool     clock_running       = false;
 void midi_init(void)
 {
   usNFO("\n");
-  usNFO("[MIDI] Init\n");
+  usMIDI("Init\n");
 
   /* Set initial stream state and index */
   midimachine.bus = FREE;

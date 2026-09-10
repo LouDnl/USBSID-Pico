@@ -507,8 +507,11 @@ void __no_inline_not_in_flash_func(default_config)(Config* config)
 void verify_midiconfig_offset(void)
 {
   uint32_t linker_config_offset = (uint32_t)ADDR_CONFIG - XIP_BASE;
-  usCFG("MIDI storage: FLASH_CONFIG_OFFSET = 0x%X, linker ADDR_CONFIG offset = 0x%X, FLASH_MIDICONFIG_OFFSET = 0x%X\n",
-    FLASH_CONFIG_OFFSET, linker_config_offset, FLASH_MIDICONFIG_OFFSET);
+  usNFO("\n");
+  usCFG("MIDI storage:\n");
+  usCFG("  FLASH_CONFIG_OFFSET = 0x%X\n", FLASH_CONFIG_OFFSET);
+  usCFG("  linker ADDR_CONFIG offset = 0x%X\n", linker_config_offset);
+  usCFG("  FLASH_MIDICONFIG_OFFSET = 0x%X\n", FLASH_MIDICONFIG_OFFSET);
   if (linker_config_offset != FLASH_CONFIG_OFFSET) {
     usERR("MIDI storage: ADDR_CONFIG (linker) 0x%X != FLASH_CONFIG_OFFSET (macro) 0x%X - refusing to trust MIDI flash offsets!\n",
       linker_config_offset, FLASH_CONFIG_OFFSET);
@@ -579,7 +582,6 @@ AGAIN:
     (uint)config);
   usCFG("  &config = 0x%x\n",
     (uint)&config);
-
 
   cm_verification = usbsid_config.magic;   /* Store the current magic for later */
   if (usbsid_config.magic != MAGIC_SMOKE) {  /* Verify the magic */
