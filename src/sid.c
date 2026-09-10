@@ -276,6 +276,9 @@ void pause_sid_withmute(void)
  */
 void reset_sid(void)
 {
+  /* bus_heavy_op_begin()/_end() bracket the reset line assert/deassert,
+   * see bus.h. */
+  bus_heavy_op_begin();
   set_reset_state(true);
   set_paused_state(false);
   clear_volume_state();    /* Volume state to default */
@@ -287,6 +290,7 @@ void reset_sid(void)
   }
   sPIN(RES);
   set_reset_state(false);
+  bus_heavy_op_end();
   return;
 }
 
@@ -370,11 +374,14 @@ void clear_sid_registers(int sidno)
  */
 void reset_sid_registers(void)
 {
+  /* See reset_sid()'s comment on bus_heavy_op_begin()/_end() above. */
+  bus_heavy_op_begin();
   set_reset_state(true);
   set_paused_state(false);
   for (int sid = 0; sid < cfg.numsids; sid++) {
     clear_sid_registers(sid);
   }
   set_reset_state(false);
+  bus_heavy_op_end();
   return;
 }
