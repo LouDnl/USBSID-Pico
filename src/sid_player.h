@@ -24,7 +24,7 @@
  */
 
 /* SID player & Emulator flags used in usbsid.c */
-#if defined(ONBOARD_SIDPLAYER)
+#if defined(ONBOARD_EMULATOR)
 extern volatile bool
   sidplayer_init,
   sidplayer_start,
@@ -35,12 +35,12 @@ extern volatile bool
 extern volatile char tuneno;
 extern volatile bool is_prg;
 extern volatile uint32_t playtime, maxplaytime;
-/* ONBOARD_CYNTHCART */
+/* Cynthcart */
 extern volatile bool
   emulator_running,
   starting_emulator,
   stopping_emulator;
-#endif /* ONBOARD_SIDPLAYER */
+#endif /* ONBOARD_EMULATOR */
 
 extern volatile bool is_sidplayerplaying(void); /* Always returns false if no sidplayer available */
 

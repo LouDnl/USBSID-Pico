@@ -51,12 +51,12 @@
 #endif
 
 /* SID player */
-#if defined(ONBOARD_SIDPLAYER)
+#if defined(ONBOARD_EMULATOR)
 #include <sid_player.h>
 #include <usplayer.h>
 static int sidbytes_received = 0;
 static bool receiving_sidfile = 0;
-#endif /* ONBOARD_SIDPLAYER */
+#endif /* ONBOARD_EMULATOR */
 
 /* Declare variables */
 static const Config usbsid_default_config = USBSID_DEFAULT_CONFIG_INIT;
@@ -1465,7 +1465,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         break;
       }
       break;
-#if defined(ONBOARD_SIDPLAYER)
+#if defined(ONBOARD_EMULATOR)
     case UPLOAD_SID_START:
       /* REVERT NOTE: this used to stage the incoming file in its own
        * calloc'd buffer (0x10000 on RP2350, 0x8000 on RP2040) here, then

@@ -29,7 +29,7 @@
 #include <logging.h>
 
 /* SID player */
-#if defined(ONBOARD_SIDPLAYER)
+#if defined(ONBOARD_EMULATOR)
 #include <usplayer.h>
 volatile bool sidplayer_init = false;
 volatile bool sidplayer_start = false;
@@ -48,24 +48,20 @@ volatile bool is_prg = false; /* Default to SID file */
 volatile uint32_t playtime = 0;
 volatile uint32_t maxplaytime = 300000; /* 5 minutes in milliseconds */
 /* Cynthcart, via USBSID-Player's MC68B50 ACIA */
-#if defined(ONBOARD_CYNTHCART)
 #include <cynthcart_embedded.h>
 volatile bool emulator_running = false;
 volatile bool starting_emulator = false;
 volatile bool stopping_emulator = false;
 #else
-volatile bool emulator_running = false;
-#endif /* ONBOARD_CYNTHCART */
-#else
 /**
  * @brief Check whether the onboard SID player is currently playing
  *
- * @note Stub used when ONBOARD_SIDPLAYER is not compiled in; always false
+ * @note Stub used when ONBOARD_EMULATOR is not compiled in; always false
  *
  * @return bool always false
  */
 volatile bool is_sidplayerplaying(void) { return false; };
-#endif /* ONBOARD_SIDPLAYER */
+#endif /* ONBOARD_EMULATOR */
 
 
 /**
@@ -78,7 +74,7 @@ volatile bool is_sidplayerplaying(void) { return false; };
  */
 void set_maxplaytime(uint8_t * buffer)
 {
-#if defined(ONBOARD_SIDPLAYER)
+#if defined(ONBOARD_EMULATOR)
   maxplaytime = ((buffer[1] << 24) | (buffer[2] << 16) | (buffer[3] << 8) | buffer[4]);
   double maxtimeplayed = maxplaytime / 1000.0; /* Force floating-point division by using 1000.0 */
   int minutes = (int)(maxtimeplayed / 60); /* Get total whole minutes */
@@ -100,7 +96,7 @@ void set_maxplaytime(uint8_t * buffer)
  */
 void get_playtime(void)
 {
-#if defined(ONBOARD_SIDPLAYER)
+#if defined(ONBOARD_EMULATOR)
   if (sidplayer_playing) {
     playtime = usplayer_playtime_ms();
   }
@@ -136,7 +132,7 @@ void get_playtime(void)
  */
 void set_mutestate(uint8_t * buffer)
 {
-#if defined(ONBOARD_SIDPLAYER)
+#if defined(ONBOARD_EMULATOR)
   if ((buffer[1] == 0 && buffer[2] > 1) /* all chips, no voices specified */
       || (buffer[1] > 4) /* chip */
       || (buffer[2] > 3) /* voice */
@@ -187,7 +183,7 @@ void set_mutestate(uint8_t * buffer)
  */
 void get_mutestate(void)
 {
-#if defined(ONBOARD_SIDPLAYER)
+#if defined(ONBOARD_EMULATOR)
   uint8_t chips = 0, chip1 = 0, chip2 = 0, chip3 = 0, chip4 = 0;
   if (sidplayer_playing) {
     chips = usplayer_chip_mute();

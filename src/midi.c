@@ -41,12 +41,12 @@
 #include <midi_queue.h>
 #include <sysex.h>
 
-#if defined(ONBOARD_CYNTHCART)
+#if defined(ONBOARD_EMULATOR)
 #include <usbsid.h> /* emulator variables */
 #include <sid_player.h> /* emulator variables */
 #include <cynthcart_embedded.h> /* Cynthcart ~ USBSID-Player */
 queue_t cynthcart_queue;
-#endif /* ONBOARD_CYNTHCART */
+#endif /* ONBOARD_EMULATOR */
 
 
 /* MIDI state machine (declared extern in midi.h) */
@@ -124,7 +124,7 @@ void midi_init(void)
   return;
 }
 
-#if defined(ONBOARD_CYNTHCART)
+#if defined(ONBOARD_EMULATOR)
 /**
  * @brief Initialise the Cynthcart data queue
  *
@@ -237,7 +237,7 @@ static const void handle_emulator_cc(void)
   }
   return;
 }
-#endif /* ONBOARD_CYNTHCART */
+#endif /* ONBOARD_EMULATOR */
 
 /**
  * @brief Process one MIDI clock pulse and update the smoothed BPM estimate
@@ -381,17 +381,17 @@ uint32_t midi_clock_total_pulses(void)
  * Shared by the legacy byte state machine (midi_buffer_task()) and the USB
  * packet fast path (process_usb_midi_packet()); both callers must already
  * have the message in midimachine.streambuffer with midimachine.index set
- * to its length. Cynthcart interception (ONBOARD_CYNTHCART) stays on
- * core0; a normal MIDI message is queued for midi_engine_task() on core1,
- * gated by usbsid_config.Midi.enabled so a disabled MIDI path never fills
- * a queue nothing drains.
+ * to its length.
+ * Cynthcart interception stays on core0 and a regular MIDI message is queued
+ * for midi_engine_task() on core1, gated by usbsid_config.Midi.enabled.
+ * So a disabled MIDI path never fills a queue nothing drains.
  */
 static inline void dispatch_complete_message(void)
 {
   usMCMD("\n");
   dtype = midi; /* Set data type to midi */
 
-  #if defined(ONBOARD_CYNTHCART)
+  #if defined(ONBOARD_EMULATOR)
   if (((midimachine.streambuffer[0] & 0xF0) == 0xB0) /* Control mode change */
     && (midimachine.streambuffer[1] >= midi_ccvalues_defaults.CC_CEN)
     && (midimachine.streambuffer[1] <= midi_ccvalues_defaults.CC_CRE)) {
@@ -404,7 +404,7 @@ static inline void dispatch_complete_message(void)
     if (usbsid_config.Midi.enabled) {
       midi_queue_push(midimachine.streambuffer, (uint8_t)midimachine.index);
     }
-  #if defined(ONBOARD_CYNTHCART)
+  #if defined(ONBOARD_EMULATOR)
   }
   #endif
 

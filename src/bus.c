@@ -53,7 +53,7 @@ volatile static uint32_t data_word, dir_mask;
 
 /* Bus lock: guards control_word/data_word/delay_word, the four shared DMA
  * channels, and sid_memory[] - written from both cores now (core1 runs
- * ONBOARD_SIDPLAYER and MIDI). Hardware spinlock, not software:
+ * ONBOARD_EMULATOR and MIDI). Hardware spinlock, not software:
  * spin_lock_blocking() disables interrupts for the few cycles it takes to
  * set the words and kick the DMA trigger. */
 static spin_lock_t *bus_spinlock = NULL;

@@ -445,7 +445,7 @@ enum
   /* legacy commands */
   PDSID            = 0xA3,  /* Holds the reset line for 5 seconds to change SID type on a PDSID */
 
-#if defined(ONBOARD_SIDPLAYER)
+#if defined(ONBOARD_EMULATOR)
   /* Internal SID player */
   UPLOAD_SID_START    = 0xD0,  /* Start command for USBSID to go into receiving mode */
   UPLOAD_SID_DATA     = 0xD1,  /* Init byte for each packet containing data */
@@ -552,8 +552,8 @@ enum {
  * 3 = PIO Uart: 0 No, 1 Yes
  * 4 = Wifi onboard: 0 No, 1 Yes
  * 5 = Bluetooth onboard: 0 No, 1 Yes
- * 6 = Embedded Cynthcart: 0 No, 1 Yes
- * 7 = Embedded SID player: 0 No, 1 Yes
+ * 6 = Unused
+ * 7 = Embedded SID player & Cynthcart: 0 No, 1 Yes
  */
 static const uint8_t us_features = (
   0b00000000 /* 0 */
@@ -573,21 +573,18 @@ static const uint8_t us_features = (
 #if defined(USE_BLUETOOTH)
   | (1 << 5)
 #endif
-#if defined(ONBOARD_CYNTHCART)
-  | (1 << 6)
-#endif
-#if defined(ONBOARD_SIDPLAYER)
+  /* 6 Unused */
+#if defined(ONBOARD_EMULATOR)
   | (1 << 7)
 #endif
 );
 
-static const bool is_rp2350     = (us_features & 0b00000001);
-static const bool has_rgb_vu    = (us_features & 0b00000100);
-static const bool has_pio_uart  = (us_features & 0b00001000);
-static const bool has_wifi      = (us_features & 0b00010000);
-static const bool has_bluetooth = (us_features & 0b00100000);
-static const bool has_cynthcart = (us_features & 0b01000000);
-static const bool has_sidplayer = (us_features & 0b10000000);
+static const bool is_rp2350     = (us_features & 0b00000001); /* 0 */
+static const bool has_rgb_vu    = (us_features & 0b00000100); /* 2 */
+static const bool has_pio_uart  = (us_features & 0b00001000); /* 3 */
+static const bool has_wifi      = (us_features & 0b00010000); /* 4 */
+static const bool has_bluetooth = (us_features & 0b00100000); /* 5 */
+static const bool has_emulator  = (us_features & 0b10000000); /* 7 */
 
 /* Global variables from config.c */
 extern Config        usbsid_config;

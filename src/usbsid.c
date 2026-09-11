@@ -50,12 +50,10 @@
 #ifdef USE_NSD
 #include <nsd.h>
 #endif
-#if defined(ONBOARD_SIDPLAYER)
+#if defined(ONBOARD_EMULATOR)
 #include <sid_player.h>
 #include <usplayer.h>
-#if defined(ONBOARD_CYNTHCART)
 #include <cynthcart_embedded.h>
-#endif
 #endif
 
 #if !defined(USE_WIFI) && defined(USE_BLUETOOTH)
@@ -902,12 +900,12 @@ void __us_noreturn core1_loop(void)
      * Core1 handles SID bus writes for MIDI input
      * so USB callbacks on Core0 are not interrupted
      */
-    #ifdef ONBOARD_CYNTHCART
+    #ifdef ONBOARD_EMULATOR
     /* Skip if embedded Cynthcart is running  */
     if __us_likely(!emulator_running) {
     #endif
       midi_engine_task();
-    #ifdef ONBOARD_CYNTHCART
+    #ifdef ONBOARD_EMULATOR
     }
     #endif
 
@@ -923,7 +921,7 @@ void __us_noreturn core1_loop(void)
      * is mutually exclusive with Cynthcart.
      * There can be only 1 ;-)
      */
-    #ifdef ONBOARD_SIDPLAYER
+    #ifdef ONBOARD_EMULATOR
     if (sidplayer_init && !emulator_running) {
       sidplayer_init = false;
       sidplayer_start = false;
@@ -985,7 +983,6 @@ void __us_noreturn core1_loop(void)
      * platform to run on. It is only available if the player is
      * also compiled in as feature.
      */
-    #ifdef ONBOARD_CYNTHCART
     if ((!emulator_running && starting_emulator) && !sidplayer_playing) {
       starting_emulator = false;
       emulator_running = true;
@@ -998,8 +995,7 @@ void __us_noreturn core1_loop(void)
         bus_release(BUS_OWNER_PLAYER);
       }
     }
-    #endif /* ONBOARD_CYNTHCART */
-    #endif /* ONBOARD_SIDPLAYER */
+    #endif /* ONBOARD_EMULATOR */
 
     #ifdef WRITE_DEBUG  /* Only run this queue when needed */
     if (is_receivedata()) {
@@ -1137,7 +1133,7 @@ void core1_main(void)
 int main()
 {
   /* Set system clockspeed */
-  #if (defined(ONBOARD_SIDPLAYER) && ONBOARD_SIDPLAYER) \
+  #if (defined(ONBOARD_EMULATOR) && ONBOARD_EMULATOR) \
     || (defined(USE_WIFI) && USE_WIFI) \
     || (defined(USE_BLUETOOTH) && USE_BLUETOOTH)
     /* System clock overclocked @ 250MHz */
@@ -1333,8 +1329,8 @@ int main()
     if (has_pio_uart)  usDBG("  - PIO Uart\n");
     if (has_wifi)      usDBG("  - WiFi\n");
     if (has_bluetooth) usDBG("  - Bluetooth\n");
-    if (has_cynthcart) usDBG("  - Embedded Cynthcart\n");
-    if (has_sidplayer) usDBG("  - Embedded USBSID-Player\n");
+    if (has_emulator)  usDBG("  - Embedded USBSID-Player\n");
+    if (has_emulator)  usDBG("    - with Cynthcart\n");
   }
 
   { /* Separate code block */
