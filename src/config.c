@@ -1091,7 +1091,8 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case BT_NSD_ENABLE:
       usCFG("BT_NSD_ENABLE: %u\n", buffer[1]);
       if (buffer[1] <= 1) net_cfg.flags.bt_nsd_enabled = (bool)buffer[1];
-      /* Doesn't require WIFI_APPLY to have been sent first, mirrors WIFI_ENABLE */
+      save_net_config(&net_cfg); /* Save the config first */
+      /* Doesn't require WIFI_APPLY to have been sent first */
       net_bt_set_power(net_cfg.flags.bt_nsd_enabled);
 #endif /* USE_NET */
       break;
