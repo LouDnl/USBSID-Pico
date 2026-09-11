@@ -70,11 +70,8 @@ set(ONBOARD_EMULATOR 0 CACHE STRING "ONBOARD_EMULATOR")
 ### Enable / Disable build with PIO Uart on unused pins 26/27
 set(USE_PIO_UART 0)
 
-### Enable / Disable build with Bluetooth on rp2350_w
-set(ENABLE_BLUETOOTH 0 CACHE STRING "ENABLE_BLUETOOTH")
-
-### Enable / Disable build with WiFi Network SID Device (NSD) support on _w boards
-set(ENABLE_WIFI 0 CACHE STRING "ENABLE_WIFI")
+### Enable / Disable build with WiFi/Bluetooth Network SID Device (NSD) support on _w boards
+set(ENABLE_NET 0 CACHE STRING "ENABLE_NET")
 
 ### Enable/ Disable build with CDC telemetry port (pico2 with sidplayer only!)
 set(ENABLE_TELEMETRY 0 CACHE STRING "ENABLE_TELEMETRY")
@@ -116,10 +113,8 @@ if(ONBOARD_EMULATOR EQUAL 1)
   list(APPEND FEATURE_LIST "${Cyan}${ColorBold}SID Player${ColorReset}")
   list(APPEND FEATURE_LIST "${Cyan}${ColorBold}Cynthcart${ColorReset}")
 endif()
-if(ENABLE_WIFI EQUAL 1)
+if(ENABLE_NET EQUAL 1)
   list(APPEND FEATURE_LIST "${Cyan}${ColorBold}WiFi${ColorReset}")
-endif()
-if(ENABLE_BLUETOOTH EQUAL 1)
   list(APPEND FEATURE_LIST "${Cyan}${ColorBold}Bluetooth${ColorReset}")
 endif()
 if(USE_PIO_UART EQUAL 1)
@@ -552,7 +547,7 @@ set(WIFIBT_TARGET_PIO 0)
 if(USBSID_W_BOARD)
 
   ## Network SID Device
-  if((ENABLE_WIFI EQUAL 1) OR (ENABLE_BLUETOOTH EQUAL 1))
+  if(ENABLE_NET EQUAL 1)
     set(SOURCEFILES
       ${SOURCEFILES}
       ${CMAKE_CURRENT_LIST_DIR}/src/nsd.c
@@ -562,38 +557,29 @@ if(USBSID_W_BOARD)
     add_compile_definitions(USE_NSD=1)
   endif()
 
-  ## WiFi (TCP + UDP discovery) transport, plus the cyw43/lwIP link
-  if(ENABLE_WIFI EQUAL 1)
+  ## WiFi (TCP + UDP discovery) transport and Bluetooth
+  if(ENABLE_NET EQUAL 1)
     set(SOURCEFILES
       ${SOURCEFILES}
       ${CMAKE_CURRENT_LIST_DIR}/src/net_wifi.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/bluetooth.c
     )
-    add_compile_definitions(USE_WIFI=1)
+    add_compile_definitions(USE_NET=1)
     add_compile_definitions(NSD_DEFAULT_PORT=6581)
   endif()
 
-  ## Bluetooth
-  if(ENABLE_BLUETOOTH EQUAL 1)
-    set(SOURCEFILES
-      ${SOURCEFILES}
-      ${CMAKE_CURRENT_LIST_DIR}/src/bluetooth.c
-    )
-    add_compile_definitions(USE_BLUETOOTH=1)
-  endif()
-
-  ## Link Poll mode
-  # WiFi & Bluetooh + filename extension definition
+  ## WiFi & Bluetooh Link Poll mode + filename extension definition
   set(FILENAME_EXTENSION)
-  if((ENABLE_WIFI EQUAL 1) AND (ENABLE_BLUETOOTH EQUAL 1))
+  if(ENABLE_NET EQUAL 1)
     set(TARGET_LL
       ${TARGET_LL}
         pico_cyw43_arch_lwip_poll
         pico_btstack_classic
         pico_btstack_cyw43
     )
-    set(FILENAME_EXTENSION "_netwb")
-  # Bluetooth
-  elseif((ENABLE_BLUETOOTH EQUAL 1) AND NOT (ENABLE_WIFI EQUAL 1))
+    set(FILENAME_EXTENSION "_net")
+  # Bluetooth only ~ Legacy build, no longer used and deprecated
+  elseif(FALSE AND (ENABLE_BLUETOOTH EQUAL 1) AND NOT (ENABLE_WIFI EQUAL 1))
     set(TARGET_LL
       ${TARGET_LL}
       pico_cyw43_arch_none  # Select 'none', 'background', or 'rtos' architecture
@@ -601,16 +587,16 @@ if(USBSID_W_BOARD)
       pico_btstack_cyw43    # Ties BTstack to the onboard CYW chip
     )
     set(FILENAME_EXTENSION "_netb")
-  # WiFi
-  elseif((ENABLE_WIFI EQUAL 1) AND NOT (ENABLE_BLUETOOTH EQUAL 1))
+  # WiFi ~ Legacy build, no longer used and deprecated
+  elseif(FALSE AND (ENABLE_WIFI EQUAL 1) AND NOT (ENABLE_BLUETOOTH EQUAL 1))
     set(TARGET_LL
       ${TARGET_LL}
       pico_cyw43_arch_lwip_poll  # Polled from core 0, see net_wifi.c
       pico_lwip_nosys            # Provides the sys_arch.h NO_SYS=1 needs
     )
     set(FILENAME_EXTENSION "_netw")
-  # If neither but still a _w board we require a librarie to control the LED
-  elseif(NOT (ENABLE_WIFI EQUAL 1) AND NOT (ENABLE_BLUETOOTH EQUAL 1))
+  # If neither but still a _w board we require a library to control the LED
+  elseif(NOT (ENABLE_NET EQUAL 1))
     set(TARGET_LL
       ${TARGET_LL}
       pico_cyw43_arch_none  # Select 'none', 'background', or 'rtos' architecture
@@ -618,7 +604,7 @@ if(USBSID_W_BOARD)
   endif()
 
   ## The WiFi/BT chip communicates SPI via a PIO so we need to define
-  if((ENABLE_WIFI EQUAL 1) OR (ENABLE_BLUETOOTH EQUAL 1))
+  if(ENABLE_NET EQUAL 1)
     # What Pio to target
     if(${PICO_PLATFORM} MATCHES rp2350-arm-s)
       set(WIFIBT_TARGET_PIO 2)
@@ -838,7 +824,7 @@ foreach(FILENAME LEDTYPE PCBVERSION IN ZIP_LISTS FILENAMES LEDTYPES PCBVERSIONS)
   endif()
 
   # WiFi / Bluetooth definitions
-  if (USBSID_W_BOARD AND ((ENABLE_BLUETOOTH EQUAL 1) OR (ENABLE_WIFI EQUAL 1)))
+  if (USBSID_W_BOARD AND (ENABLE_NET EQUAL 1))
     # Redirect the CYW43 wireless driver off PIO0 (the SID bus)
     target_compile_definitions(${BUILD} PRIVATE
       CYW43_SPI_PIO_PREFERRED_PIO=${WIFIBT_TARGET_PIO}

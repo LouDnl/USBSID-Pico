@@ -37,96 +37,72 @@ jobs:
               directory: pico,
               pico_board: pico,
               pico_platform: rp2040,
-              withsidplayer: 0,
-              withcynthcart: 0,
+              withemulator: 0,
+              extra_cmake_args: "",
             }
           - {
-              buildname: Pico_SIDplayer,
-              directory: pico_sp,
+              buildname: Pico_Emulator,
+              directory: pico_em,
               pico_board: pico,
               pico_platform: rp2040,
-              withsidplayer: 1,
-              withcynthcart: 0,
-            }
-          - {
-              buildname: Pico_SIDplayer_Cynthcart,
-              directory: pico_sp_cc,
-              pico_board: pico,
-              pico_platform: rp2040,
-              withsidplayer: 1,
-              withcynthcart: 1,
+              withemulator: 1,
+              extra_cmake_args: "",
             }
           - {
               buildname: Pico_W,
               directory: picow,
               pico_board: pico_w,
               pico_platform: rp2040,
-              withsidplayer: 0,
-              withcynthcart: 0,
+              withemulator: 0,
+              extra_cmake_args: "",
             }
           - {
-              buildname: Pico_W_SIDplayer,
-              directory: picow_sp,
+              buildname: Pico_W_Emulator,
+              directory: picow_em,
               pico_board: pico_w,
               pico_platform: rp2040,
-              withsidplayer: 1,
-              withcynthcart: 0,
+              withemulator: 1,
+              extra_cmake_args: "",
             }
           - {
-              buildname: Pico_W_SIDplayer_Cynthcart,
-              directory: picow_sp_cc,
+              buildname: Pico_W_Net_NSD,
+              directory: picow_net,
               pico_board: pico_w,
               pico_platform: rp2040,
-              withsidplayer: 1,
-              withcynthcart: 1,
+              withemulator: 0,
+              extra_cmake_args: "-DENABLE_NET=1",
             }
           - {
               buildname: Pico2,
               directory: pico2,
               pico_board: pico2,
               pico_platform: rp2350-arm-s,
-              withsidplayer: 0,
-              withcynthcart: 0,
+              withemulator: 0,
+              extra_cmake_args: "",
             }
           - {
-              buildname: Pico2_SIDplayer,
-              directory: pico2_sp,
+              buildname: Pico2_Emulator,
+              directory: pico2_em,
               pico_board: pico2,
               pico_platform: rp2350-arm-s,
-              withsidplayer: 1,
-              withcynthcart: 0,
-            }
-          - {
-              buildname: Pico2_SIDplayer_Cynthcart,
-              directory: pico2_sp_cc,
-              pico_board: pico2,
-              pico_platform: rp2350-arm-s,
-              withsidplayer: 1,
-              withcynthcart: 1,
+              withemulator: 1,
+              extra_cmake_args: "",
             }
           - {
               buildname: Pico2_W,
               directory: pico2w,
               pico_board: pico2_w,
               pico_platform: rp2350-arm-s,
-              withsidplayer: 0,
-              withcynthcart: 0,
+              withemulator: 0,
+              extra_cmake_args: "",
             }
           - {
-              buildname: Pico2_W_SIDplayer,
-              directory: pico2w_sp,
+              buildname: Pico2_W_Emulator_Net_NSD,
+              directory: pico2w_emnet,
               pico_board: pico2_w,
               pico_platform: rp2350-arm-s,
-              withsidplayer: 1,
-              withcynthcart: 0,
-            }
-          - {
-              buildname: Pico2_W_SIDplayer_Cynthcart,
-              directory: pico2w_sp_cc,
-              pico_board: pico2_w,
-              pico_platform: rp2350-arm-s,
-              withsidplayer: 1,
-              withcynthcart: 1,
+              withemulator: 1,
+              extra_cmake_args: "-DENABLE_NET=1",
             }
 
       fail-fast: false
@@ -146,19 +122,19 @@ jobs:
           sudo apt-get update && sudo apt-get install curl build-essential cmake -y
 
       - name: Install SID player xa dependency
-        if: ${{matrix.withsidplayer == 1 }}
+        if: ${{matrix.withemulator == 1 }}
         run: |
           sudo apt-get update && sudo apt-get install -y xa65
 
       - name: Checkout bin2h source
-        if: ${{matrix.withsidplayer == 1 }}
+        if: ${{matrix.withemulator == 1 }}
         uses: actions/checkout@v4
         with:
           repository: elnormous/bin2h
           path: bin2h-src
 
       - name: Build and add to PATH
-        if: ${{matrix.withsidplayer == 1 }}
+        if: ${{matrix.withemulator == 1 }}
         run: |
           cd bin2h-src
           make
@@ -166,7 +142,7 @@ jobs:
           echo "$(pwd)" >> $GITHUB_PATH
 
       - name: Verify installation
-        if: ${{matrix.withsidplayer == 1 }}
+        if: ${{matrix.withemulator == 1 }}
         run: bin2h --help
 
       - name: 🗒️ Check GCC Version
@@ -248,14 +224,14 @@ jobs:
           path: master
 
       - name: 📇 Checkout USBSID-Player
-        if: ${{matrix.withsidplayer == 1 }}
+        if: ${{matrix.withemulator == 1 }}
         uses: actions/checkout@v4
         with:
           repository: loudnl/usbsid-player
           path: master/lib/usbsid-player
 
       - name: 📇 Set USBSID-Player EMUDIR
-        if: ${{matrix.withsidplayer == 1 }}
+        if: ${{matrix.withemulator == 1 }}
         run: |
           echo "EMUDIR=${{github.workspace}}/master/lib/usbsid-player" >> $GITHUB_ENV
 
@@ -273,10 +249,9 @@ jobs:
             -DPICO_PLATFORM=${{matrix.pico_platform}} \
             -DPICO_BOARD=${{matrix.pico_board}} \
             -Dpicotool_DIR=${{github.workspace}}/picotool/picotool \
-            -DONBOARD_SIDPLAYER=${{matrix.withsidplayer}} \
-            -DONBOARD_CYNTHCART=${{matrix.withcynthcart}} \
+            -DONBOARD_EMULATOR=${{matrix.withemulator}} \
             -DEMUDIR=${{env.EMUDIR}} \
-            $extra_arg
+            ${{matrix.extra_cmake_args}}
 
       - name: 🏭 Build ${{matrix.name}}
         run: |
