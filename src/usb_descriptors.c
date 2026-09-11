@@ -107,18 +107,14 @@ enum
 #define EPNUM_CDC2_NOTIF  0x85 /* WebSerial */
 #define EPNUM_CDC2_OUT    0x06 /* WebSerial */
 #define EPNUM_CDC2_IN     0x86 /* WebSerial */
-#endif
 
 #define USBD_CDC_CMD_MAX_SIZE         8
 #define USBD_CDC_IN_OUT_MAX_SIZE     64
 #define USBD_MIDI_IN_OUT_MAX_SIZE    64
 #define USBD_VENDOR_IN_OUT_MAX_SIZE  64
 
-#ifdef USB_PRINTF
 #define CONFIG_TOTAL_LEN   (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_MIDI_DESC_LEN + TUD_VENDOR_DESC_LEN + TUD_CDC_DESC_LEN)
-#else
-#define CONFIG_TOTAL_LEN   (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_MIDI_DESC_LEN + TUD_VENDOR_DESC_LEN)
-#endif
+
 
 /* Full speed configuration */
 uint8_t const desc_fs_configuration[] =
@@ -137,10 +133,6 @@ uint8_t const desc_fs_configuration[] =
 
   // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
   TUD_CDC_DESCRIPTOR(ITF_NUM_CDC_2, 7, EPNUM_CDC2_NOTIF, USBD_CDC_CMD_MAX_SIZE, EPNUM_CDC2_OUT, EPNUM_CDC2_IN, USBD_CDC_IN_OUT_MAX_SIZE),
-
-  // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
-  TUD_CDC_DESCRIPTOR(ITF_NUM_CDC_2, 4, EPNUM_CDC2_NOTIF, USBD_CDC_CMD_MAX_SIZE, EPNUM_CDC2_OUT, EPNUM_CDC2_IN, USBD_CDC_IN_OUT_MAX_SIZE),
-  #endif
 };
 
 /* Some Microsoft mumbo jumbo 🪄 */
