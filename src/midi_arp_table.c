@@ -31,28 +31,18 @@ midi_arp_table_t arp_tables[MIDI_ARP_TABLE_COUNT];
 
 /**
  * @brief Initialise the MIDI arpeggiator tables to their default content
- *
- * Zeroes all `arp_tables` entries, then seeds table 0 with a repeating
- * major triad (root, major third, fifth as semitone offsets 0/4/7), the
- * same "audible, not silent" convention used by midi_config_init() and
- * midi_patch_init() for their own index-0 defaults. Tables 1-15 stay
- * zeroed (step_count 0), so arp_advance_table() no-ops on an unauthored
- * table rather than producing an unexpected note.
  */
 void midi_arp_table_init(void)
 {
   memset(arp_tables, 0, sizeof(arp_tables));
 
-  /* Table 0: repeating major triad (root, major third, fifth), the same
-   * "audible, not silent" convention midi_config_init()/midi_patch_init()
-   * use for their own index-0 defaults. */
+  /* Table 0: repeating major triad (root, major third, fifth). */
   arp_tables[0].offsets[0] = 0;
   arp_tables[0].offsets[1] = 4;
   arp_tables[0].offsets[2] = 7;
   arp_tables[0].loop_start = 0;
   arp_tables[0].step_count = 3;
 
-  /* Tables 1-15 stay zeroed: step_count 0, arp_advance_table() no-ops on
-   * an unauthored table rather than producing an unexpected note. */
+  /* Tables 1-15 stay zeroed: step_count 0, arp_advance_table() no-ops. */
   return;
 }

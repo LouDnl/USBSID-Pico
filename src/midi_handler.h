@@ -39,9 +39,8 @@ void midi_processor_init(void);
 void process_midi(uint8_t *buffer, int size);
 
 /* Recomputes every channel's poly_limit against the SID count actually
- * present. Call once at boot after cfg.numsids is authoritative (usbsid.c),
- * before the host is allowed to enumerate. See its definition for why
- * midi_config_init()'s own poly_limit defaults can be stale. */
+ * present. Call once at boot after cfg.numsids is authoritative, before
+ * the host is allowed to enumerate. */
 void midi_config_sync_poly_limits(void);
 
 /* The 1kHz modulation tick (LFO, portamento, arpeggiator). Called from
@@ -54,12 +53,9 @@ void midi_tick(void);
  * (< MIDI_PATCH_COUNT) first; see sysex.c's handle_patch_save(). */
 void midi_handler_capture_patch(uint8_t channel, uint8_t patch_index);
 
-/* midi_handler.c's live CC map is private to that file. These exist so
- * midi_config.c's flash persistence can save/restore it - there is no CC
- * remapping feature yet (CC is only ever set once, from
- * midi_ccvalues_defaults, at midi_processor_init()), so today this always
- * round-trips the compiled-in defaults. Included now anyway so the blob
- * format does not need a version bump the day remapping is added. */
+/* midi_handler.c's live CC map is private to that file; these exist so
+ * midi_config.c's flash persistence can save/restore it. No CC remapping
+ * feature yet, so this currently always round-trips compiled-in defaults. */
 void midi_handler_get_ccmap(midi_ccvalues *out);
 void midi_handler_set_ccmap(const midi_ccvalues *in);
 

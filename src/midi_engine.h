@@ -31,11 +31,8 @@
   extern "C" {
 #endif
 
-/* Called from the core1 loop in usbsid.c, next to led_runner() and the SID
- * test queue drain. Drains whatever midi_queue_pop() has waiting and hands
- * each event to process_midi(), which is where the SID bus writes happen.
- * Safe to call every core1 iteration; it is a no-op when the ring is empty
- * or MIDI is disabled. */
+/* Called from the core1 loop in usbsid.c. Drains midi_queue_pop() and
+ * hands each event to process_midi(). No-op if empty or MIDI disabled. */
 void midi_engine_task(void);
 
 

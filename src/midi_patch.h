@@ -34,20 +34,14 @@
 #include <stdint.h>
 
 
-/* 32 patches, selected by MIDI Program Change (0-31; 32-127 are simply
- * unmapped - see midi_handler.c's Program Change case for why Bank Select
- * is not wired: 32 patches fit inside one 7-bit program number, so there is
- * nothing for a bank to select yet). */
+/* 32 patches, selected by MIDI Program Change (0-31; 32-127 unmapped, no
+ * Bank Select needed yet). */
 #define MIDI_PATCH_COUNT 32
 #define MIDI_PATCH_NONE  0xFF
 
-/* A patch is the persistable subset of a channel's timbre: everything a
- * Program Change should be able to recall in one shot. Deliberately not
- * the same shape as midi_channel_cfg_t - that struct also carries routing
- * (voice_mask, poly_limit, ...) and live runtime state (arp_held[],
- * lfo_phase, bend_x256, ...) that a patch has no business touching or
- * persisting; see midi_config.c's blob save/load for the same distinction
- * made at the channel level. */
+/* A patch is the persistable subset of a channel's timbre. Deliberately
+ * not the same shape as midi_channel_cfg_t, which also carries routing
+ * and live runtime state a patch has no business touching. */
 typedef struct {
   /* Per-voice register template, applied to the channel exactly the way a
    * CC_NOIS/CC_ATT/... change would: stamped onto new notes, pushed live
@@ -59,19 +53,13 @@ typedef struct {
   uint8_t  tmpl_pwmhi;
 
   /* Chip-wide filter settings, written straight to every SID in the
-   * channel's mask when the patch loads (RESFLT/FC_HI/FC_LO), same as the
-   * corresponding CCs do - there is no per-channel resonance/routing cache
-   * to update, only filter_cutoff has one (see midi_config.h) since the
-   * LFO-CUTOFF tick needs a base to modulate around. */
+   * channel's mask when the patch loads (RESFLT/FC_HI/FC_LO). */
   uint16_t filter_cutoff;   /* 0..CUTOFF_MAX (2047) */
   uint8_t  resonance;       /* 0..15 */
   uint8_t  filter_routing;  /* BIT_0=voice1, BIT_1=voice2, BIT_2=voice3, BIT_3=external, matches RESFLT's own bit layout */
-  /* MODVOL's filter mode select bits (BIT_6=HPF, BIT_5=BPF, BIT_4=LPF,
-   * matches CC_HPF/CC_BPF/CC_LPF). A voice routed into the filter
-   * (filter_routing above) but with none of these selected is routed to
-   * nowhere and produces no output at all - this is real SID behaviour,
-   * not a bug to route around: a patch that engages the filter must pick
-   * a mode. 0 is a valid choice only for a patch with filter_routing = 0. */
+  /* MODVOL's filter mode select bits (BIT_6=HPF, BIT_5=BPF, BIT_4=LPF).
+   * A voice routed into the filter with none of these selected produces
+   * no output at all - real SID behaviour, not a bug. */
   uint8_t  filter_mode;
 
   uint8_t  lfo_wave;
@@ -85,31 +73,21 @@ typedef struct {
 
   uint8_t  bend_range;
 
-  /* LFO 2 and unison fields: appended, not inserted - the SysEx frame
-   * (sysex.c's pack_patch()/unpack_patch(), 0x20-0x22) is a fixed nibble
-   * layout already
-   * hardware-verified byte-for-byte; new fields go at the tail only, so an
-   * old (shorter) dump is refused by the size check rather than misread,
-   * and a new dump sent to old firmware just has its unknown trailing
-   * nibbles ignored. See midi_config.h's MIDI_CONFIG_VERSION comment for
-   * the matching flash-blob side of the same rule. */
+  /* LFO 2 and unison fields: appended, not inserted, so an old (shorter)
+   * SysEx dump (sysex.c pack_patch()/unpack_patch()) is refused by the
+   * size check rather than misread. */
   uint8_t  lfo2_wave;
   uint8_t  lfo2_rate;
   uint8_t  lfo2_depth;
   uint8_t  lfo2_dest;
-  uint8_t  unison_enabled;  /* 0/1 - stored as a byte, not folded into a flags
-                                bitfield, since a patch has no flags byte of
-                                its own to fold it into */
+  uint8_t  unison_enabled;  /* 0/1 - a patch has no flags byte to fold this into */
   uint8_t  unison_detune;
 } midi_patch_t;
 
 extern midi_patch_t midi_patches[MIDI_PATCH_COUNT];
 
-/* Patch 0 is set to the same values midi_config_init() gives a channel by
- * default, so selecting it changes nothing audible - a safe, silent patch
- * to land on. Patches 1-31 start zeroed (silent: no waveform bit set,
- * filter closed) until loaded from flash or set some other way; a zeroed
- * patch is inert rather than surprising. */
+/* Patch 0 mirrors midi_config_init()'s channel defaults. Patches 1-31
+ * start zeroed until loaded from flash or set another way. */
 void midi_patch_init(void);
 
 

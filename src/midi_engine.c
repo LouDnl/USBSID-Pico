@@ -32,12 +32,9 @@
 #include <midi_engine.h>
 
 
-/* 1kHz modulation tick. Re-derived from time_us_64() rather than
- * incremented by a fixed period from the last scheduled time: a
- * flash_safe_execute() freeze on core1 (a config save) can stall this loop
- * for a while, and re-deriving means it resumes with exactly one tick
- * firing, phase picked up from wherever `now` actually is, rather than a
- * burst of catch-up ticks trying to make up for lost time. */
+/* 1kHz modulation tick, re-derived from time_us_64() each pass so a core1
+ * stall (e.g. a flash_safe_execute() config save) resumes with a single
+ * tick instead of a burst of catch-up ticks. */
 #define MIDI_TICK_PERIOD_US 1000
 static uint64_t next_tick_us = 0;
 
@@ -48,15 +45,6 @@ static uint32_t last_reported_dropped = 0;
 
 /**
  * @brief Drain the MIDI event ring and drive the 1kHz modulation tick
- *
- * Called from core1's main loop. Pops and processes every event queued by
- * midi_queue_push() (core0) in one pass rather than one per call, since
- * core1 also services the LED runner, SID test queue and SID player and a
- * single event per pass could starve the ring under a fast player. Reports
- * (once, on change) how many events midi_queue_push() had to drop due to a
- * full ring. Then fires midi_tick() at a 1kHz cadence re-derived from
- * time_us_64() each pass, so a stall (e.g. a flash_safe_execute() config
- * save) resumes with a single tick rather than a burst of catch-up ticks.
  *
  * @note runs on core 1
  */
@@ -75,13 +63,8 @@ void midi_engine_task(void)
     process_midi(buf, ev.len);
   }
 
-  /* midi_queue_push() (core0) already counts every event it has to drop
-   * because this side was not draining fast enough; nothing ever read that
-   * counter back out until now, so a ring genuinely overflowing under a
-   * real keyboard was indistinguishable from a note silently mis-parsed
-   * further down the pipeline. Checked after the drain above so a burst
-   * that filled the ring between polls is reported in the same pass that
-   * caught up on it. */
+  /* midi_queue_push() (core0) counts drops on overflow; report only the
+   * delta since last time, checked after draining above. */
   uint32_t dropped = midi_queue_dropped();
   if __us_unlikely(dropped != last_reported_dropped) {
     usWRN("[MIDI] queue full, dropped %u event(s) (%u total)\n",

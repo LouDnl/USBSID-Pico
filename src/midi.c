@@ -52,20 +52,13 @@ queue_t cynthcart_queue;
 /* MIDI state machine (declared extern in midi.h) */
 midi_machine midimachine;
 
-/* Compile-time defaults, always the CC map's starting point at boot;
- * midi_processor_init() then calls midi_config_load() (midi_config.c) as its
- * last step, which overwrites this with a saved ccmap from flash if
- * verify_midiconfig_offset() finds a valid one - see
- * midi_handler_set_ccmap() (midi_handler.c). */
+/* Compile-time defaults, the CC map's starting point at boot until
+ * midi_config_load() (midi_config.c) overwrites it from flash, if valid. */
 const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT;
 
-/* USB-MIDI 1.0 Code Index Number (low nibble of byte 0 in a 4-byte USB-MIDI
- * event packet). The high nibble of byte 0 is the cable number, which this
- * firmware does not yet route anywhere: the descriptor exposes one embedded
- * cable (TUD_MIDI_DESCRIPTOR, usb_descriptors.c), so cable is always 0 on
- * the wire today. process_usb_midi_packet() already masks the cable nibble
- * out rather than assuming 0, so the routing side is ready whenever a
- * multi-cable descriptor lands. */
+/* USB-MIDI 1.0 Code Index Number (low nibble of byte 0 in a 4-byte event
+ * packet). High nibble is cable number; only one embedded cable exists
+ * today (TUD_MIDI_DESCRIPTOR, usb_descriptors.c), so it's always 0. */
 typedef enum {
   CIN_MISC          = 0x0, /* reserved, unused */
   CIN_CABLE_EVENT   = 0x1, /* reserved, unused */
@@ -86,10 +79,9 @@ typedef enum {
 } usb_midi_cin;
 
 /* MIDI clock: 24 PPQN, BPM estimated from an EWMA of pulse intervals,
- * published via midi_clock_bpm_x100() / midi_clock_present() (midi.h) for
- * the core1 engine to read when syncing the arpeggiator or an LFO. Runs on
- * core0, same as the rest of this file's SysEx/realtime handling; the
- * engine only ever reads these, never writes them, so no lock is needed. */
+ * published via midi_clock_bpm_x100()/midi_clock_present() (midi.h) for
+ * the core1 engine (arp/LFO sync). Runs on core0; engine only reads, never
+ * writes, so no lock needed. */
 static volatile uint32_t clock_pulse_count   = 0;      /* 0..23 within the current quarter note */
 static volatile uint32_t clock_total_pulses  = 0;      /* monotonic, for clock-synced division counting */
 static volatile uint64_t clock_last_pulse_us = 0;
@@ -105,10 +97,7 @@ static volatile bool     clock_running       = false;
 /**
  * @brief Initialise the MIDI state machine and start the buffer processor
  *
- * Resets midimachine's state and index, clears the stream buffer, and
- * initialises the MIDI queue and buffer processor. Runs on core0 before
- * core1 is released to its main loop, so there is no consumer racing the
- * queue init.
+ * Runs on core0 before core1 is released, so nothing races the queue init.
  */
 void midi_init(void)
 {
@@ -389,20 +378,13 @@ uint32_t midi_clock_total_pulses(void)
  * @brief Hand a complete channel voice message off to the emulator
  *        interception, or enqueue it for the core1 MIDI engine
  *
- * Shared by the legacy byte state machine (`midi_buffer_task`) and the USB
- * packet fast path (`process_usb_midi_packet`), so a full message always
- * takes the exact same route regardless of which one assembled it. Both
- * callers are required to have already placed the message in
- * `midimachine.streambuffer` and set `midimachine.index` to its length.
- *
- * The Cynthcart interception (CC's and, once running, Cynthcart data),
- * present under `ONBOARD_CYNTHCART`, stays on core0 exactly as before: it never touches the
- * SID bus, so it never needed to move. Only the "otherwise it is a normal
- * MIDI message" branch changed, from calling `process_midi()` directly to
- * enqueueing it for `midi_engine_task()` on core1, which is where the SID
- * bus writes now happen. `usbsid_config.Midi.enabled` gates this branch the
- * same way it gates the consumer, so disabling MIDI stops it at the source
- * instead of quietly filling a ring nothing will ever drain.
+ * Shared by the legacy byte state machine (midi_buffer_task()) and the USB
+ * packet fast path (process_usb_midi_packet()); both callers must already
+ * have the message in midimachine.streambuffer with midimachine.index set
+ * to its length. Cynthcart interception (ONBOARD_CYNTHCART) stays on
+ * core0; a normal MIDI message is queued for midi_engine_task() on core1,
+ * gated by usbsid_config.Midi.enabled so a disabled MIDI path never fills
+ * a queue nothing drains.
  */
 static inline void dispatch_complete_message(void)
 {
@@ -436,11 +418,9 @@ static inline void dispatch_complete_message(void)
 /**
  * @brief Feed one incoming byte through the legacy MIDI/SysEx byte state machine
  *
- * Figures out whether the stream is System Real-Time, SysEx, or a channel
- * voice message, accumulates bytes into `midimachine.streambuffer`, and
- * dispatches the message via process_sysex() or dispatch_complete_message()
- * once complete. Also handles MIDI running status by re-entering itself
- * with the cached last_status byte.
+ * Classifies the stream as Real-Time, SysEx, or a channel voice message,
+ * accumulates into midimachine.streambuffer, and dispatches once complete.
+ * Also handles running status by re-entering with the cached last_status.
  *
  * @param uint8_t buffer, one incoming MIDI byte
  */
@@ -590,14 +570,9 @@ static inline void dispatch_packet_message(const uint8_t *buf, uint8_t n)
 /**
  * @brief Entry point for the USB MIDI packet API
  *
- * `tud_midi_n_stream_read` strips the 4-byte USB-MIDI framing before this
- * firmware ever sees it, which is exactly why the CIN fast path used to be
- * `#if 0`'d out with a note that it "will _not_ work with tinyusb and stream
- * reading". Reading full 4-byte event packets instead means every channel
- * voice message arrives already framed, with no byte-wise state machine
- * needed at all. SysEx and single-byte System Real-Time messages still go
- * through the existing byte state machine, unchanged, since they are the
- * cases that state machine exists for.
+ * Reads full 4-byte USB-MIDI event packets, so a channel voice message
+ * arrives already framed with no byte-wise state machine needed. SysEx and
+ * single-byte System Real-Time messages still go through midi_buffer_task().
  *
  * @param uint8_t pkt[4], one USB-MIDI event packet
  */

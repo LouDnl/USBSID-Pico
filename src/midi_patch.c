@@ -33,21 +33,15 @@ midi_patch_t midi_patches[MIDI_PATCH_COUNT];
 /**
  * @brief Initialise midi_patches[] with default and factory-preset patches
  *
- * Zeroes the whole array, then fills patch 0 to mirror midi_config_init()'s
- * channel 1 defaults (so selecting it right after boot is a no-op) and
- * patches 1-15 (bank 0) with a curated set of basic instruments so a fresh
- * board has something to play via Program Change without a config tool.
- * Patches 16-31 (bank 1) stay zeroed, reserved for the user's own saves.
+ * Patch 0 mirrors midi_config_init()'s channel 1 defaults; patches 1-15
+ * (bank 0) are curated presets; 16-31 (bank 1) stay zeroed for user saves.
  */
 void midi_patch_init(void)
 {
   memset(midi_patches, 0, sizeof(midi_patches));
 
   /* Patch 0 mirrors midi_config_init()'s channel defaults field for field,
-   * so selecting it right after boot is a no-op rather than a surprise -
-   * including the audible-not-silent waveform/sustain defaults, see the
-   * comment in midi_config_init() (midi_config.c) for why those are what
-   * they are. */
+   * so selecting it right after boot is a no-op. */
   midi_patches[0].tmpl_contr     = BIT_4;  /* triangle */
   midi_patches[0].tmpl_attdec    = 0x00;
   midi_patches[0].tmpl_susrel    = 0xF0;   /* full sustain, fast release */
@@ -70,23 +64,12 @@ void midi_patch_init(void)
    * unison_detune 0 - already correct from the memset above, same as
    * lfo_depth/lfo_dest/arp_mode's own zero-is-correct fields. */
 
-  /* Patches 1-15 (bank 0): a curated set of basic instruments so a fresh
-   * board has something to play immediately via Program Change, without
-   * needing a config tool first - same "plug in and play" intent as
-   * channel 1's own defaults. Patches 16-31 (bank 1) stay zeroed: reserved
-   * for the user's own saves, inert rather than surprising until then.
-   *
-   * ADSR nibbles: tmpl_attdec is attack (high) | decay (low), tmpl_susrel
-   * is sustain (high) | release (low) - matches CC_ATT/CC_SUS writing the
-   * high nibble and CC_DEC/CC_REL the low one (set_adsr(), midi_handler.c).
-   *
-   * filter_routing 0x07 (BIT_0|BIT_1|BIT_2) routes every physical voice
-   * *position* through the filter, not "whichever voice this note lands
-   * on" - RESFLT's routing bits are chip hardware wired to voice position,
-   * not to a logical note, and the flat pool can land a note on any of the
-   * 3 positions per SID. A patch that wants its filter to reliably apply
-   * needs all three set; routing only one position would only affect
-   * whichever notes happen to land there. */
+  /* Patches 1-15 (bank 0): curated basic instruments to play via Program
+   * Change out of the box. ADSR nibbles: tmpl_attdec is attack|decay,
+   * tmpl_susrel is sustain|release (set_adsr(), midi_handler.c).
+   * filter_routing 0x07 routes all three physical voice positions through
+   * the filter - RESFLT's routing bits are wired to position, not to a
+   * logical note, so a patch needs all three set to reliably apply. */
   static const midi_patch_t bank0[] = {
     /* 1: Sawtooth lead */
     { .tmpl_contr = BIT_5, .tmpl_attdec = 0x00, .tmpl_susrel = 0xF0,
@@ -141,16 +124,10 @@ void midi_patch_init(void)
   static_assert(count_of(bank0) == 15, "[MIDI PATCH] bank0 must define exactly patches 1-15");
   for (uint8_t i = 0; i < count_of(bank0); i++) {
     midi_patches[1 + i] = bank0[i];
-    /* Designated initializers zero any field not named above, so arp_mode
-     * (0 == MIDI_ARP_UP) is already a sane, harmless default even though
-     * arp only actually runs once CC_ARPE separately enables it. */
   }
 
-  /* Patches 16-31 (bank 1) stay zeroed: no waveform bit set, filter closed
-   * - inert and silent rather than surprising, until loaded from flash or
-   * set some other way. Nothing yet captures a channel's current live state
-   * into a patch slot - SYSEX_MIDI_PATCH_LOAD (sysex.c) only writes data
-   * sent to it. */
+  /* Patches 16-31 (bank 1) stay zeroed: inert and silent until loaded from
+   * flash or set another way. */
 
   return;
 }

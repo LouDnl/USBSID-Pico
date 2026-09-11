@@ -59,10 +59,6 @@ void midi_queue_init(void)
 /**
  * @brief Push one MIDI event onto the ring buffer
  *
- * Copies up to 3 status/data bytes from `buf` into the next ring slot. If
- * the ring is full (next head would collide with tail), the event is
- * dropped and `queue_dropped` is incremented instead of blocking.
- *
  * @note single-producer: must only be called from core0 (the USB callback)
  * @note a data memory barrier separates the entry write from publishing
  *       the new head, so the consumer never sees a half-written entry

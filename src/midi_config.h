@@ -78,20 +78,13 @@ typedef enum {
 #define MIDI_CH_AUTO_GATE      (1u << 0)  /* gate follows note-on/off automatically */
 #define MIDI_CH_VELOCITY_MODE  (1u << 1)  /* velocity scales decay instead of doing nothing */
 #define MIDI_CH_ARP_ENABLED    (1u << 2)  /* note-on/off feed the arpeggiator instead of the pool directly */
-/* Set/cleared by CC_FMEN (midi_fmopl.c's midi_fmopl_set_target()):
- * a channel with this set never touches the SID voice pool - note-on/off,
- * Program Change and CC_VOL are redirected to midi_fmopl.c entirely, and
- * every other SID-specific CC becomes a no-op for it (see
- * handle_control_change(), midi_handler.c). Independent of voice_mask/
- * sid_override - deliberately so, since the one physical FMOpl chip has
- * nothing to do with SID slot routing. */
+/* Set/cleared by CC_FMEN (midi_fmopl_set_target()): note-on/off, Program
+ * Change and CC_VOL redirect to midi_fmopl.c entirely, every other
+ * SID-specific CC is a no-op. Independent of voice_mask/sid_override. */
 #define MIDI_CH_TARGET_FMOPL   (1u << 3)
-/* Channel claims MIDI_VOICE_UNISON_COUNT (3) adjacent pool slots on
- * one SID per note instead of 1 - detuned unison, MBSID Lead-engine style.
- * Real tradeoff, not a free addition: that SID drops from 3-voice polyphony
- * to monophonic while a channel with this set is sounding on it. See
- * midi_voice_alloc_unison() (midi_voice.h/.c) and note_on()/note_off()'s
- * unison branch (midi_handler.c). */
+/* Claims MIDI_VOICE_UNISON_COUNT (3) adjacent pool slots on one SID per
+ * note instead of 1 (detuned unison) - that SID drops to monophonic while
+ * a channel with this set is sounding on it. See midi_voice_alloc_unison(). */
 #define MIDI_CH_UNISON         (1u << 4)
 
 /* Held-note capacity for the arpeggiator's input pattern. A held key beyond
@@ -158,12 +151,8 @@ typedef struct {
   uint32_t lfo_sh_seed;
   int16_t  lfo_sh_value;
 
-  /* A second, fully independent LFO. Same shape as the fields
-   * above, stacked at the tick (midi_tick(), midi_handler.c): if both
-   * target the same destination their offsets simply add before the one
-   * bus write for that destination, same principle write_voice_pitch()
-   * already uses for bend+portamento+LFO. Reuses midi_lfo_wave_t/
-   * midi_lfo_dest_t - two destinations, not two enums. */
+  /* A second, fully independent LFO, same shape as above. If both target
+   * the same destination their offsets simply add. */
   uint8_t  lfo2_wave;
   uint8_t  lfo2_rate;
   uint8_t  lfo2_depth;
@@ -185,10 +174,7 @@ typedef struct {
   uint8_t  arp_held_count;
   uint8_t  arp_step;        /* index into the expanded (octaves-multiplied) pattern */
   bool     arp_step_up;     /* MIDI_ARP_UPDOWN direction state */
-  uint8_t  arp_voice_slot;  /* 0xFF (matches midi_voice.h's MIDI_VOICE_NONE), or the pool slot
-                                currently sounding the arp - not including midi_voice.h here to
-                                avoid a circular include, since midi_voice.c already includes
-                                this header for the policy fields it reads */
+  uint8_t  arp_voice_slot;  /* 0xFF (MIDI_VOICE_NONE), or the pool slot sounding the arp */
   uint16_t arp_phase;       /* free-run phase accumulator, same shape as lfo_phase */
   uint32_t arp_last_step_pulses; /* midi_clock_total_pulses() value at the last step, clock-synced mode */
 
@@ -229,15 +215,9 @@ uint16_t midi_channel_effective_mask(uint8_t channel);
  * valid data from garbage once the ring has wrapped. */
 
 #define MIDI_CONFIG_MAGIC   0x4D494431u  /* 'MID1', fixed, independent of MAGIC_SMOKE */
-#define MIDI_CONFIG_VERSION 3  /* 2: arp_tables[] added to the blob and
-                                   arp_table_sel added to midi_channel_cfg_t.
-                                   3: the lfo2 fields and unison_detune added
-                                   to midi_channel_cfg_t, and the lfo2 and
-                                   unison fields added to midi_patch_t (see
-                                   midi_patch.h). Old size no longer matches
-                                   either bump; midi_config_load's existing
-                                   size check falls back to defaults on an
-                                   old blob rather than misreading it. */
+#define MIDI_CONFIG_VERSION 3  /* bump whenever the blob layout changes; the
+                                   size check in midi_config_load() falls
+                                   back to defaults on an old blob */
 
 typedef struct {
   uint32_t magic;
@@ -255,26 +235,19 @@ typedef struct {
 } midi_config_blob_t;
 
 /* Erase-and-write a new slot with the current live state (midi_channels[],
- * midi_patches[], the CC map). Round-robins across MIDICONFIG_SAVE_SLOTS
- * sectors the same way Config's own save does across its 16 pages. Refuses
- * (logs and returns) if verify_midiconfig_offset() found the linker and
- * macro views of the flash layout disagree - see config.c. */
+ * midi_patches[], the CC map), round-robin across MIDICONFIG_SAVE_SLOTS
+ * sectors. Refuses if verify_midiconfig_offset() found a mismatch. */
 void midi_config_save(void);
 
-/* Scans all MIDICONFIG_SAVE_SLOTS slots, loads the highest-sequence one
- * that passes magic+size+crc32, and sanitises the transient runtime fields
- * in midi_channels[] afterward (pitch bend offset, portamento glide target,
- * SID/voice overrides, LFO phase, arpeggiator held notes and voice) since
- * those describe a moment mid-performance, not a setting - a reboot should
- * never resume with a note the arp thinks is still held. Falls back to
- * midi_config_init()/midi_patch_init() defaults, unmodified, if no slot
- * validates. */
+/* Loads the highest-sequence slot that passes magic+size+crc32, then
+ * sanitises transient runtime fields in midi_channels[] (bend offset,
+ * portamento target, overrides, LFO phase, arp held notes/voice) since
+ * those describe a moment mid-performance, not a setting. Falls back to
+ * compiled-in defaults if no slot validates. */
 void midi_config_load(void);
 
-/* Re-initialises midi_channels[]/midi_patches[] to compiled-in defaults and
- * erases every save slot, so a subsequent load() also finds nothing and
- * stays on defaults - a real factory reset, not just "load defaults into
- * RAM until the next boot re-reads stale flash". */
+/* Re-initialises midi_channels[]/midi_patches[] to compiled-in defaults
+ * and erases every save slot - a real factory reset. */
 void midi_config_reset(void);
 
 

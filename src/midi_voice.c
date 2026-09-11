@@ -178,14 +178,10 @@ static uint8_t pick_steal(uint16_t candidates, uint8_t steal_mode)
 /**
  * @brief Allocate a voice slot for a note-on, retriggering or stealing as needed
  *
- * A note-on for a (channel, note) pair that is already gated retriggers the
- * existing voice instead of allocating a new one, so a fast re-strike never
- * orphans a voice. Otherwise the channel's effective slot mask is consulted:
- * if the channel is already at its poly_limit, a voice is stolen from among
- * its own gated slots (never another channel's); if a free slot exists in
- * the mask it is used directly; if the mask is exhausted (only possible when
- * two channels' masks overlap) a voice is stolen from within the mask,
- * following the channel's configured steal_mode.
+ * Already-gated (channel, note) retriggers instead of allocating a second
+ * voice. Otherwise steals from the channel's own gated slots at poly_limit,
+ * uses a free slot in the mask if one exists, or steals within the mask if
+ * exhausted (only possible when two channels' masks overlap).
  *
  * @param uint8_t channel
  * @param uint8_t note
@@ -194,15 +190,10 @@ static uint8_t pick_steal(uint16_t candidates, uint8_t steal_mode)
  */
 uint8_t midi_voice_alloc(uint8_t channel, uint8_t note, uint8_t velocity)
 {
-  /* A note-on for a (channel, note) that is already gated - a key repeat,
-   * or any fast re-strike that arrives before the matching note-off - must
-   * retrigger the voice it is already holding, not allocate a second one.
-   * Without this, two voices end up gated for the same key, and the one
-   * note-off that eventually arrives (via midi_voice_find(), which returns
-   * only the first match) frees just one of them: the other is orphaned
-   * forever, since nothing will ever send a second note-off for the same
-   * key. Reported stuck notes on real hardware playing chords in VMPK
-   * traced to exactly this. */
+  /* Retrigger, don't allocate a second voice: otherwise the one note-off
+   * that eventually arrives (midi_voice_find() returns only the first
+   * match) frees just one, orphaning the other forever. Caused reported
+   * stuck notes playing chords in VMPK. */
   uint8_t existing = midi_voice_find(channel, note);
   if (existing != MIDI_VOICE_NONE) {
     voices[existing].velocity = velocity;
@@ -261,11 +252,9 @@ uint8_t midi_voice_alloc(uint8_t channel, uint8_t note, uint8_t velocity)
 /**
  * @brief Allocate 3 voice slots on a single SID chip for a unison note-on
  *
- * Retriggers the existing 3 slots if (channel, note) is already gated,
- * mirroring midi_voice_alloc()'s retrigger behaviour. Otherwise scans the
- * channel's effective mask for a SID chip that grants all
- * MIDI_VOICE_UNISON_COUNT of its voice slots and has them all free; refuses
- * (no stealing) if no such SID exists.
+ * Retriggers the existing 3 slots if already gated. Otherwise scans the
+ * channel's mask for a SID chip with all MIDI_VOICE_UNISON_COUNT slots
+ * free; refuses (no stealing) if no such SID exists.
  *
  * @param uint8_t channel
  * @param uint8_t note
@@ -275,9 +264,7 @@ uint8_t midi_voice_alloc(uint8_t channel, uint8_t note, uint8_t velocity)
  */
 uint8_t midi_voice_alloc_unison(uint8_t channel, uint8_t note, uint8_t velocity, uint8_t out_slots[MIDI_VOICE_UNISON_COUNT])
 {
-  /* Retrigger: a note-on for a (channel, note) already gated must restrike
-   * the same 3 slots, not claim a second triplet - same reasoning as
-   * midi_voice_alloc()'s own retrigger branch. */
+  /* Retrigger the same 3 slots, don't claim a second triplet. */
   uint8_t found = midi_voice_find_all(channel, note, out_slots);
   if (found > 0) {
     for (uint8_t k = 0; k < found; k++) {
@@ -293,11 +280,9 @@ uint8_t midi_voice_alloc_unison(uint8_t channel, uint8_t note, uint8_t velocity,
   uint16_t mask = midi_channel_effective_mask(channel);
   if (mask == 0) return MIDI_VOICE_NONE;
 
-  /* First-pass policy: refuse rather than steal if no single SID
-   * in the mask has all MIDI_VOICE_UNISON_COUNT of its slots free. Slot
-   * layout matches midi_voice_sidindex()/midi_voice_regbase(): slot n is
-   * SID n/MAX_VOICES, voice n%MAX_VOICES within it, so SID s's slots are
-   * exactly s*MAX_VOICES .. s*MAX_VOICES+MAX_VOICES-1. */
+  /* Refuse rather than steal if no single SID in the mask has all
+   * MIDI_VOICE_UNISON_COUNT slots free. SID s's slots are
+   * s*MAX_VOICES .. s*MAX_VOICES+MAX_VOICES-1. */
   for (uint8_t s = 0; s < MAX_SIDS; s++) {
     uint16_t sid_bits = (uint16_t)(((1u << MAX_VOICES) - 1) << (s * MAX_VOICES));
     if ((mask & sid_bits) != sid_bits) continue;  /* mask doesn't grant every slot on this SID */

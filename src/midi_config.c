@@ -50,12 +50,8 @@ static inline uint16_t sid_slot_bits(uint8_t sid)
 /**
  * @brief Initialise midi_channels[] to their compiled-in default configuration
  *
- * Resets every channel's voice mask, poly/steal/bend/aftertouch settings,
- * per-voice waveform template, both LFOs, the arpeggiator state, and the
- * filter/patch defaults. Channel 1 (index 0) is set up with every voice
- * slot enabled and full polyphony, channels 2-5 (index 1-4) get one SID
- * each exclusive with poly within that SID, and channels 6-16 (index 5-15)
- * are left disabled via an empty voice_mask.
+ * Channel 1 gets every voice slot and full polyphony, channels 2-5 get one
+ * SID each exclusive, channels 6-16 are left disabled (empty voice_mask).
  */
 void midi_config_init(void)
 {
@@ -70,16 +66,11 @@ void midi_config_init(void)
     ch->flags          = MIDI_CH_AUTO_GATE;  /* velocity mode off by default */
     ch->sid_override   = MIDI_OVERRIDE_NONE;
     ch->voice_override = MIDI_OVERRIDE_NONE;
-    /* Audible defaults, not silent ones: BIT_4 selects the triangle
-     * waveform (the one waveform that needs no PWM setting to actually
-     * produce output - a default pulse wave with pwmlo/hi still 0 would be
-     * a 0% duty cycle, i.e. also silent), and a nonzero sustain (high
-     * nibble of tmpl_susrel) means a held note actually sustains instead
-     * of decaying to silence immediately after the attack. Without both of
-     * these, "plug in a keyboard and play" (this file's own stated intent
-     * for channel 1, below) produced perfectly correct gate/frequency/
-     * envelope timing and total silence - CONTR with no waveform bit set
-     * has no oscillator output at all, regardless of the gate or envelope. */
+    /* Audible defaults, not silent ones: triangle needs no PWM setting to
+     * produce output (a default pulse wave would be 0% duty, i.e. silent),
+     * and nonzero sustain means a held note doesn't decay to silence right
+     * after attack. Without both, gate/frequency/envelope timing was
+     * correct but totally silent. */
     ch->tmpl_contr     = BIT_4;   /* triangle */
     ch->tmpl_attdec    = 0x00;    /* instant attack, instant decay to sustain */
     ch->tmpl_susrel    = 0xF0;    /* full sustain, fast release */
@@ -194,10 +185,8 @@ static uint32_t midi_sequence = 0;
 /**
  * @brief IEEE 802.3 CRC32 over a byte buffer, bit-by-bit
  *
- * Bit-by-bit rather than table-based: nothing else in this firmware needed
- * a CRC32 before, and a save happens rarely enough (a user action, not a
- * hot path) that a 256-entry lookup table would cost flash for no
- * measurable benefit.
+ * Bit-by-bit rather than table-based: a save is rare enough that a
+ * 256-entry lookup table isn't worth the flash.
  *
  * @param uint8_t *data
  * @param size_t len
@@ -247,10 +236,8 @@ static midi_flash_write_buf_t __not_in_flash("midi") midi_flash_write_buf;
 /**
  * @brief The actual flash erase + program, run inside flash_safe_execute()
  *
- * Unlike Config's write_config_lowlevel() (`config.c`), which erases only
- * once every 16 writes because its 16 slots share one 4KB sector, every
- * MIDI slot here IS its own whole sector - each save must erase its own
- * slot every time, there is nothing to skip.
+ * Unlike config.c's write_config_lowlevel(), every MIDI slot here is its
+ * own whole sector, so each save must erase it every time.
  */
 static void __no_inline_not_in_flash_func(write_midi_config_lowlevel)(void *blob_data)
 { /* No logging in this function to avoid errors, matching write_config_lowlevel() */
@@ -265,11 +252,8 @@ static void __no_inline_not_in_flash_func(write_midi_config_lowlevel)(void *blob
 /**
  * @brief Save the current MIDI configuration to the next flash slot
  *
- * Builds a midi_config_blob_t from midi_channels, midi_patches, arp_tables
- * and the CC map, stamps it with a magic/version/size header, an
- * incrementing sequence number, and a CRC32, then erases and programs it
- * into the next round-robin slot via write_midi_config_lowlevel(). Refuses
- * to run if the MIDI flash offset failed its boot-time cross-check.
+ * Builds a midi_config_blob_t (channels, patches, arp tables, CC map),
+ * stamps it with header/sequence/CRC32, and writes it round-robin.
  */
 void midi_config_save(void)
 {
@@ -308,17 +292,13 @@ void midi_config_save(void)
 }
 
 /**
- * @brief Clear whatever describes a moment mid-performance rather than a
- *        setting, after a bulk overwrite of midi_channels[] from flash
+ * @brief Clear transient runtime state after a bulk overwrite of
+ *        midi_channels[] from flash
  *
- * The persisted blob keeps the whole live midi_channel_cfg_t, transient
- * runtime fields included - simpler and less error-prone than hand
- * maintaining a second, parallel "persistable subset" struct that would
- * silently drift out of sync every time midi_channel_cfg_t gains a field.
- * This is what actually enforces "a reboot never resumes mid-glide, or
- * with a note the arpeggiator thinks is still held": every field that
- * would be wrong to resume with gets reset here, explicitly, right after
- * the load that overwrote them.
+ * The persisted blob keeps the whole live midi_channel_cfg_t rather than a
+ * separate persistable-subset struct, so a reboot never resumes mid-glide
+ * or with a note the arpeggiator thinks is still held - every field that
+ * would be wrong to resume with gets reset here.
  */
 static void sanitise_loaded_channels(void)
 {
@@ -346,12 +326,8 @@ static void sanitise_loaded_channels(void)
 /**
  * @brief Load the most recently saved MIDI configuration from flash
  *
- * Scans all MIDICONFIG_SAVE_SLOTS slots, validating each candidate's magic,
- * size, and CRC32, and keeps the one with the highest sequence number.
- * Applies its CC map, channel config, patches, and arpeggiator tables, then
- * calls sanitise_loaded_channels() to clear transient runtime state. Leaves
- * the compiled-in defaults in place if no valid slot is found. Refuses to
- * run if the MIDI flash offset failed its boot-time cross-check.
+ * Scans all slots, validates magic/size/CRC32, keeps the highest sequence
+ * number, and applies it. Leaves compiled-in defaults if no slot is valid.
  */
 void midi_config_load(void)
 {
@@ -366,10 +342,7 @@ void midi_config_load(void)
 
   for (uint8_t slot = 0; slot < MIDICONFIG_SAVE_SLOTS; slot++) {
     /* Memory-mapped flash read, same technique load_config() (config.c)
-     * uses - no flash_range_* API needed for reading, XIP flash is just
-     * memory. Bounded to exactly MIDICONFIG_SAVE_SLOTS iterations, unlike
-     * Config's own open-ended "keep scanning while it looks valid" loop -
-     * see the note on midi_config_blob_t in midi_config.h for why. */
+     * uses - XIP flash is just memory, no flash_range_* API needed. */
     memcpy(&candidate,
       (void *)(XIP_BASE + FLASH_MIDICONFIG_OFFSET + (MIDICONFIG_SLOT_SIZE * slot)),
       sizeof(candidate));
@@ -413,10 +386,8 @@ void midi_config_load(void)
 /**
  * @brief Erase one MIDI config flash slot, run inside flash_safe_execute()
  *
- * flash_safe_execute() calls back with `void (*)(void *param)`; the slot
- * offset to erase is passed through `param` as its numeric value rather
- * than a pointer to it, since there is nothing to point to that outlives
- * the call, the offset is fully known before the call is made.
+ * The slot offset is passed through `param` as its numeric value, not a
+ * pointer - it's fully known before the call, nothing to point to.
  *
  * @param void *param, the slot's flash offset, cast to a pointer-sized value
  */
@@ -432,11 +403,8 @@ static void __no_inline_not_in_flash_func(erase_one_midi_slot_lowlevel)(void *pa
 /**
  * @brief Reset MIDI configuration to compiled-in defaults and erase flash
  *
- * Reinitialises midi_channels, midi_patches, and the arpeggiator tables in
- * RAM, then erases every MIDICONFIG_SAVE_SLOTS flash slot via
- * erase_one_midi_slot_lowlevel() and resets the save/sequence counters. If
- * the MIDI flash offset failed its boot-time cross-check, only the RAM
- * reset is applied.
+ * Reinitialises midi_channels/midi_patches/arp_tables in RAM, then erases
+ * every flash slot and resets the save/sequence counters.
  */
 void midi_config_reset(void)
 {

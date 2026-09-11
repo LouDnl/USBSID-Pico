@@ -60,12 +60,6 @@ static const uint8_t OPL_OP_OFFSET[MIDI_FMOPL_CHANNELS][2] = {
 /**
  * @brief Write one OPL2 register: index byte then data byte
  *
- * One index/data-port pair per register write, exactly the sequence
- * clear_fmopl_registers_at_addr() (sid.c) already uses: write the register
- * number to the index port (base), then the value to the data port
- * (base + 0x10), each via cycled_write_operation() (bus.h), the same
- * primitive every SID register write in this firmware goes through.
- *
  * @param uint8_t base
  * @param uint8_t reg
  * @param uint8_t value
@@ -80,17 +74,13 @@ static inline void opl_write(uint8_t base, uint8_t reg, uint8_t value)
 /**
  * @brief Compute the SID-socket base register address the FMOpl chip is configured on
  *
- * cfg.fmopl_sid is 1-based (0 = disabled, config_socket.c); converts to
- * the socket's register offset (sidno * 0x20), the same convention
- * clear_sid_registers() uses for plain SID sockets.
+ * cfg.fmopl_sid is 1-based (0 = disabled); converts to the socket's
+ * register offset (sidno * 0x20).
  *
  * @return uint8_t base address of the configured FMOpl socket (0 if unconfigured)
  */
 static inline uint8_t fmopl_base_address(void)
 {
-  /* cfg.fmopl_sid is 1-based, 0 = disabled (config_socket.c) - same
-   * convention clear_sid_registers() already relies on for plain SID
-   * sockets (sidno * 0x20), just shifted by the -1. */
   return (uint8_t)((cfg.fmopl_sid > 0 ? (cfg.fmopl_sid - 1) : 0) * 0x20);
 }
 
@@ -105,13 +95,9 @@ opl_instrument_t fmopl_patches[MIDI_FMOPL_PATCH_COUNT];
 /**
  * @brief Populate factory patches 0-5 of fmopl_patches[] with hand-designed starter instruments
  *
- * First-pass, hand-designed-by-FM-theory starter instruments, not claimed
- * to reproduce any specific commercial soundfont/ROM byte-for-byte and
- * unverified against real hardware (see midi_fmopl.h). op0 is the
- * modulator, op1 the carrier throughout. Patches 6-31 are left zeroed by
- * this function's memset, for SYSEX_FMOPL_PATCH_LOAD/flash to fill in
- * later, the same "inert rather than surprising" reasoning
- * midi_patch_init() uses for the unfilled tail of midi_patches[].
+ * Not modeled on any specific commercial soundfont, unverified against
+ * real hardware. op0 is the modulator, op1 the carrier. Patches 6-31 stay
+ * zeroed for SYSEX_FMOPL_PATCH_LOAD/flash to fill in later.
  */
 static void midi_fmopl_patch_init(void)
 {
@@ -143,18 +129,11 @@ static void midi_fmopl_patch_init(void)
 /**
  * @brief Derive a scaled Total Level byte from an operator's authored TL, channel volume and mod wheel boost
  *
- * Adds volume-derived extra attenuation to an operator's authored Total
- * Level (low 6 bits of op_ksl_tl; the Key Scale Level in the top 2 bits is
- * left untouched). volume 127 means no change, volume 0 adds +48 of TL's
- * 63-step range, not full silence (a channel volume of 0 on an otherwise
- * live channel reads as a controller glitch rather than an intentional
- * mute; CC_ASOF/CC_ANOF exist for real silence).
- *
- * mod_boost is CC_PWM (mod wheel)'s contribution: pass the wheel value
- * for the modulator operator (op0) and 0 for the carrier (op1), since a
- * 2-op FM voice's brightness is set almost entirely by the modulator's
- * level relative to the carrier. Both curves are first-pass linear
- * mappings, not yet tuned against real hardware.
+ * Adds volume-derived attenuation to op_ksl_tl's low 6 bits (Key Scale
+ * Level in the top 2 bits untouched). volume 127 = no change, volume 0
+ * adds +48 of TL's 63-step range, not full silence (CC_ASOF/CC_ANOF exist
+ * for that). mod_boost: pass the wheel value for the modulator (op0), 0
+ * for the carrier (op1). Linear curves, not tuned against real hardware.
  *
  * @param uint8_t op_ksl_tl
  * @param uint8_t volume
@@ -175,11 +154,6 @@ static uint8_t fmopl_scale_tl(uint8_t op_ksl_tl, uint8_t volume, uint8_t mod_boo
 
 /**
  * @brief Write a full instrument's registers to one OPL2 hardware voice slot
- *
- * Writes multiplier/vibrato/envelope-type, scaled Total Level (via
- * fmopl_scale_tl(), applying volume and mod wheel boost), attack/decay,
- * sustain/release and waveform for both operators of slot, followed by
- * the channel's feedback/algorithm register.
  *
  * @param uint8_t base
  * @param uint8_t slot
@@ -219,10 +193,8 @@ static fmopl_channel_state_t fmopl_channels[MAX_CHANNELS];
 typedef struct {
   uint8_t  midi_channel;  /* FMOPL_CH_NONE = free */
   uint8_t  note;
-  uint8_t  instrument;    /* index into fmopl_patches[] this voice was struck with - a
-                              Program Change while it's still held must not retroactively
-                              change it, same as apply_patch_to_channel() never rewrites
-                              held SID voices either */
+  uint8_t  instrument;    /* index into fmopl_patches[] struck with - a Program Change
+                              while held must not retroactively change it */
   uint8_t  block;
   uint16_t fnum;
   uint32_t age;
@@ -248,12 +220,9 @@ static uint8_t fmopl_find(uint8_t channel, uint8_t note)
 /**
  * @brief Allocate a hardware voice slot for a note-on, retriggering if already held
  *
- * Returns the existing slot if channel/note is already sounding
- * (retrigger, not a second voice), otherwise a free slot if one exists,
- * else steals the oldest voice. Same default behaviour as
- * MIDI_STEAL_OLDEST in midi_voice.c, kept unconditional here rather than
- * configurable: one physical chip, 9 channels total, not worth a whole
- * steal-mode setting yet.
+ * Retriggers if channel/note is already sounding, else a free slot if one
+ * exists, else steals the oldest voice (unconditional, no steal-mode
+ * setting - only 9 channels on one chip).
  *
  * @param uint8_t channel
  * @param uint8_t note
@@ -277,11 +246,9 @@ static uint8_t fmopl_alloc(uint8_t channel, uint8_t note)
 /**
  * @brief Rewrite the Total Level registers of every voice a channel currently holds
  *
- * Live part of CC_VOL/CC_PWM handling: rewrites just the Total Level
- * registers (not the whole instrument) of every held voice, using each
- * voice's own struck instrument, so an already-sounding note responds
- * immediately instead of waiting for its next note-on. No-op when FMOpl
- * is disabled.
+ * Live part of CC_VOL/CC_PWM handling: rewrites just Total Level (not the
+ * whole instrument) using each voice's own struck instrument. No-op when
+ * FMOpl is disabled.
  *
  * @param uint8_t channel
  */
@@ -293,9 +260,6 @@ static void fmopl_apply_live_attenuation(uint8_t channel)
   const uint8_t mod_boost[2] = { fmopl_channels[channel].mod_wheel, 0 };
   for (uint8_t slot = 0; slot < MIDI_FMOPL_CHANNELS; slot++) {
     if (fmopl_voices[slot].midi_channel != channel) continue;
-    /* Each voice's own struck instrument, not the channel's current one -
-     * a Program Change while this note is still held must not retroactively
-     * change its timbre, see fmopl_voice_t.instrument. */
     const opl_instrument_t *ins = &fmopl_patches[fmopl_voices[slot].instrument];
     for (uint8_t op = 0; op < 2; op++) {
       uint8_t off = OPL_OP_OFFSET[slot][op];
@@ -335,13 +299,9 @@ static inline uint32_t fmopl_effective_clock(void)
 /**
  * @brief Convert a frequency in Hz to an OPL2 block/Fnum pair
  *
- * Shared by the note table build (once, at init or when the clock is
- * overridden) and by pitch bend (arbitrary fractional semitone offset,
- * live, see midi_fmopl_pitch_bend()). Both are infrequent, note-triggered
- * paths, never audio-rate, so the floating point cost is acceptable, the
- * same tradeoff build_note_table() makes for the SID side. Picks the
- * lowest block whose Fnum still fits 10 bits for best resolution, then
- * clamps Fnum to [0, 1023].
+ * Shared by the note table build and pitch bend, both infrequent,
+ * note-triggered paths, never audio-rate. Picks the lowest block whose
+ * Fnum still fits 10 bits, then clamps Fnum to [0, 1023].
  *
  * @param double freq
  * @param uint8_t * out_block
@@ -366,9 +326,7 @@ static void fmopl_freq_to_block_fnum(double freq, uint8_t *out_block, uint16_t *
 /**
  * @brief Build the MIDI-note to OPL2 block/Fnum lookup tables for all 128 notes
  *
- * Computes each note's frequency (A4 = MIDI note 69 = 440 Hz) and converts
- * it via fmopl_freq_to_block_fnum() using the currently effective OPL2
- * clock. Run once at init and again whenever the clock override changes.
+ * Run once at init and again whenever the clock override changes.
  */
 static void build_fmopl_note_table(void)
 {
@@ -398,11 +356,9 @@ static void fmopl_note_to_fnum(uint8_t midi_note, uint8_t *out_block, uint16_t *
 /**
  * @brief Look up block/Fnum for a MIDI note with an optional pitch bend offset
  *
- * The lookup table only covers integer semitones at bend=0, so a nonzero
- * bend recomputes the frequency directly via fmopl_freq_to_block_fnum()
- * instead of indexing it, still just one call per note-on or per
- * pitch-bend message, never per sample. bend_semitones == 0.0 takes the
- * fast table path via fmopl_note_to_fnum().
+ * bend_semitones == 0.0 takes the fast table path via fmopl_note_to_fnum();
+ * otherwise recomputes the frequency directly, still just one call per
+ * note-on or pitch-bend message, never per sample.
  *
  * @param uint8_t midi_note
  * @param double bend_semitones
@@ -426,13 +382,8 @@ static void fmopl_note_to_fnum_bent(uint8_t midi_note, double bend_semitones,
 /**
  * @brief Initialise FMOpl state: voice pool, per-channel state, note table and factory patches
  *
- * Marks all hardware voice slots free, resets per-channel instrument,
- * volume, mod wheel and bend state to defaults, resets the age counter
- * and clock override back to the compiled-in default, rebuilds the note
- * table and (re)initialises the factory patches. If FMOpl is enabled in
- * config, also clears the chip's registers at its configured base address
- * and sets the OPL_REG_TEST bit that enables per-operator waveform
- * selection.
+ * If FMOpl is enabled in config, also clears the chip's registers and
+ * sets OPL_REG_TEST's per-operator waveform-select bit.
  */
 void midi_fmopl_init(void)
 {
@@ -462,11 +413,10 @@ void midi_fmopl_init(void)
 /**
  * @brief Handle a MIDI note-on for a channel targeting FMOpl
  *
- * Allocates a hardware voice slot (retriggering if already held, else
- * free/oldest-steal, see fmopl_alloc()), writes the channel's current
- * instrument to it with volume/mod wheel scaling, computes the note's
- * block/Fnum with the channel's current pitch bend applied, and writes
- * the Fnum/block/key-on registers. No-op when FMOpl is disabled.
+ * Allocates a hardware voice slot (fmopl_alloc()), writes the channel's
+ * current instrument with volume/mod wheel scaling, and writes the
+ * Fnum/block/key-on registers with the current pitch bend applied.
+ * No-op when FMOpl is disabled.
  *
  * @note velocity is accepted but not yet used
  *
@@ -476,7 +426,7 @@ void midi_fmopl_init(void)
  */
 void midi_fmopl_note_on(uint8_t channel, uint8_t note, uint8_t velocity)
 {
-  (void)velocity;  /* not yet used, see midi_fmopl.h */
+  (void)velocity;
   if (!cfg.fmopl_enabled) return;
 
   uint8_t base = fmopl_base_address();
@@ -489,9 +439,8 @@ void midi_fmopl_note_on(uint8_t channel, uint8_t note, uint8_t velocity)
   const opl_instrument_t *ins = &fmopl_patches[fmopl_channels[channel].instrument];
   fmopl_write_instrument(base, slot, ins, fmopl_channels[channel].volume, fmopl_channels[channel].mod_wheel);
 
-  /* A note struck while the wheel is already bent starts bent too, same as
-   * any other synth - the bend offset doesn't reset between notes, only
-   * another pitch-bend message (centre = 0x2000) changes it. */
+  /* A note struck while the wheel is already bent starts bent too - the
+   * bend offset only resets on another pitch-bend message. */
   uint8_t block; uint16_t fnum;
   fmopl_note_to_fnum_bent(note, fmopl_channels[channel].bend_semitones, &block, &fnum);
   fmopl_voices[slot].block = block;
@@ -506,9 +455,8 @@ void midi_fmopl_note_on(uint8_t channel, uint8_t note, uint8_t velocity)
 /**
  * @brief Handle a MIDI note-off for a channel targeting FMOpl
  *
- * Finds the voice slot holding channel/note, clears its key-on bit
- * (block/Fnum-hi register rewritten without BIT_5) and frees the slot.
- * No-op when FMOpl is disabled or the note is not currently held.
+ * Clears the key-on bit and frees the slot. No-op when FMOpl is disabled
+ * or the note is not currently held.
  *
  * @note velocity is accepted but not yet used
  *
@@ -535,19 +483,13 @@ void midi_fmopl_note_off(uint8_t channel, uint8_t note, uint8_t velocity)
  * @brief Set a MIDI channel's current FMOpl instrument (Program Change)
  *
  * Range-checked, not wrapped: an out-of-range program number is ignored
- * rather than silently wrapped onto another patch, matching how
- * apply_patch_to_channel()'s own caller checks the range before calling
- * at all.
+ * rather than wrapped onto another patch.
  *
  * @param uint8_t channel
  * @param uint8_t program
  */
 void midi_fmopl_program_change(uint8_t channel, uint8_t program)
 {
-  /* Range-checked, not wrapped - matches how apply_patch_to_channel()'s own
-   * caller checks `< MIDI_PATCH_COUNT` before calling at all
-   * (midi_handler.c's 0xC0 case), rather than silently wrapping an
-   * out-of-range program number onto some other patch. */
   if (program >= MIDI_FMOPL_PATCH_COUNT) return;
   fmopl_channels[channel].instrument = program;
   usMIDI("[FMOPL] ch%d -> patch %d\n", channel, program);
@@ -557,14 +499,10 @@ void midi_fmopl_program_change(uint8_t channel, uint8_t program)
 /**
  * @brief Capture a channel's currently-selected instrument into another patch slot
  *
- * Today this is a plain duplicate of fmopl_patches[fmopl_channels[channel].instrument]
- * into fmopl_patches[patch_index] - there is no live per-operator editing yet (only
- * Program Change instrument selection exists, see midi_fmopl.h), so a channel's
- * "current live state" and its currently selected instrument are the same data. This
- * becomes a genuine live-tweaks capture the day per-operator CCs are added; until
- * then it is a "duplicate this instrument to slot N" operation, still useful on its
- * own for building a new instrument from an existing one as a starting point. Caller
- * must range-check channel and patch_index first; see sysex.c's handle_fmopl_patch_save().
+ * Today a plain duplicate (no live per-operator editing exists yet, so a
+ * channel's live state and its selected instrument are the same data) -
+ * still useful for building a new instrument from an existing one. Caller
+ * must range-check channel and patch_index first.
  *
  * @param uint8_t channel
  * @param uint8_t patch_index, must be < MIDI_FMOPL_PATCH_COUNT
@@ -601,22 +539,15 @@ void midi_fmopl_set_target(uint8_t channel, uint8_t value)
 /**
  * @brief Set a MIDI channel's FMOpl volume (CC_VOL handler) and apply it live
  *
- * OPL2 has no chip-wide master-volume register the way SID's MODVOL
- * nibble is; Total Level is baked into each operator's own register, so
- * "live" here means rewriting the TL bytes of every voice this channel
- * currently holds via fmopl_apply_live_attenuation(), not a single
- * chip-wide write.
+ * OPL2 has no chip-wide master-volume register like SID's MODVOL nibble;
+ * "live" means rewriting the TL bytes of every held voice
+ * (fmopl_apply_live_attenuation()), not a single chip-wide write.
  *
  * @param uint8_t channel
  * @param uint8_t value
  */
 void midi_fmopl_set_volume(uint8_t channel, uint8_t value)
 {
-  /* OPL2 has no separate master-volume register the way SID's MODVOL
-   * nibble is - Total Level is baked into each operator's own register -
-   * so "live" here means finding every fmopl_voices[] slot this channel
-   * currently holds and rewriting just their TL bytes, not the SID-style
-   * single chip-wide write. */
   fmopl_channels[channel].volume = value;
   fmopl_apply_live_attenuation(channel);
   return;
@@ -639,11 +570,8 @@ void midi_fmopl_set_mod_wheel(uint8_t channel, uint8_t value)
  * @brief Apply a MIDI pitch bend message to a channel's FMOpl voices
  *
  * Converts the 14 bit bend value (centre 0x2000) to a semitone offset
- * using the channel's bend_range (shared with the SID side via
- * midi_channels[]), stores it, then recomputes and rewrites the
- * Fnum/block registers of every voice this channel currently holds,
- * keeping the key-on bit set since the voice is still held. No-op when
- * FMOpl is disabled.
+ * using the channel's bend_range, then rewrites Fnum/block on every held
+ * voice, keeping key-on set. No-op when FMOpl is disabled.
  *
  * @param uint8_t channel
  * @param uint8_t lsb
@@ -653,11 +581,8 @@ void midi_fmopl_pitch_bend(uint8_t channel, uint8_t lsb, uint8_t msb)
 {
   if (!cfg.fmopl_enabled) return;
 
-  /* 0x2000 is MIDI pitch bend's protocol-fixed centre point - same constant
-   * midi_handler.c's own MIDI_BEND_CENTRE names, not shared across the
-   * translation unit boundary since it's the only thing that would be. */
   int32_t bend14 = (int32_t)(((uint16_t)msb << 7) | lsb);  /* 0..16383, centre 0x2000 */
-  int32_t bend_range = midi_channels[channel].bend_range;  /* semitones, channel-scoped, shared with the SID side */
+  int32_t bend_range = midi_channels[channel].bend_range;
   fmopl_channels[channel].bend_semitones =
     ((double)(bend14 - 0x2000) / (double)0x2000) * (double)bend_range;
 
@@ -669,8 +594,7 @@ void midi_fmopl_pitch_bend(uint8_t channel, uint8_t lsb, uint8_t msb)
     fmopl_voices[slot].block = block;
     fmopl_voices[slot].fnum = fnum;
     opl_write(base, (uint8_t)(OPL_REG_FNUM_LO + slot), (uint8_t)(fnum & 0xFF));
-    /* Still held: key-on (BIT_5) stays set, same as any other in-place
-     * Fnum/block rewrite on a gated voice. */
+    /* Still held: key-on (BIT_5) stays set. */
     uint8_t hib = (uint8_t)(((block & 0x7) << 2) | ((fnum >> 8) & 0x3) | BIT_5);
     opl_write(base, (uint8_t)(OPL_REG_KEYON_BLOCK_FNUMHI + slot), hib);
   }
@@ -680,11 +604,8 @@ void midi_fmopl_pitch_bend(uint8_t channel, uint8_t lsb, uint8_t msb)
 /**
  * @brief Override the OPL2 clock used for block/Fnum calculations (SYSEX_FMOPL_SET_CLOCK)
  *
- * Debugging/tuning knob for boards whose actual clone clock does not
- * match the compiled-in FMOPL_CLOCK_HZ default; 0 resets to that default.
- * Rebuilds the note table and, if FMOpl is enabled, recomputes and
- * rewrites the Fnum/block registers of every currently held voice with
- * its pitch bend re-applied, keeping key-on set.
+ * 0 resets to the compiled-in FMOPL_CLOCK_HZ default. Rebuilds the note
+ * table and, if FMOpl is enabled, rewrites Fnum/block on every held voice.
  *
  * @param uint32_t hz
  */

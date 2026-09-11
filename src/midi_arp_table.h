@@ -34,16 +34,10 @@
 #include <stdint.h>
 
 
-/* GoatTracker/SidWizard-style arp/chord table - a small numbered sequence of
- * relative semitone offsets applied against the arpeggiator's held-note
- * root, replacing the fixed Up/Down/Up-Down/Random/As-Played shapes with an
- * author-defined one. Reuses arp_tick()'s existing stepping engine entirely
- * (free-run phase accumulator or MIDI-clock-synced division, see
- * midi_handler.c's arp_advance_table()) - only "which relative offset does
- * step N produce" is new.
- *
- * 16 steps matches MIDI_ARP_MAX_NOTES-scale storage costs - this is a
- * tracker-style arp shape, not a full sequencer track. */
+/* GoatTracker/SidWizard-style arp/chord table: a numbered sequence of
+ * relative semitone offsets against the arpeggiator's held-note root,
+ * replacing the fixed Up/Down/Up-Down/Random/As-Played shapes with an
+ * author-defined one (see midi_handler.c's arp_advance_table()). */
 #define MIDI_ARP_TABLE_STEPS 16
 #define MIDI_ARP_TABLE_COUNT 16
 
@@ -57,10 +51,7 @@ typedef struct {
 
 extern midi_arp_table_t arp_tables[MIDI_ARP_TABLE_COUNT];
 
-/* Table 0 is a plain repeating major triad (0, 4, 7), a safe non-silent
- * default to land on; tables 1-15 start empty (step_count 0), same "inert
- * rather than surprising" convention midi_patch_init() uses for its own
- * unauthored slots. */
+/* Table 0 is a repeating major triad (0, 4, 7); tables 1-15 start empty. */
 void midi_arp_table_init(void);
 
 
