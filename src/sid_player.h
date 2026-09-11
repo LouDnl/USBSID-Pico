@@ -23,6 +23,15 @@
  *
  */
 
+#ifndef _USBSID_SID_PLAYER_H_
+#define _USBSID_SID_PLAYER_H_
+#pragma once
+
+#ifdef __cplusplus
+  extern "C" {
+#endif
+
+
 /* SID player & Emulator flags used in usbsid.c */
 #if defined(ONBOARD_EMULATOR)
 extern volatile bool
@@ -48,3 +57,10 @@ extern void set_maxplaytime(uint8_t * buffer);
 extern void get_playtime(void);
 extern void set_mutestate(uint8_t * buffer);
 extern void get_mutestate(void);
+
+
+#ifdef __cplusplus
+  }
+#endif
+
+#endif /* _USBSID_SID_PLAYER_H_ */
