@@ -233,22 +233,18 @@ const FILL_BUDGET_MS = 8;
 const SKIP_SETTLE_FRAMES = 50;    /* about a second, well past the ring down */
 const SKIP_THRESHOLD     = 128;   /* int16 peak to peak, about -54 dBFS */
 /* Give up after this much emulated silence and play on at one times speed.
+ * It has to exist, because a tune that makes no sound at all would
+ * otherwise be run through at speed for its whole length. A skip that runs
+ * through a tune is worth being suspicious of the *player* for first, not
+ * the tune: `ResidFpSidBackend::attach()` once built a chip with the volume
+ * at zero for any tune attached after its registers were already set,
+ * which looked exactly like this from here.
  *
- * It has to exist, because a tune that makes no sound at all would otherwise be
- * run through at speed for its whole length.
- *
- * The tune this was first written against, `Beisikki_Demo_BASIC.sid`, turned out
- * **not** to be silent: it was being silenced by a bug of ours, where attaching
- * the software SID after a program had already set its registers built a chip
- * with the volume at zero. Fixed in `ResidFpSidBackend::attach()`. It is worth
- * remembering as the shape of the mistake: a skip that runs through a tune is
- * suspicious of the *player* first, not of the tune.
- *
- * Giving up is not free: the tune's clock is now this far in, so a five minute
- * tune has that much less to play. Ninety seconds is chosen against the case
- * this feature is for, loaders of "up to sixty seconds", with margin, and
- * against the cost of being wrong, which is a minute and a half of a tune that
- * was not going to be heard anyway. */
+ * Giving up is not free: the tune's clock is now this far in, so a five
+ * minute tune has that much less to play. Ninety seconds is chosen against
+ * the case this feature is for, loaders of "up to sixty seconds", with
+ * margin, against the cost of being wrong (a minute and a half of a tune
+ * that was not going to be heard anyway). */
 const SKIP_MAX_SECONDS   = 90;
 /* How long one call may spend on this. It runs on the main thread, and the
  * worklet asks for samples about every 11 ms, so this is the share of the thread

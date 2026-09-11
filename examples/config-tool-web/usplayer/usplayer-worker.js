@@ -210,10 +210,9 @@ const handlers = {
     /* The worker owns the board here, so it is the only one that can ask what
      * is in it. Done at init, before any tune loads.
      *
-     * Never let it stop the worker coming up. Reading the board is a
-     * convenience: without it the sockets default and FM/OPL is off, which is
-     * a worse tune, not a dead player. This used to be an unbounded wait and
-     * it hung init for ever when the board left a config read unanswered. */
+     * Never let it stop the worker coming up: reading the board is a
+     * convenience, and without it the sockets default and FM/OPL is off,
+     * which is a worse tune, not a dead player. */
     let board = null;
     if (opened) {
       try { board = await player.applyBoardConfig(); }

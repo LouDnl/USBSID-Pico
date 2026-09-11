@@ -912,15 +912,11 @@ export class USPlayerAdapter {
    * @param {function} callback  called once the tune is loaded and running
    */
   async load(subtune, timeout, url, callback) {
-    /* A tune picked while the previous one is still loading used to run both
+    /* A tune picked while the previous one is still loading must not run both
      * loads at once: two overlapping sets of worker RPCs (loadSID,
-     * audioConfigure, start) interleaving on the worker's single thread, each
-     * blind to the other. On a heavy tune (many SIDs, already behind on real
-     * time) that RPC pileup could take the worker the better part of a minute
-     * to work through, and whichever load's calls landed last decided what
-     * actually played - not necessarily the last one clicked. The status line
-     * and the log both reported the click that lost the race as a success,
-     * because that is genuinely what its own load() saw happen.
+     * audioConfigure, start) would interleave on the worker's single thread,
+     * each blind to the other, and whichever load's calls landed last would
+     * decide what actually played, not necessarily the last one clicked.
      *
      * `gen` makes every load() know whether a newer one has since started.
      * Checked before each worker RPC: a superseded load stops issuing them
@@ -1084,11 +1080,7 @@ export class USPlayerAdapter {
          *
          * It counts songs from **one**, and this method's argument is 0 based
          * like `load_sidtune()` and like every other branch here, so the two
-         * have to be converted between. They used not to be, and this branch
-         * read the argument as 1 based: every host that passed a 0 based number
-         * played song 1 whichever song it asked for, and the one host that
-         * passed a 1 based number got the right song here and the wrong one in
-         * all four other modes. */
+         * have to be converted between. */
         if (!this._transport || !this._transport.isOpen) {
           throw new Error('no board on the serial port to send it to');
         }

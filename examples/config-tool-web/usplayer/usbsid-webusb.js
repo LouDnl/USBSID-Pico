@@ -115,14 +115,10 @@ const MAX_FRAMES  = 15;   /* 1 + 15 * 4 = 61 bytes */
 const MAX_QUEUE   = 256;
 /* Transfers submitted but not yet completed. See _pump() for why this is not
  * one: a digi needs about 2200 packets a second and a serialised round trip
- * cannot do half of it.
- *
- * Eight was not enough either. Measured with web/bench.html on a digi: the
- * queue reached 172, the player's backpressure stopped it stepping 449 times in
- * twenty seconds, and the board went up to 85 ms without a write, which is four
- * frames. Emulation load was 5%, so nothing was short of CPU; the transfers
- * simply were not completing fast enough. At eight in flight that needs a round
- * trip under about 3.9 ms and Chrome's WebUSB does not manage it. */
+ * cannot do half of it. Eight was measured not enough either, with
+ * web/bench.html on a digi: transfers were not completing fast enough to
+ * keep the queue from growing, even though emulation load was nowhere near
+ * the bottleneck. */
 const MAX_INFLIGHT = 32;
 
 /**
@@ -196,25 +192,19 @@ const COALESCE = 8;
  *     it.
  *
  * **False**, and deliberately so even though the firmware now has the FIFO on.
- * The run that finally came out clean, eight commands a transfer with the
- * vendor port buffered, used short final packets, because that was the default
- * at the time. So short packets and a FIFO is the combination actually
- * measured working, and the desync above is a hazard on paper that did not
- * appear in practice: a batch's short packet lands where the reader has caught
- * up, not mid stream. Switching this to true would trade a verified setting for
- * an unverified one.
+ * Short packets combined with a FIFO is the combination actually measured
+ * working; the desync above is a hazard on paper that did not appear in
+ * practice, since a batch's short packet lands where the reader has caught
+ * up, not mid stream. Switching this to true would trade a verified setting
+ * for an unverified one.
  *
  * If a desync ever does show, garbled registers rather than timing, this is the
  * first thing to try.
  *
- * The FIFO itself is what removed the crackle. Without it the firmware played
- * out each packet inside `tud_vendor_rx_cb` while the endpoint NAKed, so the
- * board could not accept the next packet until it had finished the last, and
- * that gap landed on top of the next write's pre delay. The CDC port the libusb
- * driver uses has always been buffered, which is why the command line player
- * was clean on the identical write stream. No amount of host side work reached
- * it: coalescing one command a transfer against eight changed the transfer rate
- * from 2173 a second to 296 and sounded exactly the same.
+ * The FIFO itself is what removed the crackle: without it the firmware could
+ * not accept the next packet until it had finished the last, and that gap
+ * landed on top of the next write's pre delay. No amount of host side
+ * coalescing reached it on its own.
  */
 const FULL_PACKETS = false;
 
@@ -339,8 +329,8 @@ export class USBSIDWebUSBTransport {
     await this._dev.selectAlternateInterface(this._ifaceNum, 0);
     /* Crashes the whole browser process on Windows (Chrome/Edge/Canary), confirmed
      * via crash dump analysis - a Chromium-internal CHECK() in the Windows USB
-     * backend, not something this driver can work around other than not calling it.
-     * See _llm-memory/temp or _docs_etc/_bugs/windows/ for the dumps and writeup. */
+     * backend, not something this driver can work around other than not calling
+     * it. Filed upstream at issues.chromium.org/issues/557605844. */
     //try { await this._dev.clearHalt('out', this._epOut); } catch (_) {}
     //try { await this._dev.clearHalt('in',  this._epIn);  } catch (_) {}
     await this._dev.controlTransferOut({
@@ -482,16 +472,13 @@ export class USBSIDWebUSBTransport {
    * Ask the board something and wait for the answer.
    *
    * **Never raced, and always serialised.** WebUSB has no way to cancel a
-   * `transferIn`, so a read given up on is not aborted, it is *abandoned*: the
-   * reply still arrives and is handed to whoever reads next. One timeout
-   * therefore puts every later read one reply behind for the rest of the
-   * session, and the backlog only grows. That is what this used to do, with a
-   * 250 ms `Promise.race`, and it is why the socket read at connect would answer
-   * and the FM/OPL read straight after it would not.
-   *
-   * So the timeout only *reports*. Reporting is free; abandoning is what breaks
-   * the session. And every read goes through one chain, because two readers on
-   * one endpoint take each other's replies.
+   * `transferIn`, so a read given up on is not aborted, it is *abandoned*:
+   * the reply still arrives and is handed to whoever reads next. Racing a
+   * read against a timeout therefore puts every later read one reply behind
+   * for the rest of the session, with the backlog only growing. So a
+   * timeout here only *reports*; abandoning is what breaks the session. And
+   * every read goes through one chain, because two readers on one endpoint
+   * take each other's replies.
    *
    * A caller that must not block waits on the promise this returns with a
    * timeout of its own. That is safe in a way racing the transfer is not: the
@@ -637,17 +624,13 @@ export class USBSIDWebUSBTransport {
   }
 
   playerLoadTune(subtune) {
-    /* Two bytes, and the order of them is the whole point: the file id first,
-     * 0 being the one just uploaded, then the subtune, which the firmware
-     * counts from zero.
-     *
-     * The file id used to be left out, so the subtune went into its byte and
-     * the firmware read the subtune out of the byte after it, which was always
-     * zero. Every SendSID upload therefore played song 1 whichever song was
-     * asked for, on a board reached over WebUSB. The Web Serial transport sent
-     * both bytes and was right all along, which is why this only ever showed up
-     * on some machines. `config.c` reads it as `tuneno = buffer[2]` with the
-     * config init byte already stripped, so that is this packet's byte 3. */
+    /* Two bytes, and the order of them is the whole point: the file id
+     * first, 0 being the one just uploaded, then the subtune, which the
+     * firmware counts from zero. `config.c` reads it as `tuneno =
+     * buffer[2]` with the config init byte already stripped, so that is
+     * this packet's byte 3 - leaving the file id out shifts the subtune
+     * into the wrong byte and the firmware reads a subtune of zero
+     * regardless of what was asked for. */
     const t = new Uint8Array([0, subtune & 0xFF]);
     return this._sendNow(SID_PLAYER_TUNE, t);
   }

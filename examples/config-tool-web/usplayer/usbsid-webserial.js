@@ -490,10 +490,8 @@ export class USBSIDWebSerialTransport {
   setAudioSwitch(stereo) {
     if (!this._open) return;
     /* _queueCommand and not _send: over CDC every command occupies a whole
-     * 64 byte slot, and _send refuses anything that is not a multiple of one.
-     * The first version of this copied the WebUSB transport, where _send takes
-     * the six bytes raw, so the packet was rejected before it left the page and
-     * the board never heard it while the app cheerfully logged success. */
+     * 64 byte slot, and _send refuses anything that is not a multiple of
+     * one, unlike the WebUSB transport's _send which takes six raw bytes. */
     this._queueCommand(
       new Uint8Array([CFG_CMD, SET_AUDIO, stereo ? 1 : 0, 0, 0, 0]));
     this._flushBatch();

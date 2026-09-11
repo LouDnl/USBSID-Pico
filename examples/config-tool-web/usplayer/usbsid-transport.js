@@ -94,14 +94,8 @@ export function availableTransport() {
 }
 
 /**
- * What to call the transport in the interface.
- *
- * Worth naming rather than leaving as "USB", because the two are not
- * interchangeable from the user's side: WebUSB takes the vendor interface and
- * leaves the CDC one alone, so the command line player can still open the board.
- * Web Serial takes the CDC interface, which is the one the command line player
- * wants, so the two cannot both have it and using the CLI costs a replug before
- * the browser can have it back.
+ * What to call the transport in the interface. Worth naming rather than
+ * leaving as "USB": see the file header for why the two are not interchangeable.
  *
  * @param {'webusb'|'webserial'|null} kind  defaults to this browser's
  * @param {boolean} withInterface  append which USB interface it uses

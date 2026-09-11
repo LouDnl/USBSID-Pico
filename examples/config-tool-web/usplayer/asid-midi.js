@@ -100,10 +100,8 @@ export class ASIDMIDITransport {
      * routing them into some chip's register space where they would go out as
      * ordinary SID data and no receiver would decode them as FM.
      *
-     * The player checks this flag and forces `fmopl_sid` to -1 for us. It used
-     * to work only because this class has no readBoardConfig() and so the board
-     * config was never applied over ASID, which is a thing that would break the
-     * first time anyone added one. */
+     * The player checks this flag and forces `fmopl_sid` to -1 for us; this
+     * class has no readBoardConfig() to override that with. */
     this.fmAsOwnMessage = true;
     this.onWrite = null;
   }
@@ -208,13 +206,11 @@ export class ASIDMIDITransport {
      * receiver applies after the register itself. That is what carries a
      * gate off followed by a gate on, so a retrigger inside one frame survives.
      *
-     * A **third** write has nowhere left to go. This used to shuffle the second
-     * value down into the primary slot and drop the first, and that loses notes:
-     * gate on, gate off, gate off in one frame kept only the two offs, so a note
-     * whose onset was in that frame never sounded at all. Heard as an occasional
-     * skip, not often, because it needs three writes to one gate register in one
-     * frame. Now the frame is simply cut short instead: flush what is there and
-     * begin a new snapshot with the new value, which loses nothing.
+     * A **third** write has nowhere left to go: the frame is cut short instead,
+     * flushing what is there and starting a new snapshot with the new value.
+     * Dropping the first of the three values instead (shuffling the second down
+     * into the primary slot) loses notes whose onset falls in that frame: gate
+     * on, gate off, gate off in one frame would keep only the two offs.
      *
      * Filter and volume have no shadow and are flushed at once, because their
      * order within the frame is audible.
@@ -268,19 +264,12 @@ export class ASIDMIDITransport {
     /* Before the SID snapshots, so an OPL note and the SID writes around it stay
      * in the order the tune made them. */
     this._flushFm();
-    /* Every chip that has something to say, not the first `nosids` of them.
-     *
-     * This used to stop at `nosids`, which the host set from its own reading of
-     * the file header, and a chip the emulation wrote to but the header count
-     * did not reach was **silently dropped**: measured on `Quad_Core_4SID.sid`,
-     * 4667 register writes to chip four and not one ASID message carrying them,
-     * while the same tune over WebUSB and over serial played correctly, because
-     * those transports send by address and never consult a count.
-     *
-     * Two parsers disagreeing about how many chips a file has is the sort of
-     * thing that stays wrong for a long time, so the stream now follows the
-     * writes instead: a chip that nothing wrote to has an empty mask and is
-     * skipped a line below, which is the same saving without the guess. */
+    /* Every chip that has something to say, not the first `nosids` of them:
+     * stopping at a header-derived chip count silently drops any chip the
+     * emulation wrote to but the header didn't count, unlike WebUSB/serial
+     * which send by address and never consult a count. The stream follows
+     * the writes instead - a chip nothing wrote to has an empty mask and is
+     * skipped a line below, the same saving without the guess. */
     for (let sid = 0; sid < this._chips.length; sid++) {
       const c = this._chips[sid];
       let mask = 0, msb = 0;
