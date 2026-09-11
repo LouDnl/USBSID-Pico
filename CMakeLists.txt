@@ -61,7 +61,6 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(SIDWRITES_DEBUGGING 0)  # Enable logging of SID writes one core 2
   set(EMULATOR_DEBUGGING 1)   # Enable debugging in emulator
   set(BT_DIAG_DEBUGGING 0)    # Enable verbose per-HCI-event logging in bluetooth.c ~ floods UART, causes audible lag while playing
-  set(ENABLE_PROFILING 0)     # Experimental!
 endif()
 
 ### Enable / Disable build with USBSID-Player for tune playback or Cynthcart emulation
@@ -625,28 +624,6 @@ if(USBSID_W_BOARD)
     endforeach()
     set(FILENAMES ${FILENAMES_net})
   endif()
-endif()
-
-### Enable Profiling
-if(ENABLE_PROFILING EQUAL 1)
-  add_compile_definitions(ENABLE_PROFILING=1)
-  # set(COMPILE_OPTS
-  #   ${COMPILE_OPTS}
-  #   -pg
-  #   -mgeneral-regs-only
-  #   )
-  # set(TARGET_LL
-  #   ${TARGET_LL}
-  #   pico_stdio_semihosting
-  # )
-  # set(TARGET_INCLUDE_DIRS
-  #     ${TARGET_INCLUDE_DIRS}
-  #     ${CMAKE_CURRENT_LIST_DIR}/lib/McuLib/config
-  #     ${CMAKE_CURRENT_LIST_DIR}/lib/McuLib/src
-  #     ${CMAKE_CURRENT_LIST_DIR}/lib/CrashCourseC/Content/lib
-  # )
-  # add_link_options(-pg --specs=rdimon.specs)
-  # pico_enable_stdio_semihosting(${CMAKE_PROJECT_NAME} ENABLED)
 endif()
 
 ### Enable Telemetry and update the filenames if needed
