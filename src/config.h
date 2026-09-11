@@ -586,8 +586,8 @@ static const uint8_t us_features = (
 static const bool is_rp2350     = (us_features & 0b00000001); /* 0 */
 static const bool has_rgb_vu    = (us_features & 0b00000100); /* 2 */
 static const bool has_pio_uart  = (us_features & 0b00001000); /* 3 */
-static const bool has_nsd       = (us_features & 0b00010000); /* 4 */
-static const bool has_net       = (us_features & 0b00100000); /* 5 */
+static const bool has_net       = (us_features & 0b00010000); /* 4 */
+static const bool has_nsd       = (us_features & 0b00100000); /* 5 */
 static const bool has_emulator  = (us_features & 0b10000000); /* 7 */
 
 /* Global variables from config.c */
