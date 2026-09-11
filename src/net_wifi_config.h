@@ -23,9 +23,25 @@
  *
  */
 
+#ifndef _USBSID_NET_WIFI_CONFIG_H_
+#define _USBSID_NET_WIFI_CONFIG_H_
+#pragma once
+
+#ifdef __cplusplus
+  extern "C" {
+#endif
+
 #include <net_wifi.h>
+
 
 void default_wifi_config(WifiConfig* config);
 void save_wifi_config(WifiConfig *config);
 void load_wifi_config(WifiConfig* config);
 void start_wifi(void);
+
+
+#ifdef __cplusplus
+  }
+#endif
+
+#endif /* _USBSID_NET_WIFI_CONFIG_H_ */
