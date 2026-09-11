@@ -7,10 +7,6 @@
 #define ENABLE_PRINTF_HEXDUMP
 #define ENABLE_SCO_OVER_HCI
 
-// Required: pico_btstack_classic is always linked when ENABLE_NET=1 (CMakeLists.txt),
-// so classic BT sources need this defined or they fail to build (missing bd_addr_t etc.)
-#define ENABLE_CLASSIC
-
 #ifdef ENABLE_BLE
 #define ENABLE_GATT_CLIENT_PAIRING
 #define ENABLE_L2CAP_LE_CREDIT_BASED_FLOW_CONTROL_MODE
