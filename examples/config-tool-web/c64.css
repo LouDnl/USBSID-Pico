@@ -140,9 +140,11 @@ body::before {
   padding-bottom: 4px;
 }
 .c64-tab {
+  display: inline-block;
   font-family: var(--font-main);
   font-size: 1rem;
   text-transform: uppercase;
+  text-decoration: none;
   background: var(--c64-darkgray);
   color: var(--c64-text);
   border: 2px solid var(--c64-gray);
@@ -161,9 +163,11 @@ body::before {
 }
 /* External link buttons in the tab bar - same shape, cyan accent, pushed to right */
 .c64-tab-link {
+  display: inline-block;
   font-family: var(--font-main);
   font-size: 1rem;
   text-transform: uppercase;
+  text-decoration: none;
   background: var(--c64-darkgray);
   color: var(--c64-cyan);
   border: 2px solid var(--c64-cyan);
@@ -186,6 +190,8 @@ body::before {
 }
 .c64-panel { display: none; }
 .c64-panel.active { display: block; }
+.blog-view { display: none; }
+.blog-view.active { display: block; }
 
 /* Generic box */
 .c64-box {
@@ -1023,7 +1029,7 @@ input[type=range].c64-range::-moz-range-thumb {
 }
 #panel-blog .c64-img-grid img { max-width: 100%; margin: 0; }
 #panel-blog sup { display: block; margin: 0px auto; text-align: center; color: var(--c64-bloggray); font-size: 0.8em; }
-#panel-blog .c64-date-author { font-size: 0.8rem; color: var(--c64-bloggray); }
+#panel-blog .c64-date-author { display: block; font-size: 0.8rem; color: var(--c64-bloggray); }
 #panel-blog code {
   background: var(--c64-screen);
   color: var(--c64-cyan);
@@ -1076,4 +1082,31 @@ input[type=range].c64-range::-moz-range-thumb {
   padding-bottom: 3px;
   /* display: block; */
   /* align-self: auto; */
+}
+
+/* Blog section/subsection labels are real h2-h5 elements now (SEO/semantic
+   structure), not divs. Reset the UA heading defaults (top margin, bold
+   weight) they'd otherwise add on top of the explicit values above, so the
+   retag is visually invisible. */
+#panel-blog h2.c64-blog-title,
+#panel-blog h3.c64-box-title,
+#panel-blog h4.c64-blog-h2,
+#panel-blog h5.c64-blog-h3 {
+  margin-top: 0;
+  font-weight: normal;
+  display: block;
+}
+
+/* Visually hidden but present in the DOM: for search engines and screen
+   readers only, never shown on screen. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

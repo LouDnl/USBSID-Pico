@@ -141,6 +141,10 @@ const RESET_MIDI_STATE = 0x63;
 
 const USBSID_VERSION  = 0x80;
 const US_PCB_VERSION  = 0x81;
+/* What the firmware was compiled with, one byte of flags
+ * bit 7 is the embedded SID player, which is the one SendSID needs. */
+const US_FEATURES     = 0x82;
+const FEATURE_SIDPLAYER = 1 << 7;
 const RESTART_BUS     = 0x85;
 const RESTART_BUS_CLK = 0x86;
 const SYNC_PIOS       = 0x87;
@@ -793,6 +797,20 @@ class USBSIDDevice {
     return (r && r.length) ? r[0] : 0;
   }
 
+  /* What the firmware was built with, or null when it will not say (older
+   * firmware that predates this command). */
+  async readFeatures() {
+    usbsidLog("Reading USBSID-Pico feature flags");
+    const r = await this.configReadNoRace(US_FEATURES, MAX_PACKET_SIZE);
+    return (r && r.length) ? r[0] : null;
+  }
+
+  /** Does this board carry the onboard SID player? null when it will not say. */
+  async hasSidPlayer() {
+    const f = await this.readFeatures();
+    return (f === null) ? null : (f & FEATURE_SIDPLAYER) !== 0;
+  }
+
   /* Clone config commands */
   async configFPGASID(b2, b3, b4) { await this.configCmd(FPGASID, b2, b3, b4); }
   async configSKPico(b2, b3, b4)  { await this.configCmd(SKPICO, b2, b3, b4); }
@@ -889,7 +907,7 @@ class USBSIDDevice {
   async pause()   { await this.write([this.cmd(COMMAND, PAUSE),   0, 0, 0, 0, 0]); }
   async unpause() { await this.write([this.cmd(COMMAND, UNPAUSE), 0, 0, 0, 0, 0]); }
 
-  /* Onboard player (requires ONBOARD_SIDPLAYER firmware build) */
+  /* Onboard player (requires ONBOARD_EMULATOR firmware build) */
   async playerUploadStart(fileType = 0x01) {
     await this.configCmd(UPLOAD_SID_START, fileType);
   }

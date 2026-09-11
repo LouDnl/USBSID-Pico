@@ -67,6 +67,16 @@ let audioSent = 0;             /* posted since the ring last reported */
 let audioSteps = 24;           /* frames one fill may emulate */
 let audioFilling = false;
 
+/* The longest a single audioFill() burst may run, in wall clock ms, whatever
+ * audioSteps says. A many-SID tune's frame cost scales with chip count, and
+ * audioSteps alone does not: at VISIBLE_STEPS (8), a 15SID tune already
+ * behind on real time could spend the better part of a second inside one
+ * synchronous burst, and every control message this worker is sent - a tune
+ * switch among them - waits in this thread's own queue until that burst
+ * returns. Bounding the burst by time as well makes that wait a few
+ * milliseconds instead, on any chip count: see audioFill(). */
+const AUDIO_FILL_BUDGET_MS = 8;
+
 /** Everything the page shows, in one message rather than a call per field. */
 function snapshot() {
   if (player === null) return null;
@@ -95,17 +105,22 @@ function snapshot() {
 /**
  * Emulate until the ring has what it asked for, then send it.
  *
- * Bounded by `audioSteps` so one request cannot run for an unbounded time, and
- * whatever is left is asked for again on the next report. A worker blocking
- * itself is far less serious than the main thread blocking, but a tune that
- * cannot be synthesised in real time should degrade to a shorter buffer rather
- * than to a worker that never returns.
+ * Bounded by `audioSteps` frames and by `AUDIO_FILL_BUDGET_MS` wall clock time,
+ * whichever comes first, so one request cannot run for an unbounded time and
+ * cannot hold this thread's own message queue - the one a tune switch's RPCs
+ * arrive on - for longer than a few milliseconds regardless of chip count.
+ * Whatever is left of `audioOwed` is asked for again on the next report,
+ * possibly the very next one: a worker blocking itself briefly and often is
+ * far less serious than the main thread blocking, but a tune that cannot be
+ * synthesised in real time should degrade to a shorter buffer rather than to
+ * a worker that is unresponsive for as long as it takes to catch up.
  */
 function audioFill() {
   if (!audioMode || player === null || audioFilling || !clockPort) return;
   audioFilling = true;
   try {
     const M = player.M;
+    const deadline = performance.now() + AUDIO_FILL_BUDGET_MS;
     let steps = 0;
     while (audioOwed > 0 && steps < audioSteps) {
       player.stepAndDrain();
@@ -122,6 +137,7 @@ function audioFill() {
         audioOwed -= n;
         if (n < audioMax) break;
       }
+      if (performance.now() >= deadline) break;
     }
   } finally {
     audioFilling = false;

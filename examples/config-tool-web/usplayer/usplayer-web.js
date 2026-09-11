@@ -48,6 +48,16 @@
  */
 
 /**
+ * The most SID chips the wasm build's own emulation core wires up
+ * (SidConfig::base in mos6581_8580.h), matching kMaxSids there and in
+ * sidfile.h: the same ceiling a v5 tune's own multiSidConfig can ask for.
+ * Unlike a real board (UsbSidBackend, EmbeddedSidBackend, WebSidBackend),
+ * which stays a hard 4 chip placeholder by design, the reSIDfp software
+ * audio backend this file drives actually synthesises all of them.
+ */
+export const MAX_SIDS = 15;
+
+/**
  * Is this a .sid file rather than a program?
  *
  * @param {Uint8Array} bytes
@@ -60,22 +70,33 @@ export function isSidHeader(bytes) {
 }
 
 /**
- * How many SID chips a .sid header asks for, 1 to 3.
+ * How many SID chips a .sid header asks for, 1 to MAX_SIDS.
  *
  * The second and third chips live at $7a and $7b and only exist from header
  * version 3 and 4, so the version has to be checked before the bytes are
- * believed: a v2 file has something else there.
+ * believed: a v2 file has something else there. Version 5 redefines both
+ * bytes again: $7a's low nibble is the total chip count (multiSidConfig),
+ * which may ask for up to 15 - MAX_SIDS itself, so it needs no further
+ * clamping here. Working out which of those 15 addresses are actually valid
+ * (multiSidConfig's high nibble, the $D400-$D7E0/$DE00-$DFE0 ranges, the
+ * FM/OPL overlap rule) is sidfile.cpp's job, done once the file is actually
+ * loaded; this is only ever a quick pre-parse for UI and transport setup
+ * before that happens.
  *
  * Lives here rather than in a frontend because more than one of them needs it
  * and they must agree. ASID in particular only emits the chips it is told
  * about, so a transport left at one chip plays a three SID tune as one.
  *
  * @param {Uint8Array} bytes
- * @returns {number} 1, 2 or 3
+ * @returns {number} 1 to MAX_SIDS
  */
 export function countSids(bytes) {
   if (!bytes || bytes.length < 0x7c) return 1;
   const version = (bytes[0x04] << 8) | bytes[0x05];
+  if (version >= 5) {
+    const total = bytes[0x7a] & 0x0f;
+    return Math.min(MAX_SIDS, Math.max(1, total || 1));
+  }
   let n = 1;
   if (version >= 3 && bytes[0x7a] !== 0) n++;
   if (version >= 4 && bytes[0x7b] !== 0) n++;
@@ -185,6 +206,16 @@ export class USBSIDPlayerWeb {
     this._tuneName    = M.cwrap('usp_tune_name', 'number', []);
     this._tuneAuthor  = M.cwrap('usp_tune_author', 'number', []);
     this._tuneReleased = M.cwrap('usp_tune_released', 'number', []);
+    /* v5: multi-SID, panning, FM/OPL, embedded song lengths. All informational,
+     * see web_api.cpp for why nothing here is rendered. */
+    this._sidCount    = M.cwrap('usp_sid_count', 'number', []);
+    this._sidAddr     = M.cwrap('usp_sid_addr', 'number', ['number']);
+    this._sidPan      = M.cwrap('usp_sid_pan', 'number', ['number']);
+    this._panLayout   = M.cwrap('usp_pan_layout', 'number', []);
+    this._panMode     = M.cwrap('usp_pan_mode', 'number', []);
+    this._hasFmOpl    = M.cwrap('usp_has_fm_opl', 'number', []);
+    this._hasEmbeddedSonglengths = M.cwrap('usp_has_embedded_songlengths', 'number', []);
+    this._embeddedSonglenMs = M.cwrap('usp_embedded_songlength_ms', 'number', ['number']);
     this._readMemory  = M.cwrap('usp_read_memory', 'number', ['number']);
     this._ciaLatch    = M.cwrap('usp_cia_latch', 'number', ['number', 'number']);
     this._sidRegister = M.cwrap('usp_sid_register', 'number', ['number', 'number']);
@@ -833,12 +864,38 @@ export class USBSIDPlayerWeb {
     }
   }
 
-  /** Title, author and release, as the file's own header spells them. */
+  /**
+   * Every song's length from the tune's own v5 embedded table, or null when
+   * it has none. Same shape as `songLengths()`, so a caller can fall back to
+   * this when the external database has nothing for the file.
+   *
+   * @returns {number[]|null}
+   */
+  embeddedSongLengths() {
+    if (!this._hasEmbeddedSonglengths()) return null;
+    const count = this._songs();
+    if (count <= 0) return null;
+    const out = [];
+    for (let s = 1; s <= count; s++) out.push(this._embeddedSonglenMs(s));
+    return out;
+  }
+
+  /** Title, author and release, as the file's own header spells them, plus
+   * the v5 multi-SID/panning/FM-OPL summary. Chip fields cover only what
+   * this player actually wires up (MAX_SIDS at most, see mos6581_8580.h's
+   * own kMaxSids); `numSidsRequested` is the raw count the file's own header
+   * asked for, which for any real v5 file cannot exceed that either. */
   info() {
     const str = (fn) => {
       const p = fn();
       return p ? this.M.UTF8ToString(p) : '';
     };
+    const requested = this._sidCount();
+    const wired = Math.min(MAX_SIDS, Math.max(1, requested));
+    const sids = [];
+    for (let i = 0; i < wired; i++) {
+      sids.push({ addr: this._sidAddr(i), pan: ['L', 'C', 'R'][this._sidPan(i)] || 'C' });
+    }
     return {
       name: str(this._tuneName),
       author: str(this._tuneAuthor),
@@ -846,6 +903,12 @@ export class USBSIDPlayerWeb {
       song: this._song(),
       songs: this._songs(),
       isPrg: this.isPrg(),
+      numSidsRequested: requested,
+      sids,
+      panLayout: ['standard', 'lcr', 'centerFirst', 'fullyCentered'][this._panLayout()] || 'standard',
+      panMode: ['direct', 'reverse', 'group', 'spread'][this._panMode()] || 'direct',
+      hasFmOpl: !!this._hasFmOpl(),
+      hasEmbeddedSongLengths: !!this._hasEmbeddedSonglengths(),
     };
   }
 }

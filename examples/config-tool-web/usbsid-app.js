@@ -29,7 +29,15 @@ var _browser        = null;
 var _player         = null;
 var _pcbver         = '';        /* PCB version string from device descriptor */
 var _emulator       = 'usplayer';  /* matches the default selected option in index.html */
-var _hasSIDPlayer   = false;     /* true when connected device productName contains 'Pico2' */
+/* Tri-state: does the connected WebUSB device's firmware carry the onboard SID
+ * player (SendSID mode)? true/false straight from hasSidPlayer(), or null on
+ * an older firmware that predates the US_FEATURES command and will not say.
+ * Never gate SendSID on this being false-y from silence: only a definite
+ * `false` blocks it, the way a definite `true` or an unknown `null` (older
+ * firmware, or Web Serial, which cannot be asked before trying at all -
+ * see connectSendsidSerial()) both allow it and let the board itself refuse
+ * an upload it cannot use. */
+var _sidplayerCap   = null;
 var _loadedBytes    = null;      /* Uint8Array of the currently loaded SID file */
 var _sendsidPlaying = false;     /* playback state for SendSID onboard player mode */
 var _currentFile    = null;      /* { url, name } - url is blob: or http: */
@@ -74,30 +82,107 @@ function setLED(connected) {
   else led.classList.remove('connected');
 }
 
-/* Tab switching */
+/* Tab switching - real path slugs (/player, /config, ...), not #hash.
+ * Hash fragments are invisible to Google's indexer as separate URLs; real
+ * paths are. Nav tabs are <a href="/x" data-tab="x"> so a crawler that does
+ * not run JS still sees real links, and the click handler below intercepts
+ * same-tab-bar clicks to route client-side without a full page load.
+ * Requires the web server to fall back unknown paths to this same index.html
+ * (nginx: try_files $uri $uri/ /index.html;) - otherwise a direct hit or
+ * refresh on e.g. /blog 404s. */
+const TAB_NAMES = ['player', 'regs', 'config', 'about', 'blog'];
+/* One entry per blog post. Add a slug + title here and a matching
+ * #blog-post-<slug> .blog-view block in index.html to publish a new post -
+ * /blog itself just lists whatever is in this map. */
+const BLOG_POSTS = {
+  'usbsid-pico-sids-on-usb': {
+    title: 'USBSID-Pico: Bridging Real Commodore 64 Sound to Modern USB | USBSID-Pico Blog'
+  }
+};
+/* Distinct <title> per route - a real, differing title per page is an SEO
+ * signal a single static title across every tab could never give. */
+const TAB_TITLES = {
+  player: 'USBSID-Pico Web SID Player',
+  regs:   'USBSID-Pico SID Registers (Live)',
+  config: 'USBSID-Pico Web Config',
+  about:  'About USBSID-Pico',
+  blog:   'USBSID-Pico Blog'
+};
+function tabPath(name, sub) {
+  if (name === 'player') return '/';
+  if (name === 'blog' && sub) return '/blog/' + sub;
+  return '/' + name;
+}
+/* Parses a pathname into { tab, sub } or null if it matches no known route.
+ * sub is only ever set for a recognised /blog/<slug>. */
+function parseRoute(path) {
+  const slug = path.replace(/\/+$/, '') || '/';
+  if (slug === '/') return { tab: 'player', sub: null };
+  const parts = slug.slice(1).split('/');
+  const name = parts[0];
+  if (!TAB_NAMES.includes(name)) return null;
+  if (parts.length === 1) return { tab: name, sub: null };
+  if (name === 'blog' && parts.length === 2 && BLOG_POSTS[parts[1]]) {
+    return { tab: 'blog', sub: parts[1] };
+  }
+  return null;
+}
 function initTabs() {
   const tabs   = document.querySelectorAll('.c64-tab');
   const panels = document.querySelectorAll('.c64-panel');
-  function activateTab(target, updateHash) {
-    const tab = document.querySelector('.c64-tab[data-tab="' + target + '"]');
+  function activateRoute(route, updatePath) {
+    const tab = document.querySelector('.c64-tab[data-tab="' + route.tab + '"]');
     if (!tab) return false;
     tabs.forEach(t => t.classList.remove('active'));
     panels.forEach(p => p.classList.remove('active'));
     tab.classList.add('active');
-    const panel = document.getElementById('panel-' + target);
+    const panel = document.getElementById('panel-' + route.tab);
     if (panel) panel.classList.add('active');
-    if (updateHash) history.replaceState(null, '', '#' + target);
+
+    if (route.tab === 'blog') {
+      document.querySelectorAll('#panel-blog .blog-view').forEach(v => v.classList.remove('active'));
+      const viewId = route.sub ? 'blog-post-' + route.sub : 'blog-index';
+      const view = document.getElementById(viewId);
+      if (view) view.classList.add('active');
+    }
+
+    if (updatePath) history.pushState(null, '', tabPath(route.tab, route.sub));
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) canonical.href = 'https://usbsid.loudai.nl' + tabPath(route.tab, route.sub);
+    document.title = route.sub ? BLOG_POSTS[route.sub].title : TAB_TITLES[route.tab];
     return true;
   }
   tabs.forEach(tab => {
-    tab.addEventListener('click', () => activateTab(tab.dataset.tab, true));
+    tab.addEventListener('click', (e) => {
+      e.preventDefault();
+      activateRoute({ tab: tab.dataset.tab, sub: null }, true);
+    });
   });
-  window.addEventListener('hashchange', () => {
-    activateTab(location.hash.slice(1), false);
+  /* Blog index -> post links live inside panel-blog, not the tab bar. */
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('[data-blog-link]');
+    if (!link) return;
+    e.preventDefault();
+    const route = parseRoute(new URL(link.href).pathname);
+    if (route) activateRoute(route, true);
   });
-  /* Activate tab from URL hash, else first tab */
-  const initial = location.hash.slice(1);
-  if (!initial || !activateTab(initial, false)) {
+  window.addEventListener('popstate', () => {
+    activateRoute(parseRoute(location.pathname) || { tab: 'player', sub: null }, false);
+  });
+  /* Old shared links used #blog etc (previous hash router). Redirect those to
+   * the real path so old posts/bookmarks land on the new canonical URL. */
+  const hashName = location.hash.slice(1);
+  const hashRoute = TAB_NAMES.includes(hashName) ? { tab: hashName, sub: null } : null;
+  if (hashRoute) {
+    history.replaceState(null, '', tabPath(hashRoute.tab, null) + location.search);
+  }
+
+  /* Activate route from URL path, else first tab. An unrecognised path (a
+   * stale link, a typo) falls back to the player tab but keeps the URL - the
+   * server decides whether that path is a real 404, this is just what
+   * renders. */
+  const initial = hashRoute || parseRoute(location.pathname);
+  if (!initial || !activateRoute(initial, false)) {
     if (tabs.length) tabs[0].click();
   }
 }
@@ -217,12 +302,19 @@ async function onDeviceConnected() {
     await checkConfigAck(pcbver);
   }
 
-  /* Detect onboard SID player capability - Pico2 firmware builds only.
-   * readFMOplSID() is intentionally deferred to after config load so we only
-   * issue it when the config confirms FMOpl is enabled on a SID socket. */
-  _hasSIDPlayer = pname.includes('Pico2');
+  /* Onboard SID player capability (SendSID mode). ONBOARD_EMULATOR now builds
+   * for Pico 1 boards as well as Pico 2, so productName can no longer say
+   * whether this device's firmware carries it, the way it once could from
+   * 'Pico2' alone. Ask the firmware directly instead, over the same
+   * US_FEATURES byte Web Serial's SendSID route already reads; see
+   * _sidplayerCap. readFMOplSID() is intentionally deferred to after config
+   * load so we only issue it when the config confirms FMOpl is enabled on a
+   * SID socket. */
+  _sidplayerCap = await usbsidDevice.hasSidPlayer();
   usbsidLog('USB productName:', JSON.stringify(pname));
-  usbsidLog('Onboard SID player:', _hasSIDPlayer ? 'available' : 'not available');
+  usbsidLog('Onboard SID player:', _sidplayerCap === null
+    ? 'unknown (firmware predates the feature query)'
+    : (_sidplayerCap ? 'available' : 'not available'));
 
   /* Enable config panel */
   configavailable = true;
@@ -235,16 +327,17 @@ async function onDeviceConnected() {
   updateConfTabVisibility();
   updatePlayerSideButtons();
 
-  /* In SendSID mode, enable transport buttons immediately on connect */
+  /* In SendSID mode, enable transport buttons immediately on connect, unless
+   * the firmware has just told us definitively it has no onboard player. */
   if (_emulator === 'sendsid') {
-    if (_hasSIDPlayer) {
+    if (_sidplayerCap === false) {
+      setPlayerButtons(false);
+      setLoadButtons(false);
+      usbsidSetStatus('Incompatible: this firmware has no onboard SID player', 'red');
+    } else {
       setPlayerButtons(true);
       setLoadButtons(true);
       updateSendSIDPlayButton();
-    } else {
-      setPlayerButtons(false);
-      setLoadButtons(false);
-      usbsidSetStatus('Incompatible: SendSID requires Pico 2 firmware', 'red');
     }
   }
 
@@ -306,7 +399,7 @@ function onDeviceDisconnected() {
   const cfgHint = document.getElementById('config-status');
   if (cfgHint) cfgHint.textContent = 'Click \u201cRETRIEVE CONFIG\u201d to load the current device configuration.';
 
-  _hasSIDPlayer = false;
+  _sidplayerCap = null;
   _sendsidPlaying = false;
   _webusbSidOffset = 0;
   /* Clear v1.5 state */
@@ -359,7 +452,7 @@ function sendsidDev() {
 /** Is a SendSID connection up, by either route? */
 function sendsidReady() {
   if (typeof usbsidDevice !== 'undefined' && usbsidDevice.isOpen) {
-    return _hasSIDPlayer;   /* the descriptor says whether it is a Pico 2 */
+    return _sidplayerCap !== false;   /* only a definite 'no' blocks it */
   }
   return !!(_sendsidSerial && _sendsidSerial.isOpen);
 }
@@ -1522,15 +1615,30 @@ function resolveSongLengths() {
   ensureSonglengthDb(p).then((ok) => {
     /* Another tune was chosen while the database was on its way. Its own
      * lookup is in flight; this answer is for a tune nobody is playing. */
-    if (!ok || seq !== _lengthSeq) return;
-    const key = p.md5();
-    if (!key) return;
-    const lens = p.songLengths(key);
     if (seq !== _lengthSeq) return;
+    const key = ok ? p.md5() : null;
+    let lens = key ? p.songLengths(key) : null;
     if (lens) {
       usbsidLog('Song lengths:', lens.map(ms => formatTime(ms)).join(', '));
       setSongLengths(lens);
-    } else {
+      return;
+    }
+    /* Not in the external database, or no database at all. A v5 tune can
+     * carry its own song length table right in the file (see sidfile.h),
+     * which is authoritative for this file, so it is used in place of the
+     * database rather than falling back to the five minute default -
+     * currentSongLengthMs()'s DEFAULT_SONG_MS is for when nothing at all
+     * knows how long the tune runs. Same fallback order
+     * usplayer-adapter.js's own _sendBoardPlaytime() already uses for the
+     * onboard player. */
+    if (typeof p.embeddedSongLengths === 'function') {
+      lens = p.embeddedSongLengths();
+    }
+    if (lens && lens.length) {
+      usbsidLog('Song lengths (from the file\'s own v5 table):',
+                lens.map(ms => formatTime(ms)).join(', '));
+      setSongLengths(lens);
+    } else if (key) {
       usbsidLog('Not in songlengths.md5:', key);
     }
   });
@@ -1998,7 +2106,7 @@ function updatePlayerSideButtons() {
   const sendsidBtns = document.getElementById('sendsid-player-btns');
   if (webusbBtns)  webusbBtns.style.display  = (_emulator === 'webusb')  ? 'flex' : 'none';
   if (asidBtns)    asidBtns.style.display    = (_emulator === 'asid')   ? 'flex' : 'none';
-  const shown = (_emulator === 'sendsid' && usbsidDevice.isOpen && _hasSIDPlayer);
+  const shown = (_emulator === 'sendsid' && usbsidDevice.isOpen && _sidplayerCap !== false);
   if (shown) ensureSendsidTimeTimer();
   if (sendsidBtns) sendsidBtns.style.display = shown ? 'flex' : 'none';
   /* The mute grid rides with them, but only when the transport in use can carry
@@ -2090,14 +2198,14 @@ function switchEmulator(em) {
   }
   /* Enable all transport buttons immediately in sendsid mode when already connected */
   if (em === 'sendsid' && typeof usbsidDevice !== 'undefined' && usbsidDevice.isOpen) {
-    if (_hasSIDPlayer) {
+    if (_sidplayerCap === false) {
+      setPlayerButtons(false);
+      setLoadButtons(false);
+      usbsidSetStatus('Incompatible: this firmware has no onboard SID player', 'red');
+    } else {
       setPlayerButtons(true);
       setLoadButtons(true);
       updateSendSIDPlayButton();
-    } else {
-      setPlayerButtons(false);
-      setLoadButtons(false);
-      usbsidSetStatus('Incompatible: SendSID requires a Pico2 with onboard sidplayer firmware', 'red');
     }
   }
   updateConnectButtonVisibility();
@@ -2980,9 +3088,8 @@ function setSerialButton(on) {
 async function uploadCurrentSID() {
   const dev = sendsidDev();
   if (!dev) { usbsidSetStatus('Not connected', 'red'); return; }
-  /* Only the WebUSB route can tell a Pico from a Pico 2 before trying. */
-  if (dev === usbsidDevice && !_hasSIDPlayer) {
-    usbsidSetStatus('Incompatible: SendSID requires Pico 2 firmware', 'red'); return;
+  if (dev === usbsidDevice && _sidplayerCap === false) {
+    usbsidSetStatus('Incompatible: this firmware has no onboard SID player', 'red'); return;
   }
   if (!_loadedBytes) { usbsidSetStatus('No SID file loaded', 'yellow'); return; }
   /* The board path never hands the file to a player, so the header is the only

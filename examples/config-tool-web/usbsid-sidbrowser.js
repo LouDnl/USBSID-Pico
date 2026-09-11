@@ -70,7 +70,10 @@ const SidBrowser = (function () {
   let _path    = [];     /* where we are in the tree, as segments */
   let _view    = [];     /* the tunes currently listed, in display order */
   let _display = [];     /* the same, with group headings interleaved */
-  let _drawn   = 0;      /* how much of _display is in the DOM */
+  let _drawn   = 0;      /* how much of _display is in the DOM, [_drawnStart, _drawn) */
+  /* Start of the drawn window. 0 except right after a jumpDraw(), which drops
+   * everything before the window it draws: see jumpDraw(). */
+  let _drawnStart = 0;
   /* View index -> position in _display, built on first use and thrown away with
    * the pane. ensureDrawn() used to scan _display for it, which is 63000
    * comparisons per pick on the live library's `all` view. */
@@ -474,19 +477,18 @@ const SidBrowser = (function () {
   }
 
   /** Render far enough that the row for `idx` exists, for PREV and NEXT. */
-  /* How far past what is drawn it is worth drawing to reveal a row.
+  /* How far past what is drawn it is worth extending row by row to reveal a
+   * pick, before jumping straight to a fresh window around it instead.
    *
-   * Revealing means drawing every row in between, so the cost is the distance,
-   * not the row. Walking the list a page at a time never travels far, but a
-   * shuffled pick lands anywhere: on the live library's `all` view, 63243 tunes,
-   * the average jump is over thirty thousand rows and building those synchronously
-   * froze the tab for seconds. Pressing NEXT again while it was frozen queued
-   * another one, and a few presses took the tab down.
+   * Extending means drawing every row in between, so walking the list a page
+   * at a time never travels far and is cheap done that way. A shuffled pick
+   * lands anywhere though: on the live library's `all` view, 63243 tunes, the
+   * average jump is over thirty thousand rows, and extending row by row that
+   * far synchronously froze the tab for seconds. Pressing NEXT again while it
+   * was frozen queued another one, and a few presses took the tab down.
    *
-   * Past this distance the row is simply not revealed. Nothing breaks: the tune
-   * plays, and the transport box above already says what it is. The list just
-   * does not scroll to it, which is a fair trade and is what shuffle over sixty
-   * thousand tunes means anyway. */
+   * Past this distance jumpDraw() is used instead, which is a fixed cost
+   * regardless of how far `idx` is from what is currently drawn. */
   const REVEAL_MAX = PAGE * 4;
 
   /** Position of a view index within `_display`, or -1. */
@@ -502,6 +504,25 @@ const SidBrowser = (function () {
   }
 
   /**
+   * Drop whatever is drawn and draw a fresh window of rows around `at`.
+   *
+   * The cost of this is the window size, not the distance jumped, which is
+   * what lets a shuffle pick anywhere in a 63000 tune view reveal itself
+   * without the row by row walk ensureDrawn() otherwise needs (see
+   * REVEAL_MAX). The trade: rows before the window are gone from the DOM, so
+   * scrolling back up past it needs reopening the directory rather than an
+   * unbroken scroll to the top, same as reopening it fresh would.
+   */
+  function jumpDraw(at) {
+    const pane = $('sid-file-list');
+    if (!pane) return;
+    pane.innerHTML = '';
+    _drawnStart = Math.max(0, at - PAGE);
+    _drawn = _drawnStart;
+    draw(Math.min(_display.length, at + PAGE));
+  }
+
+  /**
    * Make sure a row is in the DOM, if that can be done cheaply.
    *
    * @returns true when the row is drawn and can be pointed at.
@@ -510,8 +531,11 @@ const SidBrowser = (function () {
     if (idx < 0) return false;
     const at = displayPos(idx);
     if (at < 0) return false;
-    if (at < _drawn) return true;
-    if (at - _drawn > REVEAL_MAX) return false;
+    if (at >= _drawnStart && at < _drawn) return true;
+    if (at < _drawnStart || at - _drawn > REVEAL_MAX) {
+      jumpDraw(at);
+      return true;
+    }
     draw(at + PAGE);
     return true;
   }
@@ -536,6 +560,7 @@ const SidBrowser = (function () {
     _view = [];
     _display = [];
     _drawn = 0;
+    _drawnStart = 0;
     _pos = null;
     _onRow = null;
     _order = [];

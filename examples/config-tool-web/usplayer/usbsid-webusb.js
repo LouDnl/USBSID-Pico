@@ -337,8 +337,12 @@ export class USBSIDWebUSBTransport {
 
     await this._dev.claimInterface(this._ifaceNum);
     await this._dev.selectAlternateInterface(this._ifaceNum, 0);
-    try { await this._dev.clearHalt('out', this._epOut); } catch (_) {}
-    try { await this._dev.clearHalt('in',  this._epIn);  } catch (_) {}
+    /* Crashes the whole browser process on Windows (Chrome/Edge/Canary), confirmed
+     * via crash dump analysis - a Chromium-internal CHECK() in the Windows USB
+     * backend, not something this driver can work around other than not calling it.
+     * See _llm-memory/temp or _docs_etc/_bugs/windows/ for the dumps and writeup. */
+    //try { await this._dev.clearHalt('out', this._epOut); } catch (_) {}
+    //try { await this._dev.clearHalt('in',  this._epIn);  } catch (_) {}
     await this._dev.controlTransferOut({
       requestType: 'class',
       recipient:   'interface',

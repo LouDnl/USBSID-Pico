@@ -97,6 +97,16 @@ const GRID_MS = 50;
 /* The status line, once a second: it is text to read, not an animation. */
 const STATUS_EVERY = 20;
 
+/* Above this many chips, software audio drops from sinc to Fast (linear)
+ * interpolation. Sinc quality on this many simultaneous reSIDfp instances in
+ * one worker thread does not fit a 20 ms frame budget: measured on a v5 8SID
+ * tune, the worklet's buffer collapsed to single digit ms and kept losing
+ * ground, audible as continuous stutter. 4 was chosen because that is what
+ * the software path was actually tuned and tested against before kMaxSids
+ * widened to 15 for the board backends; Fast still sounds fine, it is only
+ * the sinc filter that is too expensive at these chip counts. */
+const SINC_CHIP_LIMIT = 4;
+
 let _modulePromise = null;
 /**
  * The wasm module, instantiated once for the page.
@@ -171,6 +181,10 @@ export class USPlayerAdapter {
     this._reportTimer = 0;
     this._prefix = 'Playing';
     this._lastStatus = '';
+    /* Set in load() when this tune's chip count forced Fast quality instead
+     * of sinc: see SINC_CHIP_LIMIT. Read by _status() to colour the status
+     * line and by _report() to say why. */
+    this._reducedQuality = false;
     this._volume = 1;
     /* The register grid's shadow copy: see the onWrite comment in _ensure(). */
     this._shadow = new Uint8Array(128).fill(0xff);
@@ -192,6 +206,9 @@ export class USPlayerAdapter {
     this._snap = null;
     this._msgId = 0;
     this._pending = new Map();
+    /* Bumped at the top of every load() so an earlier, still in-flight call can
+     * tell it has been superseded and stop issuing worker RPCs: see load(). */
+    this._loadGen = 0;
     /* What the host wants doing with the running commentary, see setHost(). All
      * null means "config-tool-web", which is what this was written for and what
      * every default below reproduces. */
@@ -312,6 +329,9 @@ export class USPlayerAdapter {
               ` | buffer ${a.queuedMs} ms`;
       /* Only when a tune has an FM side at all, which most do not. */
       if (a.fmWrites > 0) line += ` | FM ${a.fmWrites}`;
+      if (this._reducedQuality) {
+        line += ` | REDUCED QUALITY (>${SINC_CHIP_LIMIT} SIDs, too heavy for sinc)`;
+      }
       if (a.starvedMs) line += ` | STARVED ${a.starvedMs} ms`;
       if (a.clipped > 0) line += ` | CLIPPED ${a.clipped}`;
       this._status(line);
@@ -338,7 +358,13 @@ export class USPlayerAdapter {
     if (this._host.status) { this._host.status(line); return; }
     if (typeof document === 'undefined') return;
     const el = document.getElementById('status-text');
-    if (el) el.textContent = line;
+    if (!el) return;
+    el.textContent = line;
+    /* Orange while REDUCED QUALITY is in the line above, the CSS default
+     * (cyan) otherwise. Only touched here, alongside the text that explains
+     * it, so nothing has to remember to clear it on the next tune: a normal
+     * load's own _status() call does that for free. */
+    el.style.color = this._reducedQuality ? 'var(--c64-orange)' : '';
   }
 
   /**
@@ -401,7 +427,15 @@ export class USPlayerAdapter {
       setTimeout(() => {
         const el = (typeof document !== 'undefined')
           ? document.getElementById('status-text') : null;
-        this._prefix = (el && el.textContent) ? el.textContent : 'Playing';
+        const text = (el && el.textContent) ? el.textContent : 'Playing';
+        /* This element is also where _status() below writes its own
+         * "prefix | fps | ..." line, and on a fast switch this timer can fire
+         * after that has already happened once for the *previous* tune -
+         * stats this call is not the source of. Keeping only what precedes
+         * the first " | " is what makes this a plain "Playing: <name>" again
+         * rather than a whole stale report grafted onto every line after it. */
+        const bar = text.indexOf(' | ');
+        this._prefix = bar === -1 ? text : text.slice(0, bar);
       }, 250);
     }
     /* One timer for both: the grid at twenty a second, which is faster than
@@ -683,7 +717,13 @@ export class USPlayerAdapter {
     if (!t || typeof t.playerSetPlaytime !== 'function') return;
     let ms = 0;
     try {
-      const lens = this.songLengths(this.md5());
+      /* The external Songlengths database first; a v5 tune's own embedded
+       * table (see sidfile.h) as the fallback, for a file the database has
+       * never heard of. */
+      let lens = this.songLengths(this.md5());
+      if ((!lens || !lens.length) && typeof this._player.embeddedSongLengths === 'function') {
+        lens = this._player.embeddedSongLengths();
+      }
       if (lens && lens.length) {
         ms = lens[Math.min(lens.length, Math.max(1, subtune)) - 1] || 0;
       }
@@ -737,7 +777,7 @@ export class USPlayerAdapter {
     if (has) return;
     this._log('this board has no onboard SID player: SendSID has nothing to ' +
               'play the file. Disconnected. Build the firmware with ' +
-              'ONBOARD_SIDPLAYER=1, or use one of the other modes.');
+              'ONBOARD_EMULATOR=1, or use one of the other modes.');
     this._status('no onboard player on this board, disconnected');
     try { await this._transport.disconnect(); } catch (_) {}
   }
@@ -872,7 +912,24 @@ export class USPlayerAdapter {
    * @param {function} callback  called once the tune is loaded and running
    */
   async load(subtune, timeout, url, callback) {
+    /* A tune picked while the previous one is still loading used to run both
+     * loads at once: two overlapping sets of worker RPCs (loadSID,
+     * audioConfigure, start) interleaving on the worker's single thread, each
+     * blind to the other. On a heavy tune (many SIDs, already behind on real
+     * time) that RPC pileup could take the worker the better part of a minute
+     * to work through, and whichever load's calls landed last decided what
+     * actually played - not necessarily the last one clicked. The status line
+     * and the log both reported the click that lost the race as a success,
+     * because that is genuinely what its own load() saw happen.
+     *
+     * `gen` makes every load() know whether a newer one has since started.
+     * Checked before each worker RPC: a superseded load stops issuing them
+     * rather than adding to the pileup, and never reaches the final "loaded"
+     * log or callback - only the newest load's success is ever reported. */
+    const gen = ++this._loadGen;
+    const stale = () => gen !== this._loadGen;
     await this._ensure();
+    if (stale()) return;
     /* Stop clocking the tune that is playing, before the fetch rather than
      * after it.
      *
@@ -893,6 +950,7 @@ export class USPlayerAdapter {
     }
     try {
       const bytes = await this._fetch(url);
+      if (stale()) return;
       this._bytes = bytes;
 
       const sid = isSidHeader(bytes) && !/\.(prg|p00)(\?|$)/i.test(url);
@@ -961,12 +1019,15 @@ export class USPlayerAdapter {
         }
         /* Whatever the host asked for before there was a graph to ask. */
         if (this._volume !== undefined) this._audio.setVolume(this._volume);
+        this._reducedQuality = nsids > SINC_CHIP_LIMIT;
+        const quality = this._reducedQuality ? 0 : 1;
         const started = await this._audio.start({
           chips: nsids,
-          quality: 1,
+          quality,
           model: sid ? sidModel(bytes) : 0,
         });
         if (!started) throw new Error('reSIDfp would not take this rate');
+        if (stale()) return;
 
         /* The emulation goes in a worker and the ring is handed to it, so the
          * main thread is out of the audio path entirely. The player on this
@@ -974,6 +1035,7 @@ export class USPlayerAdapter {
          * both of which the host calls synchronously, but it is never started
          * and never steps. */
         const inWorker = await this._startWorker();
+        if (stale()) return;
         if (inWorker) {
           if (!this._audio.handedOver) {
             const port = this._audio.handOver();
@@ -984,19 +1046,23 @@ export class USPlayerAdapter {
               if (this._worker) this._call('audioTarget', { target, steps });
             };
           }
+          if (stale()) return;
           const copy = bytes.slice();
           await this._call('loadSID',
                            { bytes: copy.buffer, subtune: subtune || 0 },
                            [copy.buffer]);
+          if (stale()) return;
           await this._call('audioConfigure', {
             chips: nsids,
             rate: this._audio.ctx.sampleRate | 0,
-            quality: 1,
+            quality,
             model: sid ? sidModel(bytes) : 0,
             target: this._audio._target,
             steps: this._audio._maxSteps || 24,
           });
+          if (stale()) return;
           await this._call('start', {});
+          if (stale()) return;
         } else {
           /* The main thread does it, as it did before there was a worker. */
           await this._player.start({ externalClock: true });
@@ -1044,6 +1110,7 @@ export class USPlayerAdapter {
       } else {
         await this._player.start();
       }
+      if (stale()) return;
       this._paused = false;
 
       this._log(`${sid ? 'SID' : 'program'} loaded: ${i.name || '(untitled)'}` +
