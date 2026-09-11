@@ -243,6 +243,21 @@ image:images/software/denise-sid-config.png[link="https://github.com/LouDnl/USBS
 [%always]
 <<<
 
+=== Network SID Device (NSD) clients (ACID 64, JSidplay2, SIDPlay & USBSID-Player)
+`pico_w` and `pico2_w` firmware builds compiled with `_net` appear on the LAN as a Network SID Device server, the same protocol ACID 64, JSidplay2, SIDPlay and USBSID-Player speak as network clients. No driver, no libusb and no WebUSB permission dance is needed: point the client at the board's IP address (or let it auto-discover the board, see below) and it plays exactly like a USB-attached USBSID-Pico.
+
+==== Discovery
+The board answers a UDP broadcast on port `6581` whose first 9 bytes are the ASCII string `SidDevice` with `SidDevice,<hostname>,<board description>`, which is how ACID 64 and JSidplay2 populate their device lists without a manually typed IP address. If the board doesn't show up automatically, use its configured hostname or IP directly instead.
+
+==== Connecting
+Add the board as a Network SID Device host in the client's settings using its IP address and port `6581` (the default, configurable over WebUSB/configtool). USB stays fully functional at the same time: whichever transport writes to the SID bus first keeps it until it goes idle, so a network client and a USB client can share the board without either corrupting the other's playback, though only one will actually be driving the SID chips at any given moment.
+
+==== Multi-SID
+The register byte the NSD protocol sends already matches USBSID-Pico's own SID address space byte-for-byte (`0x00-0x1F` SID 1, `0x20-0x3F` SID 2, `0x40-0x5F` SID 3, `0x60-0x7F` SID 4), so 2SID and 4SID tunes address the correct socket with no extra configuration.
+
+==== Audio-domain settings
+Commands that only make sense for a software SID emulator (sample rate, stereo positioning, per-channel level, fade in/out) are accepted and acknowledged but have no effect on real hardware - the board's own audio path (mono/stereo switch, SID socket configuration) is controlled the same way it always has been, over USB/WebUSB.
+
 === Retrodebugger
 t.b.d.
 

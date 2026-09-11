@@ -239,9 +239,9 @@ device, SID voices and an FMOpl chip alike. Send this first when starting a new 
 song, in case a note was left stuck by earlier testing.
 
 === Cynthcart
-Only relevant on a firmware built with `ONBOARD_CYNTHCART=1` (Cynthcart running through
-USBSID-Player's own C64 core, see `USBSID-Pico-Cynthcart-manual`). These three are fixed CC
-numbers, not remapped by the general CC map:
+Only relevant on a firmware build with `_em` (Cynthcart running through USBSID-Player's own C64
+core, see `USBSID-Pico-Cynthcart-manual`). These three are fixed CC numbers, not remapped by the
+general CC map:
 
 [cols="1,1,3"]
 |===
