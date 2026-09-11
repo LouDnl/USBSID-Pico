@@ -60,7 +60,7 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(MEMORY_LOGGING 0)       # Enable memory map of SID 1 voices printing
   set(SIDWRITES_DEBUGGING 0)  # Enable logging of SID writes one core 2
   set(EMULATOR_DEBUGGING 1)   # Enable debugging in emulator
-  set(BT_DIAG_DEBUGGING 0)    # Enable verbose per-HCI-event logging in bluetooth.c ~ floods UART, causes audible lag while playing
+  set(BT_DIAG_DEBUGGING 0)    # Enable verbose per-HCI-event logging in net_bluetooth.c ~ floods UART, causes audible lag while playing
 endif()
 
 ### Enable / Disable build with USBSID-Player for tune playback or Cynthcart emulation
@@ -561,7 +561,7 @@ if(USBSID_W_BOARD)
     set(SOURCEFILES
       ${SOURCEFILES}
       ${CMAKE_CURRENT_LIST_DIR}/src/net_wifi.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/bluetooth.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/net_bluetooth.c
     )
     add_compile_definitions(USE_NET=1)
     add_compile_definitions(NSD_DEFAULT_PORT=6581)

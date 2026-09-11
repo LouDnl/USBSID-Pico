@@ -37,7 +37,7 @@
 
 
 /* Call once from core 0's main(), after config load, before core 1 is
- * released and after bluetooth.c's setup_bluetooth() has brought up cyw43.
+ * released and after net_bluetooth.c's setup_bluetooth() has brought up cyw43.
  * Does NOT power the radio or start station mode/lwIP, see
  * net_wifi_start(). */
 void net_wifi_init(void);

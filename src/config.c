@@ -45,7 +45,7 @@
 #ifdef USE_NET
 #include <net_wifi.h>
 #include <net_config.h>
-#include <bluetooth.h>
+#include <net_bluetooth.h>
 #ifdef USE_NSD
 #include <nsd.h>
 #endif /* USE_NSD */

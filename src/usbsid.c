@@ -44,7 +44,7 @@
 #include <asid.h>
 #include <logging.h>
 #ifdef USE_NET
-#include <bluetooth.h>
+#include <net_bluetooth.h>
 #include <net_wifi.h>
 #include <net_config.h>
 #ifdef USE_NSD

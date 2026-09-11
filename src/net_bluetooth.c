@@ -3,7 +3,7 @@
  * for interfacing one or two MOS SID chips and/or hardware SID emulators over
  * (WEB)USB with your computer, phone or ASID supporting player
  *
- * bluetooth.c
+ * net_bluetooth.c
  * Bluetooth Classic SPP transport for the Network SID Device (NSD) protocol
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
@@ -26,7 +26,7 @@
 
 #include <globals.h>
 #include <nsd.h>
-#include <bluetooth.h>
+#include <net_bluetooth.h>
 #include <logging.h>
 #include <string.h>
 #include <stdio.h>

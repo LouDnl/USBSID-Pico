@@ -27,7 +27,7 @@
 #include <config.h>
 #include <logging.h>
 #include <net_wifi.h>
-#include <bluetooth.h>
+#include <net_bluetooth.h>
 
 /* WiFi/Bluetooth config, kept out of Config on purpose - see config.h's
  * FLASH_NET_OFFSET comment and WIFI_SET_PSK's write-only handling below. */

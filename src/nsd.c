@@ -85,7 +85,7 @@ static uint8_t nsd_sid_count = 1;
 static uint8_t nsd_psid_header[124];
 
 /* Session state - single session at a time, enforced by the transport
- * layer (net_wifi.c / bluetooth.c) via `nsd_session_open()`. */
+ * layer (net_wifi.c / net_bluetooth.c) via `nsd_session_open()`. */
 static const nsd_transport_t *g_transport = NULL;
 static bool session_active = false;
 

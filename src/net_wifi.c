@@ -273,10 +273,10 @@ static void udp_discovery_start(uint16_t port)
 static bool wifi_started = false;
 
 /**
- * @brief Finish net bring-up after bluetooth.c's setup_bluetooth() has
+ * @brief Finish net bring-up after net_bluetooth.c's setup_bluetooth() has
  *        already brought up cyw43 itself
  *
- * When USE_NET == 1, bluetooth.c/setup_bluetooth() calls
+ * When USE_NET == 1, net_bluetooth.c/setup_bluetooth() calls
  * cyw43_arch_init() (called first in the boot sequence, usbsid.c).
  * This function never calls it.
  * pio.c's setup_vu() likewise skips its own cyw43_arch_init(),

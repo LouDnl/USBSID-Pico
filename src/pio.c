@@ -104,7 +104,7 @@ void setup_vu(void)
 #if !defined(USE_NET)
   /* For Pico W devices we need to initialise the driver etc, unless
    * USE_NET is defined, this owns the cyw43_arch_init() call.
-   - see the guard in net_wifi.c / bluetooth.c's setup_bluetooth() */
+   - see the guard in net_wifi.c / net_bluetooth.c's setup_bluetooth() */
   if (cyw43_arch_init()) {
     usERR("cyw43_arch_init() failed, onboard LED will not work\n");
   }
