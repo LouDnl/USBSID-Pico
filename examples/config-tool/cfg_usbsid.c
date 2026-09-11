@@ -79,6 +79,11 @@ static char project_version[MAX_BUFFER_SIZE] = {0};
 static uint8_t config[FLASH_PAGE_SIZE] = {0};
 static uint8_t socket_config[SOCKET_BUFFER_SIZE] = {0};
 static Config usbsid_config = USBSID_DEFAULT_CONFIG_INIT;
+static uint8_t net_config[MAX_BUFFER_SIZE] = {0};
+static uint8_t wifi_status[2] = {0};
+static NetConfig net_cfg = {0};
+static uint8_t us_features = 0;
+static bool us_features_read = false;
 
 /* -----SIDKICK-pico----- */
 
@@ -802,14 +807,163 @@ void set_socketcfg_from_buffer(const uint8_t * buff, size_t len)
   return;
 }
 
+void write_net_string_command(uint8_t subcmd, const char * str)
+{
+  uint8_t len = (str == NULL) ? 0 : (uint8_t)strlen(str);
+  uint8_t buf[MAX_BUFFER_SIZE] = { (uint8_t)((COMMAND << 6) | CONFIG), subcmd, len };
+  if (len != 0) memcpy(&buf[3], str, len);
+  write_chars(buf, 3 + len);
+  return;
+}
+
+void set_netcfg_from_buffer(const uint8_t * buff, size_t len)
+{
+  if (buff[0] != READ_NETCFG
+    || buff[1] != 0x7F
+    || buff[len - 1] != 0xFF) {
+    printf("Net config buffer with length %ld verification failed %02X %02X %02X,\ndisplayed information can be incorrect!\n",
+      len, buff[0], buff[1], buff[len - 1]);
+    return;
+  }
+
+  memset(net_cfg.ssid, 0, sizeof(net_cfg.ssid));
+  memcpy(net_cfg.ssid, &buff[2], sizeof(net_cfg.ssid) - 1);
+  memset(net_cfg.hostname, 0, sizeof(net_cfg.hostname));
+  memcpy(net_cfg.hostname, &buff[35], sizeof(net_cfg.hostname) - 1);
+  /* Read direction is little endian, unlike NSD_SET_PORT's write direction */
+  net_cfg.nsd_port = (uint16_t)(buff[59] | (buff[60] << 8));
+  net_cfg.flags.wifi_enabled      = (buff[61] & 0b1);
+  net_cfg.flags.nsd_enabled       = ((buff[61] & 0b10) >> 1);
+  net_cfg.flags.bt_nsd_enabled    = ((buff[61] & 0b100) >> 2);
+  net_cfg.flags.discovery_enabled = ((buff[61] & 0b1000) >> 3);
+
+  return;
+}
+
+void read_net_config(void)
+{
+  memset(net_config, 0, count_of(net_config));
+  config_buffer[1] = READ_NETCFG;
+  write_chars(config_buffer, count_of(config_buffer));
+
+  int len;
+  len = read_chars(net_config, count_of(net_config));
+  if (debug == 1) printf("Read %d bytes of data, byte 0 = %02X\n", len, net_config[0]);
+
+  if (debug == 1) print_cfg_buffer(net_config, count_of(net_config));
+
+  set_netcfg_from_buffer(net_config, count_of(net_config));
+  return;
+}
+
+void print_wifi_status(void)
+{
+  write_config_command(WIFI_STATUS, 0x0, 0x0, 0x0, 0x0);
+
+  int len;
+  memset(wifi_status, 0, count_of(wifi_status));
+  len = read_chars(wifi_status, count_of(wifi_status));
+  if (debug == 1) printf("Read %d bytes of data, byte 0 = %02X byte 1 = %02X\n", len, wifi_status[0], wifi_status[1]);
+
+  printf("WiFi link:    %s\n", (wifi_status[0] == 0xFF ? "N/A (not a WiFi/net build)" : onoff[(int)wifi_status[0]]));
+  printf("NSD session:  %s\n", (wifi_status[1] == 0xFF ? "N/A (NSD not enabled)" : onoff[(int)wifi_status[1]]));
+  return;
+}
+
+void print_net_config(void)
+{
+  printf("Network config summary:\n");
+  printf("  SSID:          %s\n", net_cfg.ssid);
+  printf("  Hostname:      %s\n", net_cfg.hostname);
+  printf("  NSD port:      %u\n", net_cfg.nsd_port);
+  printf("  WiFi:          %s\n", enabled[(int)net_cfg.flags.wifi_enabled]);
+  printf("  NSD:           %s\n", enabled[(int)net_cfg.flags.nsd_enabled]);
+  printf("  Bluetooth NSD: %s\n", enabled[(int)net_cfg.flags.bt_nsd_enabled]);
+  printf("  Discovery:     %s\n", enabled[(int)net_cfg.flags.discovery_enabled]);
+  return;
+}
+
+uint8_t read_us_features(void)
+{
+  if (us_features_read) return us_features;
+
+  write_config_command(US_FEATURES, 0x0, 0x0, 0x0, 0x0);
+  uint8_t buf[1] = {0};
+  int len = read_chars(buf, count_of(buf));
+  if (debug == 1) printf("Read %d byte of data, byte 0 = %02X\n", len, buf[0]);
+  us_features = buf[0];
+  us_features_read = true;
+  return us_features;
+}
+
+bool board_is_rp2350(void)
+{
+  return (read_us_features() & 0b00000001) != 0;
+}
+
+bool board_has_rgbvu(void)
+{
+  return (read_us_features() & 0b00000100) != 0;
+}
+
+bool board_has_net(void)
+{
+  return (read_us_features() & 0b00010000) != 0;
+}
+
+bool board_has_nsd(void)
+{
+  return (read_us_features() & 0b00100000) != 0;
+}
+
+bool board_has_emulator(void)
+{
+  return (read_us_features() & 0b10000000) != 0;
+}
+
+bool require_net_support(void)
+{
+  if (!board_has_net()) {
+    printf("This USBSID-Pico was not built with WiFi/Bluetooth support, network command unavailable!\n");
+    return false;
+  }
+  return true;
+}
+
+bool require_nsd_support(void)
+{
+  if (!require_net_support()) return false;
+  if (!board_has_nsd()) {
+    printf("This USBSID-Pico was not built with Network SID Device support, NSD command unavailable!\n");
+    return false;
+  }
+  return true;
+}
+
 void print_config(void)
 {
   printf("Config Overview:\n");
   if (pcb_version[0] != 0) printf("  PCB version = v%s\n", pcb_version);
   if (project_version[0] != 0) printf("  Firmware version = v%s\n", project_version);
-  printf("  %s C64 clockrate = %d\n",
+  printf("  Firmware for %s compiled with:\n",
+  (board_is_rp2350() ? "rp2350" : "rp2040"));
+  if(!board_has_net()) {
+    printf("    - LED Vu meter\n");
+    if (board_has_rgbvu()) {
+      printf("    - RGB LED Vu meter\n");
+    }
+  } else {
+    printf("    - LED Status indicator\n");
+  }
+  if (board_has_net())      printf("    - WiFi & Bluetooth\n");
+  if (board_has_nsd())      printf("      - with Network SID Device\n");
+  if (board_has_emulator()) printf("    - Embedded USBSID-Player\n");
+  if (board_has_emulator()) printf("      - with Cynthcart\n");
+  printf("\n");
+  printf("  Clock settings:\n");
+  printf("    %s C64 clockrate = %d\n",
     intext[(int)usbsid_config.external_clock], (int)usbsid_config.clock_rate);
-  printf("  Clock rate = %s\n",
+  printf("    Clock rate = %s\n",
     locked[(int)usbsid_config.lock_clockrate]);
   printf("\n");
   printf("  Socket One %s\n",
@@ -1613,6 +1767,18 @@ void print_help(void)
   printf("                                  0: %s, 1:%s\n", enabled[0], enabled[1]);
   printf("  -pad N,   --preset-detect N   : Disable/enable and save the silent automatic socket detection on preset selection\n");
   printf("                                  0: %s, 1:%s\n", enabled[0], enabled[1]);
+  printf("--[NETWORK]-(ONLY AVAILABLE ON _W PICO'S!)------------------------------------------------------------------------------\n");
+  printf("  -wifis,   --wifi-status       : Read and print WiFi link / NSD session status\n");
+  printf("  -rnc,     --read-net-config   : Read and print WiFi/NSD/Bluetooth network config\n");
+  printf("  -ssid S,  --wifi-ssid S       : Set the WiFi SSID to S\n");
+  printf("  -psk P,   --wifi-psk P        : Set the WiFi PSK/password to P (write-only, never read back)\n");
+  printf("  -host H,  --wifi-hostname H   : Set the WiFi hostname to H\n");
+  printf("  -wen N,   --wifi-enable N     : Enable (1) or Disable (0) WiFi\n");
+  printf("  -nsden N, --nsd-enable N      : Enable (1) or Disable (0) Network SID Device (NSD)\n");
+  printf("  -nsdp N,  --nsd-port N        : Set the Network SID Device port to N\n");
+  printf("  -wapply,  --wifi-apply        : Persist WiFi/NSD config to flash and apply live\n");
+  printf("  -wforget, --wifi-forget       : Erase stored WiFi credentials and reset network config to defaults\n");
+  printf("  -bten N,  --bt-nsd-enable N   : Enable (1) or Disable (0) Bluetooth Network SID Device (SPP transport)\n");
   printf("--[PRESETS]-------------------------------------------------------------------------------------------------------------\n");
   printf("  -single,  --single-sid        : Socket 1 enabled @ single SID, Socket 2 disabled\n");
   printf("  -single2, --single-sid-s2     : Socket 1 disabled, Socket 2 enabled @ single SID\n");
@@ -1912,6 +2078,114 @@ void config_usbsidpico(int argc, char **argv)
       write_config_command(LOCK_AUDIO, lock, 0x0, 0x0, 0x0);
       break;
     }
+
+    if (!strcmp(argv[param_count], "-wifis") || !strcmp(argv[param_count], "--wifi-status")) {
+      if (!require_net_support()) goto exit;
+      printf("Reading WiFi/NSD status\n");
+      print_wifi_status();
+      break;
+    }
+    if (!strcmp(argv[param_count], "-rnc") || !strcmp(argv[param_count], "--read-net-config")) {
+      if (!require_net_support()) goto exit;
+      printf("Reading network config\n");
+      read_net_config();
+      print_net_config();
+      break;
+    }
+    if (!strcmp(argv[param_count], "-ssid") || !strcmp(argv[param_count], "--wifi-ssid")) {
+      if (!require_net_support()) goto exit;
+      param_count++;
+      if (argv[param_count] == NULL) {
+        printf("No SSID supplied\n");
+        goto exit;
+      }
+      printf("Setting WiFi SSID\n");
+      write_net_string_command(WIFI_SET_SSID, argv[param_count]);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-psk") || !strcmp(argv[param_count], "--wifi-psk")) {
+      if (!require_net_support()) goto exit;
+      param_count++;
+      if (argv[param_count] == NULL) {
+        printf("No PSK supplied\n");
+        goto exit;
+      }
+      printf("Setting WiFi PSK\n"); /* Never log or print the value itself */
+      write_net_string_command(WIFI_SET_PSK, argv[param_count]);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-host") || !strcmp(argv[param_count], "--wifi-hostname")) {
+      if (!require_net_support()) goto exit;
+      param_count++;
+      if (argv[param_count] == NULL) {
+        printf("No hostname supplied\n");
+        goto exit;
+      }
+      printf("Setting WiFi hostname\n");
+      write_net_string_command(WIFI_SET_HOSTNAME, argv[param_count]);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-wen") || !strcmp(argv[param_count], "--wifi-enable")) {
+      if (!require_net_support()) goto exit;
+      param_count++;
+      int en = atoi(argv[param_count]);
+      if (en > 1) {
+        printf("%d is not an enable option!\n", en);
+        goto exit;
+      }
+      printf("Set WiFi to: %s\n", enabled[en]);
+      write_config_command(WIFI_ENABLE, en, 0x0, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-nsden") || !strcmp(argv[param_count], "--nsd-enable")) {
+      if (!require_nsd_support()) goto exit;
+      param_count++;
+      int en = atoi(argv[param_count]);
+      if (en > 1) {
+        printf("%d is not an enable option!\n", en);
+        goto exit;
+      }
+      printf("Set Network SID Device to: %s\n", enabled[en]);
+      write_config_command(NSD_ENABLE, en, 0x0, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-nsdp") || !strcmp(argv[param_count], "--nsd-port")) {
+      if (!require_nsd_support()) goto exit;
+      param_count++;
+      int port = atoi(argv[param_count]);
+      if (port <= 0 || port > 0xFFFF) {
+        printf("%d is not a correct port number!\n", port);
+        goto exit;
+      }
+      printf("Set Network SID Device port to: %d\n", port);
+      write_config_command(NSD_SET_PORT, ((port >> 8) & 0xFF), (port & 0xFF), 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-wapply") || !strcmp(argv[param_count], "--wifi-apply")) {
+      if (!require_net_support()) goto exit;
+      printf("Persisting and applying network config\n");
+      write_config_command(WIFI_APPLY, 0x0, 0x0, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-wforget") || !strcmp(argv[param_count], "--wifi-forget")) {
+      if (!require_net_support()) goto exit;
+      printf("Erasing stored WiFi credentials\n");
+      write_config_command(WIFI_FORGET, 0x0, 0x0, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-bten") || !strcmp(argv[param_count], "--bt-nsd-enable")) {
+      if (!require_net_support()) goto exit;
+      param_count++;
+      int en = atoi(argv[param_count]);
+      if (en > 1) {
+        printf("%d is not an enable option!\n", en);
+        goto exit;
+      }
+      printf("Set Bluetooth Network SID Device to: %s\n", enabled[en]);
+      write_config_command(BT_NSD_ENABLE, en, 0x0, 0x0, 0x0);
+      break;
+    }
+
     if (!strcmp(argv[param_count], "-sad") || !strcmp(argv[param_count], "--sock-autodetect")) {
       param_count++;
       int det = atoi(argv[param_count]);

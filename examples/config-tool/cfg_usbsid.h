@@ -120,8 +120,21 @@ enum
   SAVE_MIDI_STATE  = 0x61,
   RESET_MIDI_STATE = 0x63,
 
+  WIFI_STATUS      = 0x70,  /* Returns {link_up, session_active} */
+  WIFI_SET_SSID    = 0x71,  /* buffer[1] = length, buffer[2..] = SSID bytes */
+  WIFI_SET_PSK     = 0x72,  /* buffer[1] = length, buffer[2..] = PSK bytes, write-only */
+  WIFI_SET_HOSTNAME= 0x73,  /* buffer[1] = length, buffer[2..] = hostname bytes */
+  WIFI_ENABLE      = 0x74,  /* buffer[1] = 0/1 */
+  NSD_ENABLE       = 0x75,  /* buffer[1] = 0/1 */
+  NSD_SET_PORT     = 0x76,  /* buffer[1..2] = port, big-endian */
+  WIFI_APPLY       = 0x77,  /* Persist net_cfg to flash and apply live */
+  WIFI_FORGET      = 0x78,  /* Erase stored credentials */
+  BT_NSD_ENABLE    = 0x79,  /* buffer[1] = 0/1 */
+  READ_NETCFG      = 0x7A,  /* Read net config as bytes */
+
   USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
   US_PCB_VERSION   = 0x81,  /* Read PCB version */
+  US_FEATURES      = 0x82,  /* Read USBSID compiled features, bit 4 = net, bit 5 = nsd */
 
   RESTART_BUS      = 0x85,  /* Restart DMA & PIO */
   RESTART_BUS_CLK  = 0x86,  /* Restart PIO clocks */
@@ -213,6 +226,21 @@ typedef struct Socket {
   bool    enabled : 1;           /* enable / disable this socket */
   bool    dualsid : 1;           /* enable / disable dual SID support for this socket (requires clone) */
 } Socket;
+
+/* WiFi/Bluetooth/NSD config, wire-visible fields only (no flash-persistence
+ * fields like magic/version/save_id, and no PSK - it is write-only and never
+ * read back, mirrors firmware's WIFI_SET_PSK handling) */
+typedef struct NetConfig {
+  char     ssid[33];
+  char     hostname[24];
+  uint16_t nsd_port;
+  struct {
+    bool wifi_enabled      : 1;
+    bool nsd_enabled       : 1;
+    bool bt_nsd_enabled    : 1;
+    bool discovery_enabled : 1;
+  } flags;
+} NetConfig;
 
 typedef struct Config {
   /* Don't care from here */
