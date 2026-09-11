@@ -44,7 +44,8 @@
 #include <logging.h>
 #ifdef USE_NET
 #include <net_wifi.h>
-#include <net_wifi_config.h>
+#include <net_config.h>
+#include <bluetooth.h>
 #ifdef USE_NSD
 #include <nsd.h>
 #endif /* USE_NSD */
@@ -75,12 +76,16 @@ static uint8_t config_saveid = 0;
 static uint8_t config_array[FLASH_PAGE_SIZE] = {0};
 /* 12 bytes and counting */
 static uint8_t socket_config_array[SOCKET_BUFFER_SIZE];
+/* 256 Bytes MAX == FLASH_PAGE_SIZE */
+static uint8_t net_config_array[FLASH_PAGE_SIZE];
 /* 64 byte array for copying the config version into */
 static uint8_t p_version_array[MAX_BUFFER_SIZE] = {0};
 /* Config magic verification storage */
 static uint32_t cm_verification = 0;
 /* Number of writes to host we need to do on a config read depending on the config_array size */
 static int cfg_read_writes = 0;
+/* Number of writes to host we need to do on a config read depending on the net_config_array size */
+static int net_cfg_read_writes = 0;
 /* Temporary buffer to store incoming data */
 uint8_t * data_buffer = NULL;
 /* Well, how big is it? */
@@ -106,7 +111,6 @@ void write_back_data(size_t buffersize)
   }
   return;
 }
-
 
 /**
  * @brief Returns true if either of the variables is true
@@ -146,6 +150,7 @@ void handle_config_buffer(uint8_t * buffer, uint32_t size)
     case SOCKET_CONFIG: break;
     case MIDI_CONFIG: break;
     case MIDI_CCVALUES: break;
+    case NETWORK_CONFIG: break;
     default:
       break;
   }
@@ -170,8 +175,8 @@ void read_config(Config* config)
   usCFG("Reading configuration from 0x%x to 0x%x with size %u\n",
     (uint)config, &config_array, sizeof(Config));
 
-  config_array[0] = READ_CONFIG; /* Initiator byte */
-  config_array[1] = 0x7F;        /* Verification byte */
+  config_array[0] = READ_CONFIG;       /* Initiator byte */
+  config_array[1] = VERIFICATION_BYTE; /* Verification byte */
 
   config_array[2] = (int)config_unacknowledged();      /* (PCB v1.5+) Need configuration confirmation */
   config_array[3] = (int)config->socket_change_detect; /* (PCB v1.5+) Socket change detection */
@@ -258,13 +263,13 @@ void read_config(Config* config)
 
   config_array[61] = 0x00; /* Unused */
 
-  config_array[62] = 0x8F; /* Mark end of config */
-  config_array[63] = 0xFF; /* Terminator byte */
+  config_array[62] = END_BYTE; /* Mark end of config */
+  config_array[63] = TERMINATION_BYTE; /* Terminator byte */
 
   /* Yes, I know, I can assign cfg_read_writes manually, but I do not want to keep wondering if I need to change it */
   for (int n = 0; n < count_of(config_array); n++) { /* Find number of writes by terminator byte */
     static int endbyte = 0;
-    if (config_array[n] == 0x8F) { endbyte = n;
+    if (config_array[n] == END_BYTE) { endbyte = n;
       if (config_array[n+1] == 0xFF) {
         /* n = 62, 62+2 = 64, 64/64 = 1 */
         /* n = 117, 117+2 = 119, 119/64 = 1 */
@@ -290,8 +295,8 @@ void read_socket_config(Config* config)
 {
   memset(socket_config_array, 0, sizeof socket_config_array);  /* Make sure we don't send garbled old data */
 
-  socket_config_array[0]  = READ_SOCKETCFG; /* Initiator byte */
-  socket_config_array[1]  = 0x7F; /* Verification byte */
+  socket_config_array[0]  = READ_SOCKETCFG;    /* Initiator byte */
+  socket_config_array[1]  = VERIFICATION_BYTE; /* Verification byte */
 
   socket_config_array[2]  = ((int)config->socketOne.enabled << 4) | (int)config->socketOne.dualsid;
   socket_config_array[3]  = (int)config->socketOne.chiptype;
@@ -306,7 +311,54 @@ void read_socket_config(Config* config)
 
   socket_config_array[10] = ((int)config->mirrored | ((int)config->flipped << 1) | ((int)config->mixed << 2));
 
-  socket_config_array[11] = 0xFF;  /* Terminator byte */
+  socket_config_array[11] = TERMINATION_BYTE; /* Terminator byte */
+
+  return;
+}
+
+/**
+ * @brief Encode a NetConfig struct into the 64 byte READ_NETCFG wire buffer
+ *
+ * Fills the static `net_config_array` with the fields the host expects for a
+ * READ_NETCFG response and scans the array for the 0x8F/0xFF end marker to
+ * compute `net_cfg_read_writes`,the number of 64 byte USB writes needed to
+ * send it back.
+ *
+ * @param NetConfig* config
+ */
+void read_net_config(NetConfig* config)
+{
+  memset(net_config_array, 0, sizeof net_config_array);  /* Make sure we don't send garbled old data */
+
+  net_config_array[0]  = READ_NETCFG;       /* Initiator byte */
+  net_config_array[1]  = VERIFICATION_BYTE; /* Verification byte */
+
+  memcpy(&net_config_array[2], config->ssid, count_of(net_cfg.ssid)); /* 33 */
+  memcpy(&net_config_array[35], config->hostname, count_of(net_cfg.hostname)); /* 24 */
+
+  net_config_array[59] = (config->nsd_port & BYTE); /* Port Lo */
+  net_config_array[60] = ((config->nsd_port >> 8) & BYTE); /* Port Hi */
+  net_config_array[61]  = (
+    config->flags.wifi_enabled
+  | (config->flags.nsd_enabled << 1)
+  | (config->flags.bt_nsd_enabled << 2)
+  | (config->flags.discovery_enabled << 3));
+
+  net_config_array[62] = END_BYTE; /* Mark end of net_config */
+  net_config_array[63] = TERMINATION_BYTE; /* Terminator byte */
+
+  /* Yes, I know, I can assign net_cfg_read_writes manually, but I do not want to keep wondering if I need to change it */
+  for (int n = 0; n < count_of(net_config_array); n++) { /* Find number of writes by terminator byte */
+    static int endbyte = 0;
+    if (net_config_array[n] == END_BYTE) { endbyte = n;
+      if (net_config_array[n+1] == 0xFF) {
+        /* n = 62, 62+2 = 64, 64/64 = 1 */
+        /* n = 117, 117+2 = 119, 119/64 = 1 */
+        net_cfg_read_writes = ROUND((n+2)/64);
+        break;
+      }
+    }
+  }
 
   return;
 }
@@ -588,6 +640,25 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       memcpy(write_buffer_p, socket_config_array, SOCKET_BUFFER_SIZE);
       write_back_data(SOCKET_BUFFER_SIZE);
       break;
+    case READ_NETCFG:
+    {
+      usCFG("READ_NETCFG\n");
+#ifdef USE_NET
+      read_net_config(&net_cfg);
+#else /* Write back default config (unchangeable ;) */
+      static NetConfig ndc = NETCONFIG_DEFAULT_INIT;
+      read_net_config(&ndc);
+#endif /* USE_NET */
+      print_cfg(net_config_array, count_of(net_config_array), false);
+      memset(write_buffer_p, 0, 64);
+      /* Account for the Config array size with a loop */
+      for (int i = 0; i < net_cfg_read_writes; i++) {
+        usCFG("Write back net config array part %d of %d\n", (i+1), net_cfg_read_writes); /* i+1 because humans count from 1 :) */
+        memcpy(write_buffer_p, net_config_array + (i * 64), 64);
+        write_back_data(64);
+      }
+      break;
+    }
     case READ_NUMSIDS:
       usCFG("READ_NUMSIDS: %u\n", get_numsids());
       memset(write_buffer_p, 0, 64);
@@ -940,101 +1011,89 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case WIFI_STATUS: /* Not available on non _w, so always returns 0xFF 0xFF */
       usCFG("WIFI_STATUS\n");
       memset(write_buffer_p, 0, 64);
-#if defined(USE_NET)
+#ifdef USE_NET
       write_buffer_p[0] = (uint8_t)net_wifi_is_connected();
 #else
       write_buffer_p[0] = 0xFF; /* Not built with WiFi/Bluetooth support */
 #endif /* USE_NET */
-#if defined(USE_NSD)
+#ifdef USE_NSD
       write_buffer_p[1] = (uint8_t)nsd_session_is_active();
 #else
       write_buffer_p[1] = 0xFF;
 #endif /* USE_NSD */
       write_back_data(2);
       break;
+#ifdef USE_NET
     case WIFI_SET_SSID:
     {
-#ifdef USE_NET
       usCFG("WIFI_SET_SSID\n");
       uint8_t len = buffer[1];
-      if (len > sizeof(wifi_cfg.ssid) - 1) len = sizeof(wifi_cfg.ssid) - 1;
-      memset(wifi_cfg.ssid, 0, sizeof(wifi_cfg.ssid));
-      memcpy(wifi_cfg.ssid, &buffer[2], len);
-#endif
+      if (len > sizeof(net_cfg.ssid) - 1) len = sizeof(net_cfg.ssid) - 1;
+      memset(net_cfg.ssid, 0, sizeof(net_cfg.ssid));
+      memcpy(net_cfg.ssid, &buffer[2], len);
       break;
     }
     case WIFI_SET_PSK:
     {
-#ifdef USE_NET
       usCFG("WIFI_SET_PSK\n"); /* Never log or read the value itself */
       uint8_t len = buffer[1];
-      if (len > sizeof(wifi_cfg.psk) - 1) len = sizeof(wifi_cfg.psk) - 1;
-      memset(wifi_cfg.psk, 0, sizeof(wifi_cfg.psk));
-      memcpy(wifi_cfg.psk, &buffer[2], len);
-#endif
+      if (len > sizeof(net_cfg.psk) - 1) len = sizeof(net_cfg.psk) - 1;
+      memset(net_cfg.psk, 0, sizeof(net_cfg.psk));
+      memcpy(net_cfg.psk, &buffer[2], len);
       break;
     }
     case WIFI_SET_HOSTNAME:
-    {
-#ifdef USE_NET
+     {
       usCFG("WIFI_SET_HOSTNAME\n");
       uint8_t len = buffer[1];
-      if (len > sizeof(wifi_cfg.hostname) - 1) len = sizeof(wifi_cfg.hostname) - 1;
-      memset(wifi_cfg.hostname, 0, sizeof(wifi_cfg.hostname));
-      memcpy(wifi_cfg.hostname, &buffer[2], len);
-#endif
+      if (len > sizeof(net_cfg.hostname) - 1) len = sizeof(net_cfg.hostname) - 1;
+      memset(net_cfg.hostname, 0, sizeof(net_cfg.hostname));
+      memcpy(net_cfg.hostname, &buffer[2], len);
       break;
     }
     case WIFI_ENABLE:
-#ifdef USE_NET
       usCFG("WIFI_ENABLE: %u\n", buffer[1]);
-      if (buffer[1] <= 1) wifi_cfg.flags.wifi_enabled = (bool)buffer[1];
+      if (buffer[1] <= 1) net_cfg.flags.wifi_enabled = (bool)buffer[1];
       /* Doesn't require WIFI_APPLY to have been sent first */
-      if (wifi_cfg.flags.wifi_enabled && wifi_cfg.ssid[0]) {
-        net_wifi_set_credentials(wifi_cfg.ssid, wifi_cfg.psk);
-        net_wifi_set_hostname(wifi_cfg.hostname);
+      if (net_cfg.flags.wifi_enabled && net_cfg.ssid[0]) {
+        net_wifi_set_credentials(net_cfg.ssid, net_cfg.psk);
+        net_wifi_set_hostname(net_cfg.hostname);
         net_wifi_start();
       }
-#endif
       break;
-    case NSD_ENABLE:
 #ifdef USE_NSD
+    case NSD_ENABLE:
       usCFG("NSD_ENABLE: %u\n", buffer[1]);
-      if (buffer[1] <= 1) wifi_cfg.flags.nsd_enabled = (bool)buffer[1];
-#endif
+      if (buffer[1] <= 1) net_cfg.flags.nsd_enabled = (bool)buffer[1];
       break;
       case NSD_SET_PORT:
-#ifdef USE_NSD
       usCFG("NSD_SET_PORT\n");
-      wifi_cfg.nsd_port = (uint16_t)((buffer[1] << 8) | buffer[2]);
-#endif
+      net_cfg.nsd_port = (uint16_t)((buffer[1] << 8) | buffer[2]);
       break;
+#endif /* USE_NSD */
     case WIFI_APPLY:
-#ifdef USE_NET
       usCFG("WIFI_APPLY\n");
-      save_wifi_config(&wifi_cfg);
-      net_wifi_set_credentials(wifi_cfg.ssid, wifi_cfg.psk);
-      net_wifi_set_hostname(wifi_cfg.hostname);
+      save_net_config(&net_cfg);
+      net_wifi_set_credentials(net_cfg.ssid, net_cfg.psk);
+      net_wifi_set_hostname(net_cfg.hostname);
       /* net_wifi_start() is one-way, one-shot power-on (no teardown yet) -
        * toggling WIFI_ENABLE back off after this does not power it down. */
-      if (wifi_cfg.flags.wifi_enabled) {
+      if (net_cfg.flags.wifi_enabled) {
         net_wifi_start();
       }
       break;
-#endif
     case WIFI_FORGET:
-#ifdef USE_NET
       usCFG("WIFI_FORGET\n");
-      default_wifi_config(&wifi_cfg);
-      save_wifi_config(&wifi_cfg);
+      default_net_config(&net_cfg);
+      save_net_config(&net_cfg);
       net_wifi_set_credentials("", "");
-#endif
       break;
     case BT_NSD_ENABLE:
-#ifdef USE_NET
       usCFG("BT_NSD_ENABLE: %u\n", buffer[1]);
-      if (buffer[1] <= 1) wifi_cfg.flags.bt_nsd_enabled = (bool)buffer[1];
-#endif
+      if (buffer[1] <= 1) net_cfg.flags.bt_nsd_enabled = (bool)buffer[1];
+      /* Doesn't require WIFI_APPLY to have been sent first, mirrors WIFI_ENABLE */
+      net_bt_set_power(net_cfg.flags.bt_nsd_enabled);
+#endif /* USE_NET */
       break;
     case SET_CLOCK:         /* Change SID clock frequency by array id */
       usCFG("SET_CLOCK\n");

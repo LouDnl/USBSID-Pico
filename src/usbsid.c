@@ -46,7 +46,7 @@
 #ifdef USE_NET
 #include <bluetooth.h>
 #include <net_wifi.h>
-#include <net_wifi_config.h>
+#include <net_config.h>
 #ifdef USE_NSD
 #include <nsd.h>
 #endif /* USE_NSD */
@@ -1253,14 +1253,14 @@ int main()
   usBOOT("Initialise ASID\n");
   asid_init();
 
-  /* Initialise Bluetooth Uart */
   #ifdef USE_NET
+  /* Initialise Bluetooth */
   setup_bluetooth();
-
   /* Init WiFi network interface */
   net_wifi_init();
-  /* Run exactly once, unconditionally, on core 0 at boot.*/
-  start_wifi();
+  /* Loads net_cfg, applies WiFi and Bluetooth power state live from it.
+   * Run exactly once, unconditionally, on core 0 at boot. */
+  start_net();
   #endif /* USE_NET */
 
   /* Init SID states */

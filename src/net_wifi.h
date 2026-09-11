@@ -42,8 +42,8 @@
  * net_wifi_start(). */
 void net_wifi_init(void);
 
-/* Call once station mode should come up: after wifi_cfg is loaded and
- * wifi_cfg.flags.wifi_enabled is true. The one call that actually powers
+/* Call once station mode should come up: after net_cfg is loaded and
+ * net_cfg.flags.wifi_enabled is true. The one call that actually powers
  * the radio - confirmed to disrupt SID chip/model detection while
  * powered, hence the explicit opt-in instead of folding into
  * net_wifi_init(). No-op if called more than once. */
@@ -59,7 +59,7 @@ void net_wifi_update(void);
 bool net_wifi_is_connected(void);
 
 /* Seams for flash-persisted credentials; harmless no-ops/defaults until
- * WifiConfig fills them in. */
+ * NetConfig fills them in. */
 void net_wifi_set_credentials(const char *ssid, const char *psk);
 void net_wifi_set_hostname(const char *hostname);
 

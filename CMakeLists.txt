@@ -552,7 +552,7 @@ if(USBSID_W_BOARD)
       ${SOURCEFILES}
       ${CMAKE_CURRENT_LIST_DIR}/src/nsd.c
       ${CMAKE_CURRENT_LIST_DIR}/src/net_ring.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/net_wifi_config.c  # Config required either way
+      ${CMAKE_CURRENT_LIST_DIR}/src/net_config.c  # Config required either way
     )
     add_compile_definitions(USE_NSD=1)
   endif()

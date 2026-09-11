@@ -3,7 +3,7 @@
  * for interfacing one or two MOS SID chips and/or hardware SID emulators over
  * (WEB)USB with your computer, phone or ASID supporting player
  *
- * net_wifi_config.h
+ * net_config.h
  * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
  * File author: LouD
  *
@@ -23,8 +23,8 @@
  *
  */
 
-#ifndef _USBSID_NET_WIFI_CONFIG_H_
-#define _USBSID_NET_WIFI_CONFIG_H_
+#ifndef _USBSID_NET_CONFIG_H_
+#define _USBSID_NET_CONFIG_H_
 #pragma once
 
 #ifdef __cplusplus
@@ -34,14 +34,16 @@
 #include <net_wifi.h>
 
 
-void default_wifi_config(WifiConfig* config);
-void save_wifi_config(WifiConfig *config);
-void load_wifi_config(WifiConfig* config);
-void start_wifi(void);
+void default_net_config(NetConfig* config);
+void save_net_config(NetConfig *config);
+void load_net_config(NetConfig* config);
+/* Loads net_cfg from flash and applies WiFi and Bluetooth power state
+ * live from it. */
+void start_net(void);
 
 
 #ifdef __cplusplus
   }
 #endif
 
-#endif /* _USBSID_NET_WIFI_CONFIG_H_ */
+#endif /* _USBSID_NET_CONFIG_H_ */

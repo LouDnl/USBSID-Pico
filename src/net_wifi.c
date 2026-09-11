@@ -45,7 +45,7 @@
 #define NSD_DEFAULT_PORT 6581
 #endif
 
-/* Temporary credential source, until flash-persisted WifiConfig calls
+/* Temporary credential source, until flash-persisted NetConfig calls
  * net_wifi_set_credentials() after loading the stored config. */
 #ifndef WIFI_SSID
 #define WIFI_SSID ""
@@ -292,7 +292,8 @@ void net_wifi_init(void)
   cyw43_arch_gpio_put(BUILTIN_LED, false);
 
   /* cyw43_arch_init()'s cyw43_driver_init()+lwip_init() sequence (CYW43_LWIP=1)
-   * desyncs the bus PIO's timing, confirmed on real v1.3/v1.5 hardware. */
+   * desyncs the bus PIO's timing, confirmed on v1.3/v1.5 hardware.
+   * This requires a full restart of the BUS for everything to work again */
   restart_bus();
 
   nsd_init();
@@ -305,7 +306,7 @@ void net_wifi_init(void)
  *
  * Radio power (cyw43_arch_enable_sta_mode()) disrupts SID chip/model
  * detection for as long as it stays powered, confirmed on real hardware.
- * Call only once wifi_cfg.flags.wifi_enabled is true, never unconditionally.
+ * Call only once net_cfg.flags.wifi_enabled is true, never unconditionally.
  */
 void net_wifi_start(void)
 {

@@ -32,11 +32,18 @@
   extern "C" {
 #endif
 
+#include <stdbool.h>
 
-/* Functions from bluetooth.c */
-void setup_bluetooth();
+/* One-time BTstack/SPP service init, called once from usbsid.c's boot
+ * sequence. Does not power the radio - see net_bt_set_power(). */
+void setup_bluetooth(void);
+
+/* True once an SPP RFCOMM channel is open to a client */
 bool net_bt_is_connected(void);
 
+/* Powers the Bluetooth radio on/off (hci_power_control()). Safe to call
+ * repeatedly, but setup_bluetooth() must have run first. */
+void net_bt_set_power(bool on);
 
 #ifdef __cplusplus
   }

@@ -107,25 +107,26 @@ extern bool midiconfig_offset_ok;
 /* Max config size = 256 Bytes == FLASH_PAGE_SIZE (FLASH_SECTOR_SIZE / 16 config saves) */
 #define CONFIG_SIZE (FLASH_SECTOR_SIZE / 16)
 
-/* WiFi credentials live in their own page, well away from Config: Config's
- * full contents are serialised back to the host by read_config() (any
- * WebUSB page could read it), and a PSK must never travel that path.
+/* WiFi credentials and Bluetooth NSD settings live in their own page, well
+ * away from Config: Config's full contents are serialised back to the
+ * host by read_config() (any WebUSB page could read it), and a PSK must
+ * never travel that path.
  *
  * Persistent region layout (usbsidpico-rp2040/-rp2350/-rp2350b.ld):
  *   quarter 0-2 - free
  *   quarter 3   - ADDR_CONFIG (16 x 256B slots), then ADDR_MIDICONFIG (16 x 4K slots, 64KB)
- * FLASH_WIFI_OFFSET below sits at quarter index 2, inside the unclaimed
+ * FLASH_NET_OFFSET below sits at quarter index 2, inside the unclaimed
  * first three quarters. */
-#define FLASH_WIFI_OFFSET (FLASH_PERSISTENT_OFFSET + ((FLASH_PERSISTENT_SIZE / 4) * 2))
+#define FLASH_NET_OFFSET (FLASH_PERSISTENT_OFFSET + ((FLASH_PERSISTENT_SIZE / 4) * 2))
 /* Same 16-slot wear-levelling shape as Config (CONFIG_SIZE/MIDICONFIG_SAVE_SLOTS) */
-#define WIFICONFIG_SAVE_SLOTS 16
-#define WIFICONFIG_SIZE       (FLASH_SECTOR_SIZE / 16) /* 256B page, same as Config */
+#define NETCONFIG_SAVE_SLOTS 16
+#define NETCONFIG_SIZE       (FLASH_SECTOR_SIZE / 16) /* 256B page, same as Config */
 
-typedef struct WifiConfig {
+typedef struct NetConfig {
   uint32_t magic;             /* MAGIC_SMOKE, same wipe-on-rebuild semantics as Config */
-  uint8_t  version;
+  uint8_t  version;           /* Internal version control */
   uint8_t  save_id;           /* 16-slot wear levelling, mirrors load_config()/save_config() */
-  char     ssid[33];
+  char     ssid[33];          /* None until user sets one */
   char     psk[64];           /* NEVER serialised back to the host, see read_config() */
   char     hostname[24];      /* discovery + LWIP_NETIF_HOSTNAME, default "USBSID-Pico" */
   uint16_t nsd_port;          /* default 6581 */
@@ -135,9 +136,9 @@ typedef struct WifiConfig {
     bool bt_nsd_enabled    : 1;
     bool discovery_enabled : 1;
   } flags;
-} WifiConfig;
+} NetConfig;
 
-#define WIFICONFIG_DEFAULT_INIT { \
+#define NETCONFIG_DEFAULT_INIT { \
   .magic = MAGIC_SMOKE, \
   .version = 1, \
   .save_id = 0, \
@@ -168,6 +169,7 @@ typedef struct Socket {
   bool    dualsid : 1;  /* enable / disable dual SID support for this socket (requires clone) */
 } Socket;
 
+/* NOTE: WiFi/Bluetooth/NSD are explicitely not set in this config */
 typedef struct Config { // TODO: Add overrides for detect_default_config and add 5v/9v/12 overrides so they cannot be changed
   /* First three items must stay in the same order! */
   uint32_t magic;                /* Contains firmware build magic */
@@ -421,9 +423,10 @@ enum
   WIFI_ENABLE      = 0x74,  /* buffer[1] = 0/1 */
   NSD_ENABLE       = 0x75,  /* buffer[1] = 0/1 */
   NSD_SET_PORT     = 0x76,  /* buffer[1..2] = port, big-endian */
-  WIFI_APPLY       = 0x77,  /* Persist wifi_cfg to flash and apply live */
+  WIFI_APPLY       = 0x77,  /* Persist net_cfg to flash and apply live */
   WIFI_FORGET      = 0x78,  /* Erase stored credentials */
   BT_NSD_ENABLE    = 0x79,  /* buffer[1] = 0/1 */
+  READ_NETCFG      = 0x7A,  /* Read net config as bytes */
 
   USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
   US_PCB_VERSION   = 0x81,  /* Read PCB version */
@@ -482,11 +485,12 @@ enum
 enum {
   FULL_CONFIG       = READ_CONFIG,    /* 0x30 */
   SOCKET_CONFIG     = READ_SOCKETCFG, /* 0x37 */
-  MIDI_CONFIG       = 0x60,
-  MIDI_CCVALUES     = 0x70,
-  VERIFICATION_BYTE = 0x7F,
-  END_BYTE          = 0x8F,
-  TERMINATION_BYTE  = 0xFF,
+  MIDI_CONFIG       = 0x60, /* Not implemented */
+  MIDI_CCVALUES     = 0x6A, /* Not implemented */
+  NETWORK_CONFIG    = READ_NETCFG,    /* 0x7A */
+  VERIFICATION_BYTE = 0x7F, /* After init byte */
+  END_BYTE          = 0x8F, /* Before termination byte, but only if buffer can be more then 64 bytes */
+  TERMINATION_BYTE  = 0xFF, /* Last byte in buffer */
 };
 
 /* Clone chip config read/write initiator bytes */
@@ -567,10 +571,10 @@ static const uint8_t us_features = (
 #if defined(USE_PIO_UART)
   | (1 << 3)
 #endif
-#if defined(USE_NSD)
+#if defined(USE_NET)
   | (1 << 4)
 #endif
-#if defined(USE_NET)
+#if defined(USE_NSD)
   | (1 << 5)
 #endif
   /* 6 Unused */
@@ -612,8 +616,9 @@ void        save_load_config(void);
 void        save_load_apply_config(bool at_boot);
 void        verify_clockrate(void);
 
-/* Stray config moved to net_wifi_config but needed here */ // TODO: Move to correct header
-extern WifiConfig wifi_cfg;
+/* Defined in net_config.c, declared here since callers throughout this
+ * file need it and net_config.h doesn't include config.h */
+extern NetConfig net_cfg;
 
 #ifdef __cplusplus
   }

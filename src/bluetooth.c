@@ -26,6 +26,7 @@
 
 #include <globals.h>
 #include <nsd.h>
+#include <bluetooth.h>
 #include <logging.h>
 #include <string.h>
 #include <stdio.h>
@@ -243,8 +244,10 @@ static void bt_diag_packet_handler(uint8_t packet_type, uint16_t channel, uint8_
  * @brief Bring up the Bluetooth Classic SPP transport for NSD
  *
  * Runs on core 0, before net_wifi_init() (usbsid.c). Sole cyw43_arch_init()
- * owner under USE_NET; net_wifi_init() never calls it.
- * The LED is turned off by net_wifi_init().
+ * owner under USE_NET; net_wifi_init() never calls it. The LED is turned
+ * off by net_wifi_init(). One-time stack/service init only - does not
+ * power the radio, net_cfg isn't loaded from flash yet at this point in
+ * boot; see net_bt_set_power(), called later once it is.
  */
 void setup_bluetooth(void)
 {
@@ -290,8 +293,6 @@ void setup_bluetooth(void)
   hci_add_event_handler(&hci_diag_callback_registration);
 #endif
 
-  hci_power_control(HCI_POWER_ON);
-  usBTH("SPP NSD transport active, discoverable as '%s'\n", BT_LOCAL_NAME);
 }
 
 /**
@@ -300,4 +301,13 @@ void setup_bluetooth(void)
 bool net_bt_is_connected(void)
 {
   return rfcomm_channel_id != 0;
+}
+
+/**
+ * @brief Powers the Bluetooth radio on/off
+ */
+void net_bt_set_power(bool on)
+{
+  hci_power_control(on ? HCI_POWER_ON : HCI_POWER_OFF);
+  usBTH("SPP NSD transport %s, discoverable as '%s'\n", on ? "active" : "off", BT_LOCAL_NAME);
 }
