@@ -412,7 +412,7 @@ enum
   RESET_MIDI_STATE = 0x63,
 
   /* Network SID Device (WiFi/Bluetooth) provisioning. Only meaningfully
-   * handled when USE_WIFI or USE_BLUETOOTH is compiled in; a plain
+   * handled when USE_NET is compiled in.
    * pico/pico2 build replies ERROR (see handle_config_request()). */
   WIFI_STATUS      = 0x70,  /* Returns {link_up, session_active} */
   WIFI_SET_SSID    = 0x71,  /* buffer[1] = length, buffer[2..] = SSID bytes */
@@ -550,8 +550,8 @@ enum {
  * 1 = Unused
  * 2 = RGB LED onboard: 0 No, 1 Yes
  * 3 = PIO Uart: 0 No, 1 Yes
- * 4 = Wifi onboard: 0 No, 1 Yes
- * 5 = Bluetooth onboard: 0 No, 1 Yes
+ * 4 = Wifi & Bluetooth onboard: 0 No, 1 Yes
+ * 5 = Network SID Device: 0 No, 1 Yes
  * 6 = Unused
  * 7 = Embedded SID player & Cynthcart: 0 No, 1 Yes
  */
@@ -567,10 +567,10 @@ static const uint8_t us_features = (
 #if defined(USE_PIO_UART)
   | (1 << 3)
 #endif
-#if defined(USE_WIFI)
+#if defined(USE_NSD)
   | (1 << 4)
 #endif
-#if defined(USE_BLUETOOTH)
+#if defined(USE_NET)
   | (1 << 5)
 #endif
   /* 6 Unused */
@@ -582,8 +582,8 @@ static const uint8_t us_features = (
 static const bool is_rp2350     = (us_features & 0b00000001); /* 0 */
 static const bool has_rgb_vu    = (us_features & 0b00000100); /* 2 */
 static const bool has_pio_uart  = (us_features & 0b00001000); /* 3 */
-static const bool has_wifi      = (us_features & 0b00010000); /* 4 */
-static const bool has_bluetooth = (us_features & 0b00100000); /* 5 */
+static const bool has_nsd       = (us_features & 0b00010000); /* 4 */
+static const bool has_net       = (us_features & 0b00100000); /* 5 */
 static const bool has_emulator  = (us_features & 0b10000000); /* 7 */
 
 /* Global variables from config.c */

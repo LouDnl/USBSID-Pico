@@ -242,10 +242,9 @@ static void bt_diag_packet_handler(uint8_t packet_type, uint16_t channel, uint8_
 /**
  * @brief Bring up the Bluetooth Classic SPP transport for NSD
  *
- * Runs on core 1 before SYNC_CORE1_STAGE2, so cyw43_arch_init() below
- * always completes before net_wifi_init() could run in a combined WiFi+BT
- * build; net_wifi.c skips its own cyw43_arch_init() when USE_BLUETOOTH is
- * defined.
+ * Runs on core 0, before net_wifi_init() (usbsid.c). Sole cyw43_arch_init()
+ * owner under USE_NET; net_wifi_init() never calls it.
+ * The LED is turned off by net_wifi_init().
  */
 void setup_bluetooth(void)
 {
@@ -293,4 +292,12 @@ void setup_bluetooth(void)
 
   hci_power_control(HCI_POWER_ON);
   usBTH("SPP NSD transport active, discoverable as '%s'\n", BT_LOCAL_NAME);
+}
+
+/**
+ * @brief True once an SPP RFCOMM channel is open to a client
+ */
+bool net_bt_is_connected(void)
+{
+  return rfcomm_channel_id != 0;
 }

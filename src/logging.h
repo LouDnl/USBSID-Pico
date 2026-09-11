@@ -147,15 +147,11 @@ do {                   \
 #define usASID(...) ((void)0)
 #endif
 
-#ifdef USE_WIFI
+#ifdef USE_NET
 #define usWFI(fmt, ...) __DBG("[WIFI] " fmt __VA_OPT__(,) __VA_ARGS__)
-#else
-#define usWFI(...) ((void)0)
-#endif
-
-#ifdef USE_BLUETOOTH
 #define usBTH(fmt, ...) __DBG("[BT] " fmt __VA_OPT__(,) __VA_ARGS__)
 #else
+#define usWFI(...) ((void)0)
 #define usBTH(...) ((void)0)
 #endif
 

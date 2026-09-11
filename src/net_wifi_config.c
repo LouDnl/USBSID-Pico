@@ -148,7 +148,7 @@ void __no_inline_not_in_flash_func(save_wifi_config)(WifiConfig* config)
  */
 void start_wifi(void)
 {
-#ifdef USE_WIFI
+#ifdef USE_NET
   load_wifi_config(&wifi_cfg);
   net_wifi_set_credentials(wifi_cfg.ssid, wifi_cfg.psk);
   net_wifi_set_hostname(wifi_cfg.hostname);

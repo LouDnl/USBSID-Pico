@@ -42,13 +42,13 @@
 #include <config_socket.h>
 #include <config_logging.h>
 #include <logging.h>
-#ifdef USE_WIFI
+#ifdef USE_NET
 #include <net_wifi.h>
 #include <net_wifi_config.h>
-#endif
 #ifdef USE_NSD
 #include <nsd.h>
-#endif
+#endif /* USE_NSD */
+#endif /* USE_NET */
 
 /* SID player */
 #if defined(ONBOARD_EMULATOR)
@@ -940,21 +940,21 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case WIFI_STATUS: /* Not available on non _w, so always returns 0xFF 0xFF */
       usCFG("WIFI_STATUS\n");
       memset(write_buffer_p, 0, 64);
-#if defined(USE_WIFI)
+#if defined(USE_NET)
       write_buffer_p[0] = (uint8_t)net_wifi_is_connected();
 #else
-      write_buffer_p[0] = 0xFF; /* Not built with WiFi support */
-#endif
+      write_buffer_p[0] = 0xFF; /* Not built with WiFi/Bluetooth support */
+#endif /* USE_NET */
 #if defined(USE_NSD)
       write_buffer_p[1] = (uint8_t)nsd_session_is_active();
 #else
       write_buffer_p[1] = 0xFF;
-#endif
+#endif /* USE_NSD */
       write_back_data(2);
       break;
     case WIFI_SET_SSID:
     {
-#ifdef USE_WIFI
+#ifdef USE_NET
       usCFG("WIFI_SET_SSID\n");
       uint8_t len = buffer[1];
       if (len > sizeof(wifi_cfg.ssid) - 1) len = sizeof(wifi_cfg.ssid) - 1;
@@ -965,7 +965,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     }
     case WIFI_SET_PSK:
     {
-#ifdef USE_WIFI
+#ifdef USE_NET
       usCFG("WIFI_SET_PSK\n"); /* Never log or read the value itself */
       uint8_t len = buffer[1];
       if (len > sizeof(wifi_cfg.psk) - 1) len = sizeof(wifi_cfg.psk) - 1;
@@ -976,7 +976,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     }
     case WIFI_SET_HOSTNAME:
     {
-#ifdef USE_WIFI
+#ifdef USE_NET
       usCFG("WIFI_SET_HOSTNAME\n");
       uint8_t len = buffer[1];
       if (len > sizeof(wifi_cfg.hostname) - 1) len = sizeof(wifi_cfg.hostname) - 1;
@@ -986,7 +986,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       break;
     }
     case WIFI_ENABLE:
-#ifdef USE_WIFI
+#ifdef USE_NET
       usCFG("WIFI_ENABLE: %u\n", buffer[1]);
       if (buffer[1] <= 1) wifi_cfg.flags.wifi_enabled = (bool)buffer[1];
       /* Doesn't require WIFI_APPLY to have been sent first */
@@ -1010,7 +1010,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
 #endif
       break;
     case WIFI_APPLY:
-#ifdef USE_WIFI
+#ifdef USE_NET
       usCFG("WIFI_APPLY\n");
       save_wifi_config(&wifi_cfg);
       net_wifi_set_credentials(wifi_cfg.ssid, wifi_cfg.psk);
@@ -1023,7 +1023,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       break;
 #endif
     case WIFI_FORGET:
-#ifdef USE_WIFI
+#ifdef USE_NET
       usCFG("WIFI_FORGET\n");
       default_wifi_config(&wifi_cfg);
       save_wifi_config(&wifi_cfg);
@@ -1031,7 +1031,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
 #endif
       break;
     case BT_NSD_ENABLE:
-#ifdef USE_BLUETOOTH
+#ifdef USE_NET
       usCFG("BT_NSD_ENABLE: %u\n", buffer[1]);
       if (buffer[1] <= 1) wifi_cfg.flags.bt_nsd_enabled = (bool)buffer[1];
 #endif

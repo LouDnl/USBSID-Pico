@@ -43,26 +43,20 @@
 #include <midi_handler.h>
 #include <asid.h>
 #include <logging.h>
-#ifdef USE_WIFI
+#ifdef USE_NET
+#include <bluetooth.h>
 #include <net_wifi.h>
 #include <net_wifi_config.h>
-#endif
 #ifdef USE_NSD
 #include <nsd.h>
-#endif
+#endif /* USE_NSD */
+#endif /* USE_NET */
 #if defined(ONBOARD_EMULATOR)
 #include <sid_player.h>
 #include <usplayer.h>
 #include <cynthcart_embedded.h>
 #endif
 
-#if !defined(USE_WIFI) && defined(USE_BLUETOOTH)
-/**
- * @brief Stub function when using bluetooth but not wifi
- *
- */
-void net_wifi_update(void) { return; }
-#endif
 
 /* Declare variables ~ Do not change order to keep memory alignment! */
 uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);  /* 64 Bytes, 128 bytes aligned */
@@ -818,17 +812,17 @@ void __us_noreturn core0_loop(void)
       led_runner();
     }
 
-    #if (defined(USE_WIFI) || defined(USE_BLUETOOTH)) && (PCB_VERSION_INT >= 15)
+    #if defined(USE_NET) && (PCB_VERSION_INT >= 15)
     /* On pico_w and pico2_w the LED is controlled via the WiFi module and
      * the wifi SPI control expects single threaded calling. This forces the
      * firmware to blink via Core0 */
     if (detected_sid_change) led_fast_blink();
     #endif
 
-    #if defined(USE_WIFI)
-    /* LED tracks actual WiFi connection status
-     * - off while disconnected/connecting
-     * - on only once actually associated with an IP
+    #if defined(USE_NET)
+    /* LED tracks actual WiFi or Bluetooth connection status
+     * - off while neither is connected
+     * - on once WiFi is associated with an IP, or a Bluetooth SPP channel is open
      * Skipped while detected_sid_change is true so it never fights led_fast_blink()'s
      * priority indicator over the same GPIO.
      * Only touches the GPIO on an actual state change, not every loop tick
@@ -836,7 +830,8 @@ void __us_noreturn core0_loop(void)
      * - always runs on this core so there's no cross-core race */
     if (!detected_sid_change) {
       static bool wifi_led_on = false;
-      bool want_on = usbsid_config.LED.enabled && net_wifi_is_connected();
+      bool want_on = usbsid_config.LED.enabled
+        && (net_wifi_is_connected() || net_bt_is_connected());
       if (want_on != wifi_led_on) {
         wifi_led_on = want_on;
         cyw43_arch_gpio_put(BUILTIN_LED, wifi_led_on);
@@ -845,12 +840,10 @@ void __us_noreturn core0_loop(void)
     #endif
 
     /* Poll the cyw43/update the station state machine, unconditionally */
-    #if defined(USE_BLUETOOTH)
+    #if defined(USE_NET)
     if (!bus_heavy_op_active()) {
       cyw43_arch_poll();
-      #if defined(USE_WIFI)
       net_wifi_update();
-      #endif
     }
     #endif
   }
@@ -1088,12 +1081,6 @@ void core1_main(void)
   init_uart();
   #endif
 
-  // /* Initialise Bluetooth Uart */
-  // #ifdef USE_BLUETOOTH
-  // extern void setup_bluetooth();
-  // setup_bluetooth();
-  // #endif
-
   /* Signal Core 0 we're ready (sync point 2) */
   usBOOT("<CORE 1> Signaling core0 ready ~ 2\n");
   core_sync_state = SYNC_CORE1_STAGE2;
@@ -1134,8 +1121,7 @@ int main()
 {
   /* Set system clockspeed */
   #if (defined(ONBOARD_EMULATOR) && ONBOARD_EMULATOR) \
-    || (defined(USE_WIFI) && USE_WIFI) \
-    || (defined(USE_BLUETOOTH) && USE_BLUETOOTH)
+    || (defined(USE_NET) && USE_NET)
     /* System clock overclocked @ 250MHz */
     set_sys_clock_khz(250000, true); /* Boo fucking hoo, still too slow for rp2040!! */
   #else /* Set default speeds if non of the above */
@@ -1268,17 +1254,14 @@ int main()
   asid_init();
 
   /* Initialise Bluetooth Uart */
-  #ifdef USE_BLUETOOTH
-  extern void setup_bluetooth();
+  #ifdef USE_NET
   setup_bluetooth();
-  #endif
 
   /* Init WiFi network interface */
-  #ifdef USE_WIFI
   net_wifi_init();
   /* Run exactly once, unconditionally, on core 0 at boot.*/
   start_wifi();
-  #endif
+  #endif /* USE_NET */
 
   /* Init SID states */
   usBOOT("Init SID states\n");
@@ -1327,8 +1310,8 @@ int main()
     usDBG("  - LED Status indicator\n");
     #endif
     if (has_pio_uart)  usDBG("  - PIO Uart\n");
-    if (has_wifi)      usDBG("  - WiFi\n");
-    if (has_bluetooth) usDBG("  - Bluetooth\n");
+    if (has_net)       usDBG("  - WiFi & Bluetooth\n");
+    if (has_nsd)       usDBG("    - with Network SID Device\n");
     if (has_emulator)  usDBG("  - Embedded USBSID-Player\n");
     if (has_emulator)  usDBG("    - with Cynthcart\n");
   }

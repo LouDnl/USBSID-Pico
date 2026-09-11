@@ -273,35 +273,26 @@ static void udp_discovery_start(uint16_t port)
 static bool wifi_started = false;
 
 /**
- * @brief Bring up cyw43 itself - does NOT power the radio
+ * @brief Finish net bring-up after bluetooth.c's setup_bluetooth() has
+ *        already brought up cyw43 itself
  *
- * cyw43_arch_init() never calls into cyw43_wifi_on(); only
- * cyw43_wifi_set_up() (via _enable_sta_mode()/_enable_ap_mode()) does.
- * Starting station mode is net_wifi_start()'s job, a separate opt-in call.
+ * When USE_NET == 1, bluetooth.c/setup_bluetooth() calls
+ * cyw43_arch_init() (called first in the boot sequence, usbsid.c).
+ * This function never calls it.
+ * pio.c's setup_vu() likewise skips its own cyw43_arch_init(),
+ * so the LED GPIO is set here instead.
  */
 void net_wifi_init(void)
 {
   usNFO("\n");
   usWFI("Init WiFi\n");
-#ifndef USE_BLUETOOTH
-  /* Sole cyw43 owner in a WiFi-only build; a combined WiFi+BT build has
-   * bluetooth.c's setup_bluetooth() (core 1) own this instead. */
-  if (cyw43_arch_init()) {
-    usWFI("cyw43_arch_init failed\n");
-    return;
-  }
-  /* pio.c's setup_vu() skips its own cyw43_arch_init() when USE_WIFI is
-   * defined and relies on this call instead, so the LED GPIO has to
-   * happen here too. Starts OFF: the LED tracks actual connection status
+
+  /* Starts OFF: the LED tracks actual connection status
    * (net_wifi_update()), not just whether the board is powered. */
   cyw43_arch_gpio_put(BUILTIN_LED, false);
-#endif
 
   /* cyw43_arch_init()'s cyw43_driver_init()+lwip_init() sequence (CYW43_LWIP=1)
-   * desyncs the bus PIO's timing, confirmed on real v1.3/v1.5 hardware.
-   * Rebuild unconditionally, not just inside the #ifndef USE_BLUETOOTH
-   * block above: a WiFi+BT build reaches the same path via bluetooth.c's
-   * setup_bluetooth() on core 1. */
+   * desyncs the bus PIO's timing, confirmed on real v1.3/v1.5 hardware. */
   restart_bus();
 
   nsd_init();

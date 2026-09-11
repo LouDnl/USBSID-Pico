@@ -101,16 +101,16 @@ void setup_vu(void)
 #endif /* USE_RGB */
   setup_vu_dma();
 #elif defined(CYW43_WL_GPIO_LED_PIN)
-#if !defined(USE_BLUETOOTH) && !defined(USE_WIFI)
+#if !defined(USE_NET)
   /* For Pico W devices we need to initialise the driver etc, unless
-   * USE_BLUETOOTH or USE_WIFI already owns that single cyw43_arch_init()
-   * call - see the guard in net_wifi.c / bluetooth.c's setup_bluetooth() */
+   * USE_NET is defined, this owns the cyw43_arch_init() call.
+   - see the guard in net_wifi.c / bluetooth.c's setup_bluetooth() */
   if (cyw43_arch_init()) {
     usERR("cyw43_arch_init() failed, onboard LED will not work\n");
   }
   /* Ask the wifi "driver" to set the GPIO on or off */
   cyw43_arch_gpio_put(BUILTIN_LED, usbsid_config.LED.enabled);
-#endif /* !USE_BLUETOOTH && !USE_WIFI */
+#endif /* !USE_NET */
 #endif /* CYW43_WL_GPIO_LED_PIN */
   return;
 }
