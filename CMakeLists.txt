@@ -64,10 +64,8 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(ENABLE_PROFILING 0)     # Experimental!
 endif()
 
-### Enable / Disable build with USBSID-Player for tune playback and/or Cynthcart
-set(ONBOARD_SIDPLAYER 0 CACHE STRING "ONBOARD_SIDPLAYER")
-### Enable / Disable build with Cynthcart emulation, requires ONBOARD_SIDPLAYER=1.
-set(ONBOARD_CYNTHCART 0 CACHE STRING "ONBOARD_CYNTHCART")
+### Enable / Disable build with USBSID-Player for tune playback or Cynthcart emulation
+set(ONBOARD_EMULATOR 0 CACHE STRING "ONBOARD_EMULATOR")
 
 ### Enable / Disable build with PIO Uart on unused pins 26/27
 set(USE_PIO_UART 0)
@@ -111,18 +109,11 @@ message(DEBUG "${Green}${ColorBold}LOG_LEVEL${ColorReset} is ${Yellow}${ColorBol
 
 message(DEBUG "Starting compilation of ${Yellow}${ColorBold}${PRODUCT_STRING}${ColorReset} firmware version ${Yellow}${ColorBold}${PROJECT_VERSION}${ColorReset}")
 
-### ONBOARD_CYNTHCART runs inside the player, so it needs one
-if(ONBOARD_CYNTHCART EQUAL 1 AND NOT ONBOARD_SIDPLAYER EQUAL 1)
-  message(FATAL_ERROR "${Green}ONBOARD_CYNTHCART${ColorReset} requires ${Read}ONBOARD_SIDPLAYER=1${ColorReset} (it runs inside the player).")
-endif()
-
 ### Generate feature list for logging
 set(FEATURE_LIST)
 
-if(ONBOARD_SIDPLAYER EQUAL 1)
+if(ONBOARD_EMULATOR EQUAL 1)
   list(APPEND FEATURE_LIST "${Cyan}${ColorBold}SID Player${ColorReset}")
-endif()
-if(ONBOARD_CYNTHCART EQUAL 1)
   list(APPEND FEATURE_LIST "${Cyan}${ColorBold}Cynthcart${ColorReset}")
 endif()
 if(ENABLE_WIFI EQUAL 1)
@@ -439,7 +430,7 @@ set(TARGET_INCLUDE_DIRS PRIVATE
 )
 
 ### Embedded player stuffs
-if(ONBOARD_SIDPLAYER EQUAL 1)
+if(ONBOARD_EMULATOR EQUAL 1)
   ## Empty by default for Github workflows.
   set(EMUDIR "" CACHE STRING "Path to the USBSID-Player checkout")
   # NOTICE: SIDPLAYER REQUIRES FULL -O3 OPTIMIZATIONS!!
@@ -475,23 +466,17 @@ if(ONBOARD_SIDPLAYER EQUAL 1)
 
   if(NOT EXISTS "${USPLAYER_LIST_DIR}/cmake/usbsid-player.cmake")
     message(FATAL_ERROR
-      "ONBOARD_SIDPLAYER is on but no USBSID-Player at ${USPLAYER_LIST_DIR}.\n"
+      "ONBOARD_EMULATOR is on but no USBSID-Player at ${USPLAYER_LIST_DIR}.\n"
       "  EMUDIR was '${EMUDIR}'\n"
       "  Pass an absolute -DEMUDIR=/path/to/usbsid-player, or check the player "
       "out as lib/usbsid-player, or put it beside this repo as ../player-repo.")
   endif()
 
-  ### Adjust filenames for user interpretation
-  foreach(FILENAME ${FILENAMES})
-    list(APPEND FILENAMES_tmp "${FILENAME}_sp")
-  endforeach()
-  set(FILENAMES ${FILENAMES_tmp})
-
   ## The player brings its own file list, include paths and psiddrv target.
   include(${USPLAYER_LIST_DIR}/cmake/usbsid-player.cmake)
 
   set(COMPILE_OPTS ${COMPILE_OPTS} -DEMBEDDED=1)
-  add_compile_definitions(ONBOARD_SIDPLAYER=1)
+  add_compile_definitions(ONBOARD_EMULATOR=1)
   add_compile_definitions(${USPLAYER_DEFINITIONS})
 
   ### Where it's at
@@ -505,16 +490,15 @@ if(ONBOARD_SIDPLAYER EQUAL 1)
     ${USPLAYER_INCLUDE_DIRS}
   )
 
-  ### Cynthcart through the player's MC68B50 ACIA (see cmake/usbsid-player.cmake)
-  if(ONBOARD_CYNTHCART EQUAL 1)
-    add_compile_definitions(ONBOARD_CYNTHCART=1)
-    set(SOURCEFILES ${SOURCEFILES} ${USPLAYER_CYNTHCART_SOURCES})
-    set(TARGET_INCLUDE_DIRS ${TARGET_INCLUDE_DIRS} ${USPLAYER_CYNTHCART_INCLUDE_DIRS})
-    foreach(FILENAME ${FILENAMES})
-      list(APPEND FILENAMES_cc "${FILENAME}_cc")
-    endforeach()
-    set(FILENAMES ${FILENAMES_cc})
-  endif()
+  ### Cynthcart requires the player's MC68B50 ACIA (see cmake/usbsid-player.cmake)
+  set(SOURCEFILES ${SOURCEFILES} ${USPLAYER_CYNTHCART_SOURCES})
+  set(TARGET_INCLUDE_DIRS ${TARGET_INCLUDE_DIRS} ${USPLAYER_CYNTHCART_INCLUDE_DIRS})
+
+  ### Adjust filenames for user interpretation
+  foreach(FILENAME ${FILENAMES})
+    list(APPEND FILENAMES_tmp "${FILENAME}_em")
+  endforeach()
+  set(FILENAMES ${FILENAMES_tmp})
 endif()
 
 ### PIO Uart compilation additions
@@ -874,7 +858,7 @@ foreach(FILENAME LEDTYPE PCBVERSION IN ZIP_LISTS FILENAMES LEDTYPES PCBVERSIONS)
   endif()
 
   # rsiddrv dependency for sidplayer
-  if(ONBOARD_SIDPLAYER EQUAL 1)
+  if(ONBOARD_EMULATOR EQUAL 1)
     add_dependencies(${BUILD} RSIDDriver)
   endif()
 
