@@ -59,11 +59,11 @@
 
 
 /* Declare variables ~ Do not change order to keep memory alignment! */
-uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);  /* 64 Bytes, 128 bytes aligned */
-uint8_t __not_in_flash("usbsid_buffer") sid_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);    /* 64 Bytes, 128 bytes aligned */
-uint8_t __not_in_flash("usbsid_buffer") read_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);   /* 64 Bytes, 128 bytes aligned */
+uint8_t __not_in_flash("usbsid_buffer") write_buffer[MAX_BUFFER_SIZE]  __aligned(2 * MAX_BUFFER_SIZE); /* 64 Bytes, 128 bytes aligned */
+uint8_t __not_in_flash("usbsid_buffer") sid_buffer[MAX_BUFFER_SIZE]    __aligned(2 * MAX_BUFFER_SIZE); /* 64 Bytes, 128 bytes aligned */
+uint8_t __not_in_flash("usbsid_buffer") read_buffer[MAX_BUFFER_SIZE]   __aligned(2 * MAX_BUFFER_SIZE); /* 64 Bytes, 128 bytes aligned */
 uint8_t __not_in_flash("usbsid_buffer") config_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE); /* 64 Bytes, 128 bytes aligned */
-uint8_t __not_in_flash("usbsid_buffer") uart_buffer[MAX_BUFFER_SIZE] __aligned(2 * MAX_BUFFER_SIZE);   /* 64 Bytes, 128 bytes aligned */
+uint8_t __not_in_flash("usbsid_buffer") uart_buffer[MAX_BUFFER_SIZE]   __aligned(2 * MAX_BUFFER_SIZE); /* 64 Bytes, 128 bytes aligned */
 uint8_t *write_buffer_p = write_buffer; /* Init pointer for external use */
 
 /* 128 Bytes 'Memory' storage for SID registers */
