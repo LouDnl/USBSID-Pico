@@ -77,6 +77,7 @@
 !examples/config-tool-web/websid
 !examples/config-tool-web_old
 !examples/send_sid
+!examples/nsd_spp_bridge.py
 !examples/hardsid-sidblaster
 !examples/udev-rules
 !examples/midi
