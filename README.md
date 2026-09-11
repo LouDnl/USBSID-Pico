@@ -239,6 +239,7 @@ The firmware is still in development so features might change, be added or remov
 - WebUSB support using the same CDC protocol for WebUSB supporting players
   - Play SID files in your browser via [Deepsid](https://deepsid.chordian.net/) by Chordian
   - Play SID files in your browser via [C64jukebox](https://haendel.ddns.net:8443/static/c64jukebox.vue) by Kenchis
+- Dedicated WebSerial CDC interface, a working alternative on Windows where WebUSB can crash the browser
 - Midi (in) ASID support (heavily inspired by multiple sources)
   - Play SID files in your (midi supporting) browser via [Deepsid](https://deepsid.chordian.net/) by Chordian
   - Play SID files in your (midi supporting) browser via [IneSID](https://inesid.fazibear.me/) by Fazibear
@@ -259,6 +260,13 @@ The firmware is still in development so features might change, be added or remov
   - Requires Black Pico clone board with RGB LED onboard!
   - SID voices to use for calculation can be changed in config
 - Uses the [TinyUSB](https://github.com/hathach/tinyusb) stack
+- Network SID Device (NSD) server over WiFi (`pico_w`/`pico2_w`)
+  - Appears on the LAN and is auto-discovered by NSD clients such as ACID 64, JSidplay2 and SIDPlay
+  - Configuration of SSID/PSK WIFI/Bluetooth enable via configtool
+  - Plays cycle-exact SID streams on real hardware while USB stays fully functional
+  - Bluetooth Classic SPP transport for the same protocol, via a small host-side bridge ([`examples/nsd_spp_bridge.py`](examples/nsd_spp_bridge.py)) for clients that only speak the TCP variant
+  - Speaks protocol version 5 (up to 16 SIDs and FM OPL registers), routed to this board's own FM OPL socket when one is configured
+  - Lets a v5 client enable or disable FM OPL on a SID socket remotely, the same assignment the USB config protocol/config tool already offers locally
 #### v1.3+ PCB
 - Audio switch Stereo/Mono control
 #### v1.5+ PCB
