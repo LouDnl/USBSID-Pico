@@ -26,29 +26,7 @@ _In active development_ +
 *Amiga:* PlaySID library
 
 == Drivers
-
-=== Linux Udev rules
-In the https://github.com/LouDnl/USBSID-Pico/blob/master/examples/udev-rules/[examples/udev] directory you can find the https://github.com/LouDnl/USBSID-Pico/blob/master/examples/udev-rules/69-usbsid-permissions.rules[udev rules] that I use on Linux. +
-This purely an example file that you can use and change to your own needs.
-Steps required for this to work
-[source,bash]
-----
-# Check if you are in the plugdev group with the groups command
-groups
-# If not, add yourself to the plugdev group, then log out and in
-sudo usermod -aG plugdev $USER
-# Copy the udev ules file to the correct directory
-sudo cp 69-usbsid-permissions.rules /etc/udev/rules.d
-# Now reload the udev rules
-udevadm control --reload-rules && udevadm trigger
-# Not working? Try reloading the service
-sudo systemctl restart udev
-----
-
-=== Windows driver
-Use https://zadig.akeo.ie/[Zadig] to install the correct driver. Replace the driver for `USBSID-Pico Data` with WinUSB. +
-image:images/software/zadig-list-all-devices.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/zadig-list-all-devices.png",width="400"]
-image:images/software/zadig-install-driver.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/zadig-install-driver.png",width="400"] +
+include::drivers.adoc[]
 
 === Test and configure
 After setting up your linux udev rules or Windows driver check, configure and test your board on the https://usbsid.loudai.nl/?player=webusb[USBSID] config tool website +
@@ -56,8 +34,6 @@ image:images/software/usbsid-config-connect.png[link="https://github.com/LouDnl/
 image:images/software/usbsid-config-checkversion.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/usbsid-config-checkversion.png",width="400"] +
 _For more information on how to configure your board, please refer to the https://github.com/LouDnl/USBSID-Pico/blob/master/doc/USBSID-Pico-firmware-manual.adoc[Firmware manual]_
 
-[%always]
-<<<
 
 == Supported software
 Each section covers the basic use of USBSID-Pico with the software under that section. For more in depth information please refer to the repective website and or github repo of the software.

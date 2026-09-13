@@ -23,6 +23,10 @@ What is there to say, you can configure your board with this tool and it is self
 Prefer the command line? A CLI config tool (`cfg_usbsid`) is also available - see the `USBSID-Pico-firmware-manual` file for its usage.
 
 
+== Drivers
+include::drivers.adoc[]
+
+
 == Screens
 
 === Welcome screen

@@ -37,6 +37,10 @@ Firmware release v0.7.0 and up supports the send sid mode on the USBSID-Pico con
 Multi-subtune PSID/RSID files are supported - you can switch to the next or previous subtune while a tune is playing.
 
 
+== Drivers
+include::drivers.adoc[]
+
+
 == Development
 More information about USBSID-Player is available on the https://github.com/LouDnl/USBSID-Player[github repo]
 
