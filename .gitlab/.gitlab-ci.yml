@@ -9,7 +9,7 @@
 #                       cleanup:old-snapshots      d* tags, snapshot prerelease
 #
 # Supports two GitLab instances:
-#   - gitlab.loudai.nl (private): Linux runner only
+#   - gitlab.loudai.nl (private): Linux and Windows runners
 #   - gitlab.com (public): Linux, macOS and Windows runners
 #
 # NOTE: this file lives in .gitlab/, so the project setting
@@ -27,8 +27,11 @@ variables:
   # build against the GitLab mirrors instead of GitHub.
   USBSID_PLAYER_REPO: "https://github.com/loudnl/usbsid-player.git"
   BIN2H_REPO: "https://github.com/elnormous/bin2h.git"
-  # Instance without macOS and Windows runners
+  # Instance without a macOS runner
   PRIVATE_HOST: "gitlab.loudai.nl"
+  # Windows runner tag. The default is the gitlab.com SaaS runner, set this
+  # in the project CI/CD variables on an instance with its own Windows runner.
+  WINDOWS_RUNNER_TAG: "saas-windows-medium-amd64"
   GIT_SUBMODULE_STRATEGY: recursive
   DEBIAN_FRONTEND: noninteractive
 
@@ -94,8 +97,8 @@ default:
         - examples/send_sid/**/*
         - .gitlab/.gitlab-ci.yml
 
-# Windows and macOS runners only exist on gitlab.com
-.rules_tools_dev_public:
+# macOS runners only exist on gitlab.com
+.rules_tools_dev_macos:
   rules:
     - if: $PIPELINE_TYPE == "manual" && $CI_SERVER_HOST != $PRIVATE_HOST
     - if: $PIPELINE_TYPE == "dev" && $CI_SERVER_HOST != $PRIVATE_HOST
@@ -108,7 +111,7 @@ default:
   rules:
     - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
 
-.rules_tagged_public:
+.rules_tagged_macos:
   rules:
     - if: ($PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot") && $CI_SERVER_HOST != $PRIVATE_HOST
 
@@ -336,11 +339,11 @@ release:firmware:
     paths:
       - examples/${DIRECTORY}/${BUILDNAME}
 
-# gitlab.com SaaS Windows runner, MinGW64 through msys2 like the GitHub job
+# Windows runner (gitlab.com SaaS by default), MinGW64 through msys2 like the GitHub job
 .tools_windows:
   stage: build
   tags:
-    - saas-windows-medium-amd64
+    - $WINDOWS_RUNNER_TAG
   parallel:
     matrix:
       - DIRECTORY: [config-tool]
@@ -419,14 +422,14 @@ tools:ubuntu:
 tools:windows:
   extends:
     - .tools_windows
-    - .rules_tools_dev_public
+    - .rules_tools_dev
   artifacts:
     expire_in: 1 week
 
 tools:macos14:
   extends:
     - .tools_macos14
-    - .rules_tools_dev_public
+    - .rules_tools_dev_macos
   artifacts:
     expire_in: 1 week
 
@@ -444,14 +447,14 @@ release:tools:ubuntu:
 release:tools:windows:
   extends:
     - .tools_windows
-    - .rules_tagged_public
+    - .rules_tagged
   artifacts:
     expire_in: 4 weeks
 
 release:tools:macos14:
   extends:
     - .tools_macos14
-    - .rules_tagged_public
+    - .rules_tagged_macos
   artifacts:
     expire_in: 4 weeks
 
@@ -560,7 +563,7 @@ package:firmware:snapshot:
     - if: $PIPELINE_TYPE == "snapshot"
 
 # release.yml / tagged_build.yml: "Zip tools", flat at the zip root.
-# Windows and macOS jobs only exist on gitlab.com, hence optional.
+# The macOS job only exists on gitlab.com, hence optional.
 package:tools:
   stage: package
   image: alpine:latest
@@ -587,7 +590,6 @@ package:tools:
         matrix:
           - DIRECTORY: [config-tool, send_sid]
     - job: release:tools:windows
-      optional: true
       parallel:
         matrix:
           - DIRECTORY: [config-tool, send_sid]
