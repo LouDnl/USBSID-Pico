@@ -1,71 +1,70 @@
-# USBSID-Pico GitLab CI/CD Configuration
-# Equivalent to all GitHub Actions workflows:
-#   - build.yml (dev firmware builds)
-#   - buildtools.yml (tools builds)
-#   - release.yml (versioned releases)
-#   - tagged_build.yml (snapshot prereleases)
+# USBSID-Pico GitLab CI/CD configuration
+#
+# Mirrors the GitHub Actions workflows in .github/workflows/:
+#   build.yml        -> firmware:*                 dev branch firmware builds
+#   buildtools.yml   -> tools:*                    dev branch tools builds
+#   release.yml      -> release:*, package:*, create:release
+#                                                  v* tags, versioned release
+#   tagged_build.yml -> release:*, package:*, create:snapshot,
+#                       cleanup:old-snapshots      d* tags, snapshot prerelease
 #
 # Supports two GitLab instances:
-#   - gitlab.loudai.nl (private) - Linux runner only
-#   - gitlab.com (public) - Linux, macOS, Windows runners
+#   - gitlab.loudai.nl (private): Linux runner only
+#   - gitlab.com (public): Linux, macOS and Windows runners
+#
+# NOTE: this file lives in .gitlab/, so the project setting
+# Settings > CI/CD > General pipelines > CI/CD configuration file must be
+# set to ".gitlab/.gitlab-ci.yml" on both instances.
 
 variables:
   BUILD_THREADS: "4"
   BUILD_TYPE: "Release"
+  # Pico-SDK versions, keep in sync with the GitHub workflows
   PICO_SDK_REF: "2.2.0"
   PICO_EXTRAS_REF: "sdk-2.2.0"
   PICOTOOL_REF: "2.2.0"
+  # Sources for the extra checkouts. Override these in the CI/CD variables to
+  # build against the GitLab mirrors instead of GitHub.
+  USBSID_PLAYER_REPO: "https://github.com/loudnl/usbsid-player.git"
+  BIN2H_REPO: "https://github.com/elnormous/bin2h.git"
+  # Instance without macOS and Windows runners
+  PRIVATE_HOST: "gitlab.loudai.nl"
   GIT_SUBMODULE_STRATEGY: recursive
+  DEBIAN_FRONTEND: noninteractive
 
 # Pipeline runs on:
-# - dev branch: firmware source changes or tools changes
-# - master branch: any push
-# - Tags: v* for releases, d* for snapshots
-# - Manual trigger
+# - dev branch pushes touching firmware or tools sources (build.yml, buildtools.yml)
+# - v* tags: release (release.yml)
+# - d* tags: snapshot prerelease (tagged_build.yml)
+# - manual web trigger, or FORCE_RUN=true (workflow_dispatch / force_run)
+# Pushes to master run nothing, same as GitHub where every job there is tag gated.
 workflow:
   rules:
-    # Dev branch - firmware source changes
     - if: $CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"
       changes:
-        - src/**
-        - lib/**
+        - src/**/*
+        - lib/**/*
         - CMakeLists.txt
+        - examples/config-tool/**/*
+        - examples/send_sid/**/*
         - .gitlab/.gitlab-ci.yml
       variables:
-        PIPELINE_TYPE: "dev-firmware"
-    # Dev branch - tools changes
-    - if: $CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"
-      changes:
-        - examples/config-tool/**
-        - examples/send_sid/**
-        - .gitlab/.gitlab-ci.yml
-      variables:
-        PIPELINE_TYPE: "dev-tools"
-    # Master branch push
-    - if: $CI_COMMIT_BRANCH == "master" && $CI_PIPELINE_SOURCE == "push"
-      variables:
-        PIPELINE_TYPE: "master"
-    # Version tags (v0.0.0, v1.0.0-BETA, etc.) - full release
-    - if: $CI_COMMIT_TAG =~ /^v(\d|\.|-|[A-Z])+$/
+        PIPELINE_TYPE: "dev"
+    # Version tags (v0.0.0, v1.0.0-BETA, etc.)
+    - if: $CI_COMMIT_TAG =~ /^v[0-9][0-9A-Za-z.-]*$/
       variables:
         PIPELINE_TYPE: "release"
-    # Date tags (d20250101, etc.) - snapshot prerelease
+    # Date tags (d20250101, etc.)
     - if: $CI_COMMIT_TAG =~ /^d[0-9a-z]+$/
       variables:
         PIPELINE_TYPE: "snapshot"
-    # Manual trigger
-    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_PIPELINE_SOURCE == "web" || $FORCE_RUN == "true"
       variables:
         PIPELINE_TYPE: "manual"
-    # Triggered by another pipeline
-    - if: $CI_PIPELINE_SOURCE == "pipeline"
-    # Force run variable
-    - if: $FORCE_RUN == "true"
 
 stages:
   - prepare
-  - build-firmware
-  - build-tools
+  - build
   - package
   - release
 
@@ -73,7 +72,48 @@ default:
   interruptible: true
 
 # ============================================================================
-# CACHING - Shared SDK/toolchain caches
+# RULE SETS
+# ============================================================================
+
+.rules_firmware_dev:
+  rules:
+    - if: $PIPELINE_TYPE == "manual"
+    - if: $PIPELINE_TYPE == "dev"
+      changes:
+        - src/**/*
+        - lib/**/*
+        - CMakeLists.txt
+        - .gitlab/.gitlab-ci.yml
+
+.rules_tools_dev:
+  rules:
+    - if: $PIPELINE_TYPE == "manual"
+    - if: $PIPELINE_TYPE == "dev"
+      changes:
+        - examples/config-tool/**/*
+        - examples/send_sid/**/*
+        - .gitlab/.gitlab-ci.yml
+
+# Windows and macOS runners only exist on gitlab.com
+.rules_tools_dev_public:
+  rules:
+    - if: $PIPELINE_TYPE == "manual" && $CI_SERVER_HOST != $PRIVATE_HOST
+    - if: $PIPELINE_TYPE == "dev" && $CI_SERVER_HOST != $PRIVATE_HOST
+      changes:
+        - examples/config-tool/**/*
+        - examples/send_sid/**/*
+        - .gitlab/.gitlab-ci.yml
+
+.rules_tagged:
+  rules:
+    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
+
+.rules_tagged_public:
+  rules:
+    - if: ($PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot") && $CI_SERVER_HOST != $PRIVATE_HOST
+
+# ============================================================================
+# CACHING - shared SDK/toolchain caches
 # ============================================================================
 
 .pico_sdk_cache:
@@ -96,26 +136,88 @@ default:
       policy: pull-push
 
 # ============================================================================
-# FIRMWARE BUILD TEMPLATE
-# All variants built sequentially in a single job to avoid redundant
-# dependency downloads. Dependencies are installed once, then each
-# board/emulator combination is built in a loop.
+# FIRMWARE BUILD TEMPLATE (build.yml / release.yml / tagged_build.yml matrix)
+# One job per variant, like the GitHub matrix. The DIRECTORY values are also
+# used by the package jobs below to pick the right artifacts.
 # ============================================================================
 
-.firmware_build_template:
-  stage: build-firmware
+.firmware_directories: &firmware_directories
+  - pico
+  - pico_em
+  - picow
+  - picow_em
+  - picow_net
+  - pico2
+  - pico2_em
+  - pico2w
+  - pico2w_emnet
+
+.firmware_build:
+  stage: build
   image: ubuntu:22.04
   extends: .pico_sdk_cache
+  parallel:
+    matrix:
+      - DIRECTORY: [pico]
+        BOARD: [pico]
+        PLATFORM: [rp2040]
+        WITHEMULATOR: ["0"]
+        ENABLE_NET: ["0"]
+      - DIRECTORY: [pico_em]
+        BOARD: [pico]
+        PLATFORM: [rp2040]
+        WITHEMULATOR: ["1"]
+        ENABLE_NET: ["0"]
+      - DIRECTORY: [picow]
+        BOARD: [pico_w]
+        PLATFORM: [rp2040]
+        WITHEMULATOR: ["0"]
+        ENABLE_NET: ["0"]
+      - DIRECTORY: [picow_em]
+        BOARD: [pico_w]
+        PLATFORM: [rp2040]
+        WITHEMULATOR: ["1"]
+        ENABLE_NET: ["0"]
+      - DIRECTORY: [picow_net]
+        BOARD: [pico_w]
+        PLATFORM: [rp2040]
+        WITHEMULATOR: ["0"]
+        ENABLE_NET: ["1"]
+      - DIRECTORY: [pico2]
+        BOARD: [pico2]
+        PLATFORM: [rp2350-arm-s]
+        WITHEMULATOR: ["0"]
+        ENABLE_NET: ["0"]
+      - DIRECTORY: [pico2_em]
+        BOARD: [pico2]
+        PLATFORM: [rp2350-arm-s]
+        WITHEMULATOR: ["1"]
+        ENABLE_NET: ["0"]
+      - DIRECTORY: [pico2w]
+        BOARD: [pico2_w]
+        PLATFORM: [rp2350-arm-s]
+        WITHEMULATOR: ["0"]
+        ENABLE_NET: ["0"]
+      - DIRECTORY: [pico2w_emnet]
+        BOARD: [pico2_w]
+        PLATFORM: [rp2350-arm-s]
+        WITHEMULATOR: ["1"]
+        ENABLE_NET: ["1"]
   before_script:
-    # Install base dependencies (including SID player deps - xa65, bin2h)
+    # libusb and pkg-config are needed to build picotool
     - apt-get update
-    - apt-get install -y build-essential cmake ninja-build git python3 python3-pip wget curl xz-utils xa65
+    - apt-get install -y build-essential cmake git python3 wget curl xz-utils zip pkg-config libusb-1.0-0-dev
+    # SID player dependencies (xa65, bin2h), emulator variants only
     - |
-      if [ ! -x "/usr/local/bin/bin2h" ]; then
-        git clone --depth 1 https://github.com/elnormous/bin2h.git /tmp/bin2h
-        cd /tmp/bin2h && make && cp bin2h /usr/local/bin/ && cd -
+      if [ "$WITHEMULATOR" = "1" ]; then
+        apt-get install -y xa65
+        rm -rf /tmp/bin2h
+        git clone --depth 1 "$BIN2H_REPO" /tmp/bin2h
+        make -C /tmp/bin2h
+        cp /tmp/bin2h/bin2h /usr/local/bin/
+        bin2h --help
       fi
-    # Install ARM toolchain (13.2 Rel1 - same as GitHub Actions carlosperate/arm-none-eabi-gcc-action@v1)
+    # ARM toolchain 13.2 Rel1, the version carlosperate/arm-none-eabi-gcc-action installs
     - |
       ARM_GCC_DIR="${CI_PROJECT_DIR}/arm-gnu-toolchain"
       if [ ! -x "${ARM_GCC_DIR}/bin/arm-none-eabi-gcc" ]; then
@@ -126,351 +228,348 @@ default:
       fi
     - export PATH="${CI_PROJECT_DIR}/arm-gnu-toolchain/bin:${PATH}"
     - arm-none-eabi-gcc --version
-    # Clone/update Pico SDK if not cached
+    # Pico SDK, plus the tinyusb dependencies for this platform
     - |
       if [ ! -d "pico-sdk" ]; then
-        git clone --depth 1 --branch ${PICO_SDK_REF} --recurse-submodules https://github.com/raspberrypi/pico-sdk.git pico-sdk
+        git clone --depth 1 --branch "${PICO_SDK_REF}" --recurse-submodules https://github.com/raspberrypi/pico-sdk.git pico-sdk
       fi
-    - export PICO_SDK_PATH=$(pwd)/pico-sdk
-    # Get TinyUSB deps for both platforms
-    - cd pico-sdk/lib/tinyusb && python3 tools/get_deps.py rp2040 && python3 tools/get_deps.py rp2350-arm-s && cd -
-    # Clone/update Pico Extras if not cached
+    - export PICO_SDK_PATH="${CI_PROJECT_DIR}/pico-sdk"
+    - (cd pico-sdk/lib/tinyusb && python3 tools/get_deps.py "${PLATFORM}")
+    # Pico Extras
     - |
       if [ ! -d "pico-extras" ]; then
-        git clone --depth 1 --branch ${PICO_EXTRAS_REF} --recurse-submodules https://github.com/raspberrypi/pico-extras.git pico-extras
+        git clone --depth 1 --branch "${PICO_EXTRAS_REF}" --recurse-submodules https://github.com/raspberrypi/pico-extras.git pico-extras
       fi
-    - export PICO_EXTRAS_PATH=$(pwd)/pico-extras
-    # Build picotool if not cached
+    - export PICO_EXTRAS_PATH="${CI_PROJECT_DIR}/pico-extras"
+    # picotool
     - |
       if [ ! -d "picotool" ]; then
-        git clone --depth 1 --branch ${PICOTOOL_REF} --recurse-submodules https://github.com/raspberrypi/picotool.git picotool-src
-        cmake -S picotool-src -B picotool-src/build -DCMAKE_INSTALL_PREFIX=$(pwd)/picotool -DPICOTOOL_FLAT_INSTALL=1
-        cmake --build picotool-src/build -j${BUILD_THREADS} --target install
+        git clone --depth 1 --branch "${PICOTOOL_REF}" --recurse-submodules https://github.com/raspberrypi/picotool.git picotool-src
+        cmake -S picotool-src -B picotool-src/build -DCMAKE_INSTALL_PREFIX="${CI_PROJECT_DIR}/picotool" -DPICOTOOL_FLAT_INSTALL=1
+        cmake --build picotool-src/build -j "${BUILD_THREADS}" --target install
         rm -rf picotool-src
       fi
-    # Clone optional library (needed by ONBOARD_EMULATOR=1 variants: the
-    # onboard SID player and Cynthcart, which now runs through the player
-    # instead of the old standalone emudore-embedded path)
-    - git clone --depth 1 https://github.com/loudnl/usbsid-player.git lib/usbsid-player
   script:
-    - mkdir -p dist
+    # The SID player is checked out into lib/ for emulator variants only
     - |
-      build_variant() {
-        local dir="$1" board="$2" platform="$3" emulator="$4"
-        echo ""
-        echo "================================================================"
-        echo "Building: ${dir} (board=${board} platform=${platform} emulator=${emulator})"
-        echo "================================================================"
-        mkdir -p "build_${dir}"
-        cmake -S . -B "build_${dir}" \
-          -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
-          -DPICO_PLATFORM="${platform}" \
-          -DPICO_BOARD="${board}" \
-          -Dpicotool_DIR="$(pwd)/picotool/picotool" \
-          -DONBOARD_EMULATOR="${emulator}"
-        cmake --build "build_${dir}" --config ${BUILD_TYPE} -j${BUILD_THREADS}
-        ls -la "build_${dir}"/*.uf2
-        cp -v "build_${dir}"/*.uf2 dist/
-        rm -rf "build_${dir}"
-      }
-    # Base builds
-    - build_variant pico       pico    rp2040       0
-    - build_variant picow      pico_w  rp2040       0
-    - build_variant pico2      pico2   rp2350-arm-s 0
-    - build_variant pico2w     pico2_w rp2350-arm-s 0
-    # Emulator builds (onboard SID player + Cynthcart, bundled since ONBOARD_EMULATOR)
-    - build_variant pico2_em   pico2   rp2350-arm-s 1
-    - build_variant pico2_w_em pico2_w rp2350-arm-s 1
-    # Summary
-    - echo "All builds complete. Artifacts:"
-    - ls -la dist/
-
-# ============================================================================
-# DEV FIRMWARE BUILD (build.yml equivalent)
-# Single job builds all 6 variants sequentially
-# ============================================================================
-
-firmware:all:
-  extends: .firmware_build_template
+      EMUDIR=""
+      if [ "$WITHEMULATOR" = "1" ]; then
+        rm -rf lib/usbsid-player
+        git clone --depth 1 "$USBSID_PLAYER_REPO" lib/usbsid-player
+        EMUDIR="${CI_PROJECT_DIR}/lib/usbsid-player"
+      fi
+      unset PICO_PLATFORM PICO_BOARD
+      cmake -S . -B "build_${DIRECTORY}" \
+        -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+        -DPICO_PLATFORM="${PLATFORM}" \
+        -DPICO_BOARD="${BOARD}" \
+        -Dpicotool_DIR="${CI_PROJECT_DIR}/picotool/picotool" \
+        -DONBOARD_EMULATOR="${WITHEMULATOR}" \
+        -DEMUDIR="${EMUDIR}" \
+        -DENABLE_NET="${ENABLE_NET}"
+    - cmake --build "build_${DIRECTORY}" --config "${BUILD_TYPE}" -j "${BUILD_THREADS}"
+    - ls -la "build_${DIRECTORY}"/*.uf2
+    # dist/usbsid<directory>/ is the layout the snapshot zips expect
+    - mkdir -p "dist/usbsid${DIRECTORY}"
+    - cp -av "build_${DIRECTORY}"/*.uf2 "dist/usbsid${DIRECTORY}/"
   artifacts:
-    name: "usbsid-firmware-${CI_COMMIT_REF_SLUG}-${CI_PIPELINE_IID}"
     paths:
-      - dist/*.uf2
+      - dist/
+
+# Dev build (build.yml)
+firmware:
+  extends:
+    - .firmware_build
+    - .rules_firmware_dev
+  artifacts:
+    name: "usbsid${DIRECTORY}-${CI_COMMIT_REF_SLUG}-autobuild-${CI_PIPELINE_IID}"
     expire_in: 1 week
-  rules:
-    - if: $PIPELINE_TYPE == "dev-firmware" || $PIPELINE_TYPE == "manual"
 
-# ============================================================================
-# RELEASE FIRMWARE BUILD (release.yml equivalent)
-# Same as dev but triggered on version/date tags, longer artifact retention
-# ============================================================================
-
-release:firmware:all:
-  extends: .firmware_build_template
+# Release and snapshot build (release.yml, tagged_build.yml)
+release:firmware:
+  extends:
+    - .firmware_build
+    - .rules_tagged
   artifacts:
-    name: "releasebuild-usbsid-firmware"
-    paths:
-      - dist/*.uf2
+    name: "releasebuild-usbsid${DIRECTORY}"
     expire_in: 4 weeks
-  rules:
-    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
 
 # ============================================================================
-# TOOLS BUILD TEMPLATES (buildtools.yml equivalent)
+# TOOLS BUILD TEMPLATES (buildtools.yml)
+# send_sid links the USBSID-Player, so it is checked out into lib/ and
+# passed as EMUDIR (relative to examples/send_sid, like GitHub).
 # ============================================================================
 
-.tools_ubuntu_template:
-  stage: build-tools
+.tools_player_clone:
+  script:
+    - |
+      EMUDIR=""
+      if [ "$DIRECTORY" = "send_sid" ]; then
+        rm -rf lib/usbsid-player
+        git clone --depth 1 "$USBSID_PLAYER_REPO" lib/usbsid-player
+        EMUDIR="../../lib/usbsid-player"
+      fi
+      export EMUDIR
+
+.tools_ubuntu:
+  stage: build
   image: ubuntu:latest
+  parallel:
+    matrix:
+      - DIRECTORY: [config-tool]
+        BUILDNAME: [cfg_usbsid]
+      - DIRECTORY: [send_sid]
+        BUILDNAME: [send_sid]
   before_script:
     - apt-get update
-    - apt-get install -y pkg-config cmake build-essential libusb-1.0-0 libusb-1.0-0-dev
+    - apt-get install -y pkg-config cmake build-essential libusb-1.0-0 libusb-1.0-0-dev git
+    - !reference [.tools_player_clone, script]
   script:
-    - cd examples/${DIRECTORY}
+    - cd "examples/${DIRECTORY}"
     - ls -lhai
-    - rm ${BUILDNAME} || true
-    - cmake -S . -B build -DEXECUTABLE=${BUILDNAME}
-    - cmake --build build -j$(nproc)
+    - rm -f "${BUILDNAME}"
+    - cmake -S . -B build -DEXECUTABLE="${BUILDNAME}" -DEMUDIR="${EMUDIR}"
+    - cmake --build build -j "$(nproc)"
     - ls -lhai
   artifacts:
     name: "tools-${BUILDNAME}-linux"
     paths:
       - examples/${DIRECTORY}/${BUILDNAME}
-    expire_in: 1 week
 
-.tools_windows_template:
-  stage: build-tools
+# gitlab.com SaaS Windows runner, MinGW64 through msys2 like the GitHub job
+.tools_windows:
+  stage: build
   tags:
-    - saas-windows-medium-amd64 # gitlab.com SaaS Windows runner
+    - saas-windows-medium-amd64
+  parallel:
+    matrix:
+      - DIRECTORY: [config-tool]
+        BUILDNAME: [cfg_usbsid]
+      - DIRECTORY: [send_sid]
+        BUILDNAME: [send_sid]
   before_script:
     - choco install msys2 -y --no-progress
-    - refreshenv
     - C:\tools\msys64\usr\bin\bash -lc "pacman -Syu --noconfirm"
     - C:\tools\msys64\usr\bin\bash -lc "pacman -S --noconfirm --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-libusb mingw-w64-x86_64-cmake mingw-w64-x86_64-pkg-config mingw-w64-x86_64-ninja"
   script:
-    - C:\tools\msys64\usr\bin\bash -lc "cd '${CI_PROJECT_DIR}/examples/${DIRECTORY}' && rm -f ${BUILDNAME}.exe && cmake -S . -B build -DEXECUTABLE=${BUILDNAME} && cmake --build build -j$(nproc)"
+    # The runner shell is PowerShell: variables are $env:NAME there, and only
+    # the environment (not PowerShell variables) reaches the msys2 shell.
+    # CHERE_INVOKING keeps the msys2 login shell in the current directory.
+    - |
+      $env:EMUDIR = ""
+      if ($env:DIRECTORY -eq "send_sid") {
+        if (Test-Path lib/usbsid-player) { Remove-Item -Recurse -Force lib/usbsid-player }
+        git clone -q --depth 1 $env:USBSID_PLAYER_REPO lib/usbsid-player
+        $env:EMUDIR = "../../lib/usbsid-player"
+      }
+      $env:MSYSTEM = "MINGW64"
+      $env:CHERE_INVOKING = "1"
+      Set-Location "examples/$env:DIRECTORY"
+      C:\tools\msys64\usr\bin\bash -lc 'rm -f $BUILDNAME.exe; cmake -S . -B build -DEXECUTABLE=$BUILDNAME -DEMUDIR=$EMUDIR && cmake --build build -j$(nproc)'
   artifacts:
     name: "tools-${BUILDNAME}-windows"
     paths:
       - examples/${DIRECTORY}/${BUILDNAME}.exe
       - examples/${DIRECTORY}/*.dll
-    expire_in: 1 week
 
-.tools_macos_template:
-  stage: build-tools
+# gitlab.com SaaS macOS 14 (Apple Silicon) runner
+.tools_macos14:
+  stage: build
+  tags:
+    - saas-macos-medium-m1
+  image: macos-14-xcode-15
+  parallel:
+    matrix:
+      - DIRECTORY: [config-tool]
+        BUILDNAME: [cfg_usbsid_macos14]
+      - DIRECTORY: [send_sid]
+        BUILDNAME: [send_sid_macos14]
   before_script:
     - brew update
     - brew install pkg-config cmake ninja libusb
+    - !reference [.tools_player_clone, script]
   script:
-    - cd examples/${DIRECTORY}
+    - cd "examples/${DIRECTORY}"
     - ls -lhai
-    - rm ${BUILDNAME} || true
-    - cmake -S . -B build -DEXECUTABLE=${BUILDNAME}
-    - cmake --build build -j$(sysctl -n hw.ncpu)
+    - rm -f "${BUILDNAME}"
+    - cmake -S . -B build -DEXECUTABLE="${BUILDNAME}" -DEMUDIR="${EMUDIR}"
+    - cmake --build build -j "$(sysctl -n hw.ncpu)"
     - ls -lhai
   artifacts:
-    name: "tools-${BUILDNAME}-macos-${MACOS_VERSION}"
+    name: "tools-${BUILDNAME}-macos14"
     paths:
       - examples/${DIRECTORY}/${BUILDNAME}
+
+# macOS 15 Intel: enabled on GitHub (macos-15-intel), disabled here because
+# gitlab.com SaaS has no Intel macOS runner. Add a .tools_macos15_intel
+# template with a custom runner tag (BUILDNAME cfg_usbsid_macos15intel and
+# send_sid_macos15intel) and matching tools:macos15-intel jobs when one exists.
+
+# ============================================================================
+# DEV TOOLS BUILDS (buildtools.yml on push)
+# ============================================================================
+
+tools:ubuntu:
+  extends:
+    - .tools_ubuntu
+    - .rules_tools_dev
+  artifacts:
+    expire_in: 1 week
+
+tools:windows:
+  extends:
+    - .tools_windows
+    - .rules_tools_dev_public
+  artifacts:
+    expire_in: 1 week
+
+tools:macos14:
+  extends:
+    - .tools_macos14
+    - .rules_tools_dev_public
+  artifacts:
     expire_in: 1 week
 
 # ============================================================================
-# DEV TOOLS BUILDS
+# RELEASE TOOLS BUILDS (buildtools.yml called from release.yml and tagged_build.yml)
 # ============================================================================
 
-# Ubuntu tools (runs on both instances)
-tools:config-tool:ubuntu:
-  extends: .tools_ubuntu_template
-  variables:
-    DIRECTORY: "config-tool"
-    BUILDNAME: "cfg_usbsid"
-  rules:
-    - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
+release:tools:ubuntu:
+  extends:
+    - .tools_ubuntu
+    - .rules_tagged
+  artifacts:
+    expire_in: 4 weeks
 
-tools:send_sid:ubuntu:
-  extends: .tools_ubuntu_template
-  variables:
-    DIRECTORY: "send_sid"
-    BUILDNAME: "send_sid"
-  rules:
-    - if: $PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual"
+release:tools:windows:
+  extends:
+    - .tools_windows
+    - .rules_tagged_public
+  artifacts:
+    expire_in: 4 weeks
 
-# Windows tools (gitlab.com only)
-tools:config-tool:windows:
-  extends: .tools_windows_template
-  variables:
-    DIRECTORY: "config-tool"
-    BUILDNAME: "cfg_usbsid"
-  rules:
-    - if: ($PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual") && $CI_SERVER_HOST != "gitlab.loudai.nl"
-
-tools:send_sid:windows:
-  extends: .tools_windows_template
-  variables:
-    DIRECTORY: "send_sid"
-    BUILDNAME: "send_sid"
-  rules:
-    - if: ($PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual") && $CI_SERVER_HOST != "gitlab.loudai.nl"
-
-# macOS 14 ARM64 tools (gitlab.com only)
-tools:config-tool:macos14:
-  extends: .tools_macos_template
-  tags:
-    - saas-macos-medium-m1 # gitlab.com SaaS macOS ARM64 runner
-  variables:
-    DIRECTORY: "config-tool"
-    BUILDNAME: "cfg_usbsid_macos14"
-    MACOS_VERSION: "14"
-  rules:
-    - if: ($PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual") && $CI_SERVER_HOST != "gitlab.loudai.nl"
-
-tools:send_sid:macos14:
-  extends: .tools_macos_template
-  tags:
-    - saas-macos-medium-m1
-  variables:
-    DIRECTORY: "send_sid"
-    BUILDNAME: "send_sid_macos14"
-    MACOS_VERSION: "14"
-  rules:
-    - if: ($PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual") && $CI_SERVER_HOST != "gitlab.loudai.nl"
-
-# macOS 15 Intel tools - disabled, no Intel macOS runner available on gitlab.com SaaS
-# Uncomment when a custom runner with tag "macos-15-intel" is available
-# tools:config-tool:macos15-intel:
-#   extends: .tools_macos_template
-#   tags:
-#     - macos-15-intel
-#   variables:
-#     DIRECTORY: "config-tool"
-#     BUILDNAME: "cfg_usbsid_macos15intel"
-#     MACOS_VERSION: "15-intel"
-#   rules:
-#     - if: ($PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual") && $CI_SERVER_HOST != "gitlab.loudai.nl"
-#
-# tools:send_sid:macos15-intel:
-#   extends: .tools_macos_template
-#   tags:
-#     - macos-15-intel
-#   variables:
-#     DIRECTORY: "send_sid"
-#     BUILDNAME: "send_sid_macos15intel"
-#     MACOS_VERSION: "15-intel"
-#   rules:
-#     - if: ($PIPELINE_TYPE == "dev-tools" || $PIPELINE_TYPE == "manual") && $CI_SERVER_HOST != "gitlab.loudai.nl"
+release:tools:macos14:
+  extends:
+    - .tools_macos14
+    - .rules_tagged_public
+  artifacts:
+    expire_in: 4 weeks
 
 # ============================================================================
-# RELEASE TOOLS BUILDS
+# CLEANUP (tagged_build.yml cleanup_previous_builds)
+# Delete snapshot prereleases older than 30 days, but keep the newest 10.
+# Needs a GitLab API token in the GITLAB_API_TOKEN CI/CD variable, skipped
+# without one. Only releases are deleted, the d* tags stay.
 # ============================================================================
 
-# Ubuntu (both instances)
-release:tools:config-tool:ubuntu:
-  extends: .tools_ubuntu_template
+cleanup:old-snapshots:
+  stage: prepare
+  image: alpine:latest
   variables:
-    DIRECTORY: "config-tool"
-    BUILDNAME: "cfg_usbsid"
-  artifacts:
-    expire_in: 4 weeks
+    GIT_STRATEGY: none
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - |
+      if [ -z "${GITLAB_API_TOKEN:-}" ]; then
+        echo "GITLAB_API_TOKEN not set, skipping cleanup"
+        exit 0
+      fi
+      API_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases"
+      releases=$(curl -fsS --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" "${API_URL}?per_page=100")
+      # Newest first, skip the first 10, then keep everything younger than 30 days
+      echo "$releases" | jq -r --argjson now "$(date +%s)" '
+        [ .[] | select(.tag_name | test("^d[0-9a-z]+$")) ]
+        | sort_by(.created_at) | reverse
+        | to_entries[] | select(.key >= 10)
+        | select(($now - (.value.created_at | sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | fromdateiso8601)) > 30 * 86400)
+        | .value.tag_name' | while read -r tag; do
+        echo "Deleting old snapshot prerelease: ${tag}"
+        curl -fsS --request DELETE --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" "${API_URL}/${tag}" > /dev/null
+      done
+      echo "Cleanup complete"
   rules:
-    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
-
-release:tools:send_sid:ubuntu:
-  extends: .tools_ubuntu_template
-  variables:
-    DIRECTORY: "send_sid"
-    BUILDNAME: "send_sid"
-  artifacts:
-    expire_in: 4 weeks
-  rules:
-    - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
-
-# Windows (gitlab.com only)
-release:tools:config-tool:windows:
-  extends: .tools_windows_template
-  variables:
-    DIRECTORY: "config-tool"
-    BUILDNAME: "cfg_usbsid"
-  artifacts:
-    expire_in: 4 weeks
-  rules:
-    - if: ($PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot") && $CI_SERVER_HOST != "gitlab.loudai.nl"
-
-release:tools:send_sid:windows:
-  extends: .tools_windows_template
-  variables:
-    DIRECTORY: "send_sid"
-    BUILDNAME: "send_sid"
-  artifacts:
-    expire_in: 4 weeks
-  rules:
-    - if: ($PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot") && $CI_SERVER_HOST != "gitlab.loudai.nl"
-
-# macOS 14 ARM64 (gitlab.com only)
-release:tools:config-tool:macos14:
-  extends: .tools_macos_template
-  tags:
-    - saas-macos-medium-m1
-  variables:
-    DIRECTORY: "config-tool"
-    BUILDNAME: "cfg_usbsid_macos14"
-    MACOS_VERSION: "14"
-  artifacts:
-    expire_in: 4 weeks
-  rules:
-    - if: ($PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot") && $CI_SERVER_HOST != "gitlab.loudai.nl"
-
-release:tools:send_sid:macos14:
-  extends: .tools_macos_template
-  tags:
-    - saas-macos-medium-m1
-  variables:
-    DIRECTORY: "send_sid"
-    BUILDNAME: "send_sid_macos14"
-    MACOS_VERSION: "14"
-  artifacts:
-    expire_in: 4 weeks
-  rules:
-    - if: ($PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot") && $CI_SERVER_HOST != "gitlab.loudai.nl"
-
-# macOS 15 Intel - disabled, no Intel macOS runner available on gitlab.com SaaS
-# release:tools:config-tool:macos15-intel:
-#   extends: .tools_macos_template
-#   tags:
-#     - macos-15-intel
-#   variables:
-#     DIRECTORY: "config-tool"
-#     BUILDNAME: "cfg_usbsid_macos15intel"
-#     MACOS_VERSION: "15-intel"
-#   artifacts:
-#     expire_in: 4 weeks
-#   rules:
-#     - if: ($PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot") && $CI_SERVER_HOST != "gitlab.loudai.nl"
-#
-# release:tools:send_sid:macos15-intel:
-#   extends: .tools_macos_template
-#   tags:
-#     - macos-15-intel
-#   variables:
-#     DIRECTORY: "send_sid"
-#     BUILDNAME: "send_sid_macos15intel"
-#     MACOS_VERSION: "15-intel"
-#   artifacts:
-#     expire_in: 4 weeks
-#   rules:
-#     - if: ($PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot") && $CI_SERVER_HOST != "gitlab.loudai.nl"
+    - if: $PIPELINE_TYPE == "snapshot"
+  allow_failure: true
 
 # ============================================================================
-# PACKAGE STAGE - Collect and zip tools
+# PACKAGE STAGE
 # ============================================================================
 
+# release.yml: "Zip firmware by PCB revision" (v* tags)
+package:firmware:release:
+  stage: package
+  image: alpine:latest
+  variables:
+    GIT_STRATEGY: none
+  before_script:
+    - apk add --no-cache zip
+  script:
+    - mkdir -p release
+    - cp -v dist/*/*.uf2 release/
+    - cd release
+    - |
+      for ver in v1.0 v1.3 v1.5; do
+        set -- ./*"${ver}"*.uf2
+        if [ -e "$1" ]; then
+          zip "USBSID-Pico_${ver}.zip" "$@"
+          rm -- "$@"
+        fi
+      done
+    - ls -la
+  artifacts:
+    name: "releasebuild-usbsid-firmware"
+    paths:
+      - release/*.zip
+    expire_in: never
+  needs:
+    - job: release:firmware
+      parallel:
+        matrix:
+          - DIRECTORY: *firmware_directories
+  rules:
+    - if: $PIPELINE_TYPE == "release"
+
+# tagged_build.yml: one zip per firmware variant (d* tags)
+package:firmware:snapshot:
+  stage: package
+  image: alpine:latest
+  variables:
+    GIT_STRATEGY: none
+  before_script:
+    - apk add --no-cache zip
+  script:
+    - cd dist
+    - |
+      for d in usbsid*/; do
+        d="${d%/}"
+        zip -r "${d}-taggedbuild-${CI_COMMIT_TAG}.zip" "${d}/"
+      done
+    - ls -la
+  artifacts:
+    name: "taggedbuild-usbsid-firmware"
+    paths:
+      - dist/*.zip
+    expire_in: never
+  needs:
+    - job: release:firmware
+      parallel:
+        matrix:
+          - DIRECTORY: *firmware_directories
+  rules:
+    - if: $PIPELINE_TYPE == "snapshot"
+
+# release.yml / tagged_build.yml: "Zip tools", flat at the zip root.
+# Windows and macOS jobs only exist on gitlab.com, hence optional.
 package:tools:
   stage: package
   image: alpine:latest
+  variables:
+    GIT_STRATEGY: none
   before_script:
     - apk add --no-cache zip
   script:
     - mkdir -p tools-output
-    # Collect all tools from artifacts
     - cp -v examples/config-tool/cfg_usbsid* tools-output/ || true
     - cp -v examples/send_sid/send_sid* tools-output/ || true
     - cp -v examples/config-tool/*.dll tools-output/ || true
@@ -481,32 +580,59 @@ package:tools:
     name: "releasebuild-usbsidtools"
     paths:
       - tools.zip
-    expire_in: 4 weeks
+    expire_in: never
   needs:
-    - job: release:tools:config-tool:ubuntu
+    - job: release:tools:ubuntu
+      parallel:
+        matrix:
+          - DIRECTORY: [config-tool, send_sid]
+    - job: release:tools:windows
       optional: true
-    - job: release:tools:send_sid:ubuntu
+      parallel:
+        matrix:
+          - DIRECTORY: [config-tool, send_sid]
+    - job: release:tools:macos14
       optional: true
-    - job: release:tools:config-tool:windows
-      optional: true
-    - job: release:tools:send_sid:windows
-      optional: true
-    - job: release:tools:config-tool:macos14
-      optional: true
-    - job: release:tools:send_sid:macos14
-      optional: true
-    # - job: release:tools:config-tool:macos15-intel
-    #   optional: true
-    # - job: release:tools:send_sid:macos15-intel
-    #   optional: true
+      parallel:
+        matrix:
+          - DIRECTORY: [config-tool, send_sid]
   rules:
     - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
 
+# release.yml "Generate release notes": commits since the previous v* tag
+release:notes:
+  stage: package
+  image: alpine:latest
+  variables:
+    GIT_DEPTH: "0"
+    GIT_SUBMODULE_STRATEGY: none
+  before_script:
+    - apk add --no-cache git
+    - git config --global --add safe.directory "${CI_PROJECT_DIR}"
+  script:
+    - |
+      echo "**Commits in this release:**" > release_notes.md
+      # The v* tag before this one, or the whole history the first time round
+      PREV=$(git tag --list 'v*' --sort=-version:refname | grep -v "^${CI_COMMIT_TAG}\$" | head -n 1 || true)
+      if [ -n "$PREV" ]; then
+        git log "${PREV}..HEAD" --oneline >> release_notes.md
+      else
+        git log --oneline >> release_notes.md
+      fi
+      cat release_notes.md
+  artifacts:
+    paths:
+      - release_notes.md
+    expire_in: 4 weeks
+  rules:
+    - if: $PIPELINE_TYPE == "release"
+
 # ============================================================================
 # RELEASE STAGE
+# The package jobs keep their artifacts forever, the release links to them.
 # ============================================================================
 
-# Create GitLab release for version tags (v*)
+# release.yml "Create tagged release" (v* tags)
 create:release:
   stage: release
   image: registry.gitlab.com/gitlab-org/release-cli:latest
@@ -515,28 +641,26 @@ create:release:
   release:
     tag_name: ${CI_COMMIT_TAG}
     name: "${CI_COMMIT_TAG}"
-    description: |
-      ## USBSID-Pico ${CI_COMMIT_TAG}
-
-      Firmware and tools release.
-
-      **Commits in this release:**
-      See the commit history for changes since the previous release.
-
-      ---
-      *Generated by GitLab CI/CD*
+    description: release_notes.md
     assets:
       links:
-        - name: "Download all artifacts"
-          url: "${CI_PROJECT_URL}/-/pipelines/${CI_PIPELINE_ID}"
-          link_type: "other"
+        - name: "Firmware zips, browse (per PCB revision)"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/browse/release?job=package:firmware:release"
+          link_type: "package"
+        - name: "Firmware zips, download all"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=package:firmware:release"
+          link_type: "package"
+        - name: "Tools (tools.zip), download"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/tools.zip?job=package:tools"
+          link_type: "package"
   needs:
-    - job: release:firmware:all
+    - job: package:firmware:release
     - job: package:tools
+    - job: release:notes
   rules:
     - if: $PIPELINE_TYPE == "release"
 
-# Create prerelease for date tags (d*)
+# tagged_build.yml "Create Draft Release" + "Publish Release" (d* tags)
 create:snapshot:
   stage: release
   image: registry.gitlab.com/gitlab-org/release-cli:latest
@@ -546,74 +670,23 @@ create:snapshot:
     tag_name: ${CI_COMMIT_TAG}
     name: "${CI_COMMIT_TAG} snapshot"
     description: |
-      ## Snapshot Build ${CI_COMMIT_TAG}
+      ## Snapshot build ${CI_COMMIT_TAG}
 
-      This is an automated snapshot build for testing purposes.
-
-      **Note:** This is a prerelease and may contain bugs.
-
-      ---
-      *Generated by GitLab CI/CD*
+      Automated snapshot build for testing purposes.
+      This is a prerelease and may contain bugs.
     assets:
       links:
-        - name: "Download all artifacts"
-          url: "${CI_PROJECT_URL}/-/pipelines/${CI_PIPELINE_ID}"
-          link_type: "other"
+        - name: "Firmware zips (one per variant), browse"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/browse/dist?job=package:firmware:snapshot"
+          link_type: "package"
+        - name: "Firmware zips (one per variant), download all"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/download?job=package:firmware:snapshot"
+          link_type: "package"
+        - name: "Tools (tools.zip), download"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/tools.zip?job=package:tools"
+          link_type: "package"
   needs:
-    - job: release:firmware:all
+    - job: package:firmware:snapshot
     - job: package:tools
   rules:
     - if: $PIPELINE_TYPE == "snapshot"
-
-# ============================================================================
-# CLEANUP - Remove old snapshot releases (equivalent to tagged_build cleanup)
-# This runs as a scheduled pipeline or can be triggered manually
-# ============================================================================
-
-cleanup:old-snapshots:
-  stage: prepare
-  image: alpine:latest
-  before_script:
-    - apk add --no-cache curl jq
-  script:
-    - |
-      echo "Cleaning up old snapshot prereleases..."
-      # This requires a GitLab API token with appropriate permissions
-      # Set GITLAB_API_TOKEN in CI/CD variables
-      if [ -z "$GITLAB_API_TOKEN" ]; then
-        echo "GITLAB_API_TOKEN not set, skipping cleanup"
-        exit 0
-      fi
-
-      API_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases"
-
-      # Get all releases
-      releases=$(curl -s --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" "${API_URL}")
-
-      # Count prereleases (those with 'd' prefix tags)
-      prerelease_count=0
-
-      echo "$releases" | jq -r '.[] | select(.tag_name | startswith("d")) | .tag_name' | while read tag; do
-        prerelease_count=$((prerelease_count + 1))
-
-        # Keep at least 10 prereleases
-        if [ $prerelease_count -gt 10 ]; then
-          # Get release created_at and check if older than 30 days
-          created_at=$(echo "$releases" | jq -r ".[] | select(.tag_name == \"$tag\") | .created_at")
-          created_timestamp=$(date -d "$created_at" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "$created_at" +%s 2>/dev/null)
-          current_timestamp=$(date +%s)
-          days_ago=$(( (current_timestamp - created_timestamp) / 86400 ))
-
-          if [ $days_ago -gt 30 ]; then
-            echo "Deleting old prerelease: $tag (${days_ago} days old)"
-            curl -s --request DELETE --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" "${API_URL}/${tag}"
-          fi
-        fi
-      done
-
-      echo "Cleanup complete"
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule" && $CLEANUP_SNAPSHOTS == "true"
-    - if: $PIPELINE_TYPE == "snapshot"
-      when: manual
-      allow_failure: true
