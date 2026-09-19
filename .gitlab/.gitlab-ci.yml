@@ -144,23 +144,12 @@ default:
 # used by the package jobs below to pick the right artifacts.
 # ============================================================================
 
-.firmware_directories: &firmware_directories
-  - pico
-  - pico_em
-  - picow
-  - picow_em
-  - picow_net
-  - pico2
-  - pico2_em
-  - pico2w
-  - pico2w_emnet
-
 .firmware_build:
   stage: build
   image: ubuntu:22.04
   extends: .pico_sdk_cache
   parallel:
-    matrix:
+    matrix: &firmware_matrix
       - DIRECTORY: [pico]
         BOARD: [pico]
         PLATFORM: [rp2040]
@@ -318,7 +307,7 @@ release:firmware:
   stage: build
   image: ubuntu:latest
   parallel:
-    matrix:
+    matrix: &tools_matrix
       - DIRECTORY: [config-tool]
         BUILDNAME: [cfg_usbsid]
       - DIRECTORY: [send_sid]
@@ -345,11 +334,7 @@ release:firmware:
   tags:
     - $WINDOWS_RUNNER_TAG
   parallel:
-    matrix:
-      - DIRECTORY: [config-tool]
-        BUILDNAME: [cfg_usbsid]
-      - DIRECTORY: [send_sid]
-        BUILDNAME: [send_sid]
+    matrix: *tools_matrix
   before_script:
     - choco install msys2 -y --no-progress
     - C:\tools\msys64\usr\bin\bash -lc "pacman -Syu --noconfirm"
@@ -382,7 +367,7 @@ release:firmware:
     - saas-macos-medium-m1
   image: macos-14-xcode-15
   parallel:
-    matrix:
+    matrix: &tools_macos_matrix
       - DIRECTORY: [config-tool]
         BUILDNAME: [cfg_usbsid_macos14]
       - DIRECTORY: [send_sid]
@@ -528,8 +513,7 @@ package:firmware:release:
   needs:
     - job: release:firmware
       parallel:
-        matrix:
-          - DIRECTORY: *firmware_directories
+        matrix: *firmware_matrix
   rules:
     - if: $PIPELINE_TYPE == "release"
 
@@ -557,8 +541,7 @@ package:firmware:snapshot:
   needs:
     - job: release:firmware
       parallel:
-        matrix:
-          - DIRECTORY: *firmware_directories
+        matrix: *firmware_matrix
   rules:
     - if: $PIPELINE_TYPE == "snapshot"
 
@@ -587,17 +570,14 @@ package:tools:
   needs:
     - job: release:tools:ubuntu
       parallel:
-        matrix:
-          - DIRECTORY: [config-tool, send_sid]
+        matrix: *tools_matrix
     - job: release:tools:windows
       parallel:
-        matrix:
-          - DIRECTORY: [config-tool, send_sid]
+        matrix: *tools_matrix
     - job: release:tools:macos14
       optional: true
       parallel:
-        matrix:
-          - DIRECTORY: [config-tool, send_sid]
+        matrix: *tools_macos_matrix
   rules:
     - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
 
