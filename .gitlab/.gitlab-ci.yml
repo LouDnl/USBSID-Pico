@@ -351,6 +351,13 @@ release:firmware:
     matrix: *tools_matrix
   before_script:
     - choco install msys2 -y --no-progress
+    # First pass upgrades core packages (msys2-runtime etc). Per MSYS2's own
+    # docs that leaves the package DB in a state where the next transaction
+    # in the same process can misreport real renames (e.g. gcc-libs ->
+    # libgcc) as conflicts and block on a prompt --noconfirm does not
+    # actually reach. A second pass in a fresh bash -lc clears it, same as
+    # closing and reopening the MSYS2 shell.
+    - C:\tools\msys64\usr\bin\bash -lc "pacman -Syu --noconfirm"
     - C:\tools\msys64\usr\bin\bash -lc "pacman -Syu --noconfirm"
     - C:\tools\msys64\usr\bin\bash -lc "pacman -S --noconfirm --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-libusb mingw-w64-x86_64-cmake mingw-w64-x86_64-pkg-config mingw-w64-x86_64-ninja"
   script:
