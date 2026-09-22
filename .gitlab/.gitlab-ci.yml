@@ -9,8 +9,8 @@
 #                       cleanup:old-snapshots      d* tags, snapshot prerelease
 #
 # Supports two GitLab instances:
-#   - gitlab.loudai.nl (private): Linux and Windows runners
-#   - gitlab.com (public): Linux, macOS and Windows runners
+#   - gitlab.loudai.nl (private): Linux, Windows and macOS 15 Intel runners
+#   - gitlab.com (public): Linux, macOS (Apple Silicon) and Windows runners
 #
 # NOTE: this file lives in .gitlab/, so the project setting
 # Settings > CI/CD > General pipelines > CI/CD configuration file must be
@@ -27,7 +27,7 @@ variables:
   # build against the GitLab mirrors instead of GitHub.
   USBSID_PLAYER_REPO: "https://github.com/loudnl/usbsid-player.git"
   BIN2H_REPO: "https://github.com/elnormous/bin2h.git"
-  # Instance without a macOS runner
+  # Instance with the Intel macOS runner (no Apple Silicon runner there)
   PRIVATE_HOST: "gitlab.loudai.nl"
   # Windows runner tag. The default is the gitlab.com SaaS runner, set this
   # in the project CI/CD variables on an instance with its own Windows runner.
@@ -114,6 +114,20 @@ default:
 .rules_tagged_macos:
   rules:
     - if: ($PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot") && $CI_SERVER_HOST != $PRIVATE_HOST
+
+# macOS 15 Intel runner only exists on the private instance
+.rules_tools_dev_macos15intel:
+  rules:
+    - if: $PIPELINE_TYPE == "manual" && $CI_SERVER_HOST == $PRIVATE_HOST
+    - if: $PIPELINE_TYPE == "dev" && $CI_SERVER_HOST == $PRIVATE_HOST
+      changes:
+        - examples/config-tool/**/*
+        - examples/send_sid/**/*
+        - .gitlab/.gitlab-ci.yml
+
+.rules_tagged_macos15intel:
+  rules:
+    - if: ($PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot") && $CI_SERVER_HOST == $PRIVATE_HOST
 
 # ============================================================================
 # CACHING - shared SDK/toolchain caches
@@ -388,10 +402,34 @@ release:firmware:
     paths:
       - examples/${DIRECTORY}/${BUILDNAME}
 
-# macOS 15 Intel: enabled on GitHub (macos-15-intel), disabled here because
-# gitlab.com SaaS has no Intel macOS runner. Add a .tools_macos15_intel
-# template with a custom runner tag (BUILDNAME cfg_usbsid_macos15intel and
-# send_sid_macos15intel) and matching tools:macos15-intel jobs when one exists.
+# Private instance's own macOS 15 Intel runner (shell executor on real
+# hardware, no Docker image to pick). ARM runner on the same Mac is planned
+# but not set up yet, so this stays Intel only for now.
+.tools_macos15intel:
+  stage: build
+  tags:
+    - macos-15-intel
+  parallel:
+    matrix: &tools_macos15intel_matrix
+      - DIRECTORY: [config-tool]
+        BUILDNAME: [cfg_usbsid_macos15intel]
+      - DIRECTORY: [send_sid]
+        BUILDNAME: [send_sid_macos15intel]
+  before_script:
+    - brew update
+    - brew install pkg-config cmake ninja libusb
+    - !reference [.tools_player_clone, script]
+  script:
+    - cd "examples/${DIRECTORY}"
+    - ls -lhai
+    - rm -f "${BUILDNAME}"
+    - cmake -S . -B build -DEXECUTABLE="${BUILDNAME}" -DEMUDIR="${EMUDIR}"
+    - cmake --build build -j "$(sysctl -n hw.ncpu)"
+    - ls -lhai
+  artifacts:
+    name: "tools-${BUILDNAME}-macos15intel"
+    paths:
+      - examples/${DIRECTORY}/${BUILDNAME}
 
 # ============================================================================
 # DEV TOOLS BUILDS (buildtools.yml on push)
@@ -418,6 +456,13 @@ tools:macos14:
   artifacts:
     expire_in: 1 week
 
+tools:macos15-intel:
+  extends:
+    - .tools_macos15intel
+    - .rules_tools_dev_macos15intel
+  artifacts:
+    expire_in: 1 week
+
 # ============================================================================
 # RELEASE TOOLS BUILDS (buildtools.yml called from release.yml and tagged_build.yml)
 # ============================================================================
@@ -440,6 +485,13 @@ release:tools:macos14:
   extends:
     - .tools_macos14
     - .rules_tagged_macos
+  artifacts:
+    expire_in: 4 weeks
+
+release:tools:macos15-intel:
+  extends:
+    - .tools_macos15intel
+    - .rules_tagged_macos15intel
   artifacts:
     expire_in: 4 weeks
 
@@ -578,6 +630,10 @@ package:tools:
       optional: true
       parallel:
         matrix: *tools_macos_matrix
+    - job: release:tools:macos15-intel
+      optional: true
+      parallel:
+        matrix: *tools_macos15intel_matrix
   rules:
     - if: $PIPELINE_TYPE == "release" || $PIPELINE_TYPE == "snapshot"
 
