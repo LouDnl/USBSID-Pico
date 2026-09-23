@@ -23,9 +23,21 @@ variables:
   PICO_SDK_REF: "2.2.0"
   PICO_EXTRAS_REF: "sdk-2.2.0"
   PICOTOOL_REF: "2.2.0"
+  # ARM toolchain, the version carlosperate/arm-none-eabi-gcc-action installs
+  ARM_GCC_VERSION: "13.2.rel1"
+  ARM_GCC_URL: "https://developer.arm.com/-/media/Files/downloads/gnu/${ARM_GCC_VERSION}/binrel/arm-gnu-toolchain-${ARM_GCC_VERSION}-x86_64-arm-none-eabi.tar.xz"
   # Sources for the extra checkouts. Override these in the CI/CD variables to
-  # build against the GitLab mirrors instead of GitHub.
-  USBSID_PLAYER_REPO: "https://github.com/loudnl/usbsid-player.git"
+  # build against other mirrors.
+  # The player is cloned from the instance running the pipeline: .player_repo
+  # picks USBSID_PLAYER_REPO_PRIVATE on PRIVATE_HOST and
+  # USBSID_PLAYER_REPO_PUBLIC everywhere else. A non-empty USBSID_PLAYER_REPO
+  # overrides both.
+  USBSID_PLAYER_REPO: ""
+  USBSID_PLAYER_REPO_PRIVATE: "https://gitlab.loudai.nl/usbsid/USBSID-Player.git"
+  USBSID_PLAYER_REPO_PUBLIC: "https://gitlab.com/usbsid-pico/USBSID-Player.git"
+  PICO_SDK_REPO: "https://github.com/raspberrypi/pico-sdk.git"
+  PICO_EXTRAS_REPO: "https://github.com/raspberrypi/pico-extras.git"
+  PICOTOOL_REPO: "https://github.com/raspberrypi/picotool.git"
   BIN2H_REPO: "https://github.com/elnormous/bin2h.git"
   # Instance with the Intel macOS runner (no Apple Silicon runner there)
   PRIVATE_HOST: "gitlab.loudai.nl"
@@ -135,7 +147,7 @@ default:
 
 .pico_sdk_cache:
   cache:
-    - key: arm-gnu-toolchain-13.2
+    - key: arm-gnu-toolchain-${ARM_GCC_VERSION}
       paths:
         - arm-gnu-toolchain/
       policy: pull-push
@@ -147,10 +159,30 @@ default:
       paths:
         - pico-extras/
       policy: pull-push
-    - key: picotool-${PICOTOOL_REF}
+    # The -libusb suffix keeps this picotool (linked against libusb) apart from
+    # the one older tagged configs build without it: they share the cache but
+    # do not install libusb, so this binary fails to load there.
+    - key: picotool-${PICOTOOL_REF}-libusb
       paths:
         - picotool/
       policy: pull-push
+
+# ============================================================================
+# PLAYER SOURCE - bash only, .tools_windows has a PowerShell copy
+# ============================================================================
+
+.player_repo:
+  script:
+    - |
+      if [ -z "$USBSID_PLAYER_REPO" ]; then
+        if [ "$CI_SERVER_HOST" = "$PRIVATE_HOST" ]; then
+          USBSID_PLAYER_REPO="$USBSID_PLAYER_REPO_PRIVATE"
+        else
+          USBSID_PLAYER_REPO="$USBSID_PLAYER_REPO_PUBLIC"
+        fi
+      fi
+      export USBSID_PLAYER_REPO
+      echo "USBSID-Player source: ${USBSID_PLAYER_REPO}"
 
 # ============================================================================
 # FIRMWARE BUILD TEMPLATE (build.yml / release.yml / tagged_build.yml matrix)
@@ -223,11 +255,11 @@ default:
         cp /tmp/bin2h/bin2h /usr/local/bin/
         bin2h --help
       fi
-    # ARM toolchain 13.2 Rel1, the version carlosperate/arm-none-eabi-gcc-action installs
+    # ARM toolchain, see ARM_GCC_VERSION
     - |
       ARM_GCC_DIR="${CI_PROJECT_DIR}/arm-gnu-toolchain"
       if [ ! -x "${ARM_GCC_DIR}/bin/arm-none-eabi-gcc" ]; then
-        wget -q "https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-x86_64-arm-none-eabi.tar.xz" -O /tmp/arm-gcc.tar.xz
+        wget -q "${ARM_GCC_URL}" -O /tmp/arm-gcc.tar.xz
         mkdir -p "${ARM_GCC_DIR}"
         tar xf /tmp/arm-gcc.tar.xz -C "${ARM_GCC_DIR}" --strip-components=1
         rm /tmp/arm-gcc.tar.xz
@@ -237,25 +269,26 @@ default:
     # Pico SDK, plus the tinyusb dependencies for this platform
     - |
       if [ ! -d "pico-sdk" ]; then
-        git clone --depth 1 --branch "${PICO_SDK_REF}" --recurse-submodules https://github.com/raspberrypi/pico-sdk.git pico-sdk
+        git clone --depth 1 --branch "${PICO_SDK_REF}" --recurse-submodules "${PICO_SDK_REPO}" pico-sdk
       fi
     - export PICO_SDK_PATH="${CI_PROJECT_DIR}/pico-sdk"
     - (cd pico-sdk/lib/tinyusb && python3 tools/get_deps.py "${PLATFORM}")
     # Pico Extras
     - |
       if [ ! -d "pico-extras" ]; then
-        git clone --depth 1 --branch "${PICO_EXTRAS_REF}" --recurse-submodules https://github.com/raspberrypi/pico-extras.git pico-extras
+        git clone --depth 1 --branch "${PICO_EXTRAS_REF}" --recurse-submodules "${PICO_EXTRAS_REPO}" pico-extras
       fi
     - export PICO_EXTRAS_PATH="${CI_PROJECT_DIR}/pico-extras"
     # picotool
     - |
       if [ ! -d "picotool" ]; then
-        git clone --depth 1 --branch "${PICOTOOL_REF}" --recurse-submodules https://github.com/raspberrypi/picotool.git picotool-src
+        git clone --depth 1 --branch "${PICOTOOL_REF}" --recurse-submodules "${PICOTOOL_REPO}" picotool-src
         cmake -S picotool-src -B picotool-src/build -DCMAKE_INSTALL_PREFIX="${CI_PROJECT_DIR}/picotool" -DPICOTOOL_FLAT_INSTALL=1
         cmake --build picotool-src/build -j "${BUILD_THREADS}" --target install
         rm -rf picotool-src
       fi
   script:
+    - !reference [.player_repo, script]
     # The SID player is checked out into lib/ for emulator variants only
     - |
       EMUDIR=""
@@ -308,6 +341,7 @@ release:firmware:
 
 .tools_player_clone:
   script:
+    - !reference [.player_repo, script]
     - |
       EMUDIR=""
       if [ "$DIRECTORY" = "send_sid" ]; then
@@ -365,6 +399,14 @@ release:firmware:
     # the environment (not PowerShell variables) reaches the msys2 shell.
     # CHERE_INVOKING keeps the msys2 login shell in the current directory.
     - |
+      # Same selection as .player_repo, which is bash only
+      if (-not $env:USBSID_PLAYER_REPO) {
+        if ($env:CI_SERVER_HOST -eq $env:PRIVATE_HOST) {
+          $env:USBSID_PLAYER_REPO = $env:USBSID_PLAYER_REPO_PRIVATE
+        } else {
+          $env:USBSID_PLAYER_REPO = $env:USBSID_PLAYER_REPO_PUBLIC
+        }
+      }
       $env:EMUDIR = ""
       if ($env:DIRECTORY -eq "send_sid") {
         if (Test-Path lib/usbsid-player) { Remove-Item -Recurse -Force lib/usbsid-player }
