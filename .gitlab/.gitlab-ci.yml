@@ -17,7 +17,12 @@
 # set to ".gitlab/.gitlab-ci.yml" on both instances.
 
 variables:
-  BUILD_THREADS: "4"
+  # Parallel compile jobs (-j) for the Linux jobs. The Linux runner host has
+  # 6 cores and runs up to 4 jobs at once, and nproc inside a pod reports all
+  # host cores, so it is set here rather than derived. Override it with an
+  # instance or project CI/CD variable to tune without a code change. macOS
+  # and Windows jobs keep using all cores of their own machines.
+  BUILD_THREADS: "2"
   BUILD_TYPE: "Release"
   # Pico-SDK versions, keep in sync with the GitHub workflows
   PICO_SDK_REF: "2.2.0"
@@ -386,7 +391,7 @@ release:firmware:
     - ls -lhai
     - rm -f "${BUILDNAME}"
     - cmake -S . -B build -DEXECUTABLE="${BUILDNAME}" -DEMUDIR="${EMUDIR}"
-    - cmake --build build -j "$(nproc)"
+    - cmake --build build -j "${BUILD_THREADS}"
     - ls -lhai
   artifacts:
     name: "tools-${BUILDNAME}-linux"
