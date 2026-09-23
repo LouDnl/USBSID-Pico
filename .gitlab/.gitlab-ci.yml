@@ -173,7 +173,9 @@ default:
       paths:
         - arm-gnu-toolchain/
       policy: pull-push
-    - key: pico-sdk-${PICO_SDK_REF}
+    # The -deps suffix marks an SDK with the tinyusb dependencies of every
+    # PLATFORM already fetched, see the Pico SDK step in .firmware_build.
+    - key: pico-sdk-${PICO_SDK_REF}-deps
       paths:
         - pico-sdk/
       policy: pull-push
@@ -288,13 +290,16 @@ default:
       fi
     - export PATH="${CI_PROJECT_DIR}/arm-gnu-toolchain/bin:${PATH}"
     - arm-none-eabi-gcc --version
-    # Pico SDK, plus the tinyusb dependencies for this platform
+    # Pico SDK, plus the tinyusb dependencies of every PLATFORM in the matrix.
+    # They are fetched once, on a cache miss: get_deps.py always runs
+    # "git reset --hard" in its dependency dirs, so running it in every job
+    # changes the cached pico-sdk/ and the runner uploads the whole SDK again.
     - |
       if [ ! -d "pico-sdk" ]; then
         git clone --depth 1 --branch "${PICO_SDK_REF}" --recurse-submodules "${PICO_SDK_REPO}" pico-sdk
+        (cd pico-sdk/lib/tinyusb && python3 tools/get_deps.py rp2040 rp2350-arm-s)
       fi
     - export PICO_SDK_PATH="${CI_PROJECT_DIR}/pico-sdk"
-    - (cd pico-sdk/lib/tinyusb && python3 tools/get_deps.py "${PLATFORM}")
     # Pico Extras
     - |
       if [ ! -d "pico-extras" ]; then
