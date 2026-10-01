@@ -256,6 +256,8 @@ export class USBSIDWebUSBTransport {
     this._maxInflight = MAX_INFLIGHT;
     this._maxQ = MAX_QUEUE;
     this.resetUsbStats();
+    this.deviceOpened = false;
+    this.openingDevice = false;
   }
 
   get isOpen() {
@@ -307,7 +309,16 @@ export class USBSIDWebUSBTransport {
   }
 
   async _openDevice() {
-    await this._dev.open();
+    if (this.deviceOpened || this.openingDevice)
+      return;
+    this.openingDevice = true;
+    try {
+      await this._dev.open();
+      this.deviceOpened = true;
+    } finally {
+      this.openingDevice = false;
+    }
+
     if (this._dev.configuration === null) await this._dev.selectConfiguration(1);
 
     /* Walk the configuration for the vendor interface and its bulk endpoints

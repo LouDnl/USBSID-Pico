@@ -64,8 +64,16 @@ let audioPtr = 0;              /* scratch in the wasm heap for take() */
 let audioMax = 8192;
 let audioOwed = 0;
 let audioSent = 0;             /* posted since the ring last reported */
+let audioSentTotal = 0;        /* posted to the ring, ever */
 let audioSteps = 24;           /* frames one fill may emulate */
 let audioFilling = false;
+let audioRate = 48000;         /* the ring's sample rate, for the register lead */
+
+/* SID register mirror reported to the page in audio mode, which feeds its
+ * piano, graph and register views: the page's own player never steps.
+ * Four chips at most, the size of the adapter's shadow. */
+const REG_CHIPS_MAX = 4;
+let regChips = 1;
 
 /* The longest a single audioFill() burst may run, in wall clock ms, whatever
  * audioSteps says. A many-SID tune's frame cost scales with chip count, and
@@ -116,12 +124,12 @@ function snapshot() {
  * a worker that is unresponsive for as long as it takes to catch up.
  */
 function audioFill() {
-  if (!audioMode || player === null || audioFilling || !clockPort) return;
+  if (!audioMode || player === null || audioFilling || !clockPort) return 0;
   audioFilling = true;
+  let steps = 0;
   try {
     const M = player.M;
     const deadline = performance.now() + AUDIO_FILL_BUDGET_MS;
-    let steps = 0;
     while (audioOwed > 0 && steps < audioSteps) {
       player.stepAndDrain();
       steps++;
@@ -134,6 +142,7 @@ function audioFill() {
         const chunk = new Int16Array(M.HEAPU8.buffer, audioPtr, n).slice();
         clockPort.postMessage(chunk, [chunk.buffer]);
         audioSent += n;
+        audioSentTotal += n;
         audioOwed -= n;
         if (n < audioMax) break;
       }
@@ -142,15 +151,43 @@ function audioFill() {
   } finally {
     audioFilling = false;
   }
+  return steps;
+}
+
+/**
+ * Send the SID register mirror to the page, with how far ahead of the audible
+ * output it is.
+ *
+ * @param {number} leadSamples  samples between the ring's playhead and the
+ *                              point the emulation has reached
+ */
+function postRegisters(leadSamples) {
+  const regs = new Uint8Array(regChips * 32);
+  for (let c = 0; c < regChips; c++) {
+    for (let r = 0; r < 32; r++) regs[(c << 5) | r] = player.sidRegister(c + 1, r) & 0xff;
+  }
+  self.postMessage({ type: 'regs', payload: {
+    regs,
+    ciaLatch: player.ciaLatch(1, 0),
+    leadMs: (leadSamples * 1000) / audioRate,
+  } }, [regs.buffer]);
 }
 
 /** A report from the ring: how short it is, counting what is already on its way. */
 function onAudioReport(d) {
   if (!d || typeof d.queued !== 'number') return;
-  const owed = audioTarget - d.queued - audioSent;
+  /* In flight from the ring's own received count when it has one: a backlog
+   * of stale reports after the worker was throttled then asks for the
+   * shortfall once, not once per report. */
+  const inFlight = (typeof d.received === 'number')
+    ? Math.max(0, audioSentTotal - d.received) : audioSent;
+  const owed = audioTarget - d.queued - inFlight;
   audioSent = 0;
   audioOwed = owed > 0 ? owed : 0;
-  if (audioOwed > 0) audioFill();
+  if (audioOwed > 0 && audioFill() > 0) {
+    postRegisters(d.queued + ((typeof d.received === 'number')
+      ? Math.max(0, audioSentTotal - d.received) : audioSent));
+  }
   /* The page has no player of its own in this mode, so everything it displays
    * comes from here. Reports arrive about ninety times a second; this is three
    * times a second, which is what a clock and a status line need. */
@@ -291,6 +328,7 @@ const handlers = {
       (quality === undefined ? 1 : quality) | 0, (model || 0) | 0);
     if (target) audioTarget = target | 0;
     if (steps) audioSteps = steps | 0;
+    if (rate) audioRate = rate | 0;
     audioOwed = 0;
     audioSent = 0;
     post('log', { message: 'worker audio: ' + rate + ' Hz, ' + (chips || 1) +
@@ -327,11 +365,13 @@ const handlers = {
      * the page cannot compute one because WebCrypto leaves MD5 out. */
     player._bytesForMd5 = buf;
     const ok = player.loadSID(buf, subtune || 0);
+    regChips = Math.min(REG_CHIPS_MAX, Math.max(1, player.info().sids.length));
     return { ok, info: snapshot() };
   },
 
   loadPRG({ bytes }) {
     const ok = player.loadPRG(new Uint8Array(bytes));
+    regChips = 1;
     return { ok, info: snapshot() };
   },
 
@@ -353,6 +393,20 @@ const handlers = {
   /* Same reason as voiceMute above: the worker holds the player that is sounding. */
   chipMute({ chip, muted }) {
     player.setChipMute(chip, !!muted);
+    return { ok: true };
+  },
+  /* The SID and FM sides of the mix are scaled inside the wasm that renders,
+   * which in audio mode is this one. See usp_audio_set_sid_volume(). */
+  sidVolume({ percent }) {
+    if (player && player.M._usp_audio_set_sid_volume) {
+      player.M._usp_audio_set_sid_volume(percent | 0);
+    }
+    return { ok: true };
+  },
+  fmVolume({ percent }) {
+    if (player && player.M._usp_audio_set_fm_volume) {
+      player.M._usp_audio_set_fm_volume(percent | 0);
+    }
     return { ok: true };
   },
   speed({ mult }) { player.setSpeed(mult); return { ok: true }; },

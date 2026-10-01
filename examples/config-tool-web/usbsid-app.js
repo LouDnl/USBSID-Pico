@@ -87,9 +87,13 @@ function setLED(connected) {
  * paths are. Nav tabs are <a href="/x" data-tab="x"> so a crawler that does
  * not run JS still sees real links, and the click handler below intercepts
  * same-tab-bar clicks to route client-side without a full page load.
- * Requires the web server to fall back unknown paths to this same index.html
- * (nginx: try_files $uri $uri/ /index.html;) - otherwise a direct hit or
- * refresh on e.g. /blog 404s. */
+ * Requires the web server to serve this same index.html for every route
+ * below (nginx: a regex location per route with try_files /index.html) -
+ * otherwise a direct hit or refresh on e.g. /blog 404s. Only real routes get
+ * the fallback; any other path must stay a real 404, or every typo becomes
+ * a 200 duplicate of the home page (a "soft 404" to Google). The server also
+ * rewrites the static canonical/og:url per route, so crawlers see the same
+ * canonical before and after this script runs. */
 const TAB_NAMES = ['player', 'regs', 'config', 'about', 'blog'];
 /* One entry per blog post. Add a slug + title here and a matching
  * #blog-post-<slug> .blog-view block in index.html to publish a new post -
