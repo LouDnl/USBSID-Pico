@@ -25,7 +25,7 @@
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wincompatible-pointer-types"
-#define _POSIX_C_SOURCE 199309L
+#define _POSIX_C_SOURCE 200809L
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>  // `errno`
@@ -88,8 +88,6 @@ static bool is_u64fw = false;
 /* Mommy's little helpers */
 void teardown_wait(void)
 {
-  #include <time.h>
-
   /* 100 milliseconds setup */
   struct timespec delay = {
       .tv_sec = 0,

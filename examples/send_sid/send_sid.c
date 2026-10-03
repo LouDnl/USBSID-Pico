@@ -24,7 +24,7 @@
  */
 
 
-#define _POSIX_C_SOURCE 199309L
+#define _POSIX_C_SOURCE 200809L
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>  // `errno`
@@ -33,6 +33,7 @@
 #include <string.h> // `strerror(errno)`
 #include <stdbool.h>
 #include <ctype.h>
+#include <time.h>   // `nanosleep()`
 
 #include "USBSIDInterface.h"
 
@@ -81,8 +82,6 @@ enum {
 
 void teardown_wait(void)
 {
-  #include <time.h>
-
   /* 100 milliseconds setup */
   struct timespec delay = {
       .tv_sec = 0,
