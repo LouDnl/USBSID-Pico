@@ -31,7 +31,8 @@
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, version 2.
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -1282,8 +1283,20 @@ export class USPlayerAdapter {
     return true;
   }
 
-  /** Does the loaded tune have an FM/OPL side? */
-  hasFm() { return !!this._info.hasFm; }
+  /**
+   * Does the loaded tune have an FM/OPL side?
+   *
+   * True for the v5 header flag, and for any tune once it has written to the
+   * FM/OPL in software audio: older SID+FM tunes carry no flag.
+   *
+   * @returns {boolean}
+   */
+  hasFm() {
+    if (this._info.hasFm) return true;
+    if (!this._isAudio) return false;
+    if (this._worker) return !!this._snap && this._snap.fmWrites > 0;
+    return !!this._audio && this._audio.stats().fmWrites > 0;
+  }
 
   /** Trim the hidden ring back to the visible target and resync registers. */
   _trimOnReturn() {
