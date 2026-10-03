@@ -66,12 +66,20 @@ typedef enum {
   NSD_CMD_SET_FADE_IN = 16,
   NSD_CMD_SET_FADE_OUT = 17,
   NSD_CMD_SET_SID_HEADER = 18,
-  /* v5: 16-bit register address, up to 16 SIDs (0x0000-0x01ff) plus FM OPL
-   * (0xdf00-0xdfff). See handle_try_write_ex()/handle_try_read_ex() in nsd.c. */
+  /* v5: 16-bit register address, up to 16 SIDs (0x0000-0x01ff). TRY_WRITE_EX
+   * also takes FM OPL (0xdf00-0xdfff); TRY_READ_EX's own read target does
+   * not (spec dropped it - a read there returns READ followed by 0x00, same
+   * as an unconfigured SID). Its leading write-then-read entries still take
+   * the full TRY_WRITE_EX range, since they reuse that command's own wire
+   * format. See handle_try_write_ex()/handle_try_read_ex() in nsd.c. */
   NSD_CMD_TRY_WRITE_EX = 19,
   NSD_CMD_TRY_READ_EX = 20,
-  /* Enable/disable the board's FM OPL socket (mirrors config.c's BOARD_FMOPL).
-   * Payload: {enabled, sidno}; sidno (1-4) required when enabled != 0. */
+  /* Enable/disable FM OPL for the current connection (spec: sid number is
+   * ignored, payload is exactly one byte, {0,1}). Which physical SID socket
+   * answers as FM OPL is a board-owner decision (BOARD_FMOPL, config.c /
+   * config_socket.c's set_fmopl_sidno()), not something this command
+   * changes - it only gates whatever socket is already configured. See
+   * nsd_fmopl_active in nsd.c. */
   NSD_CMD_TRY_SET_FM_OPL = 21
 } nsd_command_t;
 

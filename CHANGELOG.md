@@ -1,6 +1,31 @@
 # Changelog
 Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on version changes
 
+* Add Network SID Device (NSD) server support over WiFi for `pico_w`/`pico2_w`
+  with UDP discovery, compatible with ACID64Pro, JSidplay2, SIDPlay and  
+  USBSID-Player's network client.
+  - Add Bluetooth Classic SPP transport for the same NSD protocol
+  - NSD server uses protocol version 5  
+    Adds enabling or disabling FM OPL on a SID socket over the network the 
+    same way the USB config protocol command already does locally.
+  - The builds that have WiFi/Bluetooth with Network SID Device support are
+    compiled with `_net` filename suffix.  
+  - Fix `TRY_READ_EX` accepting an FM OPL address ($DF00-$DFFF) for its read
+    target: the spec dropped that (network_sid_device_V5.adoc), a read there
+    now returns 0x00 same as an unconfigured SID. `TRY_WRITE_EX`, and the
+    write-then-read entries `TRY_READ_EX` itself buffers ahead of the read,
+    are unaffected - only that command's own read target changed.
+* Add an IP-to-Bluetooth NSD bridge example (`examples/nsd_spp_bridge.py`)
+  for TCP-only NSD clients to reach the board's Bluetooth SPP transport
+* Add a dedicated WebSerial CDC interface, a working alternative on Windows
+  where WebUSB can crash the browser.
+* Reduced the number of firmware build types by merging Cynthcart support
+  into the onboard USBSID-Player builds. Both now run through the same 
+  embedded player core and have `_em` filename suffix.  
+* pico2_w boards have a single `em_net` filename suffix.
+* On pico1_w boards the emulator and wireless are too large to run together.  
+  These boards have separate builds for `_em` and `_net` filename suffixes.  
+* Add WiFi/Bluetooth NSD commands to commandline configtool
 * Add Multiboard experimental clock link with other boards as optional 
   configuration. This is _not_ required for using the new multiboard driver.
   When enabled on all the boards you use, they will use the clock from the 

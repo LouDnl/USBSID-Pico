@@ -30,7 +30,6 @@
 #include <config.h>
 #include <usbsid_constants.h>
 #include <sid_cloneconfig.h>
-#include <config_socket.h>
 #include <bus.h>
 #include <sid.h>
 #include <logging.h>
@@ -60,6 +59,10 @@ typedef struct {
   uint16_t payload_len;
   uint16_t payload_have;
   bool     in_payload;
+  /* payload_len (from the header) exceeded NSD_MAX_PAYLOAD: ERROR was
+   * already sent at header time (see nsd_feed()), and the payload bytes are
+   * counted but not stored, since there is nowhere to put them. */
+  bool     oversized;
 } nsd_reassembly_t;
 
 static nsd_reassembly_t reasm;
@@ -84,6 +87,16 @@ static uint8_t nsd_sid_count = 1;
  * back today, it exists so the info is available if that changes later. */
 static uint8_t nsd_psid_header[124];
 
+/* TRY_SET_FM_OPL's own on/off state (spec: "enable or disable FM OPL for
+ * the current connection... disabled by default on a new connection").
+ * Deliberately separate from cfg.fmopl_enabled/cfg.fmopl_sid, which record
+ * whether a physical socket is wired as FM OPL at all - a board-owner
+ * config decision (BOARD_FMOPL) this connection-scoped command must never
+ * change. TRY_WRITE_EX/TRY_READ_EX's FMOpl handling below gates on both:
+ * cfg.fmopl_enabled says the hardware exists, this says the current NSD
+ * connection has turned it on. */
+static bool nsd_fmopl_active = false;
+
 /* Session state - single session at a time, enforced by the transport
  * layer (net_wifi.c / net_bluetooth.c) via `nsd_session_open()`. */
 static const nsd_transport_t *g_transport = NULL;
@@ -98,6 +111,7 @@ static void nsd_reasm_reset(void)
   reasm.payload_len = 0;
   reasm.payload_have = 0;
   reasm.in_payload = false;
+  reasm.oversized = false;
 }
 
 /**
@@ -187,6 +201,10 @@ static uint16_t handle_try_set_sid_count(uint8_t sid_number, uint8_t *resp_buf)
     resp_buf[0] = NSD_RESP_ERROR;
     return 1;
   }
+  if (net_ring_count() > 0) { /* "returns BUSY until audio quiescent, otherwise OK" (spec) */
+    resp_buf[0] = NSD_RESP_BUSY;
+    return 1;
+  }
   uint8_t max_sids = cfg.numsids ? cfg.numsids : 1;
   nsd_sid_count = (sid_number < max_sids) ? sid_number : max_sids;
   resp_buf[0] = NSD_RESP_OK;
@@ -240,6 +258,10 @@ static uint16_t handle_try_reset(uint8_t volume, uint8_t *resp_buf)
 
 static uint16_t handle_try_delay(uint8_t sid_number, uint16_t cycles, uint8_t *resp_buf)
 {
+  if (cycles == 0) { /* "0 is not allowed" (spec) */
+    resp_buf[0] = NSD_RESP_ERROR;
+    return 1;
+  }
   if (nsd_ring_busy() || net_ring_free() < 1) {
     resp_buf[0] = NSD_RESP_BUSY;
     return 1;
@@ -313,7 +335,11 @@ static uint16_t handle_try_read(const uint8_t *payload, uint16_t payload_len, ui
   const uint8_t *tail = &payload[n_leading * 4];
   uint16_t read_cycles = ((uint16_t)tail[0] << 8) | tail[1];
   uint8_t reg = tail[2];
-  uint8_t value = cycled_read_operation(reg, read_cycles);
+  /* Only chip 0-3 (reg < 0x80) is a real socket on this board - same
+   * convention as handle_try_write()'s TRY_WRITE and handle_try_write_ex()'s
+   * "SID 5-16: no such socket" guard. "accesses to unconfigured SIDs are
+   * ignored... an ignored read returns READ followed by 0x00" (spec). */
+  uint8_t value = (reg < 0x80) ? cycled_read_operation(reg, read_cycles) : 0x00;
   bus_release(BUS_OWNER_NET);
 
   resp_buf[0] = NSD_RESP_READ;
@@ -339,8 +365,10 @@ static inline uint8_t nsd_fmopl_base(void)
  * addr 0x0000-0x01ff addresses SID 1-16 (0x20 per chip); this board only
  * has 4 real sockets, so chip 5-16 entries are accepted (bookkeeping only)
  * but never touch the bus. addr 0xdf00-0xdfff becomes the two-port
- * index/data write a real OPL2 wants (opl_write(), midi_fmopl.c) when
- * cfg.fmopl_enabled, dropped (bookkeeping only) otherwise.
+ * index/data write a real OPL2 wants (opl_write(), midi_fmopl.c) when a
+ * socket is configured for it AND TRY_SET_FM_OPL has turned it on for this
+ * connection (cfg.fmopl_enabled && nsd_fmopl_active), dropped (bookkeeping
+ * only) otherwise.
  */
 static uint16_t handle_try_write_ex(const uint8_t *payload, uint16_t payload_len, uint8_t *resp_buf)
 {
@@ -359,7 +387,7 @@ static uint16_t handle_try_write_ex(const uint8_t *payload, uint16_t payload_len
     if (addr < NSD_EX_SID_MAX) {
       if (addr < 0x80) n_slots += 1; /* chip 0-3, real hardware */
     } else if (addr >= NSD_EX_FMOPL_LO && addr <= NSD_EX_FMOPL_HI) {
-      if (cfg.fmopl_enabled) n_slots += 2;
+      if (cfg.fmopl_enabled && nsd_fmopl_active) n_slots += 2;
     }
   }
   if (nsd_ring_busy() || net_ring_free() < n_slots) {
@@ -383,7 +411,7 @@ static uint16_t handle_try_write_ex(const uint8_t *payload, uint16_t payload_len
       uint8_t quad[4] = { (uint8_t)(delay >> 8), (uint8_t)(delay & 0xFF), reg, value };
       net_ring_push(quad);
     } else if (addr >= NSD_EX_FMOPL_LO && addr <= NSD_EX_FMOPL_HI) {
-      if (!cfg.fmopl_enabled) continue;
+      if (!cfg.fmopl_enabled || !nsd_fmopl_active) continue;
       uint8_t reg = (uint8_t)(addr & 0xFF);
       /* Index port write honours the caller's own delay; the data port
        * write follows it after a short settle, the same 10 cycles
@@ -431,7 +459,8 @@ static uint16_t handle_try_read_ex(const uint8_t *payload, uint16_t payload_len,
       if (addr >= 0x80) continue;
       uint8_t reg = (uint8_t)addr;
       if (!nsd_write_is_muted(reg)) cycled_write_operation(reg, value, cycles);
-    } else if (addr >= NSD_EX_FMOPL_LO && addr <= NSD_EX_FMOPL_HI && cfg.fmopl_enabled) {
+    } else if (addr >= NSD_EX_FMOPL_LO && addr <= NSD_EX_FMOPL_HI
+               && cfg.fmopl_enabled && nsd_fmopl_active) {
       uint8_t reg = (uint8_t)(addr & 0xFF);
       cycled_write_operation(fmopl_base, reg, cycles);
       cycled_write_operation((uint8_t)(fmopl_base + 0x10), value, 10);
@@ -444,13 +473,14 @@ static uint16_t handle_try_read_ex(const uint8_t *payload, uint16_t payload_len,
   uint8_t value;
   if (read_addr < NSD_EX_SID_MAX && read_addr < 0x80) {
     value = cycled_read_operation((uint8_t)read_addr, read_cycles);
-  } else if (read_addr >= NSD_EX_FMOPL_LO && read_addr <= NSD_EX_FMOPL_HI && cfg.fmopl_enabled) {
-    /* A real OPL2 only ever answers a status byte on the index port,
-     * regardless of which register number was nominally addressed - there
-     * is no per-register readback on the real chip. */
-    value = cycled_read_operation(fmopl_base, read_cycles);
   } else {
-    value = 0xFF; /* nothing on this board answers this address - open bus */
+    /* The read target's own address range dropped FM OPL in the spec
+     * (network_sid_device_V5.adoc, TRY_READ_EX no longer lists
+     * 0xdf00-0xdfff - only TRY_WRITE_EX still does, see the leading-entries
+     * loop above, which is unchanged): an unconfigured SID, or any address
+     * this protocol version no longer defines for a read, is an ignored
+     * read - returns READ followed by 0x00 (spec). */
+    value = 0x00;
   }
   bus_release(BUS_OWNER_NET);
 
@@ -535,16 +565,26 @@ static uint16_t handle_set_sid_header(const uint8_t *payload, uint16_t payload_l
 }
 
 /**
- * @brief TRY_SET_FM_OPL (21): enable/disable the board's FM OPL socket
+ * @brief TRY_SET_FM_OPL (21): enable/disable FM OPL for this connection
  *
- * Mirrors config.c's BOARD_FMOPL command: payload[0] is the enable flag,
- * payload[1] is the 1-4 SID number to assign, required when enabling.
- * Requires the write ring drained first (like TRY_RESET/TRY_SET_CLOCK),
- * since it changes how TRY_WRITE_EX routes FMOpl-range entries.
+ * Toggles nsd_fmopl_active, which the FMOpl-range handling in
+ * handle_try_write_ex()/handle_try_read_ex() checks alongside
+ * cfg.fmopl_enabled - see nsd_fmopl_active's own comment for why this never
+ * touches cfg.fmopl_sid/set_fmopl_sidno() (BOARD_FMOPL/config.c's job, a
+ * persistent board setting, not a per-connection one).
+ *
+ * Requires the write ring drained first, same reasoning as TRY_RESET/
+ * TRY_SET_CLOCK: it changes how TRY_WRITE_EX routes FMOpl-range entries
+ * from here on, and a queued entry from before the switch should not be
+ * reinterpreted after it.
+ *
+ * Known gap: spec says "enabling a disabled device resets it" - this does
+ * not reset the OPL chip's own registers on enable, only starts routing to
+ * it again. The chip keeps whatever state MIDI/ASID left it in.
  */
 static uint16_t handle_try_set_fm_opl(const uint8_t *payload, uint16_t payload_len, uint8_t *resp_buf)
 {
-  if (payload_len < 1) {
+  if (payload_len != 1) { /* spec: "the data packet is one byte long" */
     resp_buf[0] = NSD_RESP_ERROR;
     return 1;
   }
@@ -553,21 +593,23 @@ static uint16_t handle_try_set_fm_opl(const uint8_t *payload, uint16_t payload_l
     return 1;
   }
 
-  bool ok;
-  if (payload[0] == 0) {
-    ok = set_fmopl_sidno(0);  /* Clear any assigned FMOpl SID */
-  } else if (payload_len >= 2) {
-    ok = set_fmopl_sidno((int)payload[1]);
-  } else {
+  bool enable = (payload[0] != 0);
+  if (enable == nsd_fmopl_active) {
+    /* "enabling an already enabled device or disabling an already disabled
+     * device returns OK without resetting it or interrupting playback.
+     * Disabling FM OPL on an unsupported device also returns OK." (spec) */
+    resp_buf[0] = NSD_RESP_OK;
+    return 1;
+  }
+  if (enable && !cfg.fmopl_enabled) {
+    /* No socket on this board is configured as FM OPL at all: "returns
+     * ERROR when enabling FM OPL on a device that does not support it."
+     * (spec) */
     resp_buf[0] = NSD_RESP_ERROR;
     return 1;
   }
 
-  if (!ok) {
-    resp_buf[0] = NSD_RESP_ERROR;
-    return 1;
-  }
-  apply_fmopl_config(&cfg);
+  nsd_fmopl_active = enable;
   resp_buf[0] = NSD_RESP_OK;
   return 1;
 }
@@ -593,7 +635,8 @@ static void process_nsd_command(const uint8_t *header, const uint8_t *payload, u
       resp_len = handle_mute(sid_number, payload, payload_len, resp_buf);
       break;
     case NSD_CMD_TRY_RESET:
-      resp_len = handle_try_reset(payload_len >= 1 ? payload[0] : 0, resp_buf);
+      if (payload_len < 1) { resp_buf[0] = NSD_RESP_ERROR; resp_len = 1; break; }
+      resp_len = handle_try_reset(payload[0], resp_buf);
       break;
     case NSD_CMD_TRY_DELAY:
       if (payload_len < 2) { resp_buf[0] = NSD_RESP_ERROR; resp_len = 1; break; }
@@ -614,12 +657,19 @@ static void process_nsd_command(const uint8_t *header, const uint8_t *payload, u
     case NSD_CMD_GET_VERSION:
       resp_len = handle_get_version(resp_buf);
       break;
-    case NSD_CMD_TRY_SET_SAMPLING:      /* reSID software-emulation concept, accept and no-op */
-    case NSD_CMD_SET_SID_POSITION:
+    case NSD_CMD_SET_SID_POSITION:      /* reSID software-emulation concepts,
+                                          * this board has no equivalent: */
     case NSD_CMD_SET_SID_LEVEL:
     case NSD_CMD_SET_DELAY:
+      resp_buf[0] = NSD_RESP_OK;         /* "it always returns OK" (spec) */
+      resp_len = 1;
+      break;
+    case NSD_CMD_TRY_SET_SAMPLING:
     case NSD_CMD_SET_FADE_IN:
     case NSD_CMD_SET_FADE_OUT:
+      /* Also no-ops here, but "returns BUSY until audio quiescent, otherwise
+       * OK" (spec) rather than always OK - distinct from the group above. */
+      if (net_ring_count() > 0) { resp_buf[0] = NSD_RESP_BUSY; resp_len = 1; break; }
       resp_buf[0] = NSD_RESP_OK;
       resp_len = 1;
       break;
@@ -672,9 +722,19 @@ uint16_t nsd_feed(const uint8_t *data, uint16_t len)
 
       reasm.payload_len = (uint16_t)((reasm.header[2] << 8) | reasm.header[3]);
       if (reasm.payload_len > NSD_MAX_PAYLOAD) {
-        /* Client protocol violation - nothing sane to resync on but the
-         * next header, so just drop this framing attempt. */
-        nsd_reasm_reset();
+        /* Too big to buffer (spec allows up to 65,535 B of payload; this
+         * board only has room for NSD_MAX_PAYLOAD). Missing/malformed data
+         * gets ERROR elsewhere (see the Error Handling section), and a
+         * silent drop here is worse: a client waiting on a response for a
+         * legally-sized packet would otherwise hang forever. Still consume
+         * and discard exactly payload_len bytes rather than resetting
+         * outright, so framing stays in sync with a client that already
+         * committed to sending them - see the `oversized` branch below. */
+        uint8_t resp = NSD_RESP_ERROR;
+        nsd_send(&resp, 1);
+        reasm.oversized = true;
+        reasm.payload_have = 0;
+        reasm.in_payload = true;
         continue;
       }
       if (reasm.payload_len == 0) {
@@ -687,9 +747,10 @@ uint16_t nsd_feed(const uint8_t *data, uint16_t len)
       continue;
     }
 
-    reasm.payload[reasm.payload_have++] = byte;
+    if (!reasm.oversized) reasm.payload[reasm.payload_have] = byte;
+    reasm.payload_have++;
     if (reasm.payload_have == reasm.payload_len) {
-      process_nsd_command(reasm.header, reasm.payload, reasm.payload_len);
+      if (!reasm.oversized) process_nsd_command(reasm.header, reasm.payload, reasm.payload_len);
       nsd_reasm_reset();
     }
   }
@@ -707,6 +768,7 @@ void nsd_init(void)
   nsd_pending_cycles = 0;
   nsd_ring_busy_latched = false;
   nsd_sid_count = 1;
+  nsd_fmopl_active = false;
   memset(nsd_mute_mask, 0, sizeof(nsd_mute_mask));
   memset(nsd_psid_header, 0, sizeof(nsd_psid_header));
   g_transport = NULL;
@@ -724,6 +786,7 @@ bool nsd_session_open(const nsd_transport_t *t)
   g_transport = t;
   session_active = true;
   nsd_reasm_reset();
+  nsd_fmopl_active = false; /* "disabled by default on a new connection" (spec) */
   return true;
 }
 
@@ -737,6 +800,7 @@ void nsd_session_close(void)
   net_ring_clear();
   nsd_pending_cycles = 0;
   nsd_ring_busy_latched = false;
+  nsd_fmopl_active = false;
   if (bus_current_owner() == BUS_OWNER_NET) {
     bus_release(BUS_OWNER_NET);
   }
