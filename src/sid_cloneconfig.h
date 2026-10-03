@@ -39,6 +39,7 @@
 /* Functions from sid_cloneconfig.c */
 void    read_fpgasid_configuration(uint8_t base_address);
 void    read_skpico_configuration(uint8_t base_address, uint8_t profile);
+void    auto_update_skpico_clock(uint8_t base_address, uint8_t profile);
 void    reset_switch_pdsid_type(void);
 uint8_t read_pdsid_sid_type(uint8_t base_address);
 bool    set_pdsid_sid_type(uint8_t base_address, uint8_t type);
