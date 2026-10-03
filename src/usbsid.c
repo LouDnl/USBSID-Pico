@@ -178,7 +178,7 @@ void reset_reason(void)
 void init_logging(void)
 {
 #if defined(USBSID_UART)
-  stdio_uart_init_full(uart0, BAUD_RATE, TX, RX);
+  stdio_uart_init_full(uart0, BAUD_RATE, TX, RX); /* RX is unused, do not connect! */
   sleep_ms(100);  /* leave time for uart to settle */
   stdio_flush();
   usNFO("\n[NFO] Uart logging initialised\n");

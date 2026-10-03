@@ -1,7 +1,12 @@
 # Changelog
 Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on version changes
 
-#### Version: unreleased
+* Add Multiboard experimental clock link with other boards as optional 
+  configuration. This is _not_ required for using the new multiboard driver.
+  When enabled on all the boards you use, they will use the clock from the 
+  first board that boots. Booting in order is required here.
+  Connect a wire from the RX/PHI2 pin to all boards. This re-uses the uart
+  RX pin, make sure nothing else is connected to it. 
 * Add help menu's from commandline tools to dedicated README's
 * Change `cfg_usbsid` and `send_sid` to use USBSID-Pico-driver instead of
   their own libusb code: on macOS they use the vendor interface like every

@@ -186,7 +186,7 @@ void read_config(Config* config)
 
   /* Clockworx */
   config_array[5] = (int)config->lock_clockrate;
-  config_array[6] = (int)config->external_clock;
+  config_array[6] = (int)config->external_clock | ((int)config->board_clock_link << 1);
   config_array[7] = (config->clock_rate >> 16) & BYTE;
   config_array[8] = (config->clock_rate >> 8) & BYTE;
   config_array[9] = config->clock_rate & BYTE;
@@ -1344,6 +1344,14 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       memset(write_buffer_p, 0, 64);
       write_buffer_p[0] = us_features;
       write_back_data(1);
+      break;
+    case LINK_CLOCK:
+      usCFG("LINK_CLOCK %d\n", buffer[1]);
+      usbsid_config.board_clock_link = (bool)buffer[1];
+      usCFG("Saving config\n");
+      save_config_ext();
+      usCFG("Rebooting\n");
+      mcu_reset(); /* Point of no return */
       break;
     case RESTART_BUS:
       usCFG("RESTART_BUS\n");

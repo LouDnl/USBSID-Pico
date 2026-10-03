@@ -340,7 +340,41 @@ static void init_sidclock(void)
   offset_clock = pio_add_program(bus_pio, &clock_program);
   sm_clock = 0;  /* PIO0 SM0 */
   pio_sm_claim(bus_pio, sm_clock);
-  clock_program_init(bus_pio, sm_clock, offset_clock, PHI1, sidclock_frequency);
+  if (usbsid_config.board_clock_link) { /* Mirror the clock output to PHI2 */
+    clock_program_init(bus_pio, sm_clock, offset_clock, PHI1, PHI2, sidclock_frequency);
+  } else { /* No clock link, so only 1 output */
+    clock_program_init(bus_pio, sm_clock, offset_clock, PHI1, -1, sidclock_frequency);
+  }
+
+  return;
+}
+
+/**
+ * @brief Init nMHz square wave output derived from square wave input
+ *        at PHI2, GPIO PIN 17
+ *
+ * @note local function, sm_clock gets claimed and never released
+ *
+ */
+static void init_sidclock_link(void)
+{
+  uint32_t pico_hz = clock_get_hz(clk_sys);
+  sidclock_frequency = (float)pico_hz / usbsid_config.clock_rate / 2;
+
+  usNFO("\n");
+  usPIO("SID Linked clock initialisation\n");
+  usPIO("  Pico Clock @ %luMHz\n",
+    (pico_hz / 1000 / 1000));
+  usPIO("  SID clock divisor = %.2f\n",
+    sidclock_frequency);
+  usPIO("  SID Clock @ %.2f\n",
+    ((float)pico_hz / sidclock_frequency / 2));
+  usPIO("  C64 SID Clock = %d\n",
+    (int)usbsid_config.clock_rate);
+  offset_clock = pio_add_program(bus_pio, &clock_link_program);
+  sm_clock = 0;  /* PIO0 SM0 */
+  pio_sm_claim(bus_pio, sm_clock);
+  clock_link_program_init(bus_pio, sm_clock, offset_clock, PHI1, sidclock_frequency);
 
   return;
 }
@@ -361,24 +395,30 @@ void setup_sidclock(void)
   /* Verify the clockrare in the config is not out of bounds */
   verify_clockrate();
 
-  /* Run only if PCB version 1.0 */
-  if (PCB_VERSION_INT == 10) {
+  /* Run only if external clock link is enabled or when PCB version 1.0 */
+  if (usbsid_config.board_clock_link || (PCB_VERSION_INT == 10)) {
     /* Detect optional external crystal */
     if __us_likely(detect_clocksignal() == 0) {
       usbsid_config.external_clock = false;
-      gpio_deinit(PHI1); /* Disable PHI1 as gpio */
+      gpio_deinit(PHI1); /* Disable PHI1 as regular gpio */
+      if (usbsid_config.board_clock_link) {
+        gpio_deinit(PHI2); /* Disable PHI2 as regular gpio */
+      }
       init_sidclock();
     } else {  /* Do nothing gpio acts as input detection */
       usbsid_config.external_clock = true;
-      usbsid_config.clock_rate = CLOCK_DEFAULT;  /* Always fallback to 1MHz */
+      usbsid_config.clock_rate = CLOCK_PAL;  /* Always fall back to PAL */
+      /* Clock link relies on the player to set the correct SID clock */
+      if (usbsid_config.board_clock_link) {
+        init_sidclock_link(); /* PHI2 in -> PHI1 out */
+      }
     }
   } else {
     usbsid_config.external_clock = false;
-    gpio_deinit(PHI1); /* Disable PHI1 as gpio */
-#if 0 && PICO_RP2350 && !USE_PIO_UART /* Only on rp2350 for testing and when not using PIO Uart */
-    // gpio_deinit(PHI1); /* Disable PHI1 as gpio */
-    gpio_deinit(PHI2); /* Disable PHI2 as gpio */
-#endif
+    gpio_deinit(PHI1); /* Disable PHI1 as regular gpio */
+    if (usbsid_config.board_clock_link) {
+      gpio_deinit(PHI2); /* Disable PHI2 as regular gpio */
+    }
     init_sidclock();
   }
 
@@ -387,12 +427,23 @@ void setup_sidclock(void)
 /**
  * @brief De-init nMHz square wave output
  *
- * NOTE: The sidclock should actually never be disabled
  */
-static void __us_deprecated deinit_sidclock(void)
+static void deinit_sidclock(void)
 {
   usPIO("SID Clock deinitialise\n");
   clock_program_deinit(bus_pio, sm_clock, offset_clock, clock_program);
+
+  return;
+}
+
+/**
+ * @brief De-init nMHz linked square wave output
+ *
+ */
+static void deinit_sidclock_link(void)
+{
+  usPIO("SID Clock link deinitialise\n");
+  clock_link_program_deinit(bus_pio, sm_clock, offset_clock, clock_program);
 
   return;
 }

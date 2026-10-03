@@ -151,11 +151,12 @@ void init_audio_switch(void)
 int detect_clocksignal(void)
 {
   usPIN("Start external clock signal detection\n");
+  uint clockpin = (usbsid_config.board_clock_link ? PHI2 : PHI1);
   int c = 0, r = 0;
-  gpio_init(PHI1);
-  gpio_set_pulls(PHI1, false, true);
+  gpio_init(clockpin);
+  gpio_set_pulls(clockpin, false, true);
   for (int i = 0; i < 20; i++) {
-    r |= c = (read_bus(0) & bPIN(PHI1)) >> PHI1;
+    r |= c = (read_bus(0) & bPIN(clockpin)) >> clockpin;
   }
   usPIN("Result: %d: %s\n", r, (r == 0 ? "INTERNAL CLOCK" : "EXTERNAL CLOCK"));
   usPIN("End external clock signal detection\n");

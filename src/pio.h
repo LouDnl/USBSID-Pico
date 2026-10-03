@@ -41,6 +41,7 @@
 #include "bus_control.pio.h"   /* Busje komt zo! */
 #include "cycle_counter.pio.h" /* !<(O.O)>! */
 #include "clock.pio.h"         /* TikTak */
+#include "clock_link.pio.h"    /* TokTik */
 #include "vu.pio.h"            /* Kiem em goan! */
 #if defined(USE_RGB)
 #include "vu_rgb.pio.h"        /* Ik zie regenbogen! */

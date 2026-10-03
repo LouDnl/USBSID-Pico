@@ -219,6 +219,7 @@ typedef struct Config { // TODO: Add overrides for detect_default_config and add
   bool need_confirmation : 1;    /* (PCB v1.5+) current configuration needs confirmation, SID's are disabled until confirmed! */
   bool socket_change_detect : 1; /* (PCB v1.5+) disables socket change detection on boot */
   bool preset_auto_detect : 1;   /* disables silent auto detection before present change, default disabled on v1.0~v1.3, default enabled on v1.5+ */
+  bool board_clock_link : 1;     /* uses GPIO17 as external clock detection, PHI1 wil generate based on the inpu */
 } Config;
 
 /* Fixed defaults that differ between Pico1 and Pico2 */
@@ -314,6 +315,7 @@ typedef struct Config { // TODO: Add overrides for detect_default_config and add
   .need_confirmation = false, \
   .socket_change_detect = true, /* WARNING: This setting _can_ and _will_ fry your 9v SID if config is set to 6581 (12v) */ \
   .preset_auto_detect = PRESET_AUTO_DETECT_DEFAULT, /* Default disabled on v1.0~v1.3, default enabled on v1.5+ */ \
+  .board_clock_link = false, /* Disabled by default */ \
 } \
 
 typedef struct RuntimeCFG {
@@ -432,6 +434,7 @@ enum
   US_PCB_VERSION   = 0x81,  /* Read PCB version */
   US_FEATURES      = 0x82,  /* Read USBSID compiled features */
 
+  LINK_CLOCK       = 0x84,  /* Enable/Disable link with external clock feature (auto save and reboot) */
   RESTART_BUS      = 0x85,  /* Restart DMA & PIO */
   RESTART_BUS_CLK  = 0x86,  /* Restart PIO clocks */
   SYNC_PIOS        = 0x87,  /* Sync PIO clocks */

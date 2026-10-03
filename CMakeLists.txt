@@ -622,13 +622,14 @@ if(USBSID_W_BOARD)
 endif()
 
 ### Pio files
-set(PIO_BUS     ${CMAKE_CURRENT_LIST_DIR}/src/pio/bus_control.pio)
-set(PIO_CLOCK   ${CMAKE_CURRENT_LIST_DIR}/src/pio/clock.pio)
-set(PIO_VU      ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu.pio)
-set(PIO_RGB     ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu_rgb.pio)
-set(PIO_COUNTER ${CMAKE_CURRENT_LIST_DIR}/src/pio/cycle_counter.pio)
+set(PIO_BUS         ${CMAKE_CURRENT_LIST_DIR}/src/pio/bus_control.pio)
+set(PIO_CLOCK       ${CMAKE_CURRENT_LIST_DIR}/src/pio/clock.pio)
+set(PIO_CLOCK_LINK  ${CMAKE_CURRENT_LIST_DIR}/src/pio/clock_link.pio)
+set(PIO_VU          ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu.pio)
+set(PIO_RGB         ${CMAKE_CURRENT_LIST_DIR}/src/pio/vu_rgb.pio)
+set(PIO_COUNTER     ${CMAKE_CURRENT_LIST_DIR}/src/pio/cycle_counter.pio)
 if(USE_PIO_UART EQUAL 1)
-set(PIO_UART    ${CMAKE_CURRENT_LIST_DIR}/src/pio/uart_rx.pio)
+set(PIO_UART        ${CMAKE_CURRENT_LIST_DIR}/src/pio/uart_rx.pio)
 endif()
 
 ### Pico sdk path
@@ -797,6 +798,7 @@ foreach(FILENAME LEDTYPE PCBVERSION IN ZIP_LISTS FILENAMES LEDTYPES PCBVERSIONS)
   # pio headers to compile
   pico_generate_pio_header(${BUILD} ${PIO_BUS})
   pico_generate_pio_header(${BUILD} ${PIO_CLOCK})
+  pico_generate_pio_header(${BUILD} ${PIO_CLOCK_LINK})
   pico_generate_pio_header(${BUILD} ${PIO_VU})
   if(USE_PIO_UART EQUAL 1)
   pico_generate_pio_header(${BUILD} ${PIO_UART})
