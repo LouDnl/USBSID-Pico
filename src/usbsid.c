@@ -754,10 +754,12 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
            * if on default config first boot
            */
           if (first_boot || usbsid_config.need_confirmation || detected_sid_change) {
+            if (usbsid_config.need_confirmation || detected_sid_change) {
+              first_boot = false;
+            }
             return tud_control_xfer(rhport, request, (void*)(uintptr_t) &desc_url, desc_url.bLength);
-            first_boot = false;
           } else {
-            return tud_control_status(rhport, request);
+            return tud_control_xfer(rhport, request, NULL, 0);
           }
         case VENDOR_REQUEST_MICROSOFT: /* 2 */
           if (request->wIndex == 7) {
