@@ -52,7 +52,7 @@
 // RHPort max operational speed can defined by board.mk
 #ifndef BOARD_TUD_MAX_SPEED
 #define BOARD_TUD_MAX_SPEED   OPT_MODE_FULL_SPEED  /* Boo! Can't use HIGH speed 😢 */
-#define CFG_TUSB_RHPORT0_MODE (OPT_MODE_DEVICE | BOARD_TUD_MAX_SPEED)  /* High speed with TinyUSB is not available for rp2040*/
+#define CFG_TUSB_RHPORT0_MODE (OPT_MODE_DEVICE | BOARD_TUD_MAX_SPEED)  /* High speed with TinyUSB is not available for rp2040 */
 #endif
 
 //--------------------------------------------------------------------
@@ -104,7 +104,9 @@
 #define CFG_TUD_TASK_QUEUE_SZ   100  /* WHAT DOES THIS BUTTON DO!? */
 
 //------------- CLASS -------------//
-#ifdef USB_PRINTF
+/* WARNING: Adding more CDC ports can cause delays and
+ * desync on high speed demanding SID tunes */
+#if defined(USB_PRINTF)
 #define CFG_TUD_CDC              3
 #else
 #define CFG_TUD_CDC              2
@@ -112,7 +114,7 @@
 #define CFG_TUD_MSC              0
 #define CFG_TUD_HID              0
 #define CFG_TUD_MIDI             1
-#define CFG_TUD_VENDOR           1
+#define CFG_TUD_VENDOR           2
 
 // CDC Endpoint transfer buffer size, more is faster
 #define CFG_TUD_CDC_EP_BUFSIZE    64  // Even at 512KB only 64KB will be used because of TUD_OPT_FULL_SPEED, Pico is only USB2.0

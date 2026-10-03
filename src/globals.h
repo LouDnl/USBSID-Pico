@@ -106,10 +106,14 @@
 #endif
 
 /* Global USB definitions */
-#define CDC1_ITF 0
-#define CDC2_ITF 1
-#define MIDI_ITF 0
-#define WUSB_ITF 0
+#define CDC1_ITF 0 /* Data port CDC */
+#define CDC2_ITF 1 /* WebSerial CDC */
+#define WSRL_ITF 1 /* WebSerial CDC Essentially the same as CDC2_ITF */
+#define CDC3_ITF 2 /* USB Uart CDC */
+#define MIDI_ITF 0 /* Midi/ASID */
+#define WUSB_ITF 0 /* WebUSB Vendor */
+
+#define FRDS_ITF 1 /* FastReads Vendor */
 #define MIDI_CABLE 0
 
 /* USB data type */

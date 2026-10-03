@@ -64,7 +64,9 @@ tusb_desc_device_t const desc_device =
 
     .idVendor           = USB_VID,
     .idProduct          = USB_PID,
-    .bcdDevice          = 0x0100,  /* Device release number in binary-coded decimal */
+    /* Needs a bump when Vendor itf number changes due to Windows registry caching */
+    // .bcdDevice          = 0x0100,  /* Device release number in binary-coded decimal */
+    .bcdDevice          = 0x0101,  /* Device release number in binary-coded decimal */
 
     .iManufacturer      = 0x01,
     .iProduct           = 0x02,
@@ -86,13 +88,18 @@ uint8_t const * tud_descriptor_device_cb(void)
 /* Configuration Descriptor */
 enum
 {
-  ITF_NUM_CDC = 0,
-  ITF_NUM_CDC_DATA,  /* This gets the descriptor of CDC */
-  ITF_NUM_MIDI,
+  ITF_NUM_CDC = 0,         /* CDC -> Data */
+  ITF_NUM_CDC_DATA,        /* This gets the descriptor of CDC */
+  ITF_NUM_MIDI,            /* Midi */
   ITF_NUM_MIDI_STREAMING,  /* This has to be here, even if not used! */
-  ITF_NUM_VENDOR,
-  ITF_NUM_CDC_2,      /* WebSerial */
-  ITF_NUM_CDC_DATA_2, /* WebSerial */
+  ITF_NUM_VENDOR,          /* Vendor -> WebUSB */
+  ITF_NUM_CDC_2,           /* CDC -> WebSerial */
+  ITF_NUM_CDC_DATA_2,      /* CDC -> WebSerial */
+  ITF_NUM_VENDOR_2,        /* Vendor -> FastReads */
+#if defined(USB_PRINTF)
+  ITF_NUM_CDC_3,      /* USB UART */
+  ITF_NUM_CDC_DATA_3, /* USB UART */
+#endif
   ITF_NUM_TOTAL
 };
 
@@ -107,13 +114,37 @@ enum
 #define EPNUM_CDC2_NOTIF  0x85 /* WebSerial */
 #define EPNUM_CDC2_OUT    0x06 /* WebSerial */
 #define EPNUM_CDC2_IN     0x86 /* WebSerial */
+#define EPNUM_VENDOR2_OUT 0x07 /* Vendor FastReads */
+#define EPNUM_VENDOR2_IN  0x87 /* Vendor FastReads */
+#if defined(USB_PRINTF)
+#define EPNUM_CDC3_NOTIF  0x88 /* USB UART */
+#define EPNUM_CDC3_OUT    0x09 /* USB UART */
+#define EPNUM_CDC3_IN     0x89 /* USB UART */
+#endif
 
 #define USBD_CDC_CMD_MAX_SIZE         8
 #define USBD_CDC_IN_OUT_MAX_SIZE     64
 #define USBD_MIDI_IN_OUT_MAX_SIZE    64
 #define USBD_VENDOR_IN_OUT_MAX_SIZE  64
 
-#define CONFIG_TOTAL_LEN   (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_MIDI_DESC_LEN + TUD_VENDOR_DESC_LEN + TUD_CDC_DESC_LEN)
+#if !defined(USB_PRINTF)
+#define CONFIG_TOTAL_LEN ( \
+  TUD_CONFIG_DESC_LEN +    \
+  TUD_CDC_DESC_LEN +       \
+  TUD_MIDI_DESC_LEN +      \
+  TUD_VENDOR_DESC_LEN +    \
+  TUD_CDC_DESC_LEN +       \
+  TUD_VENDOR_DESC_LEN)
+#else
+#define CONFIG_TOTAL_LEN ( \
+  TUD_CONFIG_DESC_LEN +    \
+  TUD_CDC_DESC_LEN +       \
+  TUD_MIDI_DESC_LEN +      \
+  TUD_VENDOR_DESC_LEN +    \
+  TUD_CDC_DESC_LEN +       \
+  TUD_VENDOR_DESC_LEN +    \
+  TUD_CDC_DESC_LEN)
+#endif
 
 
 /* Full speed configuration */
@@ -133,11 +164,21 @@ uint8_t const desc_fs_configuration[] =
 
   // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
   TUD_CDC_DESCRIPTOR(ITF_NUM_CDC_2, 7, EPNUM_CDC2_NOTIF, USBD_CDC_CMD_MAX_SIZE, EPNUM_CDC2_OUT, EPNUM_CDC2_IN, USBD_CDC_IN_OUT_MAX_SIZE),
+
+  // Interface number, string index, EP Out & IN address, EP size
+  TUD_VENDOR_DESCRIPTOR(ITF_NUM_VENDOR_2, 8, EPNUM_VENDOR2_OUT, EPNUM_VENDOR2_IN, USBD_VENDOR_IN_OUT_MAX_SIZE),
+
+#if defined(USB_PRINTF)
+  // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
+  TUD_CDC_DESCRIPTOR(ITF_NUM_CDC_3, 9, EPNUM_CDC3_NOTIF, USBD_CDC_CMD_MAX_SIZE, EPNUM_CDC3_OUT, EPNUM_CDC3_IN, USBD_CDC_IN_OUT_MAX_SIZE),
+#endif
 };
 
 /* Some Microsoft mumbo jumbo 🪄 */
-#define BOS_TOTAL_LEN      (TUD_BOS_DESC_LEN + TUD_BOS_WEBUSB_DESC_LEN + TUD_BOS_MICROSOFT_OS_DESC_LEN)
-#define MS_OS_20_DESC_LEN  0xB2
+#define MS_OS_20_REG_PROP_LEN     0x84  /* 8 + name 0x2A + 2 + data 0x50 */
+#define MS_OS_20_FUNC_SUBSET_LEN  (0x08 + 0x14 + MS_OS_20_REG_PROP_LEN)
+#define MS_OS_20_DESC_LEN         (0x0A + 0x08 + (2 * MS_OS_20_FUNC_SUBSET_LEN))
+#define BOS_TOTAL_LEN             (TUD_BOS_DESC_LEN + TUD_BOS_WEBUSB_DESC_LEN + TUD_BOS_MICROSOFT_OS_DESC_LEN)
 
 /* BOS Descriptor is required for WebUSB */
 uint8_t const desc_bos[] =
@@ -171,24 +212,45 @@ uint8_t const desc_ms_os_20[] =
   // Configuration subset header: length, type, configuration index, reserved, configuration total length
   U16_TO_U8S_LE(0x0008), U16_TO_U8S_LE(MS_OS_20_SUBSET_HEADER_CONFIGURATION), 0, 0, U16_TO_U8S_LE(MS_OS_20_DESC_LEN-0x0A),
 
+  /* Function subset 1: WebUSB vendor interface */
   // Function Subset header: length, type, first interface, reserved, subset length
-  U16_TO_U8S_LE(0x0008), U16_TO_U8S_LE(MS_OS_20_SUBSET_HEADER_FUNCTION), ITF_NUM_VENDOR, 0, U16_TO_U8S_LE(MS_OS_20_DESC_LEN-0x0A-0x08),
+  U16_TO_U8S_LE(0x0008), U16_TO_U8S_LE(MS_OS_20_SUBSET_HEADER_FUNCTION), ITF_NUM_VENDOR, 0, U16_TO_U8S_LE(MS_OS_20_FUNC_SUBSET_LEN),
 
   // MS OS 2.0 Compatible ID descriptor: length, type, compatible ID, sub compatible ID
   U16_TO_U8S_LE(0x0014), U16_TO_U8S_LE(MS_OS_20_FEATURE_COMPATBLE_ID), 'W', 'I', 'N', 'U', 'S', 'B', 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // sub-compatible
 
   // MS OS 2.0 Registry property descriptor: length, type
-  U16_TO_U8S_LE(MS_OS_20_DESC_LEN-0x0A-0x08-0x08-0x14), U16_TO_U8S_LE(MS_OS_20_FEATURE_REG_PROPERTY),
+  U16_TO_U8S_LE(MS_OS_20_REG_PROP_LEN), U16_TO_U8S_LE(MS_OS_20_FEATURE_REG_PROPERTY),
   U16_TO_U8S_LE(0x0007), U16_TO_U8S_LE(0x002A), // wPropertyDataType, wPropertyNameLength and PropertyName "DeviceInterfaceGUIDs\0" in UTF-16
   'D', 0x00, 'e', 0x00, 'v', 0x00, 'i', 0x00, 'c', 0x00, 'e', 0x00, 'I', 0x00, 'n', 0x00, 't', 0x00, 'e', 0x00,
   'r', 0x00, 'f', 0x00, 'a', 0x00, 'c', 0x00, 'e', 0x00, 'G', 0x00, 'U', 0x00, 'I', 0x00, 'D', 0x00, 's', 0x00, 0x00, 0x00,
   U16_TO_U8S_LE(0x0050), // wPropertyDataLength
-  //bPropertyData: “{975F44D9-0D08-43FD-8B3E-127CA8AFFF9D}”.
+  // bPropertyData: "{975F44D9-0D08-43FD-8B3E-127CA8AFFF9D}"
   '{', 0x00, '9', 0x00, '7', 0x00, '5', 0x00, 'F', 0x00, '4', 0x00, '4', 0x00, 'D', 0x00, '9', 0x00, '-', 0x00,
   '0', 0x00, 'D', 0x00, '0', 0x00, '8', 0x00, '-', 0x00, '4', 0x00, '3', 0x00, 'F', 0x00, 'D', 0x00, '-', 0x00,
   '8', 0x00, 'B', 0x00, '3', 0x00, 'E', 0x00, '-', 0x00, '1', 0x00, '2', 0x00, '7', 0x00, 'C', 0x00, 'A', 0x00,
-  '8', 0x00, 'A', 0x00, 'F', 0x00, 'F', 0x00, 'F', 0x00, '9', 0x00, 'D', 0x00, '}', 0x00, 0x00, 0x00, 0x00, 0x00
+  '8', 0x00, 'A', 0x00, 'F', 0x00, 'F', 0x00, 'F', 0x00, '9', 0x00, 'D', 0x00, '}', 0x00, 0x00, 0x00, 0x00, 0x00,
+
+  /* Function subset 2: FastReads vendor interface */
+  // Function Subset header: length, type, first interface, reserved, subset length
+  U16_TO_U8S_LE(0x0008), U16_TO_U8S_LE(MS_OS_20_SUBSET_HEADER_FUNCTION), ITF_NUM_VENDOR_2, 0, U16_TO_U8S_LE(MS_OS_20_FUNC_SUBSET_LEN),
+
+  // MS OS 2.0 Compatible ID descriptor: length, type, compatible ID, sub compatible ID
+  U16_TO_U8S_LE(0x0014), U16_TO_U8S_LE(MS_OS_20_FEATURE_COMPATBLE_ID), 'W', 'I', 'N', 'U', 'S', 'B', 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // sub-compatible
+
+  // MS OS 2.0 Registry property descriptor: length, type
+  U16_TO_U8S_LE(MS_OS_20_REG_PROP_LEN), U16_TO_U8S_LE(MS_OS_20_FEATURE_REG_PROPERTY),
+  U16_TO_U8S_LE(0x0007), U16_TO_U8S_LE(0x002A), // wPropertyDataType, wPropertyNameLength and PropertyName "DeviceInterfaceGUIDs\0" in UTF-16
+  'D', 0x00, 'e', 0x00, 'v', 0x00, 'i', 0x00, 'c', 0x00, 'e', 0x00, 'I', 0x00, 'n', 0x00, 't', 0x00, 'e', 0x00,
+  'r', 0x00, 'f', 0x00, 'a', 0x00, 'c', 0x00, 'e', 0x00, 'G', 0x00, 'U', 0x00, 'I', 0x00, 'D', 0x00, 's', 0x00, 0x00, 0x00,
+  U16_TO_U8S_LE(0x0050), // wPropertyDataLength
+  // bPropertyData: "{91D2845B-F376-41DF-972B-3A2E580F17B5}"
+  '{', 0x00, '9', 0x00, '1', 0x00, 'D', 0x00, '2', 0x00, '8', 0x00, '4', 0x00, '5', 0x00, 'B', 0x00, '-', 0x00,
+  'F', 0x00, '3', 0x00, '7', 0x00, '6', 0x00, '-', 0x00, '4', 0x00, '1', 0x00, 'D', 0x00, 'F', 0x00, '-', 0x00,
+  '9', 0x00, '7', 0x00, '2', 0x00, 'B', 0x00, '-', 0x00, '3', 0x00, 'A', 0x00, '2', 0x00, 'E', 0x00, '5', 0x00,
+  '8', 0x00, '0', 0x00, 'F', 0x00, '1', 0x00, '7', 0x00, 'B', 0x00, '5', 0x00, '}', 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
 TU_VERIFY_STATIC(sizeof(desc_ms_os_20) == MS_OS_20_DESC_LEN, "Incorrect size");
@@ -232,7 +294,11 @@ static const char * const string_desc_arr[] =
     "USBSID-Pico Data",          // 4: CDC Interface
     "USBSID-Pico Midi",          // 5: Midi Interface
     "USBSID-Pico WebUSB",        // 6: WebUSB Vendor Interface
-    "USBSID-Pico WebSerial",     // 8: CDC Interface
+    "USBSID-Pico WebSerial",     // 7: CDC Interface
+    "USBSID-Pico FastReads",     // 8: Vendor Interface
+#if defined(USB_PRINTF)
+    "USBSID-Pico USB Uart",      // 9: CDC Interface
+#endif
 };
 
 /* automatically update if an additional string is later added to the table */
