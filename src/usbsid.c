@@ -1073,8 +1073,12 @@ void core1_main(void)
   queue_init(&sidtest_queue, sizeof(sidtest_queue_entry_t), 1);
   #ifdef WRITE_DEBUG  /* Only init this queue when needed */
   /* Init Write logging queue, 16384 entries deep so we don't skip any writes */
+  #ifdef RP2350
   queue_init(&logging_queue, sizeof(writelogging_queue_entry_t), 16384);
+  #else /* RP2040 */
+  queue_init(&logging_queue, sizeof(writelogging_queue_entry_t), 8192);
   #endif
+  #endif /* WRITE_DEBUG */
 
   /* Initialise PIO Uart */
   #ifdef USE_PIO_UART
