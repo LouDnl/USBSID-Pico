@@ -60,9 +60,9 @@ int      bus_drain(void);
 void     bus_resync(void);
 uint32_t clockcycles(void);
 void     clockcycle_delay(uint32_t n_cycles);
-bool    bus_try_claim(bus_owner_t who);  /* true if `who` now owns the bus */
-void    bus_touch(bus_owner_t who);      /* refresh idle timer */
-void    bus_release(bus_owner_t who);
+bool     bus_try_claim(bus_owner_t who);  /* true if `who` now owns the bus */
+void     bus_touch(bus_owner_t who);      /* refresh idle timer */
+void     bus_release(bus_owner_t who);
 bus_owner_t bus_current_owner(void);
 
 /* Heavy-operation exclusion, separate from the ownership arbiter above -
