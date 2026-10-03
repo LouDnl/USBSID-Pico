@@ -73,9 +73,6 @@ set(USE_PIO_UART 0)
 ### Enable / Disable build with WiFi/Bluetooth Network SID Device (NSD) support on _w boards
 set(ENABLE_NET 0 CACHE STRING "ENABLE_NET")
 
-### Enable/ Disable build with CDC telemetry port (pico2 with sidplayer only!)
-set(ENABLE_TELEMETRY 0 CACHE STRING "ENABLE_TELEMETRY")
-
 
 
 #######################################
@@ -119,9 +116,6 @@ if(ENABLE_NET EQUAL 1)
 endif()
 if(USE_PIO_UART EQUAL 1)
   list(APPEND FEATURE_LIST "${Cyan}${ColorBold}PIO Uart${ColorReset}")
-endif()
-if(ENABLE_TELEMETRY EQUAL 1)
-  list(APPEND FEATURE_LIST "${Cyan}${ColorBold}Telemetry${ColorReset}")
 endif()
 
 ### Replace the semi colon in the list (This will not work: list(JOIN FEATURE_LIST ", " FEATURE_STRING))
@@ -624,18 +618,6 @@ if(USBSID_W_BOARD)
       list(APPEND FILENAMES_net "${FILENAME}${FILENAME_EXTENSION}")
     endforeach()
     set(FILENAMES ${FILENAMES_net})
-  endif()
-endif()
-
-### Enable Telemetry and update the filenames if needed
-if(ENABLE_TELEMETRY EQUAL 1)
-  if(${PICO_BOARD} STREQUAL "pico2" OR ${PICO_BOARD} STREQUAL "pico2_w")
-    add_compile_definitions(USE_TELEMETRY=1)
-    ### Add filename id
-    foreach(FILENAME ${FILENAMES})
-      list(APPEND FILENAMES_telemetry "${FILENAME}_tl")
-    endforeach()
-    set(FILENAMES ${FILENAMES_telemetry})
   endif()
 endif()
 
