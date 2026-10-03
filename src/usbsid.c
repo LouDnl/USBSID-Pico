@@ -273,6 +273,29 @@ void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
   } while (state != 1);
 }
 
+#if defined(READ_COST_PROBE)
+/**
+ * @brief Time back-to-back bus reads in PHI1 cycles (benchmark probe)
+ *
+ * Reads the 4 readable registers $19-$1C of the SID at `address`
+ * round robin, `count` reads in total.
+ *
+ * @param uint8_t address any register of the SID to read from
+ * @param uint8_t count number of reads, 1-63
+ * @return uint8_t elapsed PHI1 cycles, clamped to 255
+ */
+static uint8_t __no_inline_not_in_flash_func(read_cost_probe)(uint8_t address, uint8_t count)
+{
+  uint8_t base = (address & 0xE0);
+  uint32_t t0 = clockcycles();
+  for (uint8_t i = 0; i < count; i++) {
+    (void)cycled_read_operation((uint8_t)(base | (0x19 + (i & 0x3))), 0);
+  }
+  uint32_t dt = clockcycles() - t0;
+  return (uint8_t)(dt > 0xFF ? 0xFF : dt);
+}
+#endif
+
 /**
  * @brief Process received USB data and dispatch it to the SID bus
  *
@@ -327,7 +350,13 @@ void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volat
   };
   if __us_unlikely(command == READ) {  /* READING CAN ONLY HANDLE ONE AT A TIME, PERIOD. */
     usIO("[I %d] [%c] $%02X:%02X\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2]);
+#if defined(READ_COST_PROBE)
+    write_buffer[0] = (n_bytes == 0)
+      ? cycled_read_operation(sid_buffer[1], 0)
+      : read_cost_probe(sid_buffer[1], n_bytes);
+#else
     write_buffer[0] = cycled_read_operation(sid_buffer[1], 0);  /* write the address to the SID and read the data back */
+#endif
     switch (rtype) {  /* write the result to the USB client */
       case 'C':
         cdc_write(itf, BYTES_TO_SEND);

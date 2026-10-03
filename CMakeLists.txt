@@ -61,6 +61,7 @@ if(NOT DEFINED $ENV{DISABLE_DEBUGGING})  # MATCHES
   set(SIDWRITES_DEBUGGING 0)  # Enable logging of SID writes one core 2
   set(EMULATOR_DEBUGGING 1)   # Enable debugging in emulator
   set(BT_DIAG_DEBUGGING 0)    # Enable verbose per-HCI-event logging in net_bluetooth.c ~ floods UART, causes audible lag while playing
+  set(READ_PROBE_DEBUGGING 0) # Enable read cost/time probing
 endif()
 
 ### Enable / Disable build with USBSID-Player for tune playback or Cynthcart emulation
@@ -718,6 +719,9 @@ if(USBSID_DEBUGGING EQUAL 1)
   endif()
   if(BT_DIAG_DEBUGGING EQUAL 1)
     add_compile_definitions(BT_DIAG_DEBUG=1)
+  endif()
+  if(READ_PROBE_DEBUGGING EQUAL 1)
+    add_compile_definitions(READ_COST_PROBE=1)
   endif()
 endif()
 
