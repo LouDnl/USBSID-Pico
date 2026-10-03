@@ -36,7 +36,10 @@ set(PROJECT_NAME cfg_usbsid)
 set(EXECUTABLE ${PROJECT_NAME} CACHE STRING "EXECUTABLE")
 
 ### Project type
-project(${PROJECT_NAME} C ASM)
+project(${PROJECT_NAME} C CXX ASM)
+
+### C++ standard for the driver
+set(CMAKE_CXX_STANDARD 17)
 
 ### Include
 include_directories(".")
@@ -47,29 +50,39 @@ find_package(PkgConfig REQUIRED)
 ### Create `PkgConfig::<MODULE>` variables
 pkg_check_modules(libusb REQUIRED IMPORTED_TARGET libusb-1.0)
 
+### Threads, the driver uses pthreads
+find_package(Threads REQUIRED)
+
 ### Libraries to link
 if (UNIX)
 set(TARGET_LL
   PkgConfig::libusb
+  Threads::Threads
 )
 endif (UNIX)
 if (WIN32)
 set(TARGET_LL
   PkgConfig::libusb
+  Threads::Threads
   -lwinmm
 )
 endif (WIN32)
+
+### USBSID-Pico-driver sources, sets US_DRIVER_DIR and US_DRIVER_SOURCES
+include(${CMAKE_CURRENT_LIST_DIR}/../usbsid-driver.cmake)
 
 ### Source is horse ofcourse ofcourse
 set(SOURCEFILES
   cfg_usbsid.c
   inih/ini.c
+  ${US_DRIVER_SOURCES}
 )
 
 ### Header directories to include
 set(TARGET_INCLUDE_DIRS PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}
   ${CMAKE_CURRENT_LIST_DIR}/inih
+  ${US_DRIVER_DIR}
   /usr/local/lib
   /usr/local/include
   /usr/lib

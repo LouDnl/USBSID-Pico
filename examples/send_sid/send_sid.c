@@ -34,24 +34,15 @@
 #include <stdbool.h>
 #include <ctype.h>
 
-#include <libusb.h>
+#include "USBSIDInterface.h"
 
-/* Compile with:
- * gcc -g3 -L/usr/local/lib send_sid.c -o send_sid $(pkg-config --libs --cflags libusb-1.0)
+/* Compile with CMake, the tool links USBSID-Pico-driver and the player's songlengths:
+ * cmake -S . -B build && cmake --build build
  */
 
-#define VENDOR_ID      0xcafe //5553
-#define PRODUCT_ID     0x4011
-#define ACM_CTRL_DTR   0x01
-#define ACM_CTRL_RTS   0x02
-
-static struct libusb_device_handle *devh = NULL;
-static unsigned char encoding[] = { 0x00, 0x10, 0x0E, 0x00, 0x00, 0x00, 0x08 };
-static int ep_out_addr = 0x02;
-static int ep_in_addr  = 0x82;
-
-static int len, rc, actual_length, transferred;
-static int usid_dev = -1;
+static USBSIDitf us = NULL;
+static char target_serial[USBSID_SERIAL_LEN] = {0}; /* Board to open, empty = use target_index */
+static int target_index = 0;                         /* Index in enumerate_USBSID() order */
 
 int tune_no = 1;
 const char * songlengths_path = NULL;
@@ -102,86 +93,147 @@ void teardown_wait(void)
 }
 
 /**
- * @brief Initialize a connection with USBSID-Pico
+ * @brief Case insensitive string compare, serials are uppercase hex
  *
- * @return int
+ * @param a first NUL terminated string
+ * @param b second NUL terminated string
+ * @return bool true when equal ignoring case
  */
-int usbsid_init(void)
+static bool str_ieq(const char *a, const char *b)
 {
-  if (devh != NULL) {
-    libusb_close(devh);
+  while (*a && *b) {
+    if (toupper((unsigned char)*a) != toupper((unsigned char)*b)) return false;
+    a++; b++;
+  }
+  return (*a == *b);
+}
+
+/**
+ * @brief Print one enumerated board line
+ *
+ * @param i board index in enumerate_USBSID() order
+ * @param d board info
+ */
+static void print_board(int i, const USBSIDdevinfo *d)
+{
+  printf("  board %d: serial %s @ bus=%u port=", i,
+        d->serial[0] ? d->serial : "<unreadable>", d->bus);
+  for (int p = 0; p < d->port_path_len; p++)
+    printf(p ? ".%u" : "%u", d->port_path[p]);
+  printf("\n");
+}
+
+/**
+ * @brief Enumerate attached boards and select the one usbsid_init() opens
+ *
+ * @param print_output print every board found
+ * @param board -b/--board value, board index or serial, NULL selects the first board
+ * @return int 0 on success, 1 on failure or no matching board
+ */
+static int usbsid_enumerate_boards(bool print_output, const char *board)
+{
+  /* 1st call: count only (NULL + 0 allowed) */
+  int n = enumerate_USBSID(NULL, 0);
+  if (n < 0) { fprintf(stderr, "board enumeration failed\n"); return 1; }
+  if (n == 0) { fprintf(stderr, "no USBSID-Pico boards found\n"); return 1; }
+
+  USBSIDdevinfo *devs = calloc((size_t)n, sizeof *devs);
+  if (!devs) return 1;
+
+  /* 2nd call: fill. Return can exceed capacity if a board was plugged in between */
+  int got = enumerate_USBSID(devs, n);
+  if (got < 0) { fprintf(stderr, "board enumeration failed\n"); free(devs); return 1; }
+  if (got > n) got = n;
+  if (got == 0) { fprintf(stderr, "no USBSID-Pico boards found\n"); free(devs); return 1; }
+
+  if (print_output) {
+    for (int i = 0; i < got; i++) print_board(i, &devs[i]);
   }
 
-  rc = libusb_init(NULL);
-  if (rc != 0) {
-  fprintf(stderr, "Error initializing libusb: %s: %s\n",
-    libusb_error_name(rc), libusb_strerror(rc));
-    goto out;
-  }
-
-  devh = libusb_open_device_with_vid_pid(NULL, VENDOR_ID, PRODUCT_ID);
-  if (!devh) {
-    fprintf(stderr, "Error finding USB device\n");
-    rc = -1;
-    goto out;
-  }
-
-  for (int if_num = 0; if_num < 2; if_num++) {
-    /* If the kernel driver is holding the interface, manually detach it */
-    if (libusb_kernel_driver_active(devh, if_num) == 1) {
-      libusb_detach_kernel_driver(devh, if_num);
+  /* Resolve the requested board, serial match wins over index */
+  int sel = -1;
+  if (board == NULL) {
+    sel = 0;
+  } else {
+    for (int i = 0; i < got; i++) {
+      if (devs[i].serial[0] && str_ieq(devs[i].serial, board)) { sel = i; break; }
+    }
+    if (sel < 0 && board[0] != '\0') {
+      char *end = NULL;
+      long idx = strtol(board, &end, 10);
+      if (*end == '\0' && idx >= 0 && idx < got) sel = (int)idx;
     }
   }
 
-  rc = libusb_claim_interface(devh, 0);
-  if (rc < 0) {
-    fprintf(stderr, "Error claiming interface: %d, %s: %s\n",
-    rc, libusb_error_name(rc), libusb_strerror(rc));
-    goto out;
+  if (sel < 0) {
+    fprintf(stderr, "No board matches '%s', available boards:\n", board);
+    for (int i = 0; i < got; i++) print_board(i, &devs[i]);
+    free(devs);
+    return 1;
   }
 
-  rc = libusb_claim_interface(devh, 1);
-  if (rc < 0) {
-    fprintf(stderr, "Error claiming interface: %d, %s: %s\n",
-    rc, libusb_error_name(rc), libusb_strerror(rc));
-    goto out;
+  /* Prefer the serial for opening, fall back to the index when unreadable */
+  target_index = sel;
+  memset(target_serial, 0, sizeof target_serial);
+  if (devs[sel].serial[0])
+    snprintf(target_serial, sizeof target_serial, "%s", devs[sel].serial);
+
+  free(devs);
+  return 0;
+}
+
+/**
+ * @brief Take -b=/--board= out of argv, keeping argv[argc] NULL
+ *
+ * @param argc argument count, decremented when the option is removed
+ * @param argv argument vector, option removed in place
+ * @param board receives the value after '=', untouched when absent
+ * @return int 0 when absent, 1 when found, -1 when given without a value
+ */
+static int take_board_arg(int *argc, char **argv, const char **board)
+{
+  for (int i = 1; i < *argc; i++) {
+    const char *val = NULL;
+    if (!strncmp(argv[i], "-b=", 3)) val = argv[i] + 3;
+    else if (!strncmp(argv[i], "--board=", 8)) val = argv[i] + 8;
+    else if (!strcmp(argv[i], "-b") || !strcmp(argv[i], "--board")) return -1;
+    else continue;
+
+    if (*val == '\0') return -1;
+    *board = val;
+    for (int j = i; j < *argc; j++) argv[j] = argv[j + 1];
+    (*argc)--;
+    return 1;
   }
+  return 0;
+}
 
-  rc = libusb_control_transfer(devh, 0x21, 0x22, ACM_CTRL_DTR | ACM_CTRL_RTS, 0, NULL, 0, 0);
-  if (rc != 0 && rc != 7) {
-    fprintf(stderr, "?Error configuring line state during control transfer: %d, %s: %s\n",
-      rc, libusb_error_name(rc), libusb_strerror(rc));
-    goto out;
+/**
+ * @brief Open the board selected by usbsid_enumerate_boards() without touching SID state
+ *
+ * @return int 0 on success, -1 on failure
+ */
+int usbsid_init(void)
+{
+  us = create_USBSID();
+  if (us == NULL) {
+    fprintf(stderr, "Error creating USBSID-Pico driver instance\n");
+    return -1;
   }
-
-  rc = libusb_control_transfer(devh, 0x21, 0x20, 0, 0, encoding, sizeof(encoding), 0);
-  if (rc != 0 && rc != 7) {
-  fprintf(stderr, "Error configuring line encoding during control transfer: %d, %s: %s\n",
-    rc, libusb_error_name(rc), libusb_strerror(rc));
-    goto out;
+  /* Serial survives a replug, index is the fallback when the serial was unreadable */
+  if (target_serial[0] != '\0')
+    settargetserial_USBSID(us, target_serial);
+  else
+    settargetindex_USBSID(us, target_index);
+  /* Passive: no mute, bus clear or clock query that would disturb playback */
+  setpassive_USBSID(us, true);
+  if (init_USBSID(us, false, false) < 0 || !portisopen_USBSID(us)) {
+    fprintf(stderr, "Error finding USB device\n");
+    close_USBSID(us);
+    us = NULL;
+    return -1;
   }
-
-  usid_dev = (rc == 0 || rc == 7) ? 0 : -1;
-
-  if (usid_dev < 0) {
-    fprintf(stderr, "Could not open SID device USBSID.\n");
-    goto out;
-  }
-
-  /* zero length read to clear any lingering data */
-  unsigned char buffer[1];
-  libusb_bulk_transfer(devh, ep_out_addr, buffer, 0, &transferred, 1);
-  libusb_bulk_transfer(devh, ep_in_addr, buffer, 0, &transferred, 1);
-
-  return usid_dev;
-out:
-  if (devh != NULL)
-    libusb_close(devh);
-  libusb_exit(NULL);
-  devh = NULL;
-  usid_dev = -1;
-  rc = -1;
-  return rc;
+  return 0;
 }
 
 /**
@@ -190,35 +242,22 @@ out:
  */
 void usbsid_close(void)
 {
-  libusb_release_interface(devh, 0);
-  libusb_release_interface(devh, 1);
-
-  rc = libusb_attach_kernel_driver(devh, 0);
-  if (rc < 0 && rc != LIBUSB_ERROR_NOT_FOUND) {
-    fprintf(stderr, "Attach error on interface 0: %s\n", libusb_error_name(rc));
-  }
-
+  if (us == NULL) return;
   teardown_wait();
-
-  if (devh != NULL)
-    libusb_close(devh);
-  libusb_exit(NULL);
-  devh = NULL;
-  usid_dev = -1;
+  close_USBSID(us);
+  us = NULL;
   return;
 }
 
 /**
- * @brief Write data to USBSID-Pico
+ * @brief Send a player command, report failure
  *
- * @param data
- * @param size
+ * @param cmd USBSID_PLAYER_* command
  */
-void write_chars(unsigned char * data, int size)
+static void player_command(uint8_t cmd)
 {
-  int actual_length;
-  if (libusb_bulk_transfer(devh, ep_out_addr, data, size, &actual_length, 0) < 0) {
-    fprintf(stderr, "Error while sending char\n");
+  if (playercommand_USBSID(us, cmd) < 0) {
+    fprintf(stderr, "Error sending player command $%02X\n", cmd);
   }
   return;
 }
@@ -273,51 +312,56 @@ char* get_extension_and_tolower(const char* fname) {
 }
 
 /**
+ * @brief Read a whole stream into memory
+ *
+ * @param input_f open stream, may be stdin
+ * @param size receives the number of bytes read
+ * @return uint8_t* malloc'd buffer, NULL on failure
+ */
+static uint8_t * read_all(FILE* input_f, size_t * size)
+{
+  size_t cap = 0x10000, len = 0;
+  uint8_t * data = malloc(cap);
+  if (data == NULL) return NULL;
+  for (;;) {
+    if (len == cap) {
+      uint8_t * grown = realloc(data, cap * 2);
+      if (grown == NULL) { free(data); return NULL; }
+      data = grown;
+      cap *= 2;
+    }
+    size_t n = fread(data + len, 1, cap - len, input_f);
+    len += n;
+    if (n == 0) break;
+  }
+  if (ferror(input_f)) { free(data); return NULL; }
+  *size = len;
+  return data;
+}
+
+/**
  * @brief Send input file to USBSID-Pico
  *
  * @param input_f
  * @param filetype
+ * @return bool true when the upload was sent
  */
-static void send_sid(FILE* input_f, int filetype)
+static bool send_sid(FILE* input_f, int filetype)
 {
-  int byte;
-  unsigned int i = 0U;
-  unsigned char buff[64] = {0};
-  static int bytecount = 2;
-
-  fseek(input_f, 0L, SEEK_END);
-  unsigned int file_size = ftell(input_f);
-  rewind(input_f);
-
-  buff[0] = (PACKET_TYPE|CONFIG);
-  buff[1] = UPLOAD_SID_START;
-  buff[2] = (filetype);
-  write_chars(buff, 64);
-
-  buff[1] = UPLOAD_SID_DATA;
-  while ((byte = getc(input_f)) != EOF) {
-    buff[bytecount++] = byte;
-    if (bytecount == 64 || i == (file_size - 1)) {
-      bytecount = 2;
-      write_chars(buff, 64);
-      memset(buff, 0, 64);
-      buff[0] = (PACKET_TYPE|CONFIG);
-      buff[1] = UPLOAD_SID_DATA;
-    }
-    ++i;
+  size_t file_size = 0;
+  uint8_t * data = read_all(input_f, &file_size);
+  if (data == NULL) {
+    fprintf(stderr, "Failed to read input\n");
+    return false;
   }
-  memset(buff, 0, 64);
-  buff[0] = (PACKET_TYPE|CONFIG);
-  buff[1] = UPLOAD_SID_END;
-  write_chars(buff, 64);
-  memset(buff, 0, 64);
-  buff[0] = (PACKET_TYPE|CONFIG);
-  buff[1] = UPLOAD_SID_SIZE;
-  buff[2] = ((i&0xFF00)>>8); /* High byte */
-  buff[3] = (i&0xFF); /* Low byte */
-  write_chars(buff, 64);
-
-  return;
+  int sent = uploadtune_USBSID(us, data, file_size, (uint8_t)filetype);
+  free(data);
+  if (sent < 0) {
+    fprintf(stderr, "Error uploading file\n");
+    return false;
+  }
+  fprintf(stdout, "Sent %d bytes\n", sent);
+  return true;
 }
 
 /**
@@ -329,6 +373,8 @@ void print_help(void)
   fprintf(stdout, "*** Usage ***\n");
   fprintf(stdout, "\n");
   fprintf(stdout, "-help / -h: Show this information\n");
+  fprintf(stdout, "-lb / --list-boards: List every attached board and exit\n");
+  fprintf(stdout, "-b=ID / --board=ID: Use board ID (index from -lb) or serial, default first board\n");
   fprintf(stdout, "\n");
   fprintf(stdout, "  sidfile.sid: send sidfile.sid to USBSID-Pico to start play\n");
   fprintf(stdout, "  sidtune.prg: send sidtune.prg to USBSID-Pico to start play (psid64 preferred!)\n");
@@ -373,8 +419,12 @@ int main(int argc, char* argv[])
   const char* filename = NULL;
   const char* name = "data";
 
-  unsigned char configbuff[5] = {0};
-  configbuff[0] = (PACKET_TYPE|CONFIG);
+  /* Board selection, removed from argv to keep it out of the file and option parsers */
+  const char *board = NULL;
+  if (take_board_arg(&argc, argv, &board) < 0) {
+    fprintf(stderr, "-b/--board requires a value: -b=ID or --board=SERIAL\n");
+    return EXIT_FAILURE;
+  }
 
   if (argc <= 1) {
     printf("Please supply atleast 1 option!\n");
@@ -393,8 +443,24 @@ int main(int argc, char* argv[])
     return EXIT_SUCCESS;
   }
 
+  if (!strcmp(argv[1], "-lb") || !strcmp(argv[1], "--list-boards")) {
+    return (usbsid_enumerate_boards(true, NULL) == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+  }
+
+  /* First board without -b, else the requested index or serial */
+  if (usbsid_enumerate_boards(false, board) != 0) {
+    goto exit;
+  }
+
   if (usbsid_init()) {
     goto exit;
+  }
+  {
+    char serial[USBSID_SERIAL_LEN] = {0};
+    if (getserial_USBSID(us, serial, sizeof serial) > 0)
+      fprintf(stdout, "Connected to USBSID-Pico board %d (serial %s)\n", target_index, serial);
+    else
+      fprintf(stdout, "Connected to USBSID-Pico board %d\n", target_index);
   }
 
   /* Check if we have a request to force play on SID2 / Socket2 etc. */
@@ -403,7 +469,7 @@ int main(int argc, char* argv[])
       forcetwo = true;
     } else if (!strcmp(argv[a], "--songlengths") && a + 1 < argc) {
       songlengths_path = argv[a+1];
-    } else if(!strcmp(argv[a], "-t") || !strcmp(argv[a], "t")) {
+    } else if((!strcmp(argv[a], "-t") || !strcmp(argv[a], "t")) && a + 1 < argc) {
       tune_no = atoi(argv[a+1]);
     }
   }
@@ -442,10 +508,11 @@ int main(int argc, char* argv[])
       }
       {
         fprintf(stdout, "Stopping current playback, if any!\n");
-        configbuff[1] = SID_PLAYER_STOP;
-        write_chars(configbuff, 5);
+        player_command(USBSID_PLAYER_STOP);
       }
-      send_sid((input_f ? input_f : stdin), (sidfile ? SID_FILE : prgfile ? PRG_FILE : FROM_STDIN));
+      if (!send_sid((input_f ? input_f : stdin), (sidfile ? SID_FILE : prgfile ? PRG_FILE : FROM_STDIN))) {
+        goto exit;
+      }
       sentfile = true;
     }
 
@@ -453,93 +520,59 @@ int main(int argc, char* argv[])
       fprintf(stdout, "Sending from stdin\n");
       {
         fprintf(stdout, "Stopping current playback, if any!\n");
-        configbuff[1] = SID_PLAYER_STOP;
-        write_chars(configbuff, 5);
+        player_command(USBSID_PLAYER_STOP);
       }
-      send_sid(stdin, FROM_STDIN);
+      if (!send_sid(stdin, FROM_STDIN)) {
+        goto exit;
+      }
       sentfile = true;
     }
     if (sentfile) {
-      if (songlenth != 300000) {
+      if (songlenth != 0 && songlenth != 300000) { /* 0: unknown, keep the 5 minute default */
         fprintf(stdout, "Sending playtime\n");
-        configbuff[1] = UPLOAD_SID_PLAYTIME;
-        configbuff[2] = (uint8_t)((songlenth >> 24) & 0xFF);
-        configbuff[3] = (uint8_t)((songlenth >> 16) & 0xFF);
-        configbuff[4] = (uint8_t)((songlenth >> 8) & 0xFF);
-        configbuff[5] = (uint8_t)(songlenth & 0xFF);
-        write_chars(configbuff, 5);
+        if (playersetplaytime_USBSID(us, songlenth) < 0) {
+          fprintf(stderr, "Error sending playtime\n");
+        }
       }
       if (forcetwo) {
         fprintf(stdout, "Forcing SID/Socket 2\n");
-        configbuff[1] = SID_PLAYER_TWO;
-        configbuff[2] = 0;
-        configbuff[3] = 0;
-        configbuff[4] = 0;
-        configbuff[5] = 0;
-        write_chars(configbuff, 5);
+        player_command(USBSID_PLAYER_TWO);
       }
       {
         fprintf(stdout, "Setting subtune to ");
-        configbuff[1] = SID_PLAYER_LOAD;
-        configbuff[2] = 0; //strtol(argv[arg+1], NULL, 16); /* Tune ID, 0 is uploaded SID file */
-        configbuff[3] = 0; /* subtune */
-        configbuff[4] = 0;
-        configbuff[5] = 0;
+        uint8_t subtune = 0;
         for(int arg_ = 1; arg_ < argc; arg_++) {
-          if(!strcmp(argv[arg_], "-t") || !strcmp(argv[arg_], "t")) {
-            configbuff[3] = atoi(argv[arg_+1]);
-            configbuff[3] = (configbuff[3] != 0 ? (configbuff[3] - 1) : configbuff[3]);
+          if((!strcmp(argv[arg_], "-t") || !strcmp(argv[arg_], "t")) && arg_ + 1 < argc) {
+            int t = atoi(argv[arg_+1]);
+            subtune = (uint8_t)(t > 0 ? (t - 1) : 0);
           }
         }
-        fprintf(stdout, "%d\n", (configbuff[3] + 1));
-        write_chars(configbuff, 5);
+        fprintf(stdout, "%d\n", (subtune + 1));
+        if (playerload_USBSID(us, subtune) < 0) {
+          fprintf(stderr, "Error loading tune\n");
+        }
       }
       {
         fprintf(stdout, "Starting playback\n");
-        configbuff[1] = SID_PLAYER_START;
-        configbuff[2] = 0;
-        configbuff[3] = 0;
-        configbuff[4] = 0;
-        configbuff[5] = 0;
-        write_chars(configbuff, 5);
+        player_command(USBSID_PLAYER_START);
       }
       goto done;
     }
     if(!strcmp(argv[arg], "-stop") || !strcmp(argv[arg], "stop") || !strcmp(argv[arg], "s")) {
       fprintf(stdout, "Stopping playback\n");
-      configbuff[1] = SID_PLAYER_STOP;
-      configbuff[2] = 0;
-      configbuff[3] = 0;
-      configbuff[4] = 0;
-      configbuff[5] = 0;
-      write_chars(configbuff, 5);
+      player_command(USBSID_PLAYER_STOP);
     }
     if(!strcmp(argv[arg], "-pause") || !strcmp(argv[arg], "pause") || !strcmp(argv[arg], "p")) {
       fprintf(stdout, "(Un)Pausing playback\n");
-      configbuff[1] = SID_PLAYER_PAUSE;
-      configbuff[2] = 0;
-      configbuff[3] = 0;
-      configbuff[4] = 0;
-      configbuff[5] = 0;
-      write_chars(configbuff, 5);
+      player_command(USBSID_PLAYER_PAUSE);
     }
     if(!strcmp(argv[arg], "-next") || !strcmp(argv[arg], "next")|| !strcmp(argv[arg], "n")) {
       fprintf(stdout, "Playing next subtune\n");
-      configbuff[1] = SID_PLAYER_NEXT;
-      configbuff[2] = 0;
-      configbuff[3] = 0;
-      configbuff[4] = 0;
-      configbuff[5] = 0;
-      write_chars(configbuff, 5);
+      player_command(USBSID_PLAYER_NEXT);
     }
     if(!strcmp(argv[arg], "-prev") || !strcmp(argv[arg], "prev") || !strcmp(argv[arg], "b")) {
       fprintf(stdout, "Playing previous subtune\n");
-      configbuff[1] = SID_PLAYER_PREV;
-      configbuff[2] = 0;
-      configbuff[3] = 0;
-      configbuff[4] = 0;
-      configbuff[5] = 0;
-      write_chars(configbuff, 5);
+      player_command(USBSID_PLAYER_PREV);
     }
   }
 done:

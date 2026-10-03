@@ -10,6 +10,7 @@ on:
     paths:
       - "examples/config-tool/**"
       - "examples/send_sid/**"
+      - "examples/usbsid-driver.cmake"
       - ".github/workflows/buildtools.yml"
     # Only run on dev branch
     branches: [dev]
@@ -87,8 +88,16 @@ jobs:
             mingw-w64-x86_64-pkg-config
             mingw-w64-x86_64-ninja
 
+      # Both tools link USBSID-Pico-driver, found by examples/usbsid-driver.cmake
+      # in repo/lib/usbsid-driver.
+      - name: 📇 Checkout USBSID-Pico-driver
+        uses: actions/checkout@v4
+        with:
+          repository: LouDnl/USBSID-Pico-driver
+          path: repo/lib/usbsid-driver
+
       - name: 📇 Checkout USBSID-Player
-        if: ${{ matrix.buildname == 'send_sid' }}
+        if: ${{ matrix.directory == 'send_sid' }}
         uses: actions/checkout@v4
         with:
           repository: loudnl/usbsid-player
@@ -98,7 +107,7 @@ jobs:
       # build step below runs from. An absolute ${{github.workspace}} path would
       # be backslash separated on Windows and mangled by the time cmake sees it.
       - name: 📇 Set USBSID-Player EMUDIR
-        if: ${{ matrix.buildname == 'send_sid' }}
+        if: ${{ matrix.directory == 'send_sid' }}
         run: |
           echo "EMUDIR=../../lib/usbsid-player" >> $GITHUB_ENV
 

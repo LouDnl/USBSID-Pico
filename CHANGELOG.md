@@ -1,6 +1,17 @@
 # Changelog
 Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on version changes
 
+#### Version: unreleased
+* Add help menu's from commandline tools to dedicated README's
+* Change `cfg_usbsid` and `send_sid` to use USBSID-Pico-driver instead of
+  their own libusb code: on macOS they use the vendor interface like every
+  other driver client. Both build against `driver-repo/src` beside this
+  repository, `repo/lib/usbsid-driver` (CI) or `-DUS_DRIVER_DIR`
+* Fix `send_sid` sending the play time in a 5 byte packet: the last byte of
+  the 32 bit play time was never sent
+* Fix `send_sid -sid -` losing the tail of the tune read from stdin, and
+  sending a play time of 0 that stopped playback at once
+
 #### Version: 0.8.0
 * Add full MIDI implementation overhaul: dedicated flash-backed MIDI config storage, MIDI engine/handler/queue/voice/patch/arp table modules, MIDI clock control, sid bus spinlock
 * Add FMOpl (OPL2/3) MIDI control, fixes and new config item support

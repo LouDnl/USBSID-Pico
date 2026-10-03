@@ -12,6 +12,8 @@ $ cfg_usbsid [options]
 --[OPTIONS]-------------------------------------------------------------------------------------------------------------
   -h,       --help              : Show this help message
   -v,       --version           : Read and print USBSID-Pico firmware version
+  -lb,      --list-boards       : List every attached board's serial number and exit
+  -b=ID,    --board=ID          : Connect to board ID (index from -lb) or serial, default first board
   -reboot,  --reboot-usp        : Reboot USBSID-Pico
   -boot,    --bootloader        : Reboot USBSID-Pico to the bootloader for firmware upload
   -skpico   --sidkickpico       : Enter SIDKICK-pico config mode (skips any non skpico command following this command)
@@ -134,6 +136,5 @@ $ cfg_usbsid [options]
                                   Example: `cfg_usbsid -configr 1 -config CMD`
   -config   --config-command    : Send custom config command, requires followup hex strings
   -command                      : Send arbitrary command in hex, requires followup hex strings
-  -control                      : Send libusb control transfer
 -----------------------------------------------------------------------------------------------------------------------
 ```

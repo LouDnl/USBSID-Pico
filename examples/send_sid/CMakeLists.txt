@@ -51,18 +51,26 @@ find_package(PkgConfig REQUIRED)
 ### Create `PkgConfig::<MODULE>` variables
 pkg_check_modules(libusb REQUIRED IMPORTED_TARGET libusb-1.0)
 
+### Threads, the driver uses pthreads
+find_package(Threads REQUIRED)
+
 ### Libraries to link
 if (UNIX)
 set(TARGET_LL
   PkgConfig::libusb
+  Threads::Threads
 )
 endif (UNIX)
 if (WIN32)
 set(TARGET_LL
   PkgConfig::libusb
+  Threads::Threads
   -lwinmm
 )
 endif (WIN32)
+
+### USBSID-Pico-driver sources, sets US_DRIVER_DIR and US_DRIVER_SOURCES
+include(${CMAKE_CURRENT_LIST_DIR}/../usbsid-driver.cmake)
 
 ### SID Player source
 set(EMUDIR "" CACHE STRING "Path to the USBSID-Player checkout")
@@ -92,11 +100,29 @@ if(NOT EMUDIR STREQUAL "")
       get_filename_component(USPLAYER_LIST_DIR "${CMAKE_SOURCE_DIR}/${EMUDIR}" ABSOLUTE)
     endif()
   endif()
-elseif(EXISTS "${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player/src/file/songlengths.cpp")
-  set(USPLAYER_LIST_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player")
 else()
-  get_filename_component(USPLAYER_LIST_DIR
-    "${CMAKE_CURRENT_LIST_DIR}/../player-repo" ABSOLUTE)
+  ## No EMUDIR: first match wins, the same layouts usbsid-driver.cmake searches
+  ##   send_sid/lib/usbsid-player   checkout inside the tool dir
+  ##   repo/lib/usbsid-player       where CI checks the player out
+  ##   ../player-repo               player working copy beside repo/
+  set(USPLAYER_LIST_DIR "")
+  foreach(USPLAYER_TRY
+      "${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player"
+      "${CMAKE_CURRENT_LIST_DIR}/../../lib/usbsid-player"
+      "${CMAKE_CURRENT_LIST_DIR}/../../../player-repo")
+    if(EXISTS "${USPLAYER_TRY}/src/file/songlengths.cpp")
+      get_filename_component(USPLAYER_LIST_DIR "${USPLAYER_TRY}" ABSOLUTE)
+      break()
+    endif()
+  endforeach()
+  if(USPLAYER_LIST_DIR STREQUAL "")
+    message(FATAL_ERROR
+      "No USBSID-Player found, looked for src/file/songlengths.cpp in\n"
+      "    ${CMAKE_CURRENT_LIST_DIR}/lib/usbsid-player\n"
+      "    ${CMAKE_CURRENT_LIST_DIR}/../../lib/usbsid-player\n"
+      "    ${CMAKE_CURRENT_LIST_DIR}/../../../player-repo\n"
+      "  Pass -DEMUDIR=<USBSID-Player checkout>.")
+  endif()
 endif()
 message(STATUS "USPLAYER_LIST_DIR is set to ${USPLAYER_LIST_DIR}")
 
@@ -105,12 +131,14 @@ set(SOURCEFILES
   send_sid.c
   sl_interface.cpp
   ${USPLAYER_LIST_DIR}/src/file/songlengths.cpp
+  ${US_DRIVER_SOURCES}
 )
 
 ### Header directories to include
 set(TARGET_INCLUDE_DIRS PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}
   ${USPLAYER_LIST_DIR}/src
+  ${US_DRIVER_DIR}
   /usr/local/lib
   /usr/local/include
   /usr/lib

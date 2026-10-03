@@ -7,6 +7,8 @@ Please supply atleast 1 option!
 *** Usage ***
 
 -help / -h: Show this information
+-lb / --list-boards: List every attached board and exit
+-b=ID / --board=ID: Use board ID (index from -lb) or serial, default first board
 
   sidfile.sid: send sidfile.sid to USBSID-Pico to start play
   sidtune.prg: send sidtune.prg to USBSID-Pico to start play (psid64 preferred!)

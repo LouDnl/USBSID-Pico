@@ -40,6 +40,10 @@ variables:
   USBSID_PLAYER_REPO: ""
   USBSID_PLAYER_REPO_PRIVATE: "https://gitlab.loudai.nl/usbsid/USBSID-Player.git"
   USBSID_PLAYER_REPO_PUBLIC: "https://gitlab.com/usbsid-pico/USBSID-Player.git"
+  # The driver, linked by the tools, is picked the same way (.tools_player_clone)
+  USBSID_DRIVER_REPO: ""
+  USBSID_DRIVER_REPO_PRIVATE: "https://gitlab.loudai.nl/usbsid/USBSID-Pico-driver.git"
+  USBSID_DRIVER_REPO_PUBLIC: "https://gitlab.com/usbsid-pico/USBSID-Pico-driver.git"
   PICO_SDK_REPO: "https://github.com/raspberrypi/pico-sdk.git"
   PICO_EXTRAS_REPO: "https://github.com/raspberrypi/pico-extras.git"
   PICOTOOL_REPO: "https://github.com/raspberrypi/picotool.git"
@@ -81,6 +85,7 @@ workflow:
         - CMakeLists.txt
         - examples/config-tool/**/*
         - examples/send_sid/**/*
+        - examples/usbsid-driver.cmake
         - .gitlab/.gitlab-ci.yml
       variables:
         PIPELINE_TYPE: "dev"
@@ -129,6 +134,7 @@ default:
       changes:
         - examples/config-tool/**/*
         - examples/send_sid/**/*
+        - examples/usbsid-driver.cmake
         - .gitlab/.gitlab-ci.yml
 
 # macOS runners only exist on gitlab.com
@@ -139,6 +145,7 @@ default:
       changes:
         - examples/config-tool/**/*
         - examples/send_sid/**/*
+        - examples/usbsid-driver.cmake
         - .gitlab/.gitlab-ci.yml
 
 .rules_tagged:
@@ -157,6 +164,7 @@ default:
       changes:
         - examples/config-tool/**/*
         - examples/send_sid/**/*
+        - examples/usbsid-driver.cmake
         - .gitlab/.gitlab-ci.yml
 
 .rules_tagged_macos15intel:
@@ -363,13 +371,25 @@ release:firmware:
 # ============================================================================
 # TOOLS BUILD TEMPLATES (buildtools.yml)
 # send_sid links the USBSID-Player, so it is checked out into lib/ and
-# passed as EMUDIR (relative to examples/send_sid, like GitHub).
+# passed as EMUDIR (relative to examples/send_sid, like GitHub). Both tools
+# link USBSID-Pico-driver, cloned into lib/usbsid-driver where
+# examples/usbsid-driver.cmake finds it.
 # ============================================================================
 
 .tools_player_clone:
   script:
     - !reference [.player_repo, script]
     - |
+      if [ -z "$USBSID_DRIVER_REPO" ]; then
+        if [ "$CI_SERVER_HOST" = "$PRIVATE_HOST" ]; then
+          USBSID_DRIVER_REPO="$USBSID_DRIVER_REPO_PRIVATE"
+        else
+          USBSID_DRIVER_REPO="$USBSID_DRIVER_REPO_PUBLIC"
+        fi
+      fi
+      echo "USBSID-Pico-driver source: ${USBSID_DRIVER_REPO}"
+      rm -rf lib/usbsid-driver
+      git clone --depth 1 "$USBSID_DRIVER_REPO" lib/usbsid-driver
       EMUDIR=""
       if [ "$DIRECTORY" = "send_sid" ]; then
         rm -rf lib/usbsid-player
@@ -434,6 +454,15 @@ release:firmware:
           $env:USBSID_PLAYER_REPO = $env:USBSID_PLAYER_REPO_PUBLIC
         }
       }
+      if (-not $env:USBSID_DRIVER_REPO) {
+        if ($env:CI_SERVER_HOST -eq $env:PRIVATE_HOST) {
+          $env:USBSID_DRIVER_REPO = $env:USBSID_DRIVER_REPO_PRIVATE
+        } else {
+          $env:USBSID_DRIVER_REPO = $env:USBSID_DRIVER_REPO_PUBLIC
+        }
+      }
+      if (Test-Path lib/usbsid-driver) { Remove-Item -Recurse -Force lib/usbsid-driver }
+      git clone -q --depth 1 $env:USBSID_DRIVER_REPO lib/usbsid-driver
       $env:EMUDIR = ""
       if ($env:DIRECTORY -eq "send_sid") {
         if (Test-Path lib/usbsid-player) { Remove-Item -Recurse -Force lib/usbsid-player }

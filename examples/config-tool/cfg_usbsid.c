@@ -35,7 +35,8 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <time.h>
-#include <libusb.h>
+#include "USBSIDInterface.h"
+// #include "USBSIDManagerInterface.h"
 
 #include "inih/ini.h"
 #include "cfg_usbsid.h"
@@ -43,30 +44,19 @@
 #include "macros.h"
 
 /**
- * Compile from config-tool directory:
- * gcc -g3 -L/usr/local/lib inih/ini.c cfg_usbsid.c -o cfg_usbsid $(pkg-config --libs --cflags libusb-1.0) -I./inih
- * Compile from repo root directory and copy to ~/.local/bin:
- * gcc -g3 -L/usr/local/lib examples/config-tool/inih/ini.c examples/config-tool/cfg_usbsid.c -o examples/config-tool/cfg_usbsid $(pkg-config --libs --cflags libusb-1.0) -I./examples/config-tool/inih ; cp examples/config-tool/cfg_usbsid ~/.local/bin
- * Compile with mingw from config-tool directory:
- * /usr/bin/x86_64-w64-mingw32-gcc -g3 \
-    -L/usr/x86_64-w64-mingw32/sys-root/mingw/lib \
-    inih/ini.c cfg_usbsid.c -o cfg_usbsid.exe \
-    -lusb-1.0 \
-    -I/usr/x86_64-w64-mingw32/sys-root/mingw/include/libusb-1.0 \
-    -I./inih
+ * Compile from config-tool directory, links USBSID-Pico-driver:
+ * cmake -S . -B build && cmake --build build
  */
 
 /* ---------------------- */
 
-/* init local libusb variables */
+/* init local driver variables */
 static int debug = 0;
-static struct libusb_device_handle *devh = NULL;
-static libusb_context *ctx = NULL;
-static unsigned char encoding[] = { 0x00, 0x10, 0x0E, 0x00, 0x00, 0x00, 0x08 };
-static int ep_out_addr = 0x02;
-static int ep_in_addr  = 0x82;
-static int len, rc, actual_length, transferred;
+static USBSIDitf us = NULL;
+static int len, rc;
 static int usid_dev = -1;
+static char target_serial[USBSID_SERIAL_LEN] = {0}; /* Board to open, empty = use target_index */
+static int target_index = 0;                         /* Index in enumerate_USBSID() order */
 
 /* -----USBSID-Pico------ */
 
@@ -360,128 +350,183 @@ void write_config_ini(Config * config, char * filename)
 void usbsid_close(void)
 {
   printf("Closing USBSID-Pico\n");
-  libusb_release_interface(devh, 0);
-  libusb_release_interface(devh, 1);
-
-  rc = libusb_attach_kernel_driver(devh, 0);
-  if (rc < 0 && rc != LIBUSB_ERROR_NOT_FOUND) {
-    fprintf(stderr, "Attach error on interface 0: %s\n", libusb_error_name(rc));
-  }
-
   teardown_wait();
-
-  if (devh != NULL)
-    libusb_close(devh);
-  libusb_exit(ctx);
-  devh = NULL;
+  if (us != NULL)
+    close_USBSID(us);
+  us = NULL;
   usid_dev = -1;
   return;
 }
 
 int usbsid_init(void)
 {
-  if (devh != NULL) {
-    libusb_close(devh);
+  if (us != NULL) {
+    close_USBSID(us);
+    us = NULL;
   }
 
-  rc = libusb_init(&ctx);
-  if (rc != 0) {
-    fprintf(stderr, "Error initializing libusb: %s: %s\n",
-    libusb_error_name(rc), libusb_strerror(rc));
-    goto out;
-  }
-
-  libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, 3);
-
-  devh = libusb_open_device_with_vid_pid(ctx, VENDOR_ID, PRODUCT_ID);
-  if (!devh) {
-    fprintf(stderr, "Error finding USB device\n");
+  us = create_USBSID();
+  if (us == NULL) {
+    fprintf(stderr, "Error creating USBSID-Pico driver instance\n");
     rc = -1;
-    goto out;
+    return rc;
   }
 
+  /* Board selected by usbsid_enumerate_boards(), serial survives a reboot or replug */
+  if (target_serial[0] != '\0')
+    settargetserial_USBSID(us, target_serial);
+  else
+    settargetindex_USBSID(us, target_index);
 
-  for (int if_num = 0; if_num < 2; if_num++) {
-    /* If the kernel driver is holding the interface, manually detach it */
-    if (libusb_kernel_driver_active(devh, if_num) == 1) {
-      libusb_detach_kernel_driver(devh, if_num);
+  /* Passive: no mute, bus clear or clock query on open */
+  setpassive_USBSID(us, true);
+  if (init_USBSID(us, false, false) < 0 || !portisopen_USBSID(us)) {
+    fprintf(stderr, "Error finding USB device\n");
+    close_USBSID(us);
+    us = NULL;
+    usid_dev = -1;
+    rc = -1;
+    return rc;
+  }
+
+  usid_dev = 0;
+  rc = 0;
+  return usid_dev;
+}
+
+/**
+ * @brief: Case insensitive string compare, serials are uppercase hex.
+ *
+ * @param a: first NUL terminated string
+ * @param b: second NUL terminated string
+ * @return: true when equal ignoring case
+ */
+static bool str_ieq(const char *a, const char *b)
+{
+  while (*a && *b) {
+    if (toupper((unsigned char)*a) != toupper((unsigned char)*b)) return false;
+    a++; b++;
+  }
+  return (*a == *b);
+}
+
+/**
+ * @brief: Print one enumerated board line.
+ *
+ * @param i: board index in enumerate_USBSID() order
+ * @param d: board info
+ */
+static void print_board(int i, const USBSIDdevinfo *d)
+{
+  printf("  board %d: serial %s @ bus=%u port=", i,
+        d->serial[0] ? d->serial : "<unreadable>", d->bus);
+  for (int p = 0; p < d->port_path_len; p++)
+    printf(p ? ".%u" : "%u", d->port_path[p]);
+  printf("\n");
+}
+
+/**
+ * @brief: Enumerate attached boards and select the one usbsid_init() opens.
+ *
+ * @param print_output: print every board found
+ * @param board: -b/--board value, board index or serial, NULL selects the first board
+ * @return: 0 on success, 1 on failure or no matching board
+ */
+int usbsid_enumerate_boards(bool print_output, const char *board)
+{
+  /* 1st call: count only (NULL + 0 allowed) */
+  int n = enumerate_USBSID(NULL, 0);
+  if (n < 0) { fprintf(stderr, "board enumeration failed\n"); return 1; }
+  if (n == 0) { fprintf(stderr, "no USBSID-Pico boards found\n"); return 1; }
+
+  USBSIDdevinfo *devs = calloc((size_t)n, sizeof *devs);
+  if (!devs) return 1;
+
+  /* 2nd call: fill. Return can exceed capacity if a board was plugged in between */
+  int got = enumerate_USBSID(devs, n);
+  if (got < 0) { fprintf(stderr, "board enumeration failed\n"); free(devs); return 1; }
+  if (got > n) got = n;
+  if (got == 0) { fprintf(stderr, "no USBSID-Pico boards found\n"); free(devs); return 1; }
+
+  if (print_output) {
+    for (int i = 0; i < got; i++) print_board(i, &devs[i]);
+  }
+
+  /* Resolve the requested board, serial match wins over index */
+  int sel = -1;
+  if (board == NULL) {
+    sel = 0;
+  } else {
+    for (int i = 0; i < got; i++) {
+      if (devs[i].serial[0] && str_ieq(devs[i].serial, board)) { sel = i; break; }
+    }
+    if (sel < 0 && board[0] != '\0') {
+      char *end = NULL;
+      long idx = strtol(board, &end, 10);
+      if (*end == '\0' && idx >= 0 && idx < got) sel = (int)idx;
     }
   }
 
-  rc = libusb_claim_interface(devh, 0);
-  if (rc < 0) {
-    fprintf(stderr, "Error claiming interface 0: %d, %s: %s\n",
-    rc, libusb_error_name(rc), libusb_strerror(rc));
-    goto out;
+  if (sel < 0) {
+    fprintf(stderr, "No board matches '%s', available boards:\n", board);
+    for (int i = 0; i < got; i++) print_board(i, &devs[i]);
+    free(devs);
+    return 1;
   }
 
-  rc = libusb_claim_interface(devh, 1);
-  if (rc < 0) {
-    fprintf(stderr, "Error claiming interface: %d, %s: %s\n",
-    rc, libusb_error_name(rc), libusb_strerror(rc));
-    goto out;
+  /* Prefer the serial for opening, fall back to the index when unreadable */
+  target_index = sel;
+  memset(target_serial, 0, sizeof target_serial);
+  if (devs[sel].serial[0])
+    snprintf(target_serial, sizeof target_serial, "%s", devs[sel].serial);
+
+  free(devs);
+  return 0;
+}
+
+/**
+ * @brief: Take -b=/--board= out of argv, keeping argv[argc] NULL.
+ *
+ * @param argc: argument count, decremented when the option is removed
+ * @param argv: argument vector, option removed in place
+ * @param board: receives the value after '=', untouched when absent
+ * @return: 0 when absent, 1 when found, -1 when given without a value
+ */
+static int take_board_arg(int *argc, char **argv, const char **board)
+{
+  for (int i = 1; i < *argc; i++) {
+    const char *val = NULL;
+    if (startsWith(argv[i], "-b=")) val = argv[i] + 3;
+    else if (startsWith(argv[i], "--board=")) val = argv[i] + 8;
+    else if (!strcmp(argv[i], "-b") || !strcmp(argv[i], "--board")) return -1;
+    else continue;
+
+    if (*val == '\0') return -1;
+    *board = val;
+    for (int j = i; j < *argc; j++) argv[j] = argv[j + 1];
+    (*argc)--;
+    return 1;
   }
-
-  rc = libusb_control_transfer(devh, 0x21, 0x22, ACM_CTRL_DTR | ACM_CTRL_RTS, 0, NULL, 0, 0);
-  if (rc != 0 && rc != 7) {
-    fprintf(stderr, "Error configuring line state during control transfer: %d, %s: %s\n",
-      rc, libusb_error_name(rc), libusb_strerror(rc));
-    goto out;
-  }
-
-  rc = libusb_control_transfer(devh, 0x21, 0x20, 0, 0, encoding, count_of(encoding), 0);
-  if (rc != 0 && rc != 7) {
-    fprintf(stderr, "Error configuring line encoding during control transfer: %d, %s: %s\n",
-      rc, libusb_error_name(rc), libusb_strerror(rc));
-    goto out;
-  }
-
-  usid_dev = (rc == 0 || rc == 7) ? 0 : -1;
-
-  if (usid_dev < 0)
-  {
-    fprintf(stderr, "Could not open SID device USBSID.\n");
-    goto out;
-  }
-
-  /* zero length read to clear any lingering data */
-  unsigned char buffer[1];
-  libusb_bulk_transfer(devh, ep_out_addr, buffer, 0, &transferred, 1);
-  libusb_bulk_transfer(devh, ep_in_addr, buffer, 0, &transferred, 1);
-  /* fprintf(stdout, "usbsid_init: detected [rc]%d [usid_dev]%d\n", rc, usid_dev); */
-
-  return usid_dev;
-out:;
-  if (devh != NULL)
-    usbsid_close();
-  libusb_exit(NULL);
-  rc = -1;
-  return rc;
+  return 0;
 }
 
 /* -----USBSID-Pico------ */
 
 void write_chars(unsigned char * data, int size)
 {
-  int actual_length;
-  if (libusb_bulk_transfer(devh, ep_out_addr, data, size, &actual_length, 0) < 0) {
+  if (sendcommand_USBSID(us, data, (size_t)size) < 0) {
     fprintf(stderr, "Error while sending char\n");
   }
 }
 
 int read_chars(unsigned char * data, int size)
 {
-  int actual_length;
-  int rc = libusb_bulk_transfer(devh, ep_in_addr, data, size, &actual_length, 0);
-  //printf("[R]$%02X:%02X\n", read_buffer[1], data[0]);
-  if (rc == LIBUSB_ERROR_TIMEOUT) {
-    printf("timeout (%d)\n", actual_length);
-    return -1;
-  } else if (rc < 0) {
+  int got = readresponse_USBSID(us, data, (size_t)size);
+  if (got < 0) {
     fprintf(stderr, "Error while waiting for char\n");
     return -1;
   }
-  return actual_length;
+  return got;
 }
 
 /* -----USBSID-Pico------ */
@@ -1717,6 +1762,8 @@ void print_help(void)
   printf("--[OPTIONS]-------------------------------------------------------------------------------------------------------------\n");
   printf("  -h,       --help              : Show this help message\n");
   printf("  -v,       --version           : Read and print USBSID-Pico firmware version\n");
+  printf("  -lb,      --list-boards       : List every attached board's serial number and exit\n");
+  printf("  -b=ID,    --board=ID          : Connect to board ID (index from -lb) or serial, default first board\n");
   printf("  -reboot,  --reboot-usp        : Reboot USBSID-Pico\n");
   printf("  -boot,    --bootloader        : Reboot USBSID-Pico to the bootloader for firmware upload\n");
   printf("  -skpico   --sidkickpico       : Enter SIDKICK-pico config mode (skips any non skpico command following this command)\n");
@@ -1844,7 +1891,6 @@ void print_help(void)
   printf("                                  Example: `cfg_usbsid -configr 1 -config CMD`\n");
   printf("  -config   --config-command    : Send custom config command, requires followup hex strings\n");
   printf("  -command                      : Send arbitrary command in hex, requires followup hex strings\n");
-  printf("  -control                      : Send libusb control transfer\n");
   printf("-----------------------------------------------------------------------------------------------------------------------\n");
 }
 
@@ -2266,11 +2312,6 @@ void config_usbsidpico(int argc, char **argv)
       uint8_t buf[5] = { ((COMMAND << 6) | UNMUTE), 1, 0, 0, 0 };
       write_chars(buf, count_of(buf));
       break;
-    }
-    if (!strcmp(argv[param_count], "-control")) {
-      rc = libusb_control_transfer(devh, 0x21, 0x20, 0, 0, encoding, count_of(encoding), 0);
-      fprintf(stdout, "Control transfer status: %d, %s: %s\n",
-      rc, libusb_error_name(rc), libusb_strerror(rc));
     }
     if (!strcmp(argv[param_count], "-command")) {
       param_count++;  /* skip usbsid executable and -config self */
@@ -2776,6 +2817,14 @@ int main(int argc, char **argv)
   memset(read_data, 0, 1);
   memset(read_data_max, 0, MAX_BUFFER_SIZE);
   memset(read_data_uber, 0, (MAX_BUFFER_SIZE * 2));
+
+  /* Board selection, removed from argv to keep it out of the option parsers */
+  const char *board = NULL;
+  if (take_board_arg(&argc, argv, &board) < 0) {
+    fprintf(stderr, "-b/--board requires a value: -b=ID or --board=SERIAL\n");
+    return -1;
+  }
+
   /* USBSID-Pico */
   if (argc <= 1) {
     printf("Please supply atleast 1 option\n");
@@ -2791,17 +2840,30 @@ int main(int argc, char **argv)
     print_help_skpico();
     goto exit;
   }
+
+  /* USBSID-Pico */
   fprintf(stdout, "Detecting USBSID-Pico boards\n");
+
+  if (!strcmp(argv[1], "-lb") || !strcmp(argv[1], "--list-boards")) {
+    usbsid_enumerate_boards(true, NULL);
+    goto exit;
+  }
+
+  /* First board without -b, else the requested index or serial */
+  if (usbsid_enumerate_boards(false, board) != 0) {
+    return -1;
+  }
 
   if (usid_dev != 0) {
     rc = usbsid_init();
     if (rc != 0) {
         return -1;
     }
-    /* zero length read to clear any lingering data */
-    unsigned char buffer[1];
-    libusb_bulk_transfer(devh, ep_out_addr, buffer, 0, &transferred, 1);
-    printf("Connected to USBSID-Pico\n");
+    char serial[USBSID_SERIAL_LEN] = {0};
+    if (getserial_USBSID(us, serial, sizeof serial) > 0)
+      printf("Connected to USBSID-Pico board %d (serial %s)\n", target_index, serial);
+    else
+      printf("Connected to USBSID-Pico board %d\n", target_index);
   }
 
   if (!strcmp(argv[1], "-skpico") || !strcmp(argv[1], "--sidkickpico")) {

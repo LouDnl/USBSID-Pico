@@ -64,6 +64,7 @@
 !images/tees
 !media
 !examples
+!examples/usbsid-driver.cmake
 !examples/cloje64
 !examples/config-tool
 !examples/config-tool/ini-examples
