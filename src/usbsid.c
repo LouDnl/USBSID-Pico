@@ -26,6 +26,7 @@
 #include <globals.h> /* Includes macros, sid_defs & usbsid_defs */
 #include <usbsid.h>
 #include <usbsid_constants.h>
+#include "device/usbd_pvt.h"  /* usbd_edpt_stall, _clear_stall, _release */
 #include <config.h>
 #include <config_socket.h>
 #include <gpio.h>
@@ -95,7 +96,9 @@ volatile bool is_sidwriting(void) { return sidwriting; };
  */
 volatile void set_sidwriting(bool state) { sidwriting = state; };;
 volatile uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
-volatile uint8_t *cdc_itf = 0, *wusb_itf = 0;
+/* Interface index of the last received packet, target of cdc_itf/wusb_itf */
+static volatile uint8_t cdc_itf_num = CDC1_ITF, wusb_itf_num = WUSB_ITF;
+volatile uint8_t *cdc_itf = &cdc_itf_num, *wusb_itf = &wusb_itf_num;
 /* nonetype, datatype, returntype */
 volatile char ntype = '0', dtype = '0', rtype = '0';
 const char cdc = 'C', asid = 'A', midi = 'M', sysex = 'S', wusb = 'W', uart = 'U';
@@ -564,7 +567,7 @@ void tud_cdc_rx_cb(uint8_t itf)
 { /* No need to check available bytes for reading */
   if __us_likely((itf == CDC1_ITF) || (itf == CDC2_ITF)) {
     if (tud_cdc_n_available(itf)) {
-      cdc_itf = &itf;
+      cdc_itf_num = itf;
       set_receivedata(true), dtype = cdc, rtype = cdc;
       cdcread = tud_cdc_n_read(*cdc_itf, &read_buffer, MAX_BUFFER_SIZE);  /* Read data from client */
       tud_cdc_n_read_flush(*cdc_itf);
@@ -708,7 +711,7 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
 
   /* vendor class has no connect check, so we use a makeshift check */
   if __us_likely(itf == WUSB_ITF && web_serial_connected) {
-      wusb_itf = &itf; /* Since there's only 1 vendor interface, we know it's 0 */
+      wusb_itf_num = itf;
       set_receivedata(true), dtype = wusb, rtype = wusb;
       webread = bufsize;
       /* Flush the fifo */
@@ -733,11 +736,41 @@ void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
 }
 
 /**
+ * @brief Reset both bulk endpoints of a vendor interface to DATA0
+ *
+ * SET_INTERFACE resets the host's data toggles. Stall and clear stall
+ * drops the armed buffer and sets the following PID to DATA0, release drops
+ * the claim of the dropped transfer. The OUT endpoint is re-armed through
+ * the vendor class read flush.
+ *
+ * @note Data still in the vendor TX fifo is not dropped, the vendor class
+ *       has no clear for it
+ *
+ * @param uint8_t rhport
+ * @param uint8_t itf vendor class index (WUSB_ITF or FRDS_ITF)
+ * @param uint8_t ep_out OUT endpoint address
+ * @param uint8_t ep_in IN endpoint address
+ */
+static void vendor_endpoints_reset(uint8_t rhport, uint8_t itf, uint8_t ep_out, uint8_t ep_in)
+{
+  usbd_edpt_stall(rhport, ep_out);
+  usbd_edpt_clear_stall(rhport, ep_out);
+  usbd_edpt_release(rhport, ep_out);
+  usbd_edpt_stall(rhport, ep_in);
+  usbd_edpt_clear_stall(rhport, ep_in);
+  usbd_edpt_release(rhport, ep_in);
+  tud_vendor_n_read_flush(itf);
+  usDBG("[VDR] SET_INTERFACE itf %u, endpoints $%02X/$%02X reset to DATA0\n", itf, ep_out, ep_in);
+}
+
+/**
  * @brief Handle incoming vendor and WebUSB control transfer requests
  *
  * Only the CONTROL_STAGE_SETUP stage is handled; other stages are
  * acknowledged with no action. Handles the CDC-style SET_CONTROL_LINE_STATE
  * class request (0x22) used by WebSerial to signal connect/disconnect,
+ * SET_INTERFACE on the WebUSB and FastReads interfaces (endpoints back to
+ * DATA0, see vendor_endpoints_reset()),
  * the WebUSB landing-page URL vendor request (returns desc_url on first
  * boot or when configuration confirmation/SID-change acknowledgement is
  * pending), and the Microsoft OS 2.0 compatible descriptor vendor request.
@@ -759,7 +792,19 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
 
   switch (request->bmRequestType_bit.type) { /* BitType */
     case TUSB_REQ_TYPE_STANDARD:  /* 0 */
-      break;
+      if ((request->bRequest == TUSB_REQ_SET_INTERFACE)
+        && (request->bmRequestType_bit.recipient == TUSB_REQ_RCPT_INTERFACE)) {
+        uint8_t itf_num = tu_u16_low(request->wIndex);
+        if (itf_num == WUSB_ITF_NUM) {
+          vendor_endpoints_reset(rhport, WUSB_ITF, WUSB_EP_OUT, WUSB_EP_IN);
+          return tud_control_status(rhport, request);
+        }
+        if (itf_num == FRDS_ITF_NUM) {
+          vendor_endpoints_reset(rhport, FRDS_ITF, FRDS_EP_OUT, FRDS_EP_IN);
+          return tud_control_status(rhport, request);
+        }
+      }
+      break;  /* Unhandled, usbd answers GET/SET_INTERFACE itself */
     case TUSB_REQ_TYPE_CLASS:     /* 1 */
       if (request->bRequest == 0x22) { /* On connection */
         /* Webserial simulates the CDC_REQUEST_SET_CONTROL_LINE_STATE (0x22) to connect and disconnect */

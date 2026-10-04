@@ -109,13 +109,13 @@ enum
 #define EPNUM_CDC_IN      0x82 /* CDC libusb/WinUSB (Linux+MacOs/Windows) */
 #define EPNUM_MIDI_OUT    0x03 /* Midi Out (unused) */
 #define EPNUM_MIDI_IN     0x83 /* Midi In (+ ASID) */
-#define EPNUM_VENDOR_OUT  0x04 /* Vendor/WebUSB */
-#define EPNUM_VENDOR_IN   0x84 /* Vendor/WebUSB */
+#define EPNUM_VENDOR_OUT  WUSB_EP_OUT /* Vendor/WebUSB */
+#define EPNUM_VENDOR_IN   WUSB_EP_IN  /* Vendor/WebUSB */
 #define EPNUM_CDC2_NOTIF  0x85 /* WebSerial */
 #define EPNUM_CDC2_OUT    0x06 /* WebSerial */
 #define EPNUM_CDC2_IN     0x86 /* WebSerial */
-#define EPNUM_VENDOR2_OUT 0x07 /* Vendor FastReads */
-#define EPNUM_VENDOR2_IN  0x87 /* Vendor FastReads */
+#define EPNUM_VENDOR2_OUT FRDS_EP_OUT /* Vendor FastReads */
+#define EPNUM_VENDOR2_IN  FRDS_EP_IN  /* Vendor FastReads */
 #if defined(USB_PRINTF)
 #define EPNUM_CDC3_NOTIF  0x88 /* USB UART */
 #define EPNUM_CDC3_OUT    0x09 /* USB UART */
@@ -254,6 +254,8 @@ uint8_t const desc_ms_os_20[] =
 };
 
 TU_VERIFY_STATIC(sizeof(desc_ms_os_20) == MS_OS_20_DESC_LEN, "Incorrect size");
+TU_VERIFY_STATIC(ITF_NUM_VENDOR == WUSB_ITF_NUM, "WUSB_ITF_NUM out of sync");
+TU_VERIFY_STATIC(ITF_NUM_VENDOR_2 == FRDS_ITF_NUM, "FRDS_ITF_NUM out of sync");
 
 extern uint8_t const desc_ms_os_20[];
 
