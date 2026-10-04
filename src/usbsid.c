@@ -729,7 +729,7 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
 void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
 {
   (void)itf;
-  usNFO("[VDR] TX %lu\n", sent_bytes);
+  usIO("[VDR] TX %lu\n", sent_bytes);
 }
 
 /**
