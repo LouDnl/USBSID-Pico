@@ -264,6 +264,7 @@ void handle_writeordered_asid_message(uint8_t sid, uint8_t* buffer)
     uint8_t reg;
     uint8_t data;
     uint8_t wait_us;
+    bool used; /* Defaults to false on static init below */
   };
   static struct asid_regpair_local_t writeOrder[USBSID_MAX_SIDS][NO_SID_REGISTERS_ASID];
   set_vu_action(); /* Keep that shiny Vu blinking! */
@@ -275,35 +276,42 @@ void handle_writeordered_asid_message(uint8_t sid, uint8_t* buffer)
         if(buffer[mask + 4] & (1 << bit)) {  /* if anything higher then 0 */
           register_value |= 0x80;  /* the register_value needs its 8th MSB bit */
         }
-        writeOrder[chip][asid_to_writeorder[reg].index].reg = asid_sid_registers[mask * 7 + bit];
-        writeOrder[chip][asid_to_writeorder[reg].index].data = register_value;
+        uint8_t id = ((mask * 7) + bit);             /* ASID register ID */
+        uint8_t idx = asid_to_writeorder[id].index;  /* write position from 0x30 or default */
+        writeOrder[chip][idx].reg = asid_sid_registers[id];
+        writeOrder[chip][idx].data = register_value;
         /* Pico 2 requires at least 10 cycles between writes
          * or it will be too damn fast! So if wait_us is lower then 10 we use 10 cycles
          * and do this for other Pico's aswell */
-        writeOrder[chip][asid_to_writeorder[reg].index].wait_us = asid_to_writeorder[reg].wait_us;
-        /* usASID("[%d] $%02X:%02X %u\n", asid_to_writeorder[reg].index, (writeOrder[chip][asid_to_writeorder[reg].index].reg |= sid), writeOrder[chip][asid_to_writeorder[reg].index].data, writeOrder[chip][asid_to_writeorder[reg].index].wait_us); */
-        dtype = asid;  /* Set data type to asid again */
-        reg++;
+        writeOrder[chip][idx].wait_us = asid_to_writeorder[id].wait_us;
+        writeOrder[chip][idx].used = true;           /* Set this entry as used */
+        /* usASID("[%d] $%02X:%02X %u\n", asid_to_writeorder[reg].index,
+          writeOrder[chip][idx].reg,
+          writeOrder[chip][idx].data,
+          writeOrder[chip][idx].wait_us); */
+        dtype = asid;                                /* Set data type to asid again */
+        reg++;                                       /* data index for buffer[reg + 8] only */
       }
     }
   }
   for (size_t pos = 0; pos < NO_SID_REGISTERS_ASID; pos++) {
-    if (writeOrder[chip][pos].wait_us != 0xff) {
+    if (writeOrder[chip][pos].used) {
       /* Push data to ASID ringbuffer */
       asid_ring_write(
-        (writeOrder[chip][pos].reg |= sid),
+        (writeOrder[chip][pos].reg | sid),
         writeOrder[chip][pos].data,
         /* Account for 1 cycle overhead in PIO bus */
         // ((writeOrder[chip][pos].wait_us >= 0) ? (writeOrder[chip][pos].wait_us - 1) : 0));
         writeOrder[chip][pos].wait_us);
         // (write_ordered ? writeOrder[chip][pos].wait_us : 10)); /* Default write order has 10 cycles per write */
-      WRITEDBG(dtype, pos, NO_SID_REGISTERS_ASID, (writeOrder[chip][pos].reg |= sid), writeOrder[chip][pos].data, writeOrder[chip][pos].wait_us);
+      WRITEDBG(dtype, pos, NO_SID_REGISTERS_ASID,
+        (writeOrder[chip][pos].reg | sid),
+        writeOrder[chip][pos].data,
+        writeOrder[chip][pos].wait_us);
     } else {
       asid_ring_write(0xffu,0xffu,0xffffu);
     }
-  }
-  for (size_t pos = 0; pos < NO_SID_REGISTERS_ASID; pos++) {
-    writeOrder[chip][pos].wait_us = 0xff;  /* indicate not used */
+    writeOrder[chip][pos].used = false; /* Reset use of writeOrder entry */
   }
   return;
 }
@@ -315,15 +323,27 @@ void handle_writeordered_asid_message(uint8_t sid, uint8_t* buffer)
  */
 void handle_asid_writeorder_config(uint8_t* buffer)
 { /* thanks to thomasj */
+  struct asid_regpair_t order[NO_SID_REGISTERS_ASID];
+  uint32_t seen = 0;  /* One bit per write position */
   uint8_t data;
   int cycles;
   for (int i = 0; i < NO_SID_REGISTERS_ASID; i++) {
     data = buffer[i << 1];
-    asid_to_writeorder[i].index = data & 0x1f;
+    order[i].index = data & 0x1f;
     /* Regular handling removes 7us, so adjust */
     cycles = ((data & 0x40) << 1) + buffer[(i << 1) + 1];
-    asid_to_writeorder[i].wait_us = MAX(1, cycles); /* USP has 1 cycle overhead */
-    /* asid_to_writeorder[i].wait_us = cycles; */
+    order[i].wait_us = MAX(1, cycles); /* USP has 1 cycle overhead */
+    /* order[i].wait_us = cycles; */
+    /* Reject position out of range or used twice, keep current order */
+    if (order[i].index >= NO_SID_REGISTERS_ASID || (seen & (1u << order[i].index))) {
+      usWRN("[ASID] Invalid write order packet, register %d position %u, keeping current order\n",
+        i, order[i].index);
+      return;
+    }
+    seen |= (1u << order[i].index);
+  }
+  for (int i = 0; i < NO_SID_REGISTERS_ASID; i++) {
+    asid_to_writeorder[i] = order[i];
     usASID("[WO%2d] {%02u,%02u}\n", i, asid_to_writeorder[i].index, asid_to_writeorder[i].wait_us);
   }
   default_order = false;
@@ -465,6 +485,11 @@ void decode_asid_message(uint8_t* buffer, int size)
       midimachine.bus = FREE;
       break;
     case 0x30:  /* Write order timing (order and delay between individual SID register writes, to closely match the C64 driver used) */
+      /* Drop short packet: F0 2D 30, 2 bytes per register, F7 */
+      if (size < (3 + (NO_SID_REGISTERS_ASID * 2) + 1)) {
+        usWRN("[ASID] Write order packet too short (%d bytes), dropped\n", size);
+        break;
+      }
       write_ordered = true;
       handle_asid_writeorder_config(&buffer[3]);
       break;

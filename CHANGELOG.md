@@ -41,6 +41,15 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
   the 32 bit play time was never sent
 * Fix `send_sid -sid -` losing the tail of the tune read from stdin, and
   sending a play time of 0 that stopped playback at once
+* Fix ASID write order (0x30) applied to the wrong registers: the order and
+  wait of a register were looked up by its position in the message instead
+  of its ASID register ID, messages without all 28 registers played in the
+  wrong order with the wrong waits
+* Fix ASID writing $00 to SID register 0 on the first message per SID after
+  boot, and dropping a register that had a write order wait of 255 cycles
+* Validate the ASID write order packet: an out of range or duplicate
+  position, or a packet that is too short, is ignored and the current order
+  is kept
 
 #### Version: 0.8.0
 * Add full MIDI implementation overhaul: dedicated flash-backed MIDI config storage, MIDI engine/handler/queue/voice/patch/arp table modules, MIDI clock control, sid bus spinlock
