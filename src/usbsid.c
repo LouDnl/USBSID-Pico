@@ -204,11 +204,11 @@ void cdc_write(volatile uint8_t * itf, uint32_t n)
 }
 
 /**
- * @brief Write from device to Vendor host
+ * @brief Write n bytes from device to Vendor host
  *
- * @note n is dropped and we always write MAX_BUFFER_SIZE back to the Vendor interfaec
- * @note for some unknown reason the Vendor ITF has another 0 byte length packet
- *       waiting in the fifo. send a 0 byte length read to account for it.
+ * @note A reply shorter than 64 bytes is a short packet. An exact 64 byte
+ *       reply is followed by a zero length packet from the TinyUSB vendor
+ *       TX fifo, hosts account for it on 64 byte replies only.
  *
  * @param itf
  * @param n
@@ -216,11 +216,9 @@ void cdc_write(volatile uint8_t * itf, uint32_t n)
 void webserial_write(volatile uint8_t * itf, uint32_t n)
 {
   usIO("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
-  /* ADDED: pending is what is still unsent in the TX fifo. Non zero means this
-   * reply is about to be merged with the previous one into a single packet, which
-   * is what produced a 14 byte reply to a 1 byte question on the host. */
+  /* Non zero pending: unsent data in the TX fifo, this reply merges with it */
   uint32_t pending = CFG_TUD_VENDOR_TX_BUFSIZE - tud_vendor_n_write_available(*itf);
-  uint32_t wrote = tud_vendor_n_write(*itf, write_buffer, MAX_BUFFER_SIZE);
+  uint32_t wrote = tud_vendor_n_write(*itf, write_buffer, n);
   usIO("[VDR] TXQ want:%lu wrote:%lu pending_before:%lu\n", n, wrote, pending);
   tud_vendor_n_write_flush(*itf);
   return;
