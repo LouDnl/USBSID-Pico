@@ -39,6 +39,8 @@ const USBSID_PID = 0x4011;
 /* Buffer / packet constants */
 const BUFFER_SIZE       = 64;
 const MAX_PACKET_SIZE   = 64;
+/* Reads per reply before giving up on zero length packets, see _transferInReply() */
+const ZLP_READ_ATTEMPTS = 4;
 
 /**
  * How long to wait for the board-information reads at connect.
@@ -310,13 +312,14 @@ class USBSIDDevice {
       if (this._device.configuration === null) {
         await this._device.selectConfiguration(1);
       }
-      /* Find DEVICE_CLASS (0xFF) interface */
+      /* Find the first DEVICE_CLASS (0xFF) interface: WebUSB. Later vendor
+       * interfaces (FastReads stream) take no commands. */
       this._ifaceNum = null;
       this._epOut    = null;
       this._epIn     = null;
       for (const iface of this._device.configuration.interfaces) {
         for (const alt of iface.alternates) {
-          if (alt.interfaceClass === DEVICE_CLASS) {
+          if (alt.interfaceClass === DEVICE_CLASS && this._ifaceNum === null) {
             this._ifaceNum = iface.interfaceNumber;
             for (const ep of alt.endpoints) {
               if (ep.direction === 'out') this._epOut = ep.endpointNumber;
@@ -331,7 +334,9 @@ class USBSIDDevice {
         return false;
       }
       await this._device.claimInterface(this._ifaceNum);
-      await this._device.selectAlternateInterface(this._ifaceNum, 0);
+      /* No selectAlternateInterface(): the interface has only alt 0, and
+       * SET_INTERFACE resets the host's data toggles but not the firmware's.
+       * The first packet after it is then ACKed and dropped as a duplicate. */
       // The following two lines are commented out, they cause reading issues!
       // try { await this._device.clearHalt('out', this._epOut); } catch (_) {}
       // try { await this._device.clearHalt('in',  this._epIn);  } catch (_) {}
@@ -342,12 +347,8 @@ class USBSIDDevice {
         value:       CTRL_ENABLE,
         index:       this._ifaceNum,
       });
-      /* Short settle delay: selectAlternateInterface sends SET_INTERFACE which
-       * causes TinyUSB to reset the bulk endpoints. On fast reconnects (page
-       * refresh, emulator switch) the first OUT packet can arrive while the
-       * device is still processing SET_INTERFACE and gets silently dropped.
-       * 100ms is imperceptible to the user but sufficient for the device to
-       * finish endpoint reset before the first bulk transfer. */
+      /* Short settle delay after the connect request: the firmware flushes
+       * both vendor FIFOs on it, a bulk transfer racing that flush is lost. */
       await us_delay(100);
       this._isOpen = true;
       this._log('opened, ifaceNum', this._ifaceNum, 'epOut', this._epOut, 'epIn', this._epIn);
@@ -393,14 +394,32 @@ class USBSIDDevice {
     }
   }
 
+  /**
+   * Read one reply from the IN endpoint, skipping zero length packets.
+   *
+   * A reply of exactly 64 bytes ends with a zero length packet, which arrives
+   * as an empty result on the following read. A retry follows an empty result only:
+   * the reply it waits for is already on its way.
+   *
+   * @returns {Promise<Uint8Array|null>} the reply, null when every attempt was empty
+   */
+  async _transferInReply() {
+    for (let i = 0; i < ZLP_READ_ATTEMPTS; i++) {
+      const r = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE); /* Vendor is fixed at 64 bytes */
+      if (r && r.data && r.data.byteLength > 0) {
+        return new Uint8Array(r.data.buffer, r.data.byteOffset, r.data.byteLength);
+      }
+    }
+    return null;
+  }
+
   /** Write then read one packet from the IN endpoint */
   async writeAndRead(data, readLen = MAX_PACKET_SIZE) {
     if (!this._isOpen) return null;
     const buf = data instanceof Uint8Array ? data : new Uint8Array(data);
     try {
       await this._device.transferOut(this._epOut, buf);
-      const result = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE); /* Vendor is fixed at 64 bytes */
-      return new Uint8Array(result.data.buffer);
+      return await this._transferInReply();
     } catch (e) {
       this._log('writeAndRead error:', e);
       return null;
@@ -411,8 +430,7 @@ class USBSIDDevice {
   async read(readLen = MAX_PACKET_SIZE) {
     if (!this._isOpen) return null;
     try {
-      const result = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE); /* Vendor is fixed at 64 bytes */
-      return new Uint8Array(result.data.buffer);
+      return await this._transferInReply();
     } catch (e) {
       this._log('read error:', e);
       return null;
@@ -515,14 +533,14 @@ class USBSIDDevice {
       return packets;
     }
     try {
-      const r = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE); /* Vendor is fixed at 64 bytes */
+      const r = await this._transferInReply();
       // const r = await Promise.race([
       //   this._device.transferIn(this._epIn, MAX_PACKET_SIZE), /* Vendor is fixed at 64 bytes */
       //   new Promise((_, reject) =>
       //     setTimeout(() => reject(new Error('configCmdRead timeout')), timeoutMs)
       //   ),
       // ]);
-      packets.push(new Uint8Array(r.data.buffer));
+      if (r) packets.push(r);
     } catch (e) {
       /* Remember it: the next read clears up after this one. The abandoned
        * transferIn cannot be cancelled, so its reply is still coming. */
@@ -583,9 +601,9 @@ class USBSIDDevice {
     const cmdBuf = new Uint8Array([CC, sub, b2, b3, b4, b5]);
     try {
       await this._device.transferOut(this._epOut, cmdBuf);
-      const r = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE); /* Vendor is fixed at 64 bytes */
+      const r = await this._transferInReply();
       await us_delay(100);
-      return new Uint8Array(r.data.buffer);
+      return r;
     } catch (e) {
       usbsidLog('configReadNoRace error:', e.message || e);
       return null;
@@ -622,7 +640,7 @@ class USBSIDDevice {
       /* Send READ_CONFIG and collect response without Promise.race (which leaks
        * pending transferIn calls and causes the next read to consume the wrong packet).
        * Skip stale packets inline instead:
-       *   - zero-length packets -> skip (ZLP residue)
+       *   - zero-length packets -> skipped by _transferInReply() (ZLP residue)
        *   - all-zero packets   -> skip (stale empty response)
        *   - wrong magic bytes  -> skip (stale response from another command)
        * fw >= 0.7.0: full config fits in one 64-byte packet (terminator at [62..63]).
@@ -632,17 +650,15 @@ class USBSIDDevice {
        * WebUSB rejects all pending transferIn on disconnect, so no infinite hang. */
       await this._device.transferOut(this._epOut, cmdBuf);
       for (let i = 0; i < 4; i++) {
-        const r = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE); /* Vendor is fixed at 64 bytes */
-        const chunk = new Uint8Array(r.data.buffer);
+        const chunk = await this._transferInReply();
+        if (!chunk) break;
         if (all.length === 0) {
-          if (chunk.length === 0) { this._log('readConfig: skipping zero-length packet'); continue; }
           if (chunk.every(b => b === 0)) { this._log('readConfig: skipping stale zero packet'); continue; }
           if (chunk[0] !== 0x30 || chunk[1] !== 127) {
             this._log('readConfig: skipping stale packet (magic', chunk[0], chunk[1] + ')');
             continue;
           }
         }
-        if (chunk.length === 0) break;
         all.push(...chunk);
         if (all.length >= CONFIG_SIZE) break;
       }

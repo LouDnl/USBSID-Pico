@@ -76,6 +76,12 @@ let audioRate = 48000;         /* the ring's sample rate, for the register lead 
 const REG_CHIPS_MAX = 4;
 let regChips = 1;
 
+/* RAM pages the page is reading (memory view), appended to each register
+ * report to keep the page's mirror in step with this machine. Set by memWatch. */
+const MEM_PAGES_MAX = 16;
+let memPages = new Uint8Array(0);
+let memPtr = 0;                /* MEM_PAGES_MAX pages of scratch in the wasm heap */
+
 /* The longest a single audioFill() burst may run, in wall clock ms, whatever
  * audioSteps says. A many-SID tune's frame cost scales with chip count, and
  * audioSteps alone does not: at VISIBLE_STEPS (8), a 15SID tune already
@@ -171,11 +177,62 @@ function postRegisters(leadSamples) {
   for (let c = 0; c < regChips; c++) {
     for (let r = 0; r < 32; r++) regs[(c << 5) | r] = player.sidRegister(c + 1, r) & 0xff;
   }
-  self.postMessage({ type: 'regs', payload: {
+  const payload = {
     regs,
     ciaLatch: player.ciaLatch(1, 0),
     leadMs: (leadSamples * 1000) / audioRate,
-  } }, [regs.buffer]);
+  };
+  const transfer = [regs.buffer];
+  const mem = readWatchedPages();
+  if (mem) {
+    payload.mem = mem;
+    payload.memPages = memPages.slice();
+    transfer.push(mem.buffer, payload.memPages.buffer);
+  }
+  self.postMessage({ type: 'regs', payload }, transfer);
+}
+
+/**
+ * Read the watched RAM pages, in memPages order.
+ *
+ * @returns {Uint8Array|null} 256 bytes per page, null when none are watched
+ */
+function readWatchedPages() {
+  const n = memPages.length;
+  if (n === 0) return null;
+  const M = player.M;
+  const mem = new Uint8Array(n * 256);
+  if (typeof M._usp_read_memory_block === 'function') {
+    if (!memPtr) memPtr = M._usp_alloc(MEM_PAGES_MAX * 256);
+    for (let k = 0; k < n; k++) {
+      M._usp_read_memory_block(memPtr + (k << 8), memPages[k] << 8, 256);
+    }
+    mem.set(new Uint8Array(M.HEAPU8.buffer, memPtr, n * 256));
+  } else {
+    for (let k = 0; k < n; k++) {
+      const base = memPages[k] << 8;
+      for (let i = 0; i < 256; i++) mem[(k << 8) | i] = player.readMemory(base + i) & 0xff;
+    }
+  }
+  return mem;
+}
+
+/**
+ * Apply a speed multiplier to the player and, in audio mode, to the
+ * synthesis output rate. See usp_audio_set_speed().
+ *
+ * @param {number} mult speed multiplier, 1 is normal
+ */
+function applySpeed(mult) {
+  player.setSpeed(mult);
+  applyAudioSpeed();
+}
+
+/** Follow the player's speed with the synthesis output rate, audio mode only. */
+function applyAudioSpeed() {
+  if (audioMode && typeof player.M._usp_audio_set_speed === 'function') {
+    player.M._usp_audio_set_speed(player.speed);
+  }
 }
 
 /** A report from the ring: how short it is, counting what is already on its way. */
@@ -414,8 +471,18 @@ const handlers = {
     }
     return { ok: true };
   },
-  speed({ mult }) { player.setSpeed(mult); return { ok: true }; },
-  fastForward({ on, mult }) { player.fastForward(!!on, mult); return { ok: true }; },
+  speed({ mult }) { applySpeed(mult); return { ok: true, speed: player.speed }; },
+  fastForward({ on, mult }) {
+    player.fastForward(!!on, mult);
+    applyAudioSpeed();
+    return { ok: true, speed: player.speed };
+  },
+  /* RAM pages to report with the registers, see readWatchedPages(). */
+  memWatch({ pages }) {
+    const list = Array.from(pages || []).slice(0, MEM_PAGES_MAX);
+    memPages = Uint8Array.from(list, (pg) => pg & 0xff);
+    return { ok: true, pages: memPages.length };
+  },
   nextSubtune() { player.nextSubtune(); return { ok: true }; },
   prevSubtune() { player.prevSubtune(); return { ok: true }; },
   runStop() { return { ok: player.runStop() }; },

@@ -325,6 +325,7 @@ export class UsPlayerAudio {
     /* Running through a silent lead-in: see _skipSilence(). Per tune, set in
      * run(), and never set again once the tune has made a sound. */
     this._skipping = false;
+    this._speed = 1;       /* last speed handed to the synthesis, see _applySpeed() */
     this._skippedFrames = 0;
     this._starveBase = 0;
     this._skipSince = 0;      /* frames since the output was last looked at */
@@ -386,6 +387,16 @@ export class UsPlayerAudio {
      * Racing it against a timeout is what _startAudioClock() (usplayer-web.js)
      * already does for the same reason; this path wants the same guard. */
     this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    /* Browsers only expose audioWorklet in a secure context: https://, or
+     * http://localhost / 127.0.0.1. A page on plain http under any other host
+     * name gets a context without it, and addModule below would fail with a
+     * bare "audioWorklet is undefined" that says nothing about the cause. */
+    if (!this.ctx.audioWorklet) {
+      this.ctx.close().catch(() => {});
+      this.ctx = null;
+      throw new Error('AudioWorklet is not available: the page must be served over '
+        + 'https:// or from http://localhost (secure context)');
+    }
     if (this.ctx.state === 'suspended') {
       await Promise.race([this.ctx.resume(), new Promise((r) => setTimeout(r, 2000))]);
     }
@@ -903,6 +914,22 @@ export class UsPlayerAudio {
   /** True while a silent lead-in is being run through. */
   get skipping() { return !!this._skipping; }
 
+  /**
+   * Follow a player speed change with the synthesis output rate.
+   *
+   * Faster yields fewer samples per frame and slower more, played at the
+   * context rate: pitch follows speed. See usp_audio_set_speed().
+   *
+   * @param {number} mult the player's speed multiplier
+   */
+  _applySpeed(mult) {
+    if (mult === this._speed) return;
+    this._speed = mult;
+    if (typeof this.M._usp_audio_set_speed === 'function') {
+      this.M._usp_audio_set_speed(mult);
+    }
+  }
+
   _fill() {
     const p = this._driven;
     if (!p || !this.node || this._filling) return;
@@ -919,28 +946,16 @@ export class UsPlayerAudio {
     this._filling = true;
     const t0 = (typeof performance !== 'undefined') ? performance.now() : 0;
     try {
-      /* Fast forward means seeking, not playing faster: nothing can render
-       * ahead of a ring that plays at one times speed. So the extra frames are
-       * emulated and their audio thrown away, which is what the command line
-       * player does for the same reason. */
-      const mult = Math.max(1, Math.round(p.speed || 1));
+      this._applySpeed(p.speed || 1);
       const deadline = t0 + FILL_BUDGET_MS;
       let steps = 0;
       while (this._owed > 0 && steps < this._maxSteps) {
         this._frames++;
         p.stepAndDrain();
-        if (mult > 1) {
-          for (let k = 1; k < mult; k++) p.stepAndDrain();
-          this.discard();
-          steps += mult;
-          if (t0 && performance.now() >= deadline) break;
-          continue;
-        }
         this._owed -= this.pump();
         steps++;
         if (t0 && performance.now() >= deadline) break;
       }
-      if (mult > 1) this._owed = 0;
     } finally {
       this._filling = false;
       if (t0) {

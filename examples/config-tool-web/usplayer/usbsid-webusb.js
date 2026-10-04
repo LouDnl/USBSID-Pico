@@ -109,6 +109,8 @@ export const CLOCK = { DEFAULT: 0, PAL: 1, NTSC: 2, DREAN: 3, NTSC2: 4 };
 
 const WRITE_BYTES = 4;
 const MAX_PACKET  = 64;
+/* Reads per reply before giving up on zero length packets, see _transferInReply() */
+const ZLP_READ_ATTEMPTS = 4;
 const MAX_FRAMES  = 15;   /* 1 + 15 * 4 = 61 bytes */
 /* Queued but unsent packets, about a kilobyte. At rest this holds one or two;
  * a sustained overflow means we are behind the device, and dropping the oldest
@@ -323,10 +325,12 @@ export class USBSIDWebUSBTransport {
     if (this._dev.configuration === null) await this._dev.selectConfiguration(1);
 
     /* Walk the configuration for the vendor interface and its bulk endpoints
-     * rather than assuming numbers: they move between firmware builds. */
+     * rather than assuming numbers: they move between firmware builds. First
+     * match only: later vendor interfaces (FastReads stream) take no commands. */
+    this._ifaceNum = null;
     for (const iface of this._dev.configuration.interfaces) {
       for (const alt of iface.alternates) {
-        if (alt.interfaceClass === DEVICE_CLASS) {
+        if (alt.interfaceClass === DEVICE_CLASS && this._ifaceNum === null) {
           this._ifaceNum = iface.interfaceNumber;
           for (const ep of alt.endpoints) {
             if (ep.direction === 'out') this._epOut = ep.endpointNumber;
@@ -338,7 +342,9 @@ export class USBSIDWebUSBTransport {
     if (this._ifaceNum === null) { await this._dev.close(); return false; }
 
     await this._dev.claimInterface(this._ifaceNum);
-    await this._dev.selectAlternateInterface(this._ifaceNum, 0);
+    /* No selectAlternateInterface(): the interface has only alt 0, and
+     * SET_INTERFACE resets the host's data toggles but not the firmware's.
+     * The first packet after it is then ACKed and dropped as a duplicate. */
     /* Crashes the whole browser process on Windows (Chrome/Edge/Canary), confirmed
      * via crash dump analysis - a Chromium-internal CHECK() in the Windows USB
      * backend, not something this driver can work around other than not calling
@@ -506,6 +512,25 @@ export class USBSIDWebUSBTransport {
     return await mine;
   }
 
+  /**
+   * Read one reply from the IN endpoint, skipping zero length packets.
+   *
+   * A reply of exactly 64 bytes ends with a zero length packet, which arrives
+   * as an empty result on the following read. A retry follows an empty result only:
+   * the reply it waits for is already on its way.
+   *
+   * @returns {Promise<Uint8Array|null>} the reply, null when every attempt was empty
+   */
+  async _transferInReply() {
+    for (let i = 0; i < ZLP_READ_ATTEMPTS; i++) {
+      const r = await this._dev.transferIn(this._epIn, MAX_PACKET); /* Vendor is fixed at 64 bytes */
+      if (r && r.data && r.data.byteLength > 0) {
+        return new Uint8Array(r.data.buffer, r.data.byteOffset, r.data.byteLength);
+      }
+    }
+    return null;
+  }
+
   async _configReadOnce(sub, len) {
     if (!this._open || this._extDev || !this._dev) return null;
     this._flushBatch();
@@ -524,9 +549,8 @@ export class USBSIDWebUSBTransport {
     try {
       await this._dev.transferOut(this._epOut,
         new Uint8Array([CFG_CMD, sub, 0, 0, 0, 0]));
-      const r = await this._dev.transferIn(this._epIn, MAX_PACKET); /* Vendor is fixed at 64 bytes */
-      if (!r || !r.data || r.data.byteLength === 0) return null;
-      const out = new Uint8Array(r.data.buffer, r.data.byteOffset, r.data.byteLength);
+      const out = await this._transferInReply();
+      if (!out) return null;
       if (debugReads()) {
         console.debug('[usbsid-webusb] read 0x' + (sub & 0xff).toString(16) +
                       ' answered ' + out.length + ' bytes');
