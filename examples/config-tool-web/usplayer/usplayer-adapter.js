@@ -335,8 +335,11 @@ export class USPlayerAdapter {
 
     const s = (typeof p.stats === 'function') ? p.stats() : null;
 
-    let line = `${this._prefix} | ${p.refreshHz().toFixed(2)} fps` +
-               ` | ${p.frames()} frames`;
+    /* With the worker the page's own player never steps: the numbers come
+     * from the worker's latest snapshot. */
+    const w = (this._isAudio && this._worker) ? this._snap : null;
+    let line = `${this._prefix} | ${(w ? (w.refreshHz || 0) : p.refreshHz()).toFixed(2)} fps` +
+               ` | ${w ? (w.frames || 0) : p.frames()} frames`;
 
     /* Software audio has no transport, so the board numbers below are all zero
      * and meaningless. These are the ones that matter instead: ms/frame against
@@ -345,6 +348,11 @@ export class USPlayerAdapter {
      * Both stay flat when it is working. */
     if (this._isAudio && this._audio) {
       const a = this._audio.stats();
+      if (w) {
+        a.msPerFrame = w.msPerFrame || 0;
+        a.fmWrites = w.fmWrites || 0;
+        a.clipped = w.clipped || 0;
+      }
       /* Running through a silent lead-in is the one time the numbers below mean
        * nothing: the ring is empty on purpose and the tune is deliberately not
        * playing at one times speed. Say what is happening instead. */
