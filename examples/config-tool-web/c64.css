@@ -468,6 +468,47 @@ input[type=range].c64-range::-moz-range-thumb {
 .sid-reg-cell.reg-written { background: var(--c64-darkgray); }
 .sid-reg-cell.reg-written .reg-val { color: var(--c64-yellow); }
 
+/* Visuals tab (reSIDfp mode): sub-tabs, oscilloscope mosaic, filter, stereo */
+#visuals-subtabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--c64-border);
+  padding-bottom: 4px;
+}
+.visuals-subtab[aria-selected="true"] {
+  background: var(--c64-btn-active);
+  color: var(--c64-bg);
+}
+.visuals-sub { display: none; }
+.visuals-sub.active { display: block; }
+.visuals-check {
+  min-width: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.visuals-slider input[type=range] { flex: 1; min-width: 120px; max-width: 360px; }
+.visuals-slider.disabled label { color: var(--c64-gray); }
+.usp-scope-mosaic {
+  display: grid;
+  grid-template-columns: repeat(var(--usp-scope-cols, 1), 1fr);
+  gap: 3px;
+}
+.usp-scope {
+  width: 100%;
+  height: 70px;
+  background: var(--c64-screen);
+  border: 1px solid var(--c64-gray);
+  cursor: pointer;
+  display: block;
+}
+.usp-scope.usp-scope-muted { opacity: 0.3; }
+@media (max-width: 520px) {
+  .usp-scope { height: 56px; }
+}
+
 /* Config section */
 .config-section-title {
   font-size: 1.1rem;

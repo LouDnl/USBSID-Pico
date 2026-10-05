@@ -59,6 +59,8 @@ class UspAudio extends AudioWorkletProcessor {
     const opt = (options && options.processorOptions) || {};
     const cap = opt.capacity || 32768;
     this._buf = new Float32Array(cap);
+    /* Right channel: a copy of _buf for mono chunks, see _onMessage(). */
+    this._bufR = new Float32Array(cap);
     this._head = 0;   /* written by onmessage */
     this._tail = 0;   /* read by process() */
     this._starved = 0;
@@ -137,15 +139,22 @@ class UspAudio extends AudioWorkletProcessor {
         this._since = 4;
         return;
       }
-      if (!(d instanceof Int16Array)) return;
-      if (fromPeer) this._recvPeer += d.length;
-      else this._recvPort += d.length;
+      /* A bare Int16Array is mono, { stereo: Int16Array } is L/R pairs.
+       * Counts and ring positions are frames either way. */
+      const ch = (d && d.stereo instanceof Int16Array) ? 2 : 1;
+      const pcm = (ch === 2) ? d.stereo : d;
+      if (!(pcm instanceof Int16Array)) return;
+      const frames = (ch === 2) ? (pcm.length >> 1) : pcm.length;
+      if (fromPeer) this._recvPeer += frames;
+      else this._recvPort += frames;
       /* Int16 to float here rather than on the main thread: it is the audio
        * thread's own format and doing it here keeps the transfer half the size. */
-      for (let i = 0; i < d.length; i++) {
+      for (let i = 0; i < frames; i++) {
         const next = (this._head + 1) % this._buf.length;
         if (next === this._tail) break;   /* full: drop, the page is too far ahead */
-        this._buf[this._head] = d[i] / 32768;
+        const l = pcm[i * ch] / 32768;
+        this._buf[this._head] = l;
+        this._bufR[this._head] = (ch === 2) ? pcm[i * 2 + 1] / 32768 : l;
         this._head = next;
       }
   }
@@ -157,14 +166,17 @@ class UspAudio extends AudioWorkletProcessor {
   process(inputs, outputs) {
     const out = outputs[0][0];
     if (!out) return true;
+    const outR = outputs[0][1];
     const have = this._queued();
     const n = Math.min(out.length, have);
     for (let i = 0; i < n; i++) {
       out[i] = this._buf[this._tail];
+      if (outR) outR[i] = this._bufR[this._tail];
       this._tail = (this._tail + 1) % this._buf.length;
     }
     if (n < out.length) {
       out.fill(0, n);
+      if (outR) outR.fill(0, n);
       this._starved += out.length - n;
     }
 
@@ -420,13 +432,13 @@ export class UsPlayerAudio {
      *
      * Capacity is four seconds, well beyond that, because the target is raised
      * to seconds while the page is hidden and the ring has to be able to hold
-     * it. See setTarget(). Four seconds of mono 48 kHz floats is 768 kB, which
-     * is nothing beside the wasm heap. */
+     * it. See setTarget(). Four seconds of 48 kHz floats is 768 kB per
+     * channel, 1.5 MB for the two, which is nothing beside the wasm heap. */
     const target = Math.max(2048, Math.round(rate * VISIBLE_SECONDS));
     this.node = new AudioWorkletNode(this.ctx, 'usp-audio', {
       numberOfInputs: 0,
       numberOfOutputs: 1,
-      outputChannelCount: [1],
+      outputChannelCount: [2],
       processorOptions: { capacity: Math.max(8192, rate * 4), target },
     });
     this._target = target;

@@ -49,6 +49,7 @@ import { USBSIDWebUSBTransport } from './usbsid-webusb.js';
 import { USBSIDWebSerialTransport } from './usbsid-webserial.js';
 import { ASIDMIDITransport } from './asid-midi.js';
 import { UsPlayerAudio } from './usplayer-audio.js';
+import { applySoftAudio } from './usplayer-softaudio.js';
 
 /* Where the build artefacts are: beside this file, whatever the page's own URL
  * is.
@@ -223,6 +224,8 @@ export class USPlayerAdapter {
     this._memValid = new Uint8Array(256);
     this._memPages = new Map();
     this._memSent = '';
+    /* Scope, panning and filter state, see usplayer-softaudio.js. */
+    this._softAudioInit();
     this._memCheck = 0;
     /* SID and FM sides of the software mix, percent. Undefined until the host
      * sets one: the wasm defaults (100 and 50) stand until then. */
@@ -1029,6 +1032,7 @@ export class USPlayerAdapter {
       this._dirty.fill(0);
       this._anyDirty = false;
       this._regQueue.length = 0;
+      this._scopeClear();
       this._workerCiaLatch = 0;
       this._memValid.fill(0);
 
@@ -1096,8 +1100,12 @@ export class USPlayerAdapter {
             model: sid ? sidModel(bytes) : 0,
             target: this._audio._target,
             steps: this._audio._maxSteps || 24,
+            /* Always stereo: mono is every chip Center, which needs no
+             * reconfigure to switch. See setPanning(). */
+            stereo: true,
           });
           if (stale()) return;
+          await this._softAudioReplay();
           if (this._sidVolume !== undefined) {
             await this._call('sidVolume', { percent: this._sidVolume }).catch(() => {});
           }
@@ -1113,6 +1121,7 @@ export class USPlayerAdapter {
         } else {
           /* The main thread does it, as it did before there was a worker. */
           await this._player.start({ externalClock: true });
+          if (this._filter) this.setFilter(this._filter);
           if (this._sidVolume !== undefined) this._audio.setSidVolume(this._sidVolume);
           if (this._fmVolume !== undefined) this._audio.setFmVolume(this._fmVolume);
           this._audio.run(this._player);
@@ -1242,6 +1251,7 @@ export class USPlayerAdapter {
       this._call('audioDiscard', {});
       this._snap = null;
       this._regQueue.length = 0;
+      this._scopeClear();
     }
     if (this._player) this._player.stop();
     this._paused = false;
@@ -1511,7 +1521,8 @@ export class USPlayerAdapter {
     if (!p || !p.regs) return;
     const due = _now() + Math.max(0, Number(p.leadMs) || 0);
     this._regQueue.push({ due, regs: p.regs, ciaLatch: p.ciaLatch | 0,
-                          mem: p.mem, memPages: p.memPages });
+                          mem: p.mem, memPages: p.memPages,
+                          scope: p.scope, scopeVoices: p.scopeVoices | 0 });
     /* Bound the queue for a page that never reads it. */
     if (this._regQueue.length > 256) this._applyRegisters(this._regQueue.shift());
   }
@@ -1540,6 +1551,7 @@ export class USPlayerAdapter {
       this._anyDirty = true;
     }
     this._workerCiaLatch = e.ciaLatch;
+    if (e.scope && e.scopeVoices > 0) this._scopeAppend(e.scope, e.scopeVoices, e.due);
     if (e.mem && e.memPages) {
       const pages = e.memPages;
       for (let k = 0; k < pages.length; k++) {
@@ -1787,6 +1799,8 @@ export class USPlayerAdapter {
     this._subtune = Math.max(this._subtune - 1, 0);
   }
 }
+
+applySoftAudio(USPlayerAdapter);
 
 if (typeof window !== 'undefined') {
   window.USPlayerAdapter = USPlayerAdapter;

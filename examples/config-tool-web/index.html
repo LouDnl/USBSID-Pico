@@ -7,7 +7,7 @@
 
   <!-- SEO: no visible UI change, metadata + structured data only -->
   <meta name="description" content="Play SID chiptunes straight from your browser through a real MOS SID chip via USBSID-Pico's free WebUSB/WebSerial/ASID player, browse the HVSC library, configure your board, and read the full USBSID-Pico build log and project blog.">
-  <meta name="keywords" content="USBSID-Pico, SID player, WebUSB SID player, MOS 6581, MOS 8580, Commodore 64, SID chip, chiptune player, HVSC, WebSerial, ASID, reSIDfp, SIDKICK-pico, FPGASID, ARMSID, SwinSID, Raspberry Pi Pico">
+  <meta name="keywords" content="USBSID-Pico, SID player, WebUSB SID player, MOS 6581, MOS 8580, Commodore 64, SID chip, chiptune player, HVSC, WebSerial, ASID, reSIDfp, SID oscilloscope, SID filter, SID stereo panning, 2SID, 3SID, SIDKICK-pico, FPGASID, ARMSID, SwinSID, Raspberry Pi Pico">
   <meta name="author" content="LouD">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://usbsid.loudai.nl/">
@@ -52,7 +52,17 @@
         "url": "https://usbsid.loudai.nl/",
         "applicationCategory": "MultimediaApplication",
         "operatingSystem": "Any (runs in a WebUSB/WebSerial/Web Audio capable browser)",
-        "description": "Free in-browser SID chiptune player for USBSID-Pico. Plays PSID/RSID/MUS/PRG files via a WASM reSIDfp/USBSID-Player build, or streams them to real SID hardware over WebUSB, WebSerial or ASID (WebMIDI). Includes a searchable HVSC library browser.",
+        "description": "Free in-browser SID chiptune player for USBSID-Pico. Plays PSID/RSID/MUS/PRG files via a WASM reSIDfp/USBSID-Player build, or streams them to real SID hardware over WebUSB, WebSerial or ASID (WebMIDI). Includes a searchable HVSC library browser, and in reSIDfp mode a per voice oscilloscope, reSIDfp filter controls and SID v5 stereo panning for multi SID tunes.",
+        "featureList": [
+          "Play PSID, RSID, MUS and PRG files in the browser (WASM reSIDfp)",
+          "Stream SID register writes to real SID chips over WebUSB, WebSerial or ASID",
+          "Searchable HVSC library browser with STIL comments",
+          "Per voice oscilloscope, one column per SID chip for 2SID, 3SID and 4SID tunes",
+          "reSIDfp filter controls: 6581 curve and range, 8580 curve, combined waveforms",
+          "Stereo panning of multi SID tunes, SID v5 layout and mode",
+          "Live SID register view for board play",
+          "USBSID-Pico board configuration over WebUSB"
+        ],
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
         "browserRequirements": "Requires JavaScript. WebUSB/WebSerial/WebMIDI features require a Chromium-based browser.",
         "isPartOf": { "@id": "https://usbsid.loudai.nl/#website" },
@@ -97,6 +107,7 @@
 <!-- USBSID-Player (WASM) backend: factory (classic global) + adapter (module) -->
 <script type="text/javascript" src="usplayer/usbsid.js"></script>
 <script type="module" src="usplayer/usplayer-adapter.js"></script>
+<script type="module" src="usbsid-visuals.js"></script>
 </head>
 <body>
 
@@ -122,6 +133,7 @@
   <div id="c64-tabs">
     <a class="c64-tab" href="/" data-tab="player">&#9654; Player</a>
     <a class="c64-tab" href="/regs" data-tab="regs">Registers</a>
+    <a class="c64-tab" href="/visuals" data-tab="visuals" style="display:none">Visuals</a>
     <a class="c64-tab" href="/config" data-tab="config">Config</a>
     <a class="c64-tab" href="/blog" data-tab="blog">Blog</a>
     <a class="c64-tab" href="/about" data-tab="about">About</a>
@@ -150,7 +162,8 @@
       Runs entirely in-browser via a WASM reSIDfp/USBSID-Player build, or streams
       register writes to real MOS 6581/8580 SID chips and hardware replacements
       (SIDKICK-pico, FPGASID, ARMSID, SwinSID) over WebUSB, WebSerial or ASID
-      (WebMIDI), with live SID register and STIL info display.
+      (WebMIDI), with live SID register and STIL info display, and a per voice
+      SID oscilloscope, filter and stereo controls in reSIDfp mode.
     </p>
 
     <!-- Emulator selector + ASID MIDI -->
@@ -295,8 +308,11 @@
       </div>
     </div>
 
-    <!-- Transport controls -->
-    <div class="c64-box">
+    <!-- Transport controls. The box moves into the Visuals tab while that tab
+         shows, and back to #transport-home in this panel: one set of controls, see
+         placeTransport() in usbsid-app.js. -->
+    <div id="transport-home"></div>
+    <div id="transport-box" class="c64-box">
       <div class="c64-box-title">Transport</div>
       <!-- What is loaded, and how far into it we are.
            This used to be a file name in the SID FILE box, which is where the
@@ -406,6 +422,119 @@
       <div id="sid-regs-container"></div>
     </div>
   </div><!-- /panel-regs -->
+
+
+  <!-- ╔══════════════════════════════════════════════════╗
+       ║  PANEL: VISUALS (reSIDfp mode only)              ║
+       ╚══════════════════════════════════════════════════╝ -->
+  <div id="panel-visuals" class="c64-panel">
+    <!-- Hidden (sr-only): what this tab is, for search engines and screen
+         readers. The tab itself is all controls and canvases. -->
+    <p class="sr-only">
+      SID visuals for the in-browser reSIDfp player: a live oscilloscope of every
+      SID voice, with a column per chip for 2SID, 3SID and 4SID tunes, reSIDfp
+      filter controls (6581 filter curve and range, 8580 filter curve, combined
+      waveforms) and stereo panning of multi SID tunes using the SID file format
+      v5 panning layout and mode.
+    </p>
+    <div id="visuals-transport-slot"></div>
+    <div class="c64-box">
+      <div class="c64-box-title">Visuals</div>
+      <div id="visuals-subtabs" role="tablist">
+        <button type="button" class="c64-btn c64-btn-sm visuals-subtab" data-sub="scope" role="tab">SCOPE</button>
+        <button type="button" class="c64-btn c64-btn-sm visuals-subtab" data-sub="filter" role="tab">FILTER</button>
+        <button type="button" class="c64-btn c64-btn-sm visuals-subtab" data-sub="stereo" role="tab">STEREO</button>
+      </div>
+
+      <!-- Oscilloscope: one box per voice, a column per SID chip -->
+      <div id="visuals-scope" class="visuals-sub" role="tabpanel">
+        <div class="config-row">
+          <label for="scope-zoom">Zoom</label>
+          <input type="range" id="scope-zoom" class="c64-range" min="1" max="5" step="1" value="3">
+          <label class="visuals-check"><input type="checkbox" id="scope-sync" checked> Sync</label>
+          <span class="config-hint">Click a box to mute that voice</span>
+        </div>
+        <div id="visuals-scope-boxes"></div>
+      </div>
+
+      <!-- reSIDfp filter -->
+      <div id="visuals-filter" class="visuals-sub" role="tabpanel">
+        <div class="config-row">
+          <label for="filter-enabled">Filter</label>
+          <label class="visuals-check"><input type="checkbox" id="filter-enabled" checked> Enabled</label>
+        </div>
+        <div class="config-row visuals-slider" id="row-filter-curve6581" title="6581 filter curve: 0 dark, 1 bright">
+          <label for="filter-curve6581">6581 curve</label>
+          <input type="range" id="filter-curve6581" class="c64-range" min="0" max="1" step="0.005" value="0.5">
+          <span id="filter-curve6581-val" class="config-value-display"></span>
+        </div>
+        <div class="config-row visuals-slider" id="row-filter-range6581" title="6581 filter range (one setting for all chips)">
+          <label for="filter-range6581">6581 range</label>
+          <input type="range" id="filter-range6581" class="c64-range" min="0" max="1" step="0.005" value="0.487">
+          <span id="filter-range6581-val" class="config-value-display"></span>
+        </div>
+        <div class="config-row visuals-slider" id="row-filter-curve8580" title="8580 filter curve: 0 dark, 1 bright">
+          <label for="filter-curve8580">8580 curve</label>
+          <input type="range" id="filter-curve8580" class="c64-range" min="0" max="1" step="0.005" value="0.5">
+          <span id="filter-curve8580-val" class="config-value-display"></span>
+        </div>
+        <div class="config-row">
+          <label for="filter-waveforms">Waveforms</label>
+          <select id="filter-waveforms" class="c64-select" title="Combined waveforms strength">
+            <option value="0">Average</option>
+            <option value="1">Weak</option>
+            <option value="2">Strong</option>
+          </select>
+        </div>
+        <div class="config-row">
+          <button type="button" id="filter-defaults" class="c64-btn c64-btn-sm">DEFAULTS</button>
+        </div>
+      </div>
+
+      <!-- Stereo panning, SID v5 layout and mode -->
+      <div id="visuals-stereo" class="visuals-sub" role="tabpanel">
+        <div class="config-row">
+          <label for="stereo-output">Output</label>
+          <select id="stereo-output" class="c64-select">
+            <option value="0">Mono</option>
+            <option value="1">Stereo</option>
+          </select>
+        </div>
+        <div class="config-row">
+          <label for="stereo-layout">Multi SID layout</label>
+          <select id="stereo-layout" class="c64-select">
+            <option value="-1">Tune</option>
+            <option value="0">Standard</option>
+            <option value="1">L/C/R</option>
+            <option value="2">Center first</option>
+            <option value="3">Fully centered</option>
+          </select>
+        </div>
+        <div class="config-row">
+          <label for="stereo-mode">Multi SID mode</label>
+          <select id="stereo-mode" class="c64-select">
+            <option value="-1">Tune</option>
+            <option value="0">Direct</option>
+            <option value="1">Reverse</option>
+            <option value="2">Group</option>
+            <option value="3">Spread</option>
+          </select>
+        </div>
+        <div class="config-row">
+          <label for="stereo-single">Single SID</label>
+          <select id="stereo-single" class="c64-select">
+            <option value="0">Left</option>
+            <option value="1">Center</option>
+            <option value="2">Right</option>
+          </select>
+        </div>
+        <div class="config-row">
+          <label>Playing</label>
+          <span id="stereo-playing" class="config-value-display">No tune playing</span>
+        </div>
+      </div>
+    </div>
+  </div><!-- /panel-visuals -->
 
 
   <!-- ╔══════════════════════════════════════════════════╗

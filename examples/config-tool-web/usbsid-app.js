@@ -94,7 +94,7 @@ function setLED(connected) {
  * a 200 duplicate of the home page (a "soft 404" to Google). The server also
  * rewrites the static canonical/og:url per route, so crawlers see the same
  * canonical before and after this script runs. */
-const TAB_NAMES = ['player', 'regs', 'config', 'about', 'blog'];
+const TAB_NAMES = ['player', 'regs', 'visuals', 'config', 'about', 'blog'];
 /* One entry per blog post. Add a slug + title here and a matching
  * #blog-post-<slug> .blog-view block in index.html to publish a new post -
  * /blog itself just lists whatever is in this map. */
@@ -108,6 +108,7 @@ const BLOG_POSTS = {
 const TAB_TITLES = {
   player: 'USBSID-Pico Web SID Player',
   regs:   'USBSID-Pico SID Registers (Live)',
+  visuals: 'USBSID-Pico SID Visuals: Oscilloscope, Filter and Stereo',
   config: 'USBSID-Pico Web Config',
   about:  'About USBSID-Pico',
   blog:   'USBSID-Pico Blog'
@@ -142,6 +143,8 @@ function initTabs() {
     tab.classList.add('active');
     const panel = document.getElementById('panel-' + route.tab);
     if (panel) panel.classList.add('active');
+    placeTransport(route.tab === 'visuals');
+    if (window.usbsidVisuals) window.usbsidVisuals.setActive(route.tab === 'visuals');
 
     if (route.tab === 'blog') {
       document.querySelectorAll('#panel-blog .blog-view').forEach(v => v.classList.remove('active'));
@@ -535,8 +538,33 @@ function createPlayer(emulator) {
 function getPlayer() {
   if (!_player || _player.emulator !== _emulator) {
     _player = createPlayer(_emulator);
+    /* The Visuals tab's settings go to the ResidFp player only. */
+    if (window.usbsidVisuals) {
+      window.usbsidVisuals.attach(_emulator === 'usplayer-audio' ? _player : null);
+    }
   }
   return _player;
+}
+
+/* For usbsid-visuals.js, a module that may load after the player is built. */
+window.currentPlayer = () => (_emulator === 'usplayer-audio' ? _player : null);
+window.visualsTabActive = () => {
+  const panel = document.getElementById('panel-visuals');
+  return !!panel && panel.classList.contains('active');
+};
+
+/* The Transport box lives in the player panel and moves into the Visuals tab
+ * while that tab shows: one set of controls and handlers, never a copy. */
+function placeTransport(inVisuals) {
+  const box = document.getElementById('transport-box');
+  const slot = document.getElementById('visuals-transport-slot');
+  const home = document.getElementById('transport-home');
+  if (!box || !slot || !home) return;
+  if (inVisuals) {
+    if (box.parentNode !== slot) slot.appendChild(box);
+  } else if (box.previousElementSibling !== home) {
+    home.after(box);
+  }
 }
 
 /* Workaround to always subtract 1 from subtune as the player expects this */
@@ -2086,7 +2114,20 @@ function updateConfTabVisibility() {
   }
 }
 
+function updateVisualsTabVisibility() {
+  /* Scope, filter and stereo act on reSIDfp in the page: ResidFp mode only. */
+  const tab = document.querySelector('.c64-tab[data-tab="visuals"]');
+  const panel = document.getElementById('panel-visuals');
+  const show = (_emulator === 'usplayer-audio');
+  if (tab) tab.style.display = show ? '' : 'none';
+  if (panel && !show && panel.classList.contains('active')) {
+    const playerTab = document.querySelector('.c64-tab[data-tab="player"]');
+    if (playerTab) playerTab.click();
+  }
+}
+
 function updateRegsTabVisibility() {
+  updateVisualsTabVisibility();
   /* Registers tab is shown whenever WebUSB mode is selected - no need to wait
    * for device open, which avoids auto-connect timing races. */
   const tab = document.querySelector('.c64-tab[data-tab="regs"]');
