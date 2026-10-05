@@ -70,6 +70,8 @@ let audioSteps = 24;           /* frames one fill may emulate */
 let audioFilling = false;
 let audioRate = 48000;         /* the ring's sample rate, for the register lead */
 let audioChannels = 1;         /* samples per frame from _usp_audio_take() */
+let audioCpuMs = 0;            /* time spent emulating, since audioConfigure */
+let audioFrames = 0;           /* frames emulated, since audioConfigure */
 
 /* SID register mirror reported to the page in audio mode, which feeds its
  * piano, graph and register views: the page's own player never steps.
@@ -130,6 +132,11 @@ function snapshot() {
      * the v5 header flag. */
     fmWrites: (audioMode && typeof player.M._usp_audio_fm_writes === 'function')
       ? player.M._usp_audio_fm_writes() : 0,
+    /* Mean ms of emulation per frame since the tune was configured, against a
+     * frame's budget of about 20 ms; audio mode only. */
+    msPerFrame: audioFrames > 0 ? audioCpuMs / audioFrames : 0,
+    clipped: (audioMode && typeof player.M._usp_audio_clipped === 'function')
+      ? player.M._usp_audio_clipped() : 0,
     /* Stereo position per chip, 0 left, 1 center, 2 right: see panning. */
     pans: (audioMode && typeof player.M._usp_audio_pan === 'function')
       ? info.sids.map((_, c) => player.M._usp_audio_pan(c + 1)) : [],
@@ -157,7 +164,10 @@ function audioFill() {
     const M = player.M;
     const deadline = performance.now() + AUDIO_FILL_BUDGET_MS;
     while (audioOwed > 0 && steps < audioSteps) {
+      const t0 = performance.now();
       player.stepAndDrain();
+      audioCpuMs += performance.now() - t0;
+      audioFrames++;
       steps++;
       for (;;) {
         const n = M._usp_audio_take(audioPtr, audioMax);
@@ -449,6 +459,8 @@ const handlers = {
     if (rate) audioRate = rate | 0;
     audioChannels = (typeof player.M._usp_audio_channels === 'function')
       ? (player.M._usp_audio_channels() | 0) || 1 : 1;
+    audioCpuMs = 0;
+    audioFrames = 0;
     audioOwed = 0;
     audioSent = 0;
     scopeChunks = [];
