@@ -52,6 +52,27 @@ let player = null;
 let transport = null;
 let clockPort = null;
 
+/**
+ * Instantiate the wasm module, fetching usbsid.wasm with wasmUrl's query.
+ *
+ * The loader resolves usbsid.wasm without the cache buster, and a cached wasm
+ * from an older build breaks the minified export names of a newer loader.
+ *
+ * @param {string} wasmUrl  URL of usbsid.esm.js, cache buster included
+ * @returns {Promise<object>} the module
+ */
+async function loadModule(wasmUrl) {
+  const { default: USBSIDPlayer } = await import(wasmUrl);
+  const base = new URL(wasmUrl, self.location.href);
+  return USBSIDPlayer({
+    locateFile: (p) => {
+      const u = new URL(p, base);
+      u.search = base.search;
+      return u.href;
+    },
+  });
+}
+
 /* Software audio, when the worker is synthesising rather than driving a board.
  *
  * The ring lives in the AudioWorkletProcessor and asks for what it is short of.
@@ -358,8 +379,7 @@ const handlers = {
    * hard coded because the page decides where the build artefacts live.
    */
   async init({ wasmUrl, prefer }) {
-    const { default: USBSIDPlayer } = await import(wasmUrl);
-    const M = await USBSIDPlayer();
+    const M = await loadModule(wasmUrl);
     /* WebUSB where it exists, Web Serial where it does not, which is Firefox.
      * Both re-acquire what the page was granted without a picker. `prefer`
      * overrides, which is how bench.html measures one against the other. */
@@ -430,8 +450,7 @@ const handlers = {
    * device that would sit claimed for nothing.
    */
   async audioInit({ wasmUrl }) {
-    const { default: USBSIDPlayer } = await import(wasmUrl);
-    const M = await USBSIDPlayer();
+    const M = await loadModule(wasmUrl);
     transport = null;
     player = new USBSIDPlayerWeb(M);
     audioMode = true;
