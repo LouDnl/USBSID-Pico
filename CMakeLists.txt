@@ -381,31 +381,31 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/usbsid.c
   ${CMAKE_CURRENT_LIST_DIR}/src/usbsid_constants.c
   ${CMAKE_CURRENT_LIST_DIR}/src/config.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/config_bus.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/config_socket.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/config_logging.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/config/config_bus.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/config/config_socket.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/config/config_logging.c
   ${CMAKE_CURRENT_LIST_DIR}/src/gpio.c
   ${CMAKE_CURRENT_LIST_DIR}/src/pio.c
   ${CMAKE_CURRENT_LIST_DIR}/src/dma.c
   ${CMAKE_CURRENT_LIST_DIR}/src/vu.c
   ${CMAKE_CURRENT_LIST_DIR}/src/bus.c
   ${CMAKE_CURRENT_LIST_DIR}/src/midi.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/midi_handler.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/midi_queue.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/midi_engine.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/midi_voice.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/midi_config.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/midi_patch.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/midi_arp_table.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/midi_fmopl.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi/midi_handler.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi/midi_queue.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi/midi_engine.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi/midi_voice.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi/midi_config.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi/midi_patch.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi/midi_arp_table.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi/midi_fmopl.c
   ${CMAKE_CURRENT_LIST_DIR}/src/asid.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/asid_buffer.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi/asid_buffer.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sysex.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/sid_cloneconfig.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/sid_detection.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/sid_player.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/sid_tests.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/sid/sid_cloneconfig.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/sid/sid_detection.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/sid/sid_player.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/sid/sid_tests.c
   ${CMAKE_CURRENT_LIST_DIR}/src/mcu.c
   ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c
 )
@@ -414,6 +414,10 @@ set(SOURCEFILES
 set(TARGET_INCLUDE_DIRS PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}
   ${CMAKE_CURRENT_LIST_DIR}/src
+  ${CMAKE_CURRENT_LIST_DIR}/src/config
+  ${CMAKE_CURRENT_LIST_DIR}/src/midi
+  ${CMAKE_CURRENT_LIST_DIR}/src/net
+  ${CMAKE_CURRENT_LIST_DIR}/src/sid
   ${TINYUSB_PATH}/hw
   ${TINYUSB_PATH}/src
 )
@@ -545,8 +549,8 @@ if(USBSID_W_BOARD)
     set(SOURCEFILES
       ${SOURCEFILES}
       ${CMAKE_CURRENT_LIST_DIR}/src/nsd.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/net_ring.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/net_config.c  # Config required either way
+      ${CMAKE_CURRENT_LIST_DIR}/src/net/net_ring.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/net/net_config.c  # Config required either way
     )
     add_compile_definitions(USE_NSD=1)
   endif()
@@ -555,8 +559,8 @@ if(USBSID_W_BOARD)
   if(ENABLE_NET EQUAL 1)
     set(SOURCEFILES
       ${SOURCEFILES}
-      ${CMAKE_CURRENT_LIST_DIR}/src/net_wifi.c
-      ${CMAKE_CURRENT_LIST_DIR}/src/net_bluetooth.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/net/net_wifi.c
+      ${CMAKE_CURRENT_LIST_DIR}/src/net/net_bluetooth.c
     )
     add_compile_definitions(USE_NET=1)
     add_compile_definitions(NSD_DEFAULT_PORT=6581)
@@ -585,7 +589,7 @@ if(USBSID_W_BOARD)
   elseif(FALSE AND (ENABLE_WIFI EQUAL 1) AND NOT (ENABLE_BLUETOOTH EQUAL 1))
     set(TARGET_LL
       ${TARGET_LL}
-      pico_cyw43_arch_lwip_poll  # Polled from core 0, see net_wifi.c
+      pico_cyw43_arch_lwip_poll  # Polled from core 0, see net/net_wifi.c
       pico_lwip_nosys            # Provides the sys_arch.h NO_SYS=1 needs
     )
     set(FILENAME_EXTENSION "_netw")

@@ -43,7 +43,11 @@
 
 # firmware source directories
 !src
+!src/config
+!src/midi
+!src/net
 !src/pio
+!src/sid
 !lib
 
 # non firmware related directories (and if applicable their contents)

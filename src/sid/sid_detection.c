@@ -31,11 +31,11 @@
 #include <config_bus.h>
 #include <logging.h>
 #include <sid.h>
-#include <sid_armsid.h>
-#include <sid_fpgasid.h>
-#include <sid_pdsid.h>
-#include <sid_backsid.h>
-#include <sid_sidemu.h>
+#include <clone_armsid.h>
+#include <clone_fpgasid.h>
+#include <clone_pdsid.h>
+#include <clone_backsid.h>
+#include <clone_sidemu.h>
 #if PCB_VERSION_INT >= 15
 #include <gpio.h>
 #endif

@@ -32,12 +32,12 @@
 #include <sid_detection.h>
 #include <config_logging.h>
 #include <logging.h>
-#include <sid_armsid.h>
-#include <sid_backsid.h>
-#include <sid_fpgasid.h>
-#include <sid_pdsid.h>
-#include <sid_skpico.h>
-#include <sid_sidemu.h>
+#include <clone_armsid.h>
+#include <clone_backsid.h>
+#include <clone_fpgasid.h>
+#include <clone_pdsid.h>
+#include <clone_skpico.h>
+#include <clone_sidemu.h>
 
 
 /* Init local variables */
