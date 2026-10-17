@@ -3,7 +3,7 @@
 USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board for interfacing one or two MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer, phone, ASID supporting player or USB midi controller.  
 
 > [!IMPORTANT]
-> **Pre-order run open: [USBSID-Pico v1.5c Blue PCB](https://smallrun.net/shop/loud/usbsid-pico-v1-5c-blue-pcb), 4 of 10 committed, closes October 31, 2026.**
+> **Pre-order run open: [USBSID-Pico v1.5c Blue PCB](https://smallrun.net/shop/loud/usbsid-pico-v1-5c-blue-pcb), 8 of 10 committed (minimum), closes October 31, 2026.**
 > Pre-soldered board, optional Pico2 and case. You are only charged if 10 boards are committed. Ships tracked and insured from NL (EU EUR 15).
 
 # This is USBSID-Pico! :)
