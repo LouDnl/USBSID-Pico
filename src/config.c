@@ -1023,6 +1023,17 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
 #endif /* USE_NSD */
       write_back_data(2);
       break;
+    case WIFI_READ_IP: /* Replies on every build, 0xFF state on non _w */
+      usCFG("WIFI_READ_IP\n");
+      memset(write_buffer_p, 0, 64);
+#ifdef USE_NET
+      write_buffer_p[0] = net_wifi_state_code();
+      net_wifi_get_ip4(&write_buffer_p[1]);
+#else
+      write_buffer_p[0] = 0xFF; /* Not built with WiFi/Bluetooth support */
+#endif /* USE_NET */
+      write_back_data(5);
+      break;
 #ifdef USE_NET
     case WIFI_SET_SSID:
     {
@@ -1065,17 +1076,26 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case NSD_ENABLE:
       usCFG("NSD_ENABLE: %u\n", buffer[1]);
       if (buffer[1] <= 1) net_cfg.flags.nsd_enabled = (bool)buffer[1];
+      /* Doesn't require WIFI_APPLY to have been sent first */
+      net_wifi_apply_nsd_config(&net_cfg);
+      break;
+    case DISCOVERY_ENABLE:
+      usCFG("DISCOVERY_ENABLE: %u\n", buffer[1]);
+      if (buffer[1] <= 1) net_cfg.flags.discovery_enabled = (bool)buffer[1];
+      /* Doesn't require WIFI_APPLY to have been sent first */
+      net_wifi_apply_nsd_config(&net_cfg);
       break;
       case NSD_SET_PORT:
       usCFG("NSD_SET_PORT\n");
       net_cfg.nsd_port = (uint16_t)((buffer[1] << 8) | buffer[2]);
-      break;
+      break; /* Applied by WIFI_APPLY */
 #endif /* USE_NSD */
     case WIFI_APPLY:
       usCFG("WIFI_APPLY\n");
       save_net_config(&net_cfg);
       net_wifi_set_credentials(net_cfg.ssid, net_cfg.psk);
       net_wifi_set_hostname(net_cfg.hostname);
+      net_wifi_apply_nsd_config(&net_cfg);
       /* net_wifi_start() is one-way, one-shot power-on (no teardown yet) -
        * toggling WIFI_ENABLE back off after this does not power it down. */
       if (net_cfg.flags.wifi_enabled) {

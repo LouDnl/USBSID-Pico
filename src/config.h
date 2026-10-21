@@ -429,6 +429,8 @@ enum
   WIFI_FORGET      = 0x78,  /* Erase stored credentials */
   BT_NSD_ENABLE    = 0x79,  /* buffer[1] = 0/1 */
   READ_NETCFG      = 0x7A,  /* Read net config as bytes */
+  WIFI_READ_IP     = 0x7B,  /* Returns {state, ip0, ip1, ip2, ip3}, every build */
+  DISCOVERY_ENABLE = 0x7C,  /* buffer[1] = 0/1, applied live, persisted by WIFI_APPLY */
 
   USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
   US_PCB_VERSION   = 0x81,  /* Read PCB version */
@@ -546,13 +548,22 @@ enum {
   BOARD_MIXED     = 14,
   BOARD_SDETECT   = 15, /* (PCB v1.5+) Automatic socket change detection */
   BOARD_PADETECT  = 16, /* (PCB v1.5+) Preset automatic detection */
-};
+
+/* Global variables from config.c */
+extern Config        usbsid_config;
+extern RuntimeCFG    cfg;
+extern ConfigError   err;
+extern volatile bool first_boot;
+/* Global versioning variables */
+extern const char    *us_product;
+extern const char    *project_version;
+extern const char    *pcb_version;
 
 /**
  * @brief USBSID-Pico PCB and Firmware features packed in a single byte
  * 1 Byte == 8 bits == 8 features to define
  *   76543210
- * 0b00000000
+ * 0b00000000 = default at source, compilation defines what is and is not enabled
  * 0 = Pico type: 0 Pico1, 1 Pico2
  * 1 = Unused
  * 2 = RGB LED onboard: 0 No, 1 Yes
@@ -574,10 +585,10 @@ static const uint8_t us_features = (
 #if defined(USE_PIO_UART)
   | (1 << 3)
 #endif
-#if defined(USE_NET)
+#if defined(USE_NET) /* Also enables WIFI_READ_IP command */
   | (1 << 4)
 #endif
-#if defined(USE_NSD)
+#if defined(USE_NSD) /* Also enables DISCOVERY_ENABLE command */
   | (1 << 5)
 #endif
   /* 6 Unused */
@@ -586,21 +597,13 @@ static const uint8_t us_features = (
 #endif
 );
 
+/* Const feature variables */
 static const bool is_rp2350     = (us_features & 0b00000001); /* 0 */
 static const bool has_rgb_vu    = (us_features & 0b00000100); /* 2 */
 static const bool has_pio_uart  = (us_features & 0b00001000); /* 3 */
 static const bool has_net       = (us_features & 0b00010000); /* 4 */
 static const bool has_nsd       = (us_features & 0b00100000); /* 5 */
 static const bool has_emulator  = (us_features & 0b10000000); /* 7 */
-
-/* Global variables from config.c */
-extern Config        usbsid_config;
-extern RuntimeCFG    cfg;
-extern ConfigError   err;
-extern volatile bool first_boot;
-extern const char    *us_product;
-extern const char    *project_version;
-extern const char    *pcb_version;
 
 /* Functions from config.c */
 void        write_back_data(size_t buffersize);
