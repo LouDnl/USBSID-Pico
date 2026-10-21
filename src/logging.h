@@ -117,8 +117,12 @@ do {                   \
 
 #ifdef USBIO_DEBUG
 #define usIO(fmt, ...) __DBG("[IO] " fmt __VA_OPT__(,) __VA_ARGS__)
+#define usCDC(fmt, ...) __DBG("[CDC] " fmt __VA_OPT__(,) __VA_ARGS__)
+#define usVDR(fmt, ...) __DBG("[VDR] " fmt __VA_OPT__(,) __VA_ARGS__)
 #else
 #define usIO(...) ((void)0)
+#define usCDC(...) ((void)0)
+#define usVDR(...) ((void)0)
 #endif
 
 #ifdef USBSIDGPIO_DEBUG
