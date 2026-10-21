@@ -48,42 +48,7 @@
  * cmake -S . -B build && cmake --build build
  */
 
-/* ---------------------- */
 
-/* init local driver variables */
-static int debug = 0;
-static USBSIDitf us = NULL;
-static int len, rc;
-static int usid_dev = -1;
-static char target_serial[USBSID_SERIAL_LEN] = {0}; /* Board to open, empty = use target_index */
-static int target_index = 0;                         /* Index in enumerate_USBSID() order */
-
-/* -----USBSID-Pico------ */
-
-/* init local usbsid-pico variables */
-static const enum config_clockrates clockrates[] = { DEFAULT, PAL, NTSC, DREAN, NTSC2 };
-static uint32_t read_clock_rate;
-static char version[MAX_BUFFER_SIZE] = {0};
-static char pcb_version[MAX_BUFFER_SIZE] = {0};
-static char project_version[MAX_BUFFER_SIZE] = {0};
-static uint8_t config[FLASH_PAGE_SIZE] = {0};
-static uint8_t socket_config[SOCKET_BUFFER_SIZE] = {0};
-static Config usbsid_config = USBSID_DEFAULT_CONFIG_INIT;
-static uint8_t net_config[MAX_BUFFER_SIZE] = {0};
-static uint8_t wifi_status[2] = {0};
-static NetConfig net_cfg = {0};
-static uint8_t us_features = 0;
-static bool us_features_read = false;
-
-/* -----SIDKICK-pico----- */
-
-/* init local skpico variables */
-static uint8_t skpico_config[MAX_BUFFER_SIZE] = {0xFF};
-static uint8_t skpico_version[SKPICO_VER_SIZE] = {0xFF};
-static uint8_t base_address = 0x0;
-static int sid_socket = 1;
-static int skpico_v = 0;
-static bool is_u64fw = false;
 
 /* Mommy's little helpers */
 void teardown_wait(void)
@@ -101,6 +66,7 @@ bool startsWith(const char *str, const char *prefix)
 {
   return (strncmp(str, prefix, strlen(prefix)) == 0);
 }
+
 
 /* -----USBSID-Pico------ */
 
@@ -343,6 +309,7 @@ void write_config_ini(Config * config, char * filename)
   };
 }
 
+
 /* -----USBSID-Pico------ */
 
 void usbsid_close(void)
@@ -508,6 +475,7 @@ static int take_board_arg(int *argc, char **argv, const char **board)
   return 0;
 }
 
+
 /* -----USBSID-Pico------ */
 
 void write_chars(unsigned char * data, int size)
@@ -526,6 +494,7 @@ int read_chars(unsigned char * data, int size)
   }
   return got;
 }
+
 
 /* -----USBSID-Pico------ */
 
@@ -794,6 +763,10 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
         break;
       case 58:
         usbsid_config.lock_audio_sw = buff[i];
+        break;
+      case 59:
+        usbsid_config.fastreads = buff[i];
+        break;
       case 60:
         usbsid_config.mirrored = (buff[i] & 0b1);
         usbsid_config.flipped  = ((buff[i] & 0b10) >> 1);
@@ -861,11 +834,13 @@ void write_net_string_command(uint8_t subcmd, const char * str)
 
 void set_netcfg_from_buffer(const uint8_t * buff, size_t len)
 {
-  if (buff[0] != READ_NETCFG
+  /* buff holds MAX_BUFFER_SIZE bytes, len is the actual reply length */
+  if (len < MAX_BUFFER_SIZE
+    || buff[0] != READ_NETCFG
     || buff[1] != 0x7F
-    || buff[len - 1] != 0xFF) {
+    || buff[MAX_BUFFER_SIZE - 1] != 0xFF) {
     printf("Net config buffer with length %ld verification failed %02X %02X %02X,\ndisplayed information can be incorrect!\n",
-      len, buff[0], buff[1], buff[len - 1]);
+      len, buff[0], buff[1], buff[MAX_BUFFER_SIZE - 1]);
     return;
   }
 
@@ -890,12 +865,33 @@ void read_net_config(void)
   write_chars(config_buffer, count_of(config_buffer));
 
   int len;
-  len = read_chars(net_config, count_of(net_config));
-  if (debug == 1) printf("Read %d bytes of data, byte 0 = %02X\n", len, net_config[0]);
+  memset(read_data_uber, 0, count_of(read_data_uber));
+  len = read_chars(read_data_uber, count_of(read_data_uber));  /* Consumes trailing CDC ZLP */
+  if (debug == 1) printf("Read %d bytes of data, byte 0 = %02X\n", len, read_data_uber[0]);
+  if (len < 0) len = 0;
+  memcpy(net_config, read_data_uber, (len < MAX_BUFFER_SIZE ? len : MAX_BUFFER_SIZE));
 
   if (debug == 1) print_cfg_buffer(net_config, count_of(net_config));
 
-  set_netcfg_from_buffer(net_config, count_of(net_config));
+  set_netcfg_from_buffer(net_config, (size_t)len);
+  return;
+}
+
+static bool read_wifi_ip(uint8_t * out)
+{ /* Read WIFI_READ_IP reply into out[5], false on bad reply */
+  write_config_command(WIFI_READ_IP, 0x0, 0x0, 0x0, 0x0);
+
+  int len;
+  memset(out, 0, 5);
+  len = read_chars(out, 5);
+  if (debug == 1) printf("Read %d bytes of data, byte 0 = %02X\n", len, out[0]);
+  return (len == 5);
+}
+
+static void print_wifi_ip_line(const uint8_t * ip)
+{
+  if (ip[0] == 3) printf("IP address:   %u.%u.%u.%u\n", ip[1], ip[2], ip[3], ip[4]);
+  else printf("IP address:   -\n");
   return;
 }
 
@@ -908,8 +904,29 @@ void print_wifi_status(void)
   len = read_chars(wifi_status, count_of(wifi_status));
   if (debug == 1) printf("Read %d bytes of data, byte 0 = %02X byte 1 = %02X\n", len, wifi_status[0], wifi_status[1]);
 
-  printf("WiFi link:    %s\n", (wifi_status[0] == 0xFF ? "N/A (not a WiFi/net build)" : onoff[(int)wifi_status[0]]));
-  printf("NSD session:  %s\n", (wifi_status[1] == 0xFF ? "N/A (NSD not enabled)" : onoff[(int)wifi_status[1]]));
+  if (len != 2) {
+    printf("Could not read WiFi status, got %d bytes instead of 2\n", len);
+    return;
+  }
+
+  const char * link = (wifi_status[0] == 0xFF ? "N/A (not a WiFi/net build)"
+    : (wifi_status[0] <= 1 ? onoff[wifi_status[0]] : "invalid reply"));
+  const char * nsd = (wifi_status[1] == 0xFF ? "N/A (NSD not enabled)"
+    : (wifi_status[1] <= 1 ? onoff[wifi_status[1]] : "invalid reply"));
+  printf("WiFi link:    %s\n", link);
+  printf("NSD session:  %s\n", nsd);
+
+  if (!read_us_features()) {
+    printf("WiFi state:   unknown (could not read feature byte)\n");
+  } else if (board_has_wifi_ip()) {
+    uint8_t ip[5];
+    if (!read_wifi_ip(ip)) {
+      printf("Could not read WiFi state\n");
+      return;
+    }
+    printf("WiFi state:   %s\n", (ip[0] == 0xFF ? "n/a" : (ip[0] <= 3 ? wifi_states[ip[0]] : "invalid reply")));
+    print_wifi_ip_line(ip);
+  }
   return;
 }
 
@@ -923,49 +940,75 @@ void print_net_config(void)
   printf("  NSD:           %s\n", enabled[(int)net_cfg.flags.nsd_enabled]);
   printf("  Bluetooth NSD: %s\n", enabled[(int)net_cfg.flags.bt_nsd_enabled]);
   printf("  Discovery:     %s\n", enabled[(int)net_cfg.flags.discovery_enabled]);
+  if (!read_us_features()) {
+    printf("  IP address:    unknown (could not read feature byte)\n");
+  } else if (board_has_wifi_ip()) {
+    uint8_t ip[5];
+    if (!read_wifi_ip(ip)) printf("  IP address:    could not read\n");
+    else if (ip[0] == 3) printf("  IP address:    %u.%u.%u.%u\n", ip[1], ip[2], ip[3], ip[4]);
+    else printf("  IP address:    -\n");
+  }
   return;
 }
 
-uint8_t read_us_features(void)
-{
-  if (us_features_read) return us_features;
+bool read_us_features(void)
+{ /* Read and cache US_FEATURES, false when the reply is invalid */
+  if (us_features_read) return true;
 
   write_config_command(US_FEATURES, 0x0, 0x0, 0x0, 0x0);
   uint8_t buf[1] = {0};
   int len = read_chars(buf, count_of(buf));
   if (debug == 1) printf("Read %d byte of data, byte 0 = %02X\n", len, buf[0]);
+  if (len != 1) {
+    printf("Could not read feature byte, got %d bytes instead of 1\n", len);
+    return false;
+  }
   us_features = buf[0];
   us_features_read = true;
-  return us_features;
+  return true;
+}
+
+static bool board_feature(uint8_t mask)
+{
+  return (read_us_features() && (us_features & mask) != 0);
 }
 
 bool board_is_rp2350(void)
 {
-  return (read_us_features() & 0b00000001) != 0;
+  return board_feature(0b00000001);
 }
 
 bool board_has_rgbvu(void)
 {
-  return (read_us_features() & 0b00000100) != 0;
+  return board_feature(0b00000100);
 }
 
 bool board_has_net(void)
 {
-  return (read_us_features() & 0b00010000) != 0;
+  return board_feature(0b00010000);
 }
 
 bool board_has_nsd(void)
 {
-  return (read_us_features() & 0b00100000) != 0;
+  return board_feature(0b00100000);
+}
+
+bool board_has_wifi_ip(void)
+{
+  return board_feature(0b00000010);
 }
 
 bool board_has_emulator(void)
 {
-  return (read_us_features() & 0b10000000) != 0;
+  return board_feature(0b10000000);
 }
 
 bool require_net_support(void)
 {
+  if (!read_us_features()) {
+    printf("Could not query board features, network command aborted!\n");
+    return false;
+  }
   if (!board_has_net()) {
     printf("This USBSID-Pico was not built with WiFi/Bluetooth support, network command unavailable!\n");
     return false;
@@ -988,20 +1031,24 @@ void print_config(void)
   printf("Config Overview:\n");
   if (pcb_version[0] != 0) printf("  PCB version = v%s\n", pcb_version);
   if (project_version[0] != 0) printf("  Firmware version = v%s\n", project_version);
-  printf("  Firmware for %s compiled with:\n",
-  (board_is_rp2350() ? "rp2350" : "rp2040"));
-  if(!board_has_net()) {
-    printf("    - LED Vu meter\n");
-    if (board_has_rgbvu()) {
-      printf("    - RGB LED Vu meter\n");
-    }
+  if (!read_us_features()) {
+    printf("  Firmware features: unknown (could not read feature byte)\n");
   } else {
-    printf("    - LED Status indicator\n");
+    printf("  Firmware for %s compiled with:\n",
+    (board_is_rp2350() ? "rp2350" : "rp2040"));
+    if(!board_has_net()) {
+      printf("    - LED Vu meter\n");
+      if (board_has_rgbvu()) {
+        printf("    - RGB LED Vu meter\n");
+      }
+    } else {
+      printf("    - LED Status indicator\n");
+    }
+    if (board_has_net())      printf("    - WiFi & Bluetooth\n");
+    if (board_has_nsd())      printf("      - with Network SID Device\n");
+    if (board_has_emulator()) printf("    - Embedded USBSID-Player\n");
+    if (board_has_emulator()) printf("      - with Cynthcart\n");
   }
-  if (board_has_net())      printf("    - WiFi & Bluetooth\n");
-  if (board_has_nsd())      printf("      - with Network SID Device\n");
-  if (board_has_emulator()) printf("    - Embedded USBSID-Player\n");
-  if (board_has_emulator()) printf("      - with Cynthcart\n");
   printf("\n");
   printf("  Clock settings:\n");
   printf("    %s C64 clockrate = %d\n",
@@ -1079,6 +1126,8 @@ void print_config(void)
     enabled[(int)usbsid_config.Midi.enabled]);
   printf("  ASID feature = %s\n",
     enabled[(int)usbsid_config.Asid.enabled]);
+  printf("  FastReads (batch reads, SID stream) = %s\n",
+    enabled[(int)usbsid_config.fastreads]);
   printf("\n");
   printf("Verification of socket change detection on boot = %s\n",
     enabled[(int)usbsid_config.socket_change_detect]);
@@ -1252,6 +1301,7 @@ void apply_default_socket_settings(void)
   usbsid_config.flipped   = false;
   usbsid_config.mixed     = false;
 }
+
 
 /* -----SIDKICK-pico----- */
 
@@ -1460,7 +1510,10 @@ void skpico_read_version(int debug, bool init)
 
   if (debug) print_cfg_buffer(skpico_version_result, count_of(skpico_version_result));
   memcpy(&skpico_version[0], &skpico_version_result, count_of(skpico_version_result) - 32);
-  printf("[CONFIG] SIDKICK-pico version is: %.36s (skpico_v: %d is_u64fw: %s)\n", skpico_version, skpico_v, (is_u64fw ? "true" : "false"));
+  printf("SIDKICK-pico\n"
+    "  FW version: %.36s\n"
+    "  (skpico_v: %d is_u64fw: %s)\n", skpico_version, skpico_v, (is_u64fw ? "true" : "false"));
+  printf("\n");
 }
 
 
@@ -1481,6 +1534,7 @@ void skpico_write_config(int profile, int debug)
   }
   /* No exit or leave here! */
 }
+
 
 /* -----SIDKICK-pico----- */
 
@@ -1594,6 +1648,8 @@ void config_skpico(int argc, char **argv)
       int profile = ((argv[param_count+1] != NULL) && !startsWith(argv[param_count+1], "-")) ? atoi(argv[++param_count]) : 0;
       param_count++;
       printf("Sending reset SIDs command\n");
+
+      printf("\n");
 
       skpico_read_version(debug, true);
       // if (skpico_v < 22) { skpico_exit_reset_config_mode(debug); }
@@ -1747,24 +1803,40 @@ exit:;
   return;
 }
 
+
 /* -----USBSID-Pico------ */
 
-void print_help(void)
+void print_help_separator(void)
 {
   printf("------------------------------------------------------------------------------------------------------------------------\n");
-  printf("USBSID-Pico configtool\n");
-  printf("For the tool to work correct, this tool requires firmware v0.2.4 and up\n");
-  printf("\n");
-  printf("Usage:\n");
-  printf("$ cfg_usbsid [options]\n");
+  return;
+}
+
+void print_help_extended(void)
+{
+  printf("  -h itm,   --help item         : Show item help message, items are:\n");
+  printf("                                  options,sidchips,config,features,network,presets,ini,manual,other\n");
+  return;
+}
+
+void print_help_options(void)
+{
   printf("--[OPTIONS]-------------------------------------------------------------------------------------------------------------\n");
   printf("  -h,       --help              : Show this help message\n");
+  print_help_extended();
+  printf("                                  or the first three letters of each item\n");
   printf("  -v,       --version           : Read and print USBSID-Pico firmware version\n");
   printf("  -lb,      --list-boards       : List every attached board's serial number and exit\n");
   printf("  -b=ID,    --board=ID          : Connect to board ID (index from -lb) or serial, default first board\n");
   printf("  -reboot,  --reboot-usp        : Reboot USBSID-Pico\n");
   printf("  -boot,    --bootloader        : Reboot USBSID-Pico to the bootloader for firmware upload\n");
   printf("  -skpico   --sidkickpico       : Enter SIDKICK-pico config mode (skips any non skpico command following this command)\n");
+
+  return;
+}
+
+void print_help_sidchips(void)
+{
   printf("--[CHIP/SIDS]-----------------------------------------------------------------------------------------------------------\n");
   printf("  -sidtest N                    : Run SID test routine on available SID's\n");
   printf("                                  0: All, 1: 0x00, 2: 0x20, 3: 0x40, 4: 0x60\n");
@@ -1780,9 +1852,13 @@ void print_help(void)
   printf("                                  2: Reflex detection routine\n");
   printf("                                  3: Voice 3 delayed waveform detection routine (Some clones)\n");
   printf("  -dclone,  --detect-clone-types: Send clone autodetect command to device, returns the config as with '-r' afterwards\n");
+
+  return;
+}
+
+void print_help_config(void)
+{
   printf("--[CONFIG]--------------------------------------------------------------------------------------------------------------\n");
-  printf("            --config-defaults   : Reset USBSID-Pico config to defaults\n");
-  printf("                                  Add optional positional argument `1` to reboot USBSID-Pico afterwards\n");
   printf("  -r,       --read-config       : Read and print USBSID-Pico config settings\n");
   printf("  -rc,      --read-clock-speed  : Read and print USBSID-Pico SID clock speed\n");
   printf("  -rs,      --read-sock-config  : Read and print USBSID-Pico socket config settings only\n");
@@ -1794,6 +1870,14 @@ void print_help(void)
   printf("  -s,       --save-config       : Send the save config command to USBSID-Pico\n");
   printf("  -sr,      --save-reboot       : Send the save config command to USBSID-Pico and reboot it\n");
   printf("  -rl,      --reload-config     : Reload the config stored in flash, does not return anything\n");
+  printf("            --config-defaults   : Reset USBSID-Pico config to defaults\n");
+  printf("                                  Add optional positional argument `1` to reboot USBSID-Pico afterwards\n");
+
+  return;
+}
+
+void print_help_features(void)
+{
   printf("--[FEATURES]------------------------------------------------------------------------------------------------------------\n");
   printf("  -mute                         : Mute all SID's\n");
   printf("  -unmute                       : Umute all SID's\n");
@@ -1812,18 +1896,31 @@ void print_help(void)
   printf("                                  0: %s, 1:%s\n", enabled[0], enabled[1]);
   printf("  -pad N,   --preset-detect N   : Disable/enable and save the silent automatic socket detection on preset selection\n");
   printf("                                  0: %s, 1:%s\n", enabled[0], enabled[1]);
+
+  return;
+}
+
+void print_help_network(void)
+{
   printf("--[NETWORK]-(ONLY AVAILABLE ON _W PICO'S!)------------------------------------------------------------------------------\n");
-  printf("  -wifis,   --wifi-status       : Read and print WiFi link / NSD session status\n");
-  printf("  -rnc,     --read-net-config   : Read and print WiFi/NSD/Bluetooth network config\n");
+  printf("  -wifis,   --wifi-status       : Read and print WiFi link / NSD session status (and WiFi state / IP if supported)\n");
+  printf("  -rnc,     --read-net-config   : Read and print WiFi/NSD/Bluetooth network config (and IP if supported)\n");
   printf("  -ssid S,  --wifi-ssid S       : Set the WiFi SSID to S\n");
   printf("  -psk P,   --wifi-psk P        : Set the WiFi PSK/password to P (write-only, never read back)\n");
   printf("  -host H,  --wifi-hostname H   : Set the WiFi hostname to H\n");
   printf("  -wen N,   --wifi-enable N     : Enable (1) or Disable (0) WiFi\n");
   printf("  -nsden N, --nsd-enable N      : Enable (1) or Disable (0) Network SID Device (NSD)\n");
+  printf("  -discen N,--disc-enable N     : Enable (1) or Disable (0) UDP discovery, applied live, persisted by -wapply\n");
   printf("  -nsdp N,  --nsd-port N        : Set the Network SID Device port to N\n");
   printf("  -wapply,  --wifi-apply        : Persist WiFi/NSD config to flash and apply live\n");
   printf("  -wforget, --wifi-forget       : Erase stored WiFi credentials and reset network config to defaults\n");
   printf("  -bten N,  --bt-nsd-enable N   : Enable (1) or Disable (0) Bluetooth Network SID Device (SPP transport)\n");
+
+  return;
+}
+
+void print_help_presets(void)
+{
   printf("--[PRESETS]-------------------------------------------------------------------------------------------------------------\n");
   printf("  -single,  --single-sid        : Socket 1 enabled @ single SID, Socket 2 disabled\n");
   printf("  -single2, --single-sid-s2     : Socket 1 disabled, Socket 2 enabled @ single SID\n");
@@ -1841,12 +1938,24 @@ void print_help(void)
   printf("  (Quad SID only!)                Socket 1 SIDS @ $00 & $40, Socket 2 SIDS @ $20, $60 \n");
   printf("  -qflipmixed                   : Socket 1&2 enabled @ dual SID, Socket 2 is primary socket & Mix up the SID addresses\n");
   printf("  (Quad SID only!)                Socket 1 SIDS @ $20 & $60, Socket 2 SIDS @ $00, $40 \n");
+
+  return;
+}
+
+void print_help_ini(void)
+{
   printf("--[INI FILE CONFIGURATION]----------------------------------------------------------------------------------------------\n");
   printf("  -default, --default-ini       : Generate an ini file with default USBSID-Pico config named `USBSID-Pico-cfg.ini`\n");
   printf("  -export F,--export-config F   : Read config from USBSID-Pico and export it to provided ini file or default in\n");
   printf("                                  current directory when not provided\n");
   printf("  -import F,--import-config F   : Read config from provided ini file, write to USBSID-Pico, send save command\n");
   printf("                                  and read back config for a visual confirmation\n");
+
+  return;
+}
+
+void print_help_manual(void)
+{
   printf("--[MANUAL CONFIGURATION]------------------------------------------------------------------------------------------------\n");
   printf("  All the following options require '-w'\n");
   printf("  Please do not forget to use '-a' or '-s' after writing config settings manually\n");
@@ -1866,6 +1975,7 @@ void print_help(void)
   printf("  -au ,     --audio-switch N    : Set the mono/stereo audio switch (PCB v1.3+ only!)\n");
   printf("                                  0: %s, 1:%s\n", mono_stereo[0], mono_stereo[1]);
   printf("  -la N,    --lockaudio N       : Lock the audio switch from being changed: True (1) False (0)\n");
+  printf("  -fr N,    --fastreads N       : FastReads (batch reads, SID stream) is Enabled (1) or Disabled (0)\n");
   printf("  -sock N,  --socket N          : Configure socket N ~ 1 or 2\n");
   printf("  The following options additionally require '-sock N'\n");
   printf("  Note that you can only configure 1 socket at a time!\n");
@@ -1883,20 +1993,76 @@ void print_help(void)
   printf("                                  (Available for 'Clone' chiptype only!)\n");
   printf("  -a1 N,    --as-one N          : Socket 2 mirrors socket 1 (Socket 2 setting only!)\n");
   printf("                                  Enabled (1) or Disabled (0)\n");
+
+  return;
+}
+
+void print_help_other(void)
+{
   printf("--[OTHER]---------------------------------------------------------------------------------------------------------------\n");
   printf("  -d,       --debug             : Enable debug prints\n");
   printf("  -configr N                    : Read back N bytes from a write config command, use _before_ `-config`\n");
   printf("                                  Example: `cfg_usbsid -configr 1 -config CMD`\n");
   printf("  -config   --config-command    : Send custom config command, requires followup hex strings\n");
   printf("  -command                      : Send arbitrary command in hex, requires followup hex strings\n");
-  printf("-----------------------------------------------------------------------------------------------------------------------\n");
+
+  return;
+}
+
+void print_help_all(void)
+{
+  print_help_options();
+  print_help_sidchips();
+  print_help_config();
+  print_help_features();
+  print_help_network();
+  print_help_presets();
+  print_help_ini();
+  print_help_manual();
+  print_help_other();
+
+  return;
+}
+
+void print_help(const char * help)
+{
+  print_help_separator();
+  printf("USBSID-Pico commandline configtool\n");
+  printf("For the tool to work correct, this tool requires firmware v0.2.4 and up\n");
+  printf("\n");
+  printf("Usage:\n");
+  printf("$ cfg_usbsid [arguments]\n");
+  printf("\n");
+
+  if (help != NULL) {
+    // const char *argument_to_check = help;
+    int help_idx = -1;
+    for (int i = 0; i < menu_count; i++) {
+      if ((strcmp(help_args[i], help) == 0) || /* Full string match */
+          (strncmp(help_args[i], help, 3) == 0)) {  /* First three character partial string match */
+        help_idx = i;
+        help_menus[help_idx]();
+        print_help_separator();
+        return;
+      }
+    }
+    printf("Incorrect or unparsable help option!\n");
+    printf("--[USAGE]-------------------------------------------------------------------------------------------------------------\n");
+    print_help_extended();
+    print_help_separator();
+  } else {
+    print_help_all();
+    print_help_separator();
+  }
+
+  return;
 }
 
 void config_usbsidpico(int argc, char **argv)
 {
   for (int param_count = 1; param_count < argc; param_count++) {
     if (!strcmp(argv[param_count], "-h") || !strcmp(argv[param_count], "--help")) {
-      print_help();
+      print_help(argv[2]);
       break;
     }
 
@@ -2193,6 +2359,22 @@ void config_usbsidpico(int argc, char **argv)
       write_config_command(NSD_ENABLE, en, 0x0, 0x0, 0x0);
       break;
     }
+    if (!strcmp(argv[param_count], "-discen") || !strcmp(argv[param_count], "--disc-enable")) {
+      if (!require_net_support()) goto exit;
+      if (!board_has_wifi_ip()) {
+        printf("This firmware does not support toggling discovery, update firmware\n");
+        goto exit;
+      }
+      param_count++;
+      int en = atoi(argv[param_count]);
+      if (en > 1) {
+        printf("%d is not an enable option!\n", en);
+        goto exit;
+      }
+      printf("Set Discovery to: %s\n", enabled[en]);
+      write_config_command(DISCOVERY_ENABLE, en, 0x0, 0x0, 0x0);
+      break;
+    }
     if (!strcmp(argv[param_count], "-nsdp") || !strcmp(argv[param_count], "--nsd-port")) {
       if (!require_nsd_support()) goto exit;
       param_count++;
@@ -2487,6 +2669,18 @@ void config_usbsidpico(int argc, char **argv)
           printf("Set FMOpl from %s to: %s\n", enabled[usbsid_config.FMOpl.enabled], enabled[en]);
           usbsid_config.FMOpl.enabled = en;
           write_config_command(SET_CONFIG, 0x9, en, 0x0, 0x0);
+          continue;
+        }
+        if (!strcmp(argv[pc], "-fr") || !strcmp(argv[pc], "--fastreads")) {
+          pc++;
+          int en = atoi(argv[pc]);
+          if(en >= count_of(enabled)) {
+            printf("%d is not an enable option!\n", en);
+            goto exit;
+          }
+          printf("Set FastReads from %s to: %s\n", enabled[usbsid_config.fastreads], enabled[en]);
+          usbsid_config.fastreads = en;
+          write_config_command(SET_CONFIG, 0x11, en, 0x0, 0x0);
           continue;
         }
         if (!strcmp(argv[pc], "-led") || !strcmp(argv[pc], "--led-enabled")) {
@@ -2804,6 +2998,7 @@ void config_usbsidpico(int argc, char **argv)
 exit:;
 };
 
+
 /* ---------------------- */
 
 int main(int argc, char **argv)
@@ -2826,11 +3021,11 @@ int main(int argc, char **argv)
   /* USBSID-Pico */
   if (argc <= 1) {
     printf("Please supply atleast 1 option\n");
-    print_help();
+    print_help(NULL);
     goto exit;
   }
   if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help") || !strcmp(argv[1], "-") || !strcmp(argv[1], "--")) {
-    print_help();
+    print_help(argv[2]);
     goto exit;
   }
   /* SIDKICK-pico */
@@ -2865,7 +3060,6 @@ int main(int argc, char **argv)
   }
 
   if (!strcmp(argv[1], "-skpico") || !strcmp(argv[1], "--sidkickpico")) {
-
     config_skpico(argc, argv);
     goto exit;
   } else {

@@ -43,7 +43,16 @@
 #define ACM_CTRL_DTR   0x01
 #define ACM_CTRL_RTS   0x02
 
-/* usbsid-pico variables */
+/* init local driver variables */
+static int debug = 0;
+static USBSIDitf us = NULL;
+static int len, rc;
+static int usid_dev = -1;
+static char target_serial[USBSID_SERIAL_LEN] = {0}; /* Board to open, empty = use target_index */
+static int target_index = 0;                         /* Index in enumerate_USBSID() order */
+
+/* -----USBSID-Pico------ */
+
 enum
 {
   PACKET_TYPE  = 0xC0,  /* 0b11000000 ~ 192  */
@@ -131,10 +140,12 @@ enum
   WIFI_FORGET      = 0x78,  /* Erase stored credentials */
   BT_NSD_ENABLE    = 0x79,  /* buffer[1] = 0/1 */
   READ_NETCFG      = 0x7A,  /* Read net config as bytes */
+  WIFI_READ_IP     = 0x7B,  /* Returns {state, ip0..ip3}, needs US_FEATURES bit 1 */
+  DISCOVERY_ENABLE = 0x7C,  /* buffer[1] = 0/1, needs US_FEATURES bit 1 */
 
   USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
   US_PCB_VERSION   = 0x81,  /* Read PCB version */
-  US_FEATURES      = 0x82,  /* Read USBSID compiled features, bit 4 = net, bit 5 = nsd */
+  US_FEATURES      = 0x82,  /* Read USBSID compiled features, bit 1 = wifi ip + discovery toggle, bit 4 = net, bit 5 = nsd */
 
   RESTART_BUS      = 0x85,  /* Restart DMA & PIO */
   RESTART_BUS_CLK  = 0x86,  /* Restart PIO clocks */
@@ -190,6 +201,7 @@ enum config_clockrates
     NTSC2   = CLOCK_NTSC2,    /* 4 */
 };
 
+/* Buffer arrays */
 uint8_t read_data[1];
 uint8_t read_data_max[64];
 uint8_t read_data_uber[128];
@@ -198,6 +210,7 @@ uint8_t write_buffer[3]    = { (uint8_t)(WRITE << 6), 0x0, 0x0 };
 uint8_t command_buffer[3]  = { (uint8_t)(COMMAND << 6), 0x0, 0x0 };
 uint8_t config_buffer[6]   = { (uint8_t)((COMMAND << 6) | 18), 0x0, 0x0, 0x0, 0x0, 0x0 };
 
+/* Config string variables */
 const char * error_type[]  = { "ERROR" };
 const char * enabled[]     = { "Disabled", "Enabled" };
 const char * intext[]      = { "Internal", "External" };
@@ -284,6 +297,7 @@ typedef struct Config {
   bool need_confirmation : 1;    /* (PCB v1.5+) current configuration needs confirmation, SID's are disabled until confirmed! */
   bool socket_change_detect : 1; /* (PCB v1.5+) disables socket change detection on boot */
   bool preset_auto_detect : 1;   /* disables silent auto detection before present change */
+  bool fastreads : 1;            /* FastReads batch reads + SID stream enabled */
 } Config;
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
@@ -355,7 +369,55 @@ typedef struct Config {
   .need_confirmation = false, \
   .socket_change_detect = true, /* WARNING: This setting _can_ and _will_ fry your 9v SID if config is set to 6581 (12v) */ \
   .preset_auto_detect = true, \
+  .fastreads = true, \
 } \
+
+/* init local usbsid-pico variables */
+static const enum config_clockrates clockrates[] = { DEFAULT, PAL, NTSC, DREAN, NTSC2 };
+static uint32_t read_clock_rate;
+static char version[MAX_BUFFER_SIZE] = {0};
+static char pcb_version[MAX_BUFFER_SIZE] = {0};
+static char project_version[MAX_BUFFER_SIZE] = {0};
+static uint8_t config[FLASH_PAGE_SIZE] = {0};
+static uint8_t socket_config[SOCKET_BUFFER_SIZE] = {0};
+static Config usbsid_config = USBSID_DEFAULT_CONFIG_INIT;
+static uint8_t net_config[MAX_BUFFER_SIZE] = {0};
+static uint8_t wifi_status[2] = {0};
+static NetConfig net_cfg = {0};
+static uint8_t us_features = 0;
+static bool us_features_read = false;
+
+/* Help menu declarations */
+const char * help_args[] = {
+  "options", "sidchips", "config",
+  "features", "network", "presets",
+  "ini", "manual", "other"
+};
+const int menu_count = count_of(help_args);
+
+void print_help_separator(void);
+void print_help_extended(void);
+void print_help_options(void);
+void print_help_sidchips(void);
+void print_help_config(void);
+void print_help_features(void);
+void print_help_network(void);
+void print_help_presets(void);
+void print_help_ini(void);
+void print_help_manual(void);
+void print_help_other(void);
+
+typedef void (*f_help_menu)(void);
+f_help_menu help_menus[] = {
+  print_help_options, print_help_sidchips, print_help_config,
+  print_help_features, print_help_network, print_help_presets,
+  print_help_ini, print_help_manual, print_help_other
+};
+
+/* NSD declarations */
+static const char * const wifi_states[4] = { "Off", "Down", "Connecting", "Connected" };
+bool board_has_wifi_ip(void);
+bool read_us_features(void);
 
 
 #ifdef __cplusplus
