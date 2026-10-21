@@ -416,7 +416,7 @@ f_help_menu help_menus[] = {
 
 /* NSD declarations */
 static const char * const wifi_states[4] = { "Off", "Down", "Connecting", "Connected" };
-bool board_has_wifi_ip(void);
+bool board_has_net(void);
 bool read_us_features(void);
 
 

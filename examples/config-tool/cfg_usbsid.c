@@ -918,7 +918,7 @@ void print_wifi_status(void)
 
   if (!read_us_features()) {
     printf("WiFi state:   unknown (could not read feature byte)\n");
-  } else if (board_has_wifi_ip()) {
+  } else if (board_has_net()) {
     uint8_t ip[5];
     if (!read_wifi_ip(ip)) {
       printf("Could not read WiFi state\n");
@@ -942,7 +942,7 @@ void print_net_config(void)
   printf("  Discovery:     %s\n", enabled[(int)net_cfg.flags.discovery_enabled]);
   if (!read_us_features()) {
     printf("  IP address:    unknown (could not read feature byte)\n");
-  } else if (board_has_wifi_ip()) {
+  } else if (board_has_net()) {
     uint8_t ip[5];
     if (!read_wifi_ip(ip)) printf("  IP address:    could not read\n");
     else if (ip[0] == 3) printf("  IP address:    %u.%u.%u.%u\n", ip[1], ip[2], ip[3], ip[4]);
@@ -991,11 +991,6 @@ bool board_has_net(void)
 bool board_has_nsd(void)
 {
   return board_feature(0b00100000);
-}
-
-bool board_has_wifi_ip(void)
-{
-  return board_feature(0b00000010);
 }
 
 bool board_has_emulator(void)
@@ -2361,7 +2356,7 @@ void config_usbsidpico(int argc, char **argv)
     }
     if (!strcmp(argv[param_count], "-discen") || !strcmp(argv[param_count], "--disc-enable")) {
       if (!require_net_support()) goto exit;
-      if (!board_has_wifi_ip()) {
+      if (!board_has_nsd()) {
         printf("This firmware does not support toggling discovery, update firmware\n");
         goto exit;
       }
