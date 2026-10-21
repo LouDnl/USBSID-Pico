@@ -323,7 +323,10 @@ SIDType detect_sidtype_at(uint8_t base_address, uint8_t chiptype)
 
   /* If unknown, check for FMOpl */
   /* NOTICE: Advise users to _not_ use the u64 skpico fw version for usbsid */
-  if ((chiptype == CHIP_SKPICO && sidtype == SID_UNKNOWN)) { /* WARNING: Detecting anything with the SKPico socket 2 u64 adapter doesn't work! */
+  if ((((chiptype == CHIP_SKPICO)
+     /* WARNING: Detecting anything with the SKPico u64 socket 2 adapter does not work! (yet) */
+     || (chiptype == CHIP_ARM2SID))
+     && (sidtype == SID_UNKNOWN))) {
     if (detect_fmopl(base_address)) {
       if(detection_logging) usSID("Detected SIDType %d @ $%02x = %s\n", sidtype, base_address, sid_type_name(sidtype));
       return SID_FMOPL;
