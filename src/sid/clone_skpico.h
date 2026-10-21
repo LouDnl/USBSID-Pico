@@ -23,99 +23,24 @@
  *
  */
 
-#ifndef _USBSID_SID_SKPICO_H_
-#define _USBSID_SID_SKPICO_H_
+#ifndef _USBSID_SID_CLONESKPICO_H_
+#define _USBSID_SID_CLONESKPICO_H_
 #pragma once
 
 #ifdef __cplusplus
   extern "C" {
 #endif
 
+/* Default includes */
+#include <stdint.h>
 
-#define SKPICO_VER_SIZE 36
-#define SKPICO_VER_LEN 20
-#define SKPICO_SIG_START 20
-#define SKPICO_SIG_LEN 8
-#define SKPICO_FWVER_START 28
-#define SKPICO_FWVER_LEN 2
-#define SKPICO_DAC_START 30
-#define SKPICO_DAC_LEN 1
 
-static const uint8_t init_configmode[2]      = { 0x1f, 0xff };  /* Inits and extends config mode */
-static const uint8_t config_extend[2]        = { 0x1d, 0xfa };  /* Clear address lines and extend config mode */
-static const uint8_t config_exit[2]          = { 0x1d, 0xfb };  /* Exit config mode without reset */
-static const uint8_t config_leave[3]         = { 0x1d, 0xfd };  /* Leave config mode */
-static const uint8_t config_update[2]        = { 0x1d, 0xfe };  /* Update configuration and exit */
-static const uint8_t config_writeupdate[2]   = { 0x1d, 0xff };  /* Update and write configuration and exit */
-static const uint8_t config_write[2]         = { 0x1d, 0x00 };  /* Write complete config to memory */
-static const uint8_t select_profile[2]       = { 0x1e, 0x00 };  /* Select profile before read/write v0.22 and up */
-static const uint8_t set_dac_mode_mono8[2]   = { 0x1f, 0xfc };  /* Set DAC mode to mono */
-static const uint8_t set_dac_mode_stereo8[2] = { 0x1f, 0xfb };  /* Set DAC mode to stereo */
-
-static const uint8_t skpico_default_config[64] = {                   /* Default SKPico config */
-  0x1, 0xC, 0x1, 0xE, /* SID 1 */
-  0,0,0,0, /* -- */
-  0x3, 0xC, 0x0, 0xE, /* SID 2 */
-  0x5,
-  0,0,0,0,0,0,
-  0,0,0,0,0,0,
-  0,0,0,0,0,0,
-  0,0,0,0,0,0,
-  0,0,0,0,0,0,
-  0,0,0,0,0,0,
-  0,0,0,0,0,0,
-  0,0,
-  0x0, 0x7, 0x0, 0xF, 0x0,
-  0,0,
-};
-
-static const char __in_flash("skpico_vars") *config_names[64] = {
-  "CFG_SID1_TYPE",       //  0   //  1  // 0 ... 3  // 6581, 8580, 8580+digiboost, none
-  "CFG_SID1_DIGIBOOST",  //  1   // 12  // 0 ... 15, 0x0 ... 0xF
-  "CFG_REGISTER_READ",   //  2   //  1  // Always 1
-  "CFG_SID1_VOLUME",     //  3   // 14  // 0 ... 14, 0x0 ... 0xE
-  "","","","",           //  4 -> 7
-  "CFG_SID2_TYPE",       //  8   //  3  // 0 ... 4  // 6581, 8580, 8580+digiboost, none, FMopl
-  "CFG_SID2_DIGIBOOST",  //  9   // 12  // 0 ... 15, 0x0 ... 0xF
-  "CFG_SID2_ADDRESS",    // 10   //  0  // 0 ... 5  // sidFlags{ CS, A5, A8, A5|A8, A8, A8 }
-  "CFG_SID2_VOLUME",     // 11   // 14  // 0 ... 14, 0x0 ... 0xE
-  "CFG_SID_PANNING",     // 12   //  5  // 0 ... 14, 0x0 ... 0xE
-  "","","","","","",     // 13 -> 18
-  "","","","","","",     // 19 -> 24
-  "","","","","","",     // 25 -> 30
-  "","","","","","",     // 31 -> 36
-  "","","","","","",     // 37 -> 42
-  "","","","","","",     // 43 -> 48
-  "","","","","","",     // 49 -> 54
-  "","",                 // 55 -> 56
-  "CFG_TRIGGER",         // 57   //  0  // Paddles
-  "CFG_SID_BALANCE",     // 58   //  7  // 0 ... 14, 0x0 ... 0xE
-  "CFG_CLOCKSPEED",      // 59   //  0  // 0 ... 2  // c64clock{ 985248, 1022727, 1023440 }
-  "CFG_POT_FILTER",      // 60   // 16  // Paddles
-  "CFG_DIGIDETECT",      // 61   //  0  // 0 ... 1
-  "","",                 // 62 -> 63
-};
-static const char __in_flash("skpico_vars") *u64_names[] = {
-  "CFG_SID2_VOLUME_U64", // config_names[10] becomes 0 + 10 = 10
-  "CFG_FM_VOLUME_U64"    // config_names[11] becomes 1 + 10 = 11
-};
-static const char __in_flash("skpico_vars") *sid_types[5] = {
-  "6581", "8580", "8580+digiboost", "none", "FMopl"
-};
-static const char __in_flash("skpico_vars") *sid2_address[6] = {
-  "CS", "A5", "A8", "A5|A8", "A8", "A8"
-};
-static const char __in_flash("skpico_vars") *clock_speed[3] = {
-  "985248", "1022727", "1023440"
-};
-static const size_t s_config_names = count_of(config_names);
-static const size_t s_sid_types = count_of(sid_types);
-static const size_t s_sid2_address = count_of(sid2_address);
-static const size_t s_clock_speed = count_of(clock_speed);
+void read_skpico_configuration(uint8_t base_address, uint8_t profile);
+void auto_update_skpico_clock(uint8_t base_address, uint8_t profile);
 
 
 #ifdef __cplusplus
   }
 #endif
 
-#endif /* _USBSID_SID_SKPICO_H_ */
+#endif /* _USBSID_SID_CLONESKPICO_H_ */
