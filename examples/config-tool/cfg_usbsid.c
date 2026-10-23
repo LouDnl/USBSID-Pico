@@ -645,6 +645,24 @@ void read_version(uint8_t cmd, int print_version)
   return;
 }
 
+void print_version_int(void)
+{ /* Request byte 2 = 1 makes v0.7.2+ reply with one FW_VERSION_INT byte, older firmware sends the 64 byte string reply */
+  uint8_t buf[64] = {0};
+  write_config_command(USBSID_VERSION, 0x1, 0x0, 0x0, 0x0);
+  int len = read_chars(buf, count_of(buf));
+  if (debug == 1) printf("Read %d bytes of data, byte 0 = %02X\n", len, buf[0]);
+  if (len < 1) {
+    printf("Firmware version int: could not read\n");
+    return;
+  }
+  if (len > 1 && buf[0] == USBSID_VERSION && buf[1] != 0) {
+    printf("Firmware version int: not supported (firmware older than v0.7.2)\n");
+    return;
+  }
+  printf("Firmware version int: %u\n", buf[0]);
+  return;
+}
+
 void set_cfg_from_buffer(const uint8_t * buff, size_t len)
 {
   static uint32_t clockrate = 0;
@@ -990,6 +1008,11 @@ bool board_has_nsd(void)
   return board_feature(0b00100000);
 }
 
+bool board_has_sidstream(void)
+{
+  return board_feature(0b01000000);
+}
+
 bool board_has_emulator(void)
 {
   return board_feature(0b10000000);
@@ -1038,6 +1061,7 @@ void print_config(void)
     }
     if (board_has_net())      printf("    - WiFi & Bluetooth\n");
     if (board_has_nsd())      printf("      - with Network SID Device\n");
+    if (board_has_sidstream()) printf("    - SID register stream\n");
     if (board_has_emulator()) printf("    - Embedded USBSID-Player\n");
     if (board_has_emulator()) printf("      - with Cynthcart\n");
   }
@@ -2058,6 +2082,7 @@ void config_usbsidpico(int argc, char **argv)
     if (!strcmp(argv[param_count], "-v") || !strcmp(argv[param_count], "--version")) {
       printf("Reading firmware version: ");
       read_version(USBSID_VERSION, 1);
+      print_version_int();
       printf("Reading PCB version: ");
       read_version(US_PCB_VERSION, 1);
       break;
