@@ -548,6 +548,7 @@ enum {
   BOARD_MIXED     = 14,
   BOARD_SDETECT   = 15, /* (PCB v1.5+) Automatic socket change detection */
   BOARD_PADETECT  = 16, /* (PCB v1.5+) Preset automatic detection */
+};
 
 /* Global variables from config.c */
 extern Config        usbsid_config;
