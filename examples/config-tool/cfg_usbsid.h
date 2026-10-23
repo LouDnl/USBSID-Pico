@@ -297,7 +297,6 @@ typedef struct Config {
   bool need_confirmation : 1;    /* (PCB v1.5+) current configuration needs confirmation, SID's are disabled until confirmed! */
   bool socket_change_detect : 1; /* (PCB v1.5+) disables socket change detection on boot */
   bool preset_auto_detect : 1;   /* disables silent auto detection before present change */
-  bool fastreads : 1;            /* FastReads batch reads + SID stream enabled */
 } Config;
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
@@ -369,7 +368,6 @@ typedef struct Config {
   .need_confirmation = false, \
   .socket_change_detect = true, /* WARNING: This setting _can_ and _will_ fry your 9v SID if config is set to 6581 (12v) */ \
   .preset_auto_detect = true, \
-  .fastreads = true, \
 } \
 
 /* init local usbsid-pico variables */

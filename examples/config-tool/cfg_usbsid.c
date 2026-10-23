@@ -764,9 +764,6 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
       case 58:
         usbsid_config.lock_audio_sw = buff[i];
         break;
-      case 59:
-        usbsid_config.fastreads = buff[i];
-        break;
       case 60:
         usbsid_config.mirrored = (buff[i] & 0b1);
         usbsid_config.flipped  = ((buff[i] & 0b10) >> 1);
@@ -1121,8 +1118,6 @@ void print_config(void)
     enabled[(int)usbsid_config.Midi.enabled]);
   printf("  ASID feature = %s\n",
     enabled[(int)usbsid_config.Asid.enabled]);
-  printf("  FastReads (batch reads, SID stream) = %s\n",
-    enabled[(int)usbsid_config.fastreads]);
   printf("\n");
   printf("Verification of socket change detection on boot = %s\n",
     enabled[(int)usbsid_config.socket_change_detect]);
@@ -1970,7 +1965,6 @@ void print_help_manual(void)
   printf("  -au ,     --audio-switch N    : Set the mono/stereo audio switch (PCB v1.3+ only!)\n");
   printf("                                  0: %s, 1:%s\n", mono_stereo[0], mono_stereo[1]);
   printf("  -la N,    --lockaudio N       : Lock the audio switch from being changed: True (1) False (0)\n");
-  printf("  -fr N,    --fastreads N       : FastReads (batch reads, SID stream) is Enabled (1) or Disabled (0)\n");
   printf("  -sock N,  --socket N          : Configure socket N ~ 1 or 2\n");
   printf("  The following options additionally require '-sock N'\n");
   printf("  Note that you can only configure 1 socket at a time!\n");
@@ -2664,18 +2658,6 @@ void config_usbsidpico(int argc, char **argv)
           printf("Set FMOpl from %s to: %s\n", enabled[usbsid_config.FMOpl.enabled], enabled[en]);
           usbsid_config.FMOpl.enabled = en;
           write_config_command(SET_CONFIG, 0x9, en, 0x0, 0x0);
-          continue;
-        }
-        if (!strcmp(argv[pc], "-fr") || !strcmp(argv[pc], "--fastreads")) {
-          pc++;
-          int en = atoi(argv[pc]);
-          if(en >= count_of(enabled)) {
-            printf("%d is not an enable option!\n", en);
-            goto exit;
-          }
-          printf("Set FastReads from %s to: %s\n", enabled[usbsid_config.fastreads], enabled[en]);
-          usbsid_config.fastreads = en;
-          write_config_command(SET_CONFIG, 0x11, en, 0x0, 0x0);
           continue;
         }
         if (!strcmp(argv[pc], "-led") || !strcmp(argv[pc], "--led-enabled")) {
