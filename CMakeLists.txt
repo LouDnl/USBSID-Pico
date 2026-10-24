@@ -412,6 +412,7 @@ set(SOURCEFILES
   ${CMAKE_CURRENT_LIST_DIR}/src/sid/sid_detection.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid/sid_player.c
   ${CMAKE_CURRENT_LIST_DIR}/src/sid/sid_tests.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/sid/clone_skpico.c
   ${CMAKE_CURRENT_LIST_DIR}/src/mcu.c
   ${CMAKE_CURRENT_LIST_DIR}/src/usb_descriptors.c
 )
