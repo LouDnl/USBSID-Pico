@@ -423,7 +423,7 @@ release:firmware:
     paths:
       - examples/${DIRECTORY}/${BUILDNAME}
 
-# Windows runner (gitlab.com SaaS by default), MinGW64 through msys2 like the GitHub job
+# Windows runner (gitlab.com SaaS by default), UCRT64 through msys2 like the GitHub job
 .tools_windows:
   stage: build
   tags:
@@ -440,7 +440,7 @@ release:firmware:
     # closing and reopening the MSYS2 shell.
     - C:\tools\msys64\usr\bin\bash -lc "pacman -Syu --noconfirm"
     - C:\tools\msys64\usr\bin\bash -lc "pacman -Syu --noconfirm"
-    - C:\tools\msys64\usr\bin\bash -lc "pacman -S --noconfirm --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-libusb mingw-w64-x86_64-cmake mingw-w64-x86_64-pkg-config mingw-w64-x86_64-ninja"
+    - C:\tools\msys64\usr\bin\bash -lc "pacman -S --noconfirm --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-libusb mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-pkg-config mingw-w64-ucrt-x86_64-ninja"
   script:
     # The runner shell is PowerShell: variables are $env:NAME there, and only
     # the environment (not PowerShell variables) reaches the msys2 shell.
@@ -469,7 +469,7 @@ release:firmware:
         git clone -q --depth 1 $env:USBSID_PLAYER_REPO lib/usbsid-player
         $env:EMUDIR = "../../lib/usbsid-player"
       }
-      $env:MSYSTEM = "MINGW64"
+      $env:MSYSTEM = "UCRT64"
       $env:CHERE_INVOKING = "1"
       Set-Location "examples/$env:DIRECTORY"
       C:\tools\msys64\usr\bin\bash -lc 'rm -f $BUILDNAME.exe; cmake -S . -B build -DEXECUTABLE=$BUILDNAME -DEMUDIR=$EMUDIR && cmake --build build -j$(nproc)'
