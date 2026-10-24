@@ -136,14 +136,22 @@ void asid_init(void)
  * cycled_write_operation() (10 cycle delay per write). Drops the message
  * if no FMOpl SID is configured (`cfg.fmopl_sid` not in 1..4).
  *
+ * Drops the message if len < 2, if the pair count exceeds MAX_FM_REG_PAIRS,
+ * or if len is too short for the mask and data bytes the pair count implies.
+ *
  * @note assumes buffer bytes 0-2 of the original SysEx are not included
  *
  * @param uint8_t* buffer
+ * @param int len ~ payload length after F0 2D 60, excluding F7
  */
-void handle_asid_fmoplmessage(uint8_t* buffer)
+void handle_asid_fmoplmessage(uint8_t* buffer, int len)
 { /* Assumes byte 0-2 are not included in the buffer */
-  uint8_t ndata_in_buffer = (buffer[0] + 1) << 1;
+  if (len < 2) { midimachine.fmopl = 0; return; }  /* Need pair count and at least one mask byte */
+  int npairs = buffer[0] + 1;
+  if (npairs > MAX_FM_REG_PAIRS) { midimachine.fmopl = 0; return; }  /* Would overflow fm_registers */
+  uint8_t ndata_in_buffer = (uint8_t)(npairs << 1);
   uint8_t nmask_bytes = (ndata_in_buffer - 1) / 7 + 1;
+  if (len < (1 + nmask_bytes + ndata_in_buffer)) { midimachine.fmopl = 0; return; }  /* Truncated payload */
   uint8_t data_index = nmask_bytes + 1;
   uint8_t data, field;
   uint8_t asid_fm_register_index = 0;
@@ -530,8 +538,10 @@ void decode_asid_message(uint8_t* buffer, int size)
     case 0x60:  /* FMOpl */
       if (cfg.fmopl_enabled) {  /* Only if FMOpl is enabled, drop otherwise */
         midimachine.fmopl = 1;
-        handle_asid_fmoplmessage(&buffer[3]);  /* Skip first 3 bytes */
-      };
+        /* size counts F0 and F7 (streambuffer index), payload = size - F0 2D 60 - F7 */
+        handle_asid_fmoplmessage(&buffer[3], size - 4);  /* Skip first 3 bytes */
+      }
+      break;
     default:
       break;
   }
