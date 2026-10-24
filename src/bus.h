@@ -65,6 +65,7 @@ bool     bus_held_by_other(bus_owner_t who); /* true if bus_try_claim(who) fails
 void     bus_touch(bus_owner_t who);         /* refresh idle timer */
 void     bus_release(bus_owner_t who);
 bus_owner_t bus_current_owner(void);
+bus_owner_t bus_owner_peek(void);            /* lock free, may be one claim behind */
 
 /* Heavy-operation exclusion, separate from the ownership arbiter above -
  * bus_current_owner() can't be reused since BUS_OWNER_USB never releases.
