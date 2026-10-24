@@ -46,11 +46,10 @@ var _currentSubtune = 0;
 var _maxSubtunes    = 1;
 var _webusbSidOffset   = 0;     /* SID address offset for WebUSB play-on-SID selector (0x00/0x20/0x40/0x60) */
 
-/* Path to SID library - same directory as this page, then SID/ */
-const SID_PATH = (function() {
-  const base = window.location.pathname.replace(/\/[^/]*$/, '/');
-  return base + 'SID/';
-}());
+/* Path to SID library - SID/ next to this script. Resolved from the script's
+ * own URL, not location.pathname: every route (/blog/<slug>, /blog/) serves
+ * this same page, and a page relative base there would point at /blog/SID/. */
+const SID_PATH = new URL('SID/', document.currentScript.src).pathname;
 
 /* Utility: log to debug panel + console */
 function usbsidLog(...args) {

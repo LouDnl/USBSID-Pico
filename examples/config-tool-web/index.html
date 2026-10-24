@@ -86,28 +86,28 @@
   }
   </script>
 
-  <link rel="stylesheet" href="c64.css">
+  <link rel="stylesheet" href="/c64.css">
   <!-- <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script> -->
 <!-- Scripts -->
 <!-- The MIDI sysex helper and the globals usbsid-app.js assigns to, all that
      was still in use when Hermit jsSID was replaced by USBSID-Player (ResidFp).
      Must load before usbsid-app.js, which runs under 'use strict'. -->
-<script src="asid-sysex.js"></script>
+<script src="/asid-sysex.js"></script>
 
 <!-- New driver + config + app -->
-<script src="usbsid-driver.js"></script>
-<script src="usbsid-config.js"></script>
+<script src="/usbsid-driver.js"></script>
+<script src="/usbsid-config.js"></script>
 <!-- The library browser. Before the app, which calls SidBrowser.init(). -->
-<script src="usbsid-sidbrowser.js"></script>
-<script src="usbsid-app.js"></script>
+<script src="/usbsid-sidbrowser.js"></script>
+<script src="/usbsid-app.js"></script>
 <!-- The OPL engine used to be loaded here, for Hermit's jsSID. jsSID is gone and
      USBSID-Player carries its own copy in usplayer/lib/, loaded only when a tune
      actually writes $df40/$df50: see web/opl-fm.js in player-repo. -->
 
 <!-- USBSID-Player (WASM) backend: factory (classic global) + adapter (module) -->
-<script type="text/javascript" src="usplayer/usbsid.js"></script>
-<script type="module" src="usplayer/usplayer-adapter.js"></script>
-<script type="module" src="usbsid-visuals.js"></script>
+<script type="text/javascript" src="/usplayer/usbsid.js"></script>
+<script type="module" src="/usplayer/usplayer-adapter.js"></script>
+<script type="module" src="/usbsid-visuals.js"></script>
 </head>
 <body>
 
@@ -115,7 +115,7 @@
 
   <!-- ╔═ HEADER ═══════════════════════════════════════╗ -->
   <header id="c64-header">
-    <img src="images/usbsid-logo.png" alt="USBSID-Pico logo"
+    <img src="/images/usbsid-logo.png" alt="USBSID-Pico logo"
          style="height:40px;vertical-align:middle;margin-right:12px;">
     <h1 class="c64-cursor">USBSID-Pico</h1>
     <div class="subtitle">Web Configuration &amp; SID Player</div>
@@ -971,11 +971,11 @@
       <p>Around February/March of 2024 I came across a github repo that let you create a SID player based on a Raspberry
         Pi Pico called <a target="_blank" href="https://github.com/henrikenblom/SIDPod">SIDPod</a>.<br>
         I liked how simple it seemed to use a microcontroller to play SID files so of course I had to build it.<br>
-        <img src="images/blog/20240301_sidpod.jpg" alt="SIDPod testbuild, a Raspberry Pi Pico based SID player">
+        <img src="/images/blog/20240301_sidpod.jpg" alt="SIDPod testbuild, a Raspberry Pi Pico based SID player">
         <sup>SIDPod testbuild</sup></p>
       <p>The way of adding more SID files to SIDPod's flash made me try and add an SDCard to the already great design,
         this resulted in <a target="_blank" href="https://github.com/LouDnl/SIDPod-SDCard">SIDPod-SDCard</a>.<br>
-        <img src="images/blog/20240317_sidpodsdcard.jpg" alt="SIDPod-SDCard testbuilds, SIDPod with added SD card storage">
+        <img src="/images/blog/20240317_sidpodsdcard.jpg" alt="SIDPod-SDCard testbuilds, SIDPod with added SD card storage">
         <sup>SIDPod-SDCard testbuilds</sup></p>
       <p>In early April 2024 still not satisfied by the results I found
         <a target="_blank" href="https://github.com/tobozo/ESP32-SIDView">ESP32-SIDView</a>.<br>
@@ -985,10 +985,10 @@
         schematics, but orderable.<br>
         Having some hobby level experience in hardware reverse engineering I recreated a schematic and figured out the
         Pico to DIP-28 pinout so I could use it on a breadboard.<br>
-        <img src="images/blog/20240403_ESP32-SIDView.jpg" alt="ESP32-SIDView testbuild with real SID chip on breadboard">
+        <img src="/images/blog/20240403_ESP32-SIDView.jpg" alt="ESP32-SIDView testbuild with real SID chip on breadboard">
         <sup>ESP32-SIDView testbuild</sup></p>
       <p>Not being satisfied with the spaghetti you can see in the picture above, I had to tidy things up a bit.<br>
-        <img src="images/blog/20240407_ESP32-SIDView_tidy.jpg" alt="ESP32-SIDView tidy testbuild with cleaner wiring">
+        <img src="/images/blog/20240407_ESP32-SIDView_tidy.jpg" alt="ESP32-SIDView tidy testbuild with cleaner wiring">
         <sup>ESP32-SIDView tidy testbuild</sup></p>
       <p>Having some issues getting ESP32-SIDView to work, I contacted its developer
         <a target="_blank" href="https://github.com/tobozo">tobozo</a> through GitHub. We exchanged countless messages about this
@@ -997,14 +997,14 @@
         friendship.</p>
       <p>In the meantime I also found <a target="_blank" href="https://github.com/gianlucag/SidBerry">SidBerry</a>. A linux based console
         application for playing SID tunes via the Raspberry Pi's (not Pico) GPIO pins.<br>
-        <img src="images/blog/20240407_SidBerry.jpg" alt="Raspberry Pi breadboard extension running SidBerry with SIDKICK-pico">
+        <img src="/images/blog/20240407_SidBerry.jpg" alt="Raspberry Pi breadboard extension running SidBerry with SIDKICK-pico">
         <sup>RPI breadboard extension with SKPico</sup></p>
       <p>SidBerry with Raspberry Pi is what in early May of 2024 eventually led to the creation of FTDI USBSID, my first
         try at creating a USB controlled SID device. To do this I used a
         <a target="_blank" href="https://github.com/arm8686/FT2232HL-Board">FTDI FT223HL</a> breakout board I already owned for reverse
         engineering.<br>
         Somewhere in between I acquired a v0.1 SIDKICK-pico and 2 half broken MOS6581's.<br>
-        <img src="images/blog/20240502_FTDIUSBSID.jpg" alt="FTDI USBSID, an FT2232HL-based USB SID controller prototype">
+        <img src="/images/blog/20240502_FTDIUSBSID.jpg" alt="FTDI USBSID, an FT2232HL-based USB SID controller prototype">
         <sup>FTDI USBSID</sup></p>
       <p>Creating your own hardware supporting board meant also creating software support.<br>
         Reminiscing about that, here are the links:</p>
@@ -1022,10 +1022,10 @@
       <p>By the end of May 2024 having had enough of these limitations is what led up to creating
         <a target="_blank" href="https://github.com/LouDnl/USBSID-Pico">USBSID-Pico</a>, or actually called PicoUSBSID at that time. A
         perfboard version with support for a single SID.<br>
-        <img src="images/blog/20240529_PicoUSBSID.jpg" alt="PicoUSBSID perfboard prototype, single SID version">
+        <img src="/images/blog/20240529_PicoUSBSID.jpg" alt="PicoUSBSID perfboard prototype, single SID version">
         <sup>PicoUSBSID single SID version</sup></p>
       <p>Halfway through June of 2024, I added dual SID support to the same perfboard.<br>
-        <img src="images/blog/20240621_PicUSBSID_DualSID.jpg" alt="PicoUSBSID perfboard prototype, dual SID version">
+        <img src="/images/blog/20240621_PicUSBSID_DualSID.jpg" alt="PicoUSBSID perfboard prototype, dual SID version">
         <sup>PicoUSBSID dual SID version</sup></p>
       <p>With the continued support and encouragement of <a target="_blank" href="https://github.com/tobozo">tobozo</a> (thanks m8) the
         first actual USBSID-Pico v0.1 board came to life that lead up to the first v1.0 board.</p>
@@ -1088,16 +1088,16 @@
         <li>June 2024: Dual SID perfboard version.</li>
         <li>July 2024: v0.1<br>
           Unreleased iteration<br>
-          <img src="images/blog/20240710_empty_USBSIDv0.1.jpg" alt="USBSID-Pico v0.1 bare unpopulated PCB">
-          <img src="images/blog/20240712_USBSIDv0.1.jpg" alt="USBSID-Pico v0.1 assembled board"></li>
+          <img src="/images/blog/20240710_empty_USBSIDv0.1.jpg" alt="USBSID-Pico v0.1 bare unpopulated PCB">
+          <img src="/images/blog/20240712_USBSIDv0.1.jpg" alt="USBSID-Pico v0.1 assembled board"></li>
         <li>August 2024: v0.2<br>
           Unreleased iteration with revised audio output.<br>
-          <img src="images/blog/20240801_empty_USBSIDv0.2.jpg" alt="USBSID-Pico v0.2 bare unpopulated PCB">
-          <img src="images/blog/20240802_USBSIDv0.2.jpg" alt="USBSID-Pico v0.2 assembled board with revised audio output"></li>
+          <img src="/images/blog/20240801_empty_USBSIDv0.2.jpg" alt="USBSID-Pico v0.2 bare unpopulated PCB">
+          <img src="/images/blog/20240802_USBSIDv0.2.jpg" alt="USBSID-Pico v0.2 assembled board with revised audio output"></li>
         <li>October 2024: v1.0<br>
           After several printed circuit board iterations, <strong>USBSID-Pico v1.0</strong> is officially launched.<br>
-          <img src="images/blog/20241016_empty_USBSIDv1.0.jpg" alt="USBSID-Pico v1.0 bare unpopulated PCB, first official release">
-          <img src="images/blog/20241016_USBSIDv1.0.png" alt="USBSID-Pico v1.0 assembled board"></li>
+          <img src="/images/blog/20241016_empty_USBSIDv1.0.jpg" alt="USBSID-Pico v1.0 bare unpopulated PCB, first official release">
+          <img src="/images/blog/20241016_USBSIDv1.0.png" alt="USBSID-Pico v1.0 assembled board"></li>
         <li>February 2025: v1.1<br>
           Discarded iteration.</li>
         <li>March 2025: v1.2<br>
@@ -1105,15 +1105,15 @@
         <li>April 2025: v1.3<br>
           Official release of v1.3 hardware revision with mixed SID type support and refined audio configuration options
           based on community feedback.<br>
-          <img src="images/blog/20250403_empty_USBSIDv1.3.png" alt="USBSID-Pico v1.3 bare unpopulated PCB with audio switch">
-          <img src="images/blog/20250416_USBSIDv1.3.jpg" alt="USBSID-Pico v1.3 assembled board"></li>
+          <img src="/images/blog/20250403_empty_USBSIDv1.3.png" alt="USBSID-Pico v1.3 bare unpopulated PCB with audio switch">
+          <img src="/images/blog/20250416_USBSIDv1.3.jpg" alt="USBSID-Pico v1.3 assembled board"></li>
         <li>March 2026: v1.4<br>
           Unreleased iteration.</li>
         <li>July 2026: v1.5<br>
           Official release of v1.5 hardware revision that transforms board usability by eliminating dangerous manual
           jumper configurations and adds more board space for optional ZIF sockets.<br>
-          <img src="images/blog/20260708_empty_USBSIDv1.5.png" alt="USBSID-Pico v1.5 bare unpopulated PCB, jumperless voltage control">
-          <img src="images/blog/20260614_USBSIDv1.5.jpg" alt="USBSID-Pico v1.5 assembled board with dual ZIF sockets"></li>
+          <img src="/images/blog/20260708_empty_USBSIDv1.5.png" alt="USBSID-Pico v1.5 bare unpopulated PCB, jumperless voltage control">
+          <img src="/images/blog/20260614_USBSIDv1.5.jpg" alt="USBSID-Pico v1.5 assembled board with dual ZIF sockets"></li>
         <li>Volume daughterboard<br>
           An optional accessory PCB, plug and play on v1.5+ boards (needs a small mod on v1.3), controlling left and
           right audio volume independently. It has its own hardware revision line and is licensed CC BY-SA 4.0.</li>
@@ -1168,7 +1168,7 @@
         <strong>1.022727 MHz</strong> for NTSC systems). Modern USB controllers often approximate this using CPU
         bit-banging or standard PWM generators, but CPU interrupts from USB traffic can cause cycle slippage.</p>
       <p>USBSID-Pico delegates master clock generation entirely to a dedicated PIO state machine:<br>
-        <img src="images/blog/clock_generation_diagram.png" alt="Diagram of PIO-based 1 MHz SID clock generation on rp2040/rp2350"></p>
+        <img src="/images/blog/clock_generation_diagram.png" alt="Diagram of PIO-based 1 MHz SID clock generation on rp2040/rp2350"></p>
       <ul>
         <li><strong>Jitter Elimination:</strong> Because PIO state machines operate independently of the ARM Cortex cores,
           the clock signal remains completely cycle-accurate regardless of heavy USB packet transfers, MIDI processing,
@@ -1199,7 +1199,7 @@
           and driving data by triggering PIO-specific interrupts that assert the two state machines above, guaranteeing
           that chip setup times and hold times are satisfied without stalling the main processor.</li>
       </ol>
-      <p><img src="images/blog/buswritediagram.png" alt="Diagram of the cycle-exact SID bus write timing via PIO and DMA"></p>
+      <p><img src="/images/blog/buswritediagram.png" alt="Diagram of the cycle-exact SID bus write timing via PIO and DMA"></p>
       <p>One gotcha worth mentioning: all this only holds up at <code>-O3</code>. Drop the optimization level and the
         compiler generates just enough extra overhead around the DMA/PIO handoff to reintroduce timing slack, which
         shows up as broken sample playback in the embedded SID player and Cynthcart. So <code>-O3</code> isn't a
@@ -1396,10 +1396,10 @@
       <p>I'm a big fan of retro and pixel art, thus having some special art on the bottom of each board couldn't be
         skipped (and my friend tobozo forced me to add some).</p>
       <div class="c64-img-grid">
-        <img src="images/blog/v1.0-bottom.png" alt="USBSID-Pico v1.0 bottom-side pixel art">
-        <img src="images/blog/v1.2-bottom.png" alt="USBSID-Pico v1.2 bottom-side pixel art">
-        <img src="images/blog/v1.3b-bottom.png" alt="USBSID-Pico v1.3 bottom-side pixel art">
-        <img src="images/blog/v1.5-bottom.png" alt="USBSID-Pico v1.5 bottom-side pixel art">
+        <img src="/images/blog/v1.0-bottom.png" alt="USBSID-Pico v1.0 bottom-side pixel art">
+        <img src="/images/blog/v1.2-bottom.png" alt="USBSID-Pico v1.2 bottom-side pixel art">
+        <img src="/images/blog/v1.3b-bottom.png" alt="USBSID-Pico v1.3 bottom-side pixel art">
+        <img src="/images/blog/v1.5-bottom.png" alt="USBSID-Pico v1.5 bottom-side pixel art">
       </div>
       <h4 class="c64-blog-h2">
         Swag
@@ -1409,10 +1409,10 @@
         t-shirt designs for <em>free!</em> after I asked him about creating something. How's that for exposure! The
         shirts are for sale in his <a target="_blank" href="https://smallrun.net/shop/grey-and-slate-haberdashers">Smallrun shop</a>.<br>
         <div class="c64-img-grid">
-          <img src="images/blog/tshirt_board.png" alt="USBSID-Pico fan t-shirt design featuring the board">
-          <img src="images/blog/tshirt_logo.png" alt="USBSID-Pico fan t-shirt design featuring the logo">
-          <img src="images/blog/tshirt_logo_sids.png" alt="USBSID-Pico fan t-shirt design featuring the logo and SID chips">
-          <img src="images/blog/tshirt_logo_board.png" alt="USBSID-Pico fan t-shirt design featuring the logo and board">
+          <img src="/images/blog/tshirt_board.png" alt="USBSID-Pico fan t-shirt design featuring the board">
+          <img src="/images/blog/tshirt_logo.png" alt="USBSID-Pico fan t-shirt design featuring the logo">
+          <img src="/images/blog/tshirt_logo_sids.png" alt="USBSID-Pico fan t-shirt design featuring the logo and SID chips">
+          <img src="/images/blog/tshirt_logo_board.png" alt="USBSID-Pico fan t-shirt design featuring the logo and board">
         </div>
       </p>
       <br>
@@ -1455,7 +1455,7 @@
         growing pile more on the
         <a target="_blank" href="https://github.com/LouDnl/USBSID-Pico/blob/master/SHOWCASE.md">SHOWCASE page</a> of the main repo.</p>
       <p>Here's a picture of my cat :-)<br>
-        <img src="images/blog/cat.png" alt="LouD's cat"></p>
+        <img src="/images/blog/cat.png" alt="LouD's cat"></p>
       <h4 class="c64-blog-h2">
         Note
       </h4>
