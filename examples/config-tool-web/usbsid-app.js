@@ -74,6 +74,16 @@ function usbsidSetStatus(msg, color) {
   }
 }
 
+/* Utility: status text for a failed connect, from the driver's lastError.
+ * Returns '' when the failure left no error (picker cancelled, no device). */
+function usbsidConnectErrorText(err) {
+  if (!err) return '';
+  if (err.name === 'NetworkError')
+    return 'USBSID-Pico is in use by another tab or application. Close it there and try again.';
+  if (err.name === 'NotFoundError') return '';   /* picker cancelled */
+  return 'Connection failed: ' + (err.name || 'Error') + (err.message ? ': ' + err.message : '');
+}
+
 /* Utility: set LED state */
 function setLED(connected) {
   const led = document.getElementById('status-led');
@@ -218,7 +228,9 @@ async function _connectDeviceInner() {
       /* autoconnect won the race - reflect the real (connected) state */
       await onDeviceConnected();
     } else {
-      usbsidSetStatus('Connection failed or cancelled', 'red');
+      const msg = usbsidConnectErrorText(usbsidDevice.lastError);
+      usbsidSetStatus(msg || 'Connection failed or cancelled', 'red');
+      if (msg) usbsidLog('ERROR: ' + msg);
       setLED(false);
     }
   } catch (e) {
@@ -233,7 +245,16 @@ async function reconnectDevice() {
   _connecting = true;
   try {
     const ok = await usbsidDevice.reconnect();
-    if (ok) await onDeviceConnected();
+    if (ok) {
+      await onDeviceConnected();
+    } else if (!usbsidDevice.isOpen) {
+      const msg = usbsidConnectErrorText(usbsidDevice.lastError);
+      if (msg) {
+        usbsidSetStatus(msg, 'red');
+        usbsidLog('ERROR: ' + msg);
+        setLED(false);
+      }
+    }
   } finally { _connecting = false; }
 }
 
@@ -387,6 +408,9 @@ async function checkConfigAck(pcbver) {
 }
 
 function onDeviceDisconnected() {
+  /* Drop the driver's handle and latches too (device may already be gone), or
+   * CONNECT and reconnectDevice() bail out on a stale open state after a replug. */
+  usbsidDevice._syncClose();
   webusb_enabled  = false;
   webusbplaying   = false;
   webusbconnected = false;
@@ -3270,13 +3294,34 @@ function initTransportButtons() {
   setPlayerButtons(false);
 }
 
+/* Auto-claim only in a visible tab: a hidden tab grabbing the board locks out
+ * the tab the user is looking at. Hidden: wait once for visible, then try if
+ * still not connected and the board is still present. Explicit CONNECT clicks
+ * do not pass through here. */
+var _autoReconnectPending = false;
+function autoReconnectWhenVisible() {
+  if (document.visibilityState === 'visible') {
+    reconnectDevice();
+    return;
+  }
+  if (_autoReconnectPending) return;
+  _autoReconnectPending = true;
+  const onVisible = () => {
+    if (document.visibilityState !== 'visible') return;
+    document.removeEventListener('visibilitychange', onVisible);
+    _autoReconnectPending = false;
+    if (!usbsidDevice.isOpen) reconnectDevice();   /* reconnect() finds no device if unplugged again */
+  };
+  document.addEventListener('visibilitychange', onVisible);
+}
+
 /* WebUSB device events */
 function initDeviceEvents() {
   if (navigator.usb) {
     navigator.usb.addEventListener('connect', async (e) => {
       if (e.device.vendorId === USBSID_VID && e.device.productId === USBSID_PID) {
         usbsidLog('USB device appeared');
-        await reconnectDevice();
+        autoReconnectWhenVisible();
       }
     });
     navigator.usb.addEventListener('disconnect', (e) => {
@@ -3401,7 +3446,7 @@ document.addEventListener('DOMContentLoaded', () => {
        * put a WebUSB picker in front of the serial one. */
       if ((_emulator !== 'usplayer-audio') &&
           (_emulator !== 'usplayer-serial')) {
-        setTimeout(() => reconnectDevice(), 200);
+        setTimeout(() => autoReconnectWhenVisible(), 200);
       }
     }
 

@@ -311,9 +311,25 @@ export class USBSIDWebUSBTransport {
     return this._openDevice();
   }
 
+  /* Close and unlatch after a failed open (claimInterface refused etc.), or
+   * every later _openDevice() returns early on a device nobody can use. The
+   * error still reaches the caller: its name (NetworkError = in use) matters. */
   async _openDevice() {
     if (this.deviceOpened || this.openingDevice)
       return;
+    try {
+      return await this._openDeviceInner();
+    } catch (e) {
+      try { await this._dev.close(); } catch (_) {}
+      this.deviceOpened = false;
+      this.openingDevice = false;
+      this._open = false;
+      this._ifaceNum = null; this._epOut = null; this._epIn = null;
+      throw e;
+    }
+  }
+
+  async _openDeviceInner() {
     this.openingDevice = true;
     try {
       await this._dev.open();
@@ -325,8 +341,8 @@ export class USBSIDWebUSBTransport {
     if (this._dev.configuration === null) await this._dev.selectConfiguration(1);
 
     /* Walk the configuration for the vendor interface and its bulk endpoints
-     * rather than assuming numbers: they move between firmware builds. First
-     * match only: later vendor interfaces (FastReads stream) take no commands. */
+     * rather than assuming numbers: they move between firmware builds. The
+     * first vendor (0xFF) interface is the WebUSB command interface. */
     this._ifaceNum = null;
     for (const iface of this._dev.configuration.interfaces) {
       for (const alt of iface.alternates) {
@@ -339,7 +355,11 @@ export class USBSIDWebUSBTransport {
         }
       }
     }
-    if (this._ifaceNum === null) { await this._dev.close(); return false; }
+    if (this._ifaceNum === null) {
+      await this._dev.close();
+      this.deviceOpened = false;
+      return false;
+    }
 
     await this._dev.claimInterface(this._ifaceNum);
     /* No selectAlternateInterface(): the interface has only alt 0, and
@@ -367,6 +387,8 @@ export class USBSIDWebUSBTransport {
 
   async disconnect() {
     this._open = false;
+    this.deviceOpened = false;
+    this.openingDevice = false;
     /* A fresh chain for the next connection: the old one may still hold a read
      * that will never be answered now, and everything queued behind it would
      * wait on a device that has gone. */

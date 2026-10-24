@@ -213,6 +213,7 @@ class USBSIDDevice {
     this._debug      = false;
     this._deviceOpened = false;
     this._openingDevice = false;
+    this.lastError = null;   /* last connect/open failure, read by the app for the status line */
     /* Best-effort close on page hide/refresh.
      * Chrome does not cancel HCI-queued bulk OUT transfers on same-origin
      * page reload - old SID write packets from unawaited write() calls
@@ -246,6 +247,7 @@ class USBSIDDevice {
   /** Request device via browser USB picker */
   async connect() {
     if (this._isOpen) return true;
+    this.lastError = null;
     try {
       this._device = await navigator.usb.requestDevice({
         filters: [{ vendorId: USBSID_VID, productId: USBSID_PID }]
@@ -253,6 +255,7 @@ class USBSIDDevice {
       return await this._open();
     } catch (e) {
       this._log('connect failed:', e);
+      this.lastError = e;
       return false;
     }
   }
@@ -276,6 +279,7 @@ class USBSIDDevice {
    *  before the real _open() so Chrome discards the stale handle. */
   async reconnect() {
     if (this._isOpen) return true;
+    this.lastError = null;
     try {
       const devices = await navigator.usb.getDevices();
       const dev = devices.find(d => d.vendorId === USBSID_VID && d.productId === USBSID_PID);
@@ -292,6 +296,7 @@ class USBSIDDevice {
       return await this._open();
     } catch (e) {
       this._log('reconnect failed:', e);
+      this.lastError = e;
       return false;
     }
   }
@@ -312,8 +317,7 @@ class USBSIDDevice {
       if (this._device.configuration === null) {
         await this._device.selectConfiguration(1);
       }
-      /* Find the first DEVICE_CLASS (0xFF) interface: WebUSB. Later vendor
-       * interfaces (FastReads stream) take no commands. */
+      /* The first vendor (0xFF) interface is the WebUSB command interface. */
       this._ifaceNum = null;
       this._epOut    = null;
       this._epIn     = null;
@@ -330,7 +334,7 @@ class USBSIDDevice {
       }
       if (this._ifaceNum === null) {
         this._log('DEVICE_CLASS interface not found');
-        await this._device.close();
+        await this._abortOpen();
         return false;
       }
       await this._device.claimInterface(this._ifaceNum);
@@ -355,8 +359,25 @@ class USBSIDDevice {
       return true;
     } catch (e) {
       this._log('_open failed:', e);
+      this.lastError = e;
+      await this._abortOpen();
       return false;
     }
+  }
+
+  /** Internal: undo a partial open so the next attempt starts clean. Without
+   *  this a refused claimInterface leaves _deviceOpened latched and every
+   *  later _open() returns early on a device nobody can use. */
+  async _abortOpen() {
+    if (this._device) {
+      try { await this._device.close(); } catch (_) {}
+    }
+    this._isOpen        = false;
+    this._deviceOpened  = false;
+    this._openingDevice = false;
+    this._ifaceNum      = null;
+    this._epOut         = null;
+    this._epIn          = null;
   }
 
   async close() {
