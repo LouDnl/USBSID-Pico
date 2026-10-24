@@ -153,7 +153,7 @@ function initTabs() {
     tab.classList.add('active');
     const panel = document.getElementById('panel-' + route.tab);
     if (panel) panel.classList.add('active');
-    placeTransport(route.tab === 'visuals');
+    placeVisualsBoxes(route.tab === 'visuals');
     if (window.usbsidVisuals) window.usbsidVisuals.setActive(route.tab === 'visuals');
 
     if (route.tab === 'blog') {
@@ -562,6 +562,7 @@ function createPlayer(emulator) {
 function getPlayer() {
   if (!_player || _player.emulator !== _emulator) {
     _player = createPlayer(_emulator);
+    applyStoredVolumes(_player);
     /* The Visuals tab's settings go to the ResidFp player only. */
     if (window.usbsidVisuals) {
       window.usbsidVisuals.attach(_emulator === 'usplayer-audio' ? _player : null);
@@ -577,17 +578,25 @@ window.visualsTabActive = () => {
   return !!panel && panel.classList.contains('active');
 };
 
-/* The Transport box lives in the player panel and moves into the Visuals tab
- * while that tab shows: one set of controls and handlers, never a copy. */
-function placeTransport(inVisuals) {
-  const box = document.getElementById('transport-box');
-  const slot = document.getElementById('visuals-transport-slot');
-  const home = document.getElementById('transport-home');
-  if (!box || !slot || !home) return;
-  if (inVisuals) {
-    if (box.parentNode !== slot) slot.appendChild(box);
-  } else if (box.previousElementSibling !== home) {
-    home.after(box);
+/* The Transport and SID Library boxes live in the player panel and move into
+ * the Visuals tab while that tab shows: one set of controls and handlers,
+ * never a copy. Each entry: box, its slot in Visuals, its marker at home. */
+const VISUALS_BOXES = [
+  ['transport-box', 'visuals-transport-slot', 'transport-home'],
+  ['sid-list-box', 'visuals-library-slot', 'sid-list-home'],
+];
+
+function placeVisualsBoxes(inVisuals) {
+  for (const [boxId, slotId, homeId] of VISUALS_BOXES) {
+    const box = document.getElementById(boxId);
+    const slot = document.getElementById(slotId);
+    const home = document.getElementById(homeId);
+    if (!box || !slot || !home) continue;
+    if (inVisuals) {
+      if (box.parentNode !== slot) slot.appendChild(box);
+    } else if (box.previousElementSibling !== home) {
+      home.after(box);
+    }
   }
 }
 
@@ -667,7 +676,7 @@ async function doLoadSID(url, displayName, subtune, lengths) {
   usbsidSetStatus('Loading: ' + displayName);
   if (usbsidDevice.isOpen) await usbsidDevice.resetSID();
 
-  p.setVolume(1);
+  p.setVolume(userVolume());
   /* p.load(_currentSubtune, 1000, url, null); */
   _loadTune(_currentSubtune, 1000, url, null);
   webusbplaying = true;
@@ -754,7 +763,7 @@ async function playPause() {
       /* nothing loaded yet */
     } else if (!webusbplaying) {
       /* not playing - resume from pause or start fresh */
-      p.setVolume(1);
+      p.setVolume(userVolume());
       if (p.paused) {
         p.play();
       } else {
@@ -819,7 +828,7 @@ async function prevSubtune() {
     if (p && _currentFile) {
       // p.load(_currentSubtune, 1000, _currentFile.url, null);
       _loadTune(_currentSubtune, 1000, _currentFile.url, null);
-      p.setVolume(1);
+      p.setVolume(userVolume());
     }
     updateSubtuneDisplay();
     /* A different song, so a different length and a fresh end of song guard.
@@ -847,7 +856,7 @@ async function nextSubtune() {
     if (p && _currentFile) {
       // p.load(_currentSubtune, 1000, _currentFile.url, null);
       _loadTune(_currentSubtune, 1000, _currentFile.url, null);
-      p.setVolume(1);
+      p.setVolume(userVolume());
     }
     updateSubtuneDisplay();
     /* A different song, so a different length and a fresh end of song guard.
@@ -1760,6 +1769,7 @@ function formatTime(ms) {
 var _playtimeTimer = null;
 
 function updatePlaytimeDisplay() {
+  updateVolumeRow();   /* FM shows once a tune writes to it */
   const el = document.getElementById('np-time');
   if (!el) return;
   const total = currentSongLengthMs();
@@ -2152,6 +2162,7 @@ function updateVisualsTabVisibility() {
 
 function updateRegsTabVisibility() {
   updateVisualsTabVisibility();
+  updateVolumeRow();
   /* Registers tab is shown whenever WebUSB mode is selected - no need to wait
    * for device open, which avoids auto-connect timing races. */
   const tab = document.querySelector('.c64-tab[data-tab="regs"]');
@@ -2922,14 +2933,87 @@ function initEmulatorSelect() {
   }
 }
 
-/* The volume slider is gone.
+/* Volume, reSIDfp and FM sliders, ResidFp mode only: the board modes have no
+ * gain stage, the board's output is their volume. Volume is the output gain:
+ * pause and stop silence through setVolume(0), play and resume restore
+ * userVolume(). reSIDfp and FM are the two sides of the mix, before the sum. */
+const VOLUME_KEY = 'usplayer_volume';
+
+/* Mix sliders: element id, storage key, default percent, adapter setter. */
+const MIX_SLIDERS = [
+  ['volume-sid', 'usplayer_sid_volume', 100, 'setSidVolume'],
+  ['volume-fm', 'volume_fm', 50, 'setFmVolume'],
+];
+
+/** Read a stored 0-100 percent, or fallback when absent or out of range. */
+function storedPercent(key, fallback) {
+  try {
+    const v = parseInt(localStorage.getItem(key), 10);
+    if (v >= 0 && v <= 100) return v;
+  } catch (e) { /* storage blocked */ }
+  return fallback;
+}
+
+/** Return the Volume slider's gain, 0 to 1, for play and resume. */
+function userVolume() {
+  return storedPercent(VOLUME_KEY, 100) / 100;
+}
+
+/** Give a new player the stored mix volumes, applied on its first start. */
+function applyStoredVolumes(p) {
+  if (!p) return;
+  for (const [, key, def, setter] of MIX_SLIDERS) {
+    if (typeof p[setter] === 'function') p[setter](storedPercent(key, def));
+  }
+}
+
+/** Show the volume row in ResidFp mode, the FM slider once the tune has FM. */
+function updateVolumeRow() {
+  const row = document.getElementById('audio-volume-row');
+  const fmRow = document.getElementById('row-volume-fm');
+  if (!row || !fmRow) return;
+  const audio = (_emulator === 'usplayer-audio');
+  const fm = audio && !!_player && typeof _player.hasFm === 'function' &&
+             _player.hasFm();
+  const rowDisplay = audio ? '' : 'none';
+  const fmDisplay = fm ? '' : 'none';
+  if (row.style.display !== rowDisplay) row.style.display = rowDisplay;
+  if (fmRow.style.display !== fmDisplay) fmRow.style.display = fmDisplay;
+}
+
+/**
+ * Bind a 0-100 slider to its readout and storage key.
  *
- * It called setVolume() on the player, and USPlayerAdapter.setVolume is an
- * explicit no-op: pausing and stopping do the silencing, and there is no gain
- * stage between the emulation and either a board or the AudioWorklet. Since
- * jsSID was removed there is no backend left that implements it, so the control
- * moved a slider and did nothing at all. The browser's own tab volume and the
- * board's output are the real controls. */
+ * @param {string} id        slider element id, readout is id + '-val'
+ * @param {string} key       localStorage key
+ * @param {number} def       default percent
+ * @param {function} apply   called with the percent on input
+ */
+function bindPercentSlider(id, key, def, apply) {
+  const el = document.getElementById(id);
+  const val = document.getElementById(id + '-val');
+  if (!el || !val) return;
+  el.value = String(storedPercent(key, def));
+  val.textContent = el.value;
+  el.addEventListener('input', () => {
+    val.textContent = el.value;
+    try { localStorage.setItem(key, el.value); } catch (e) { /* storage blocked */ }
+    apply(parseInt(el.value, 10));
+  });
+}
+
+function initVolumeSliders() {
+  bindPercentSlider('volume-main', VOLUME_KEY, 100, () => {
+    /* Paused or stopped stays silent: play and resume pick it up. */
+    if (_player && webusbplaying) _player.setVolume(userVolume());
+  });
+  for (const [id, key, def, setter] of MIX_SLIDERS) {
+    bindPercentSlider(id, key, def, (percent) => {
+      if (_player && typeof _player[setter] === 'function') _player[setter](percent);
+    });
+  }
+  updateVolumeRow();
+}
 
 /* Connect button */
 function initConnectButton() {
@@ -3378,6 +3462,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     initConnectButton();
     initTransportButtons();
+    initVolumeSliders();
     wireExtraTransport();   /* fast forward and the board's audio switch */
     initFileLoading();
     initSIDList();

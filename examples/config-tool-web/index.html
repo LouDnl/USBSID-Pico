@@ -275,7 +275,10 @@
          directory's tunes on the right grouped by SID type. Under 700px the
          two stack and the directory list stays a list: it is a handful of rows
          at any one level, and tapping a row is the obvious thing to do on the
-         device where it matters. See usbsid-sidbrowser.js. -->
+         device where it matters. See usbsid-sidbrowser.js.
+         The box moves into the Visuals tab while that tab shows, and back to
+         #sid-list-home in this panel, see placeVisualsBoxes() in usbsid-app.js. -->
+    <div id="sid-list-home"></div>
     <div class="c64-box" id="sid-list-box">
       <div class="c64-box-title">SID Library
         <span id="sid-list-count" style="font-size:0.8rem;color:var(--c64-text);margin-left:6px"></span>
@@ -310,7 +313,7 @@
 
     <!-- Transport controls. The box moves into the Visuals tab while that tab
          shows, and back to #transport-home in this panel: one set of controls, see
-         placeTransport() in usbsid-app.js. -->
+         placeVisualsBoxes() in usbsid-app.js. -->
     <div id="transport-home"></div>
     <div id="transport-box" class="c64-box">
       <div class="c64-box-title">Transport</div>
@@ -358,6 +361,26 @@
                   title="Board audio switch: mono or stereo">MONO</button>
         </div>
         <span class="subtune-info" id="subtune-display">Tune 1/1</span>
+      </div>
+      <!-- Software audio loudness, ResidFp mode only: Volume is the output,
+           reSIDfp and FM are the two sides of the mix. FM shows once the tune
+           has an FM/OPL side. See initVolumeSliders() in usbsid-app.js. -->
+      <div id="audio-volume-row" style="display:none;margin-top:6px">
+        <div class="config-row visuals-slider" title="Output volume">
+          <label for="volume-main">Volume</label>
+          <input type="range" id="volume-main" class="c64-range" min="0" max="100" step="1" value="100">
+          <span id="volume-main-val" class="config-value-display"></span>
+        </div>
+        <div class="config-row visuals-slider" title="reSIDfp volume, before the SID and FM are mixed">
+          <label for="volume-sid">reSIDfp</label>
+          <input type="range" id="volume-sid" class="c64-range" min="0" max="100" step="1" value="100">
+          <span id="volume-sid-val" class="config-value-display"></span>
+        </div>
+        <div class="config-row visuals-slider" id="row-volume-fm" title="FM/OPL volume, before the SID and FM are mixed" style="display:none">
+          <label for="volume-fm">FM</label>
+          <input type="range" id="volume-fm" class="c64-range" min="0" max="100" step="1" value="50">
+          <span id="volume-fm-val" class="config-value-display"></span>
+        </div>
       </div>
       <!-- WebUSB-only controls: shown when connected via WebUSB -->
       <div id="webusb-player-btns" style="display:none;margin-top:6px;flex-wrap:wrap;gap:6px">
@@ -437,7 +460,6 @@
       waveforms) and stereo panning of multi SID tunes using the SID file format
       v5 panning layout and mode.
     </p>
-    <div id="visuals-transport-slot"></div>
     <div class="c64-box">
       <div class="c64-box-title">Visuals</div>
       <div id="visuals-subtabs" role="tablist">
@@ -534,6 +556,10 @@
         </div>
       </div>
     </div>
+    <!-- Transport and SID Library from the player panel, see
+         placeVisualsBoxes() in usbsid-app.js -->
+    <div id="visuals-transport-slot"></div>
+    <div id="visuals-library-slot"></div>
   </div><!-- /panel-visuals -->
 
 

@@ -491,6 +491,7 @@ input[type=range].c64-range::-moz-range-thumb {
 }
 .visuals-slider input[type=range] { flex: 1; min-width: 120px; max-width: 360px; }
 .visuals-slider.disabled label { color: var(--c64-gray); }
+.visuals-slider input[type=range]:disabled { opacity: 0.4; cursor: not-allowed; }
 .usp-scope-mosaic {
   display: grid;
   grid-template-columns: repeat(var(--usp-scope-cols, 1), 1fr);

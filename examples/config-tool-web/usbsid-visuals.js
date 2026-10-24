@@ -112,11 +112,13 @@ function showFilter() {
     $('filter-' + name).value = String(f[name]);
     $('filter-' + name + '-val').textContent = f[name].toFixed(3);
   }
-  /* The curve of the other chip model does nothing for this tune. */
+  /* The curve of the other chip model does nothing for this tune: lock it. */
   const model = tuneModel();
-  $('row-filter-curve6581').classList.toggle('disabled', model === 8580);
-  $('row-filter-range6581').classList.toggle('disabled', model === 8580);
-  $('row-filter-curve8580').classList.toggle('disabled', model === 6581);
+  for (const name of SLIDERS) {
+    const off = name === 'curve8580' ? model === 6581 : model === 8580;
+    $('row-filter-' + name).classList.toggle('disabled', off);
+    $('filter-' + name).disabled = off;
+  }
 }
 
 /** Store the filter and send it once input has rested: a curve or range
