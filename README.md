@@ -272,6 +272,8 @@ The firmware is still in development so features might change, be added or remov
   - Bluetooth Classic SPP transport for the same protocol, via a small host-side bridge ([`examples/nsd_spp_bridge.py`](examples/nsd_spp_bridge.py)) for clients that only speak the TCP variant
   - Speaks protocol version 5 (up to 16 SIDs and FM OPL registers), routed to this board's own FM OPL socket when one is configured
   - Lets a v5 client enable or disable FM OPL on a SID socket remotely, the same assignment the USB config protocol/config tool already offers locally
+  - NSD enable and discovery settings apply live without a reboot, WiFi state and IP address can be queried (`cfg_usbsid -wifis`)
+- Optional SID register stream on a second vendor USB interface (build with `-DENABLE_SID_STREAM=1`), plus batch reads of up to 63 registers per USB packet
 #### v1.3+ PCB
 - Audio switch Stereo/Mono control
 #### v1.5+ PCB

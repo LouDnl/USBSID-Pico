@@ -183,8 +183,12 @@ CDC Enabled: `True` +
 WebUSB Enabled: `True` +
 Asid Enabled: `True` +
 Midi Enabled: `True` +
-Net Enabled: `False` (`_w` boards only) +
-NSD Enabled: `False` (`_w` boards only) +
+WiFi Enabled: `False` (`_w` boards only) +
+NSD Enabled: `True` (`_w` boards only, needs WiFi Enabled) +
+Discovery Enabled: `True` (`_w` boards only) +
+Bluetooth NSD Enabled: `False` (`_w` boards only) +
+NSD port: `6581` (`_w` boards only) +
+Hostname: `USBSID-Pico` (`_w` boards only) +
 FMOpl Enabled: `False` +
 FMOpl SID no: `0`
 
@@ -357,24 +361,52 @@ Available options are: +
 
 === WiFi Enabled
 _`pico_w`/`pico2_w` boards firmware with _net only_ +
-_This config setting is intended for future use, no CLI/GUI/Web configtool support yet_ +
+_No GUI/Web configtool support yet, use the `cfg_usbsid` commandline configtool: `-ssid`, `-psk`, `-host`, `-wen`, `-wapply`_ +
 Enables the board's WiFi station connection. Requires an SSID and password to have been provisioned first. +
 Available options are: +
 `False`, `True`
 
+=== WiFi state and IP address
+_`pico_w`/`pico2_w` boards firmware with _net only_ +
+Two read-only queries report the WiFi connection: +
+`WIFI_STATUS` replies with 2 bytes: the link (`0` down, `1` connected) and the NSD session (`0` no session, `1` active). A byte is `0xFF` when the firmware is not built with WiFi (link) or NSD (session). +
+`WIFI_READ_IP` replies with 5 bytes: the WiFi state followed by the IPv4 address, first octet first. The state is `0` off (WiFi not started), `1` down (no link, waiting to connect), `2` connecting, `3` connected, or `0xFF` when the firmware is not built with WiFi. The address bytes are all zero unless the state is `3`. +
+The commandline configtool prints both with `cfg_usbsid -wifis`, and `cfg_usbsid -rnc` prints the IP address with the network config.
+
 === NSD Enabled
 _`pico_w`/`pico2_w` boards firmware with _net only_ +
-_This config setting is intended for future use, no CLI/GUI/Web configtool support yet_ +
+_No GUI/Web configtool support yet, use the `cfg_usbsid` commandline configtool: `-nsden`, `-nsdp`, `-wapply`_ +
 Enables the Network SID Device (NSD) server: a TCP listener (default port `6581`) plus a UDP discovery responder, letting NSD clients such as ACID 64, JSidplay2 and SIDPlay find and drive the board over the LAN exactly like a native NSD server. Only one NSD session (WiFi or Bluetooth) can be active at a time; USB always keeps priority over the SID bus. +
+Changes to `NSD Enabled` and `Discovery Enabled` apply at once, a reboot is not needed. Disabling NSD closes the listener and ends a running TCP NSD session. A new port applies on `-wapply`, which also saves the network config. When the listener cannot bind its port it retries every second. +
+The NSD server buffers writes in a ring of 4096 entries and reports `BUSY` to the client above about 160 ms of queued cycles (PAL), it accepts writes again below about 120 ms. Read-only config queries (`READ_CONFIG`, `READ_NETCFG`, `WIFI_STATUS`, `WIFI_READ_IP`, version and feature queries and similar) do not take the SID bus, a host polling the board does not hold off a running NSD session. +
+Available options are: +
+`False`, `True`
+
+=== Discovery Enabled
+_`pico_w`/`pico2_w` boards firmware with _net only_ +
+_No GUI/Web configtool support yet, use the `cfg_usbsid` commandline configtool: `-discen`, `-wapply`_ +
+Enables the UDP discovery responder that answers NSD clients searching the LAN for a board. It always listens on UDP port `6581`, whatever TCP port `NSD Enabled` uses. Applies at once. +
 Available options are: +
 `False`, `True`
 
 === Bluetooth NSD Enabled
 _`pico_w`/`pico2_w` boards firmware with _net only_ +
-_This config setting is intended for future use, no CLI/GUI/Web configtool support yet_ +
+_No GUI/Web configtool support yet, use the `cfg_usbsid` commandline configtool: `-bten`_ +
 Enables the Bluetooth Classic SPP transport for the same Network SID Device protocol as `NSD Enabled` above. No NSD client speaks Bluetooth SPP directly, so this needs a small host-side RFCOMM-to-TCP bridge (see `examples/nsd_spp_bridge.py`) to be usable with existing players. +
 Available options are: +
 `False`, `True`
+
+== SID register reads
+Per the SID datasheet only registers `$19` to `$1C` are readable. A real or unknown chip answers a read of any other register with the value left on the data bus. A read returns that value to the host, but the board's register mirror (used by the onboard emulator and the SID register stream) keeps the last written value of that register. Clone chips keep full register readback. In mirrored mode (`Socket Two Act as One`) both sockets must hold a clone chip for this.
+
+== SID register stream (FastReads)
+_Optional build feature, off in the default builds_ +
+Firmware built with `-DENABLE_SID_STREAM=1` adds a second vendor USB interface (interface `7`, bulk endpoints `0x07` and `0x87`) that streams SID register frames to the host: one 63 byte frame per enabled SID per tick, up to 1000 ticks per second. The stream is started and stopped with vendor control requests and stops on unmount and suspend. The build reports the feature in bit 6 of the `US_FEATURES` byte and sets `bcdDevice` to `0x0101`, default builds have no interface 7 and `bcdDevice` `0x0100`. +
+The frames are copied from the board's register mirror, the stream does not read from the SID chips. +
+Batch reads are part of every build and do not need this option: one `READ` packet with a register count reads up to 63 registers in one USB round trip. Hosts detect it by firmware version 0.8.1 or newer.
+
+=== Debug logging
+The CDC and vendor (WebUSB) event logs (mount, line state, line coding, break, vendor TX and control requests) print only when the build has USB IO debugging enabled (`USBIO_DEBUGGING` in `CMakeLists.txt`, default `0`). Earlier builds printed them over UART regardless, each log line stalled playback for milliseconds.
 
 == License
 include::license-software.adoc[]

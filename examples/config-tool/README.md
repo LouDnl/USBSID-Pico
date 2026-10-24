@@ -4,13 +4,17 @@
 ```shell
 ❯ cfg_usbsid -h
 ------------------------------------------------------------------------------------------------------------------------
-USBSID-Pico configtool
+USBSID-Pico commandline configtool
 For the tool to work correct, this tool requires firmware v0.2.4 and up
 
 Usage:
-$ cfg_usbsid [options]
+$ cfg_usbsid [arguments]
+
 --[OPTIONS]-------------------------------------------------------------------------------------------------------------
   -h,       --help              : Show this help message
+  -h itm,   --help item         : Show item help message, items are:
+                                  options,sidchips,config,features,network,presets,ini,manual,other
+                                  or the first three letters of each item
   -v,       --version           : Read and print USBSID-Pico firmware version
   -lb,      --list-boards       : List every attached board's serial number and exit
   -b=ID,    --board=ID          : Connect to board ID (index from -lb) or serial, default first board
@@ -33,8 +37,6 @@ $ cfg_usbsid [options]
                                   3: Voice 3 delayed waveform detection routine (Some clones)
   -dclone,  --detect-clone-types: Send clone autodetect command to device, returns the config as with '-r' afterwards
 --[CONFIG]--------------------------------------------------------------------------------------------------------------
-            --config-defaults   : Reset USBSID-Pico config to defaults
-                                  Add optional positional argument `1` to reboot USBSID-Pico afterwards
   -r,       --read-config       : Read and print USBSID-Pico config settings
   -rc,      --read-clock-speed  : Read and print USBSID-Pico SID clock speed
   -rs,      --read-sock-config  : Read and print USBSID-Pico socket config settings only
@@ -46,6 +48,8 @@ $ cfg_usbsid [options]
   -s,       --save-config       : Send the save config command to USBSID-Pico
   -sr,      --save-reboot       : Send the save config command to USBSID-Pico and reboot it
   -rl,      --reload-config     : Reload the config stored in flash, does not return anything
+            --config-defaults   : Reset USBSID-Pico config to defaults
+                                  Add optional positional argument `1` to reboot USBSID-Pico afterwards
 --[FEATURES]------------------------------------------------------------------------------------------------------------
   -mute                         : Mute all SID's
   -unmute                       : Umute all SID's
@@ -64,13 +68,14 @@ $ cfg_usbsid [options]
   -pad N,   --preset-detect N   : Disable/enable and save the silent automatic socket detection on preset selection
                                   0: Disabled, 1:Enabled
 --[NETWORK]-(ONLY AVAILABLE ON _W PICO'S!)------------------------------------------------------------------------------
-  -wifis,   --wifi-status       : Read and print WiFi link / NSD session status
-  -rnc,     --read-net-config   : Read and print WiFi/NSD/Bluetooth network config
+  -wifis,   --wifi-status       : Read and print WiFi link / NSD session status (and WiFi state / IP if supported)
+  -rnc,     --read-net-config   : Read and print WiFi/NSD/Bluetooth network config (and IP if supported)
   -ssid S,  --wifi-ssid S       : Set the WiFi SSID to S
   -psk P,   --wifi-psk P        : Set the WiFi PSK/password to P (write-only, never read back)
   -host H,  --wifi-hostname H   : Set the WiFi hostname to H
   -wen N,   --wifi-enable N     : Enable (1) or Disable (0) WiFi
   -nsden N, --nsd-enable N      : Enable (1) or Disable (0) Network SID Device (NSD)
+  -discen N,--disc-enable N     : Enable (1) or Disable (0) UDP discovery, applied live, persisted by -wapply
   -nsdp N,  --nsd-port N        : Set the Network SID Device port to N
   -wapply,  --wifi-apply        : Persist WiFi/NSD config to flash and apply live
   -wforget, --wifi-forget       : Erase stored WiFi credentials and reset network config to defaults
@@ -136,5 +141,5 @@ $ cfg_usbsid [options]
                                   Example: `cfg_usbsid -configr 1 -config CMD`
   -config   --config-command    : Send custom config command, requires followup hex strings
   -command                      : Send arbitrary command in hex, requires followup hex strings
------------------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------
 ```
