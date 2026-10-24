@@ -95,7 +95,7 @@ volatile bool is_sidwriting(void) { return sidwriting; };
  *
  * @param bool state
  */
-volatile void set_sidwriting(bool state) { sidwriting = state; };;
+volatile void set_sidwriting(bool state) { sidwriting = state; };
 volatile uint32_t cdcread = 0, cdcwrite = 0, webread = 0, webwrite = 0;
 /* Interface index of the last received packet, target of cdc_itf/wusb_itf */
 static volatile uint8_t cdc_itf_num = CDC1_ITF, wusb_itf_num = WUSB_ITF;
@@ -342,8 +342,6 @@ static uint8_t __no_inline_not_in_flash_func(read_cost_probe)(uint8_t address, u
  */
 void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volatile uint32_t * n)
 {
-  bus_try_claim(BUS_OWNER_USB); /* USB always wins the claim, see bus.c */
-  set_vu_action(); /* Keep that shiny Vu blinking! */
   uint8_t command = ((sid_buffer[0] & PACKET_TYPE) >> 6);
   uint8_t subcommand = (sid_buffer[0] & COMMAND_MASK);
   uint8_t n_bytes = (sid_buffer[0] & BYTE_MASK);
