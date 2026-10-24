@@ -250,21 +250,23 @@ void print_runtime_summary(void)
 {
   usNFO("\n");  /* new line before the actual summary is printed */
   usCFG("Runtime Summary:\n");
-  usCFG("  Sockets: s1=%d s2=%d | s1_dual=%d s2_dual=%d | mirrored=%d\n",
+  usCFG("  Sockets:   s1=%d s2=%d | s1_dual=%d s2_dual=%d | mirrored=%d\n",
     cfg.sock_one, cfg.sock_two, cfg.sock_one_dual, cfg.sock_two_dual, cfg.mirrored);
-  usCFG("  SID's:   s1=%d s2=%d total=%d\n",
+  usCFG("  SID's:     s1=%d s2=%d total=%d\n",
     cfg.sids_one, cfg.sids_two, cfg.numsids);
-  usCFG("  Chips:   s1=%d s2=%d | FMOpl: en=%d sid=%d\n",
+  usCFG("  Chips:     s1=%d s2=%d | FMOpl: en=%d sid=%d\n",
     cfg.chip_one, cfg.chip_two, cfg.fmopl_enabled, cfg.fmopl_sid);
-  usCFG("  IDs:     [0,1,2,3] -> slots [%d,%d,%d,%d]\n",
+  usCFG("  SID IDs:   [0,1,2,3] -> slots [%d,%d,%d,%d] (Physical slot ID's)\n",
+    cfg.sidid[0], cfg.sidid[1], cfg.sidid[2], cfg.sidid[3]);
+  usCFG("  IDs:       [0,1,2,3] -> slots [%d,%d,%d,%d] (Configured SID order)\n",
     cfg.ids[0], cfg.ids[1], cfg.ids[2], cfg.ids[3]);
-  usCFG("  Addr:    [0x%02x,0x%02x,0x%02x,0x%02x]\n",
+  usCFG("  Addr:      [0x%02x,0x%02x,0x%02x,0x%02x]\n",
     cfg.sidaddr[0], cfg.sidaddr[1], cfg.sidaddr[2], cfg.sidaddr[3]);
-  usCFG("  Type:    [%d,%d,%d,%d]\n",
+  usCFG("  Type:      [%d,%d,%d,%d]\n",
     cfg.sidtype[0], cfg.sidtype[1], cfg.sidtype[2], cfg.sidtype[3]);
-  usCFG("  Bus:     one=0b%03b/0x%02x   two=0b%03b/0x%02x\n",
+  usCFG("  Bus:       one=0b%03b/0x%02x   two=0b%03b/0x%02x\n",
     cfg.one, cfg.one_mask, cfg.two, cfg.two_mask);
-  usCFG("           three=0b%03b/0x%02x four=0b%03b/0x%02x\n",
+  usCFG("             three=0b%03b/0x%02x four=0b%03b/0x%02x\n",
     cfg.three, cfg.three_mask, cfg.four, cfg.four_mask);
 
   return;
