@@ -176,11 +176,13 @@ void handle_asid_fmoplmessage(uint8_t* buffer, int len)
     /* Pico 2 requires at least 10 cycles between writes
      * or it will be too damn fast! So we do this for other
      * Pico's too */
-    if((reg % 2 == 0)) {
-      cycled_write_operation((addr | OPL_REG_ADDRESS), fm_registers[reg], 10);
+    if((reg % 2 == 0)) { /* TODO: Make buffer (ring) optional! */
+      /* cycled_write_operation((addr | OPL_REG_ADDRESS), fm_registers[reg], 10); */
+      asid_ring_write((addr | OPL_REG_ADDRESS), fm_registers[reg], 10);
       WRITEDBG(dtype, reg, asid_fm_register_index, (addr | OPL_REG_ADDRESS), fm_registers[reg], 10);
     } else {
-      cycled_write_operation((addr | OPL_REG_DATA), fm_registers[reg], 10);
+      /* cycled_write_operation((addr | OPL_REG_DATA), fm_registers[reg], 10); */
+      asid_ring_write((addr | OPL_REG_DATA), fm_registers[reg], 10);
       WRITEDBG(dtype, reg, asid_fm_register_index, (addr | OPL_REG_DATA), fm_registers[reg], 10);
     }
   }
@@ -538,6 +540,7 @@ void decode_asid_message(uint8_t* buffer, int size)
     case 0x60:  /* FMOpl */
       if (cfg.fmopl_enabled) {  /* Only if FMOpl is enabled, drop otherwise */
         midimachine.fmopl = 1;
+        update_sid_count(2);
         /* size counts F0 and F7 (streambuffer index), payload = size - F0 2D 60 - F7 */
         handle_asid_fmoplmessage(&buffer[3], size - 4);  /* Skip first 3 bytes */
       }
