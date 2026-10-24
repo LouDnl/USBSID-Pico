@@ -38,6 +38,7 @@
 #include <sid_detection.h>
 #include <sid_cloneconfig.h>
 #include <sid_tests.h>
+#include <clone_skpico.h>
 #include <config_bus.h>
 #include <config_socket.h>
 #include <config_logging.h>
@@ -1551,6 +1552,9 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         tud_vendor_n_write_flush(WUSB_ITF);
         tud_vendor_n_read_flush(WUSB_ITF);
       }
+      if(buffer[1] == 0x11) {
+        auto_update_skpico_clock(buffer[2], buffer[3]);
+      }
       break;
     case READ_CLONECHIP: /* Read configuration / data from clone Chips */
       usCFG("READ_CLONECHIP: $%02x @ $%02x\n", buffer[1], buffer[2]);
@@ -2014,6 +2018,23 @@ void apply_clockrate(int n_clock, bool suspend_sids)
           enable_sid(true);
         }
         bus_heavy_op_end();
+
+        /* SIDKICK-pico requires the clock to be updated if it changes,
+           otherwise it will still assume the clock has not changed at all.
+           Sends update command to physical slot address and profile 0. */
+        if (cfg.chip_one == CHIP_SKPICO) { /* Slot 0 has one physical ID (0) and one virtual (1) */
+          auto_update_skpico_clock(
+            cfg.sidaddr[cfg.ids[cfg.sidid[0]]], /* Physical SID ID 0 -> Runtime ID -> Configured address */
+            0 /* profile */
+          );
+        }
+        if (cfg.chip_two == CHIP_SKPICO) { /* Slot 1 has one physical ID (2) and one virtual (3) */
+          auto_update_skpico_clock(
+            cfg.sidaddr[cfg.ids[cfg.sidid[2]]], /* Physical SID ID 2 -> Runtime ID -> Configured address */
+            0 /* profile */
+          );
+        }
+
         // ISSUE: WHEN THE BUS IS RESTARTED THE CRACKLING ON CYCLE EXACT TUNES IS IMMENSE!
         // THIS IS AFTER PAL -> NTSC -> PAL
         // restart_bus();
