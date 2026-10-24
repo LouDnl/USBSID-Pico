@@ -58,6 +58,21 @@ void net_wifi_update(void);
 /* True once the station link is up and has an IP address */
 bool net_wifi_is_connected(void);
 
+/* WIFI_READ_IP state codes, see net_wifi_state_code() */
+enum {
+  NET_WIFI_CODE_OFF        = 0,  /* Radio off, net_wifi_start() not called */
+  NET_WIFI_CODE_DOWN       = 1,  /* No link, waiting for (re)connect */
+  NET_WIFI_CODE_CONNECTING = 2,  /* Join issued, waiting for link + DHCP */
+  NET_WIFI_CODE_CONNECTED  = 3,  /* Link up with IP, net_wifi_is_connected() */
+};
+
+/* Return station state as a NET_WIFI_CODE_* value. Core 0 only */
+uint8_t net_wifi_state_code(void);
+
+/* Fill out[0..3] with the station IPv4 address, first octet in out[0].
+ * All zero unless NET_WIFI_CODE_CONNECTED. Core 0 only */
+void net_wifi_get_ip4(uint8_t out[4]);
+
 /* Seams for flash-persisted credentials; harmless no-ops/defaults until
  * NetConfig fills them in. */
 void net_wifi_set_credentials(const char *ssid, const char *psk);

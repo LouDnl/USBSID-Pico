@@ -433,6 +433,39 @@ bool net_wifi_is_connected(void)
   return wifi_state == WSTATE_CONNECTED;
 }
 
+/**
+ * @brief: Map station state to a WIFI_READ_IP state code
+ *
+ * @return uint8_t NET_WIFI_CODE_OFF, _DOWN, _CONNECTING or _CONNECTED
+ */
+uint8_t net_wifi_state_code(void)
+{
+  if (!wifi_started) return NET_WIFI_CODE_OFF;
+  switch (wifi_state) {
+    case WSTATE_DOWN:       return NET_WIFI_CODE_DOWN;
+    case WSTATE_CONNECTING: return NET_WIFI_CODE_CONNECTING;
+    case WSTATE_CONNECTED:  return NET_WIFI_CODE_CONNECTED;
+  }
+  return NET_WIFI_CODE_DOWN;
+}
+
+/**
+ * @brief: Copy the station IPv4 address in network order
+ *
+ * @param uint8_t out[4] receives ip0..ip3, all zero unless connected
+ */
+void net_wifi_get_ip4(uint8_t out[4])
+{
+  memset(out, 0, 4);
+  if (net_wifi_state_code() != NET_WIFI_CODE_CONNECTED) return;
+  if (!netif_default) return;
+  const ip4_addr_t *ip = netif_ip4_addr(netif_default);
+  out[0] = ip4_addr1(ip);
+  out[1] = ip4_addr2(ip);
+  out[2] = ip4_addr3(ip);
+  out[3] = ip4_addr4(ip);
+}
+
 void net_wifi_set_credentials(const char *ssid, const char *psk)
 {
   strncpy(wifi_ssid, ssid ? ssid : "", sizeof(wifi_ssid) - 1);
