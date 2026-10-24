@@ -50,6 +50,13 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 * Validate the ASID write order packet: an out of range or duplicate
   position, or a packet that is too short, is ignored and the current order
   is kept
+* Add batch READ: a READ packet with a register count reads up to 63
+  registers in one USB round trip. Hosts detect it by firmware version
+  0.8.1 or newer (single byte `USBSID_VERSION` reply of 81 or higher).
+* Add a SID register stream (experimental) on a second vendor interface
+  (interface 7) with up to 1000 frames per second per SID.
+  The register stream is only built with `-DENABLE_SID_STREAM=1` and sets
+  `US_FEATURES` bit 6, default builds have no interface 7.
 * Fix SID register reads overwriting the register mirror on real or unknown
   SID chips. Per the datasheet only `$19-$1C` are readable, a read of any
   other register returns the last value on the data bus. The read still

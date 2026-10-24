@@ -73,6 +73,9 @@ set(USE_PIO_UART 0)
 ### Enable / Disable build with WiFi/Bluetooth Network SID Device (NSD) support on _w boards
 set(ENABLE_NET 0 CACHE STRING "ENABLE_NET")
 
+### Enable / Disable build with the SID register stream (vendor interface 7)
+set(ENABLE_SID_STREAM 0 CACHE STRING "ENABLE_SID_STREAM")
+
 
 
 #######################################
@@ -116,6 +119,9 @@ if(ENABLE_NET EQUAL 1)
 endif()
 if(USE_PIO_UART EQUAL 1)
   list(APPEND FEATURE_LIST "${Cyan}${ColorBold}PIO Uart${ColorReset}")
+endif()
+if(ENABLE_SID_STREAM)
+  list(APPEND FEATURE_LIST "${Cyan}${ColorBold}SID Stream${ColorReset}")
 endif()
 
 ### Replace the semi colon in the list (This will not work: list(JOIN FEATURE_LIST ", " FEATURE_STRING))
@@ -500,6 +506,15 @@ if(USE_PIO_UART EQUAL 1)
   set(SOURCEFILES
     ${SOURCEFILES}
     ${CMAKE_CURRENT_LIST_DIR}/src/uart.c
+  )
+endif()
+
+### SID register stream additions, accepts 1 or ON
+if(ENABLE_SID_STREAM)
+  add_compile_definitions(USE_SID_STREAM=1)
+  set(SOURCEFILES
+    ${SOURCEFILES}
+    ${CMAKE_CURRENT_LIST_DIR}/src/stream.c
   )
 endif()
 

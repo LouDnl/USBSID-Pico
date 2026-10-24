@@ -571,7 +571,8 @@ extern const char    *pcb_version;
  * 3 = PIO Uart: 0 No, 1 Yes
  * 4 = Wifi & Bluetooth onboard: 0 No, 1 Yes
  * 5 = Network SID Device: 0 No, 1 Yes
- * 6 = Unused
+ * 6 = SID Stream: 0 No, 1 Yes
+ *     An extra Vendor interface is available for reading a SID register stream
  * 7 = Embedded SID player & Cynthcart: 0 No, 1 Yes
  */
 static const uint8_t us_features = (
@@ -592,7 +593,9 @@ static const uint8_t us_features = (
 #if defined(USE_NSD) /* Also enables DISCOVERY_ENABLE command */
   | (1 << 5)
 #endif
-  /* 6 Unused */
+#if defined(USE_SID_STREAM)  /* SID register stream */
+  | (1 << 6)
+#endif
 #if defined(ONBOARD_EMULATOR)
   | (1 << 7)
 #endif
@@ -604,6 +607,7 @@ static const bool has_rgb_vu    = (us_features & 0b00000100); /* 2 */
 static const bool has_pio_uart  = (us_features & 0b00001000); /* 3 */
 static const bool has_net       = (us_features & 0b00010000); /* 4 */
 static const bool has_nsd       = (us_features & 0b00100000); /* 5 */
+static const bool has_sidstream = (us_features & 0b01000000); /* 6 */
 static const bool has_emulator  = (us_features & 0b10000000); /* 7 */
 
 /* Functions from config.c */

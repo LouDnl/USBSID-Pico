@@ -114,7 +114,7 @@
 #define CFG_TUD_MSC              0
 #define CFG_TUD_HID              0
 #define CFG_TUD_MIDI             1
-#define CFG_TUD_VENDOR           2
+#define CFG_TUD_VENDOR           1  /* WebUSB only, SID stream has its own class driver */
 
 // CDC Endpoint transfer buffer size, more is faster
 #define CFG_TUD_CDC_EP_BUFSIZE    64  // Even at 512KB only 64KB will be used because of TUD_OPT_FULL_SPEED, Pico is only USB2.0

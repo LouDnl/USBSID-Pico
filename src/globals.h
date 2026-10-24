@@ -112,15 +112,16 @@
 #define CDC3_ITF 2 /* USB Uart CDC */
 #define MIDI_ITF 0 /* Midi/ASID */
 #define WUSB_ITF 0 /* WebUSB Vendor */
-#define FRDS_ITF 1 /* FastReads Vendor */
 
 /* Vendor USB interface numbers and endpoints, checked in usb_descriptors.c */
 #define WUSB_ITF_NUM 4    /* WebUSB Vendor (WUSB_ITF) */
 #define WUSB_EP_OUT  0x04
 #define WUSB_EP_IN   0x84
-#define FRDS_ITF_NUM 7    /* FastReads Vendor (FRDS_ITF) */
-#define FRDS_EP_OUT  0x07
-#define FRDS_EP_IN   0x87
+#if defined(USE_SID_STREAM)
+#define STREAM_ITF_NUM 7  /* SID stream, own class driver in stream.c */
+#define STREAM_EP_OUT  0x07
+#define STREAM_EP_IN   0x87
+#endif /* USE_SID_STREAM */
 
 #define MIDI_CABLE 0
 

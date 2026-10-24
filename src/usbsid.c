@@ -34,6 +34,7 @@
 #include <pio.h>
 #include <dma.h>
 #include <bus.h>
+#include <stream.h>
 #include <uart.h>
 #include <vu.h>
 #include <mcu.h>
@@ -274,7 +275,33 @@ void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
   } while (state != 1);
 }
 
-#if defined(READ_COST_PROBE)
+#if !defined(READ_COST_PROBE)
+/**
+ * @brief Read a list of registers back to back into write_buffer
+ *
+ * Reads the registers in sid_buffer[1..count] in order, one bus read each,
+ * results in write_buffer[0..count-1]. count is clamped to the registers
+ * present in the received packet.
+ *
+ * @param uint8_t count number of registers requested, 1-63
+ * @param uint32_t received number of bytes received in sid_buffer
+ * @return uint32_t number of result bytes in write_buffer, at least 1
+ */
+static uint32_t __no_inline_not_in_flash_func(batch_read)(uint8_t count, uint32_t received)
+{
+  if __us_unlikely(received <= count) {  /* Short packet */
+    count = (received > 1) ? (uint8_t)(received - 1) : 0;
+  }
+  if __us_unlikely(count == 0) {
+    write_buffer[0] = 0x00;
+    return BYTES_TO_SEND;
+  }
+  for (uint8_t i = 0; i < count; i++) {
+    write_buffer[i] = cycled_read_operation(sid_buffer[i + 1], 0);
+  }
+  return count;
+}
+#else
 /**
  * @brief Time back-to-back bus reads in PHI1 cycles (benchmark probe)
  *
@@ -303,8 +330,9 @@ static uint8_t __no_inline_not_in_flash_func(read_cost_probe)(uint8_t address, u
  * Decodes the command/subcommand/byte-count header from sid_buffer[0] and
  * routes to the appropriate handler: CYCLED_WRITE and WRITE issue one or
  * more cycled_write_operation calls (single write inline, multi-byte via
- * buffer_task), READ performs a single cycled_read_operation and replies
- * over the originating interface, and COMMAND dispatches to the various
+ * buffer_task), READ performs one cycled_read_operation (byte count 0) or
+ * a batch_read of byte count registers and replies over the originating
+ * interface, and COMMAND dispatches to the various
  * SID/config/MCU control subcommands (PAUSE, MUTE, RESET_SID, CONFIG,
  * RESET_MCU, BOOTLOADER, etc). Incoming data is dropped while the bus is
  * in reset state, except for COMMAND, CYCLED_READ and DELAY_CYCLES.
@@ -325,6 +353,9 @@ void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volat
     bus_try_claim(BUS_OWNER_USB); /* USB always wins the claim, see bus.c */
   }
   set_vu_action(); /* Keep that shiny Vu blinking! */
+#if defined(USE_SID_STREAM)
+  stream_rx_count++;
+#endif
   if __us_unlikely(get_reset_state()
     && (command != COMMAND)
     && ((subcommand != CYCLED_READ)
@@ -355,21 +386,26 @@ void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volat
     }
     return;
   };
-  if __us_unlikely(command == READ) {  /* READING CAN ONLY HANDLE ONE AT A TIME, PERIOD. */
+  if __us_unlikely(command == READ) {  /* n_bytes 0: single read, n_bytes > 0: batch read */
     usIO("[I %d] [%c] $%02X:%02X\n", n_bytes, dtype, sid_buffer[1], sid_buffer[2]);
+    uint32_t n_reply = BYTES_TO_SEND;
 #if defined(READ_COST_PROBE)
     write_buffer[0] = (n_bytes == 0)
       ? cycled_read_operation(sid_buffer[1], 0)
       : read_cost_probe(sid_buffer[1], n_bytes);
 #else
-    write_buffer[0] = cycled_read_operation(sid_buffer[1], 0);  /* write the address to the SID and read the data back */
+    if __us_likely(n_bytes == 0) {  /* Single read */
+      write_buffer[0] = cycled_read_operation(sid_buffer[1], 0);  /* write the address to the SID and read the data back */
+    } else {
+      n_reply = batch_read(n_bytes, *n);
+    }
 #endif
     switch (rtype) {  /* write the result to the USB client */
       case 'C':
-        cdc_write(itf, BYTES_TO_SEND);
+        cdc_write(itf, n_reply);
         break;
       case 'W':
-        webserial_write(itf, BYTES_TO_SEND);
+        webserial_write(itf, n_reply);
         break;
       default:
         usIO("[WRITE ERROR]%c\n", rtype);
@@ -473,11 +509,15 @@ void tud_mount_cb(void)
 /**
  * @brief TinyUSB callback fired when the device is unmounted by the host
  *
- * Clears the received-data flag and resets dtype/rtype to the "none" type.
+ * Clears the received-data flag, resets dtype/rtype to the "none" type and
+ * stops the SID memory stream (USE_SID_STREAM builds).
  */
 void tud_umount_cb(void)
 {
   set_receivedata(false), dtype = rtype = ntype;
+#if defined(USE_SID_STREAM)
+  stream_stop();
+#endif
   /* usDBG("[%s]\n", __func__); */
   usCDC("Unmount\n");
 }
@@ -485,7 +525,8 @@ void tud_umount_cb(void)
 /**
  * @brief TinyUSB callback fired when the host suspends the bus
  *
- * Clears the received-data flag and resets dtype/rtype to the "none" type.
+ * Clears the received-data flag, resets dtype/rtype to the "none" type and
+ * stops the SID memory stream (USE_SID_STREAM builds).
  *
  * @param bool remote_wakeup_en
  */
@@ -495,6 +536,9 @@ void tud_suspend_cb(bool remote_wakeup_en)
   /* usDBG("[%s] remote_wakeup_en:%d\n", __func__, remote_wakeup_en); */
   usCDC("remote_wakeup_en:%d\n", remote_wakeup_en);
   set_receivedata(false), dtype = rtype = ntype;
+#if defined(USE_SID_STREAM)
+  stream_stop();
+#endif
 }
 
 /**
@@ -775,12 +819,13 @@ static void vendor_endpoints_reset(uint8_t rhport, uint8_t itf, uint8_t ep_out, 
  * Only the CONTROL_STAGE_SETUP stage is handled; other stages are
  * acknowledged with no action. Handles the CDC-style SET_CONTROL_LINE_STATE
  * class request (0x22) used by WebSerial to signal connect/disconnect,
- * SET_INTERFACE on the WebUSB and FastReads interfaces (endpoints back to
- * DATA0, see vendor_endpoints_reset()),
+ * SET_INTERFACE on the WebUSB interface (endpoints back to DATA0, see
+ * vendor_endpoints_reset(), the SID stream interface has its own driver),
  * the WebUSB landing-page URL vendor request (returns desc_url on first
  * boot or when configuration confirmation/SID-change acknowledgement is
  * pending), and the Microsoft OS 2.0 compatible descriptor vendor request.
- * Any other request stalls the endpoint.
+ * STREAM_REQUEST_* vendor requests go to stream_control_xfer() in every
+ * stage (USE_SID_STREAM builds). Any other request stalls the endpoint.
  *
  * @param uint8_t rhport
  * @param uint8_t stage
@@ -789,6 +834,10 @@ static void vendor_endpoints_reset(uint8_t rhport, uint8_t itf, uint8_t ep_out, 
  */
 bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const * request)
 {
+#if defined(USE_SID_STREAM)
+  /* Stream requests are not logged: UART logging blocks core0 for ms and stalls a playing tune */
+  if (stream_is_request(request)) return stream_control_xfer(rhport, stage, request);
+#endif
   usVDR("XFER stage:%x, rhport:%x, bRequest:0x%x, wValue:%d, wIndex:%x, wLength:%x, bmRequestType:%x, type:%x, recipient:%x, direction:%x\n",
     stage, rhport,
     request->bRequest, request->wValue, request->wIndex, request->wLength, request->bmRequestType,
@@ -803,10 +852,6 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
         uint8_t itf_num = tu_u16_low(request->wIndex);
         if (itf_num == WUSB_ITF_NUM) {
           vendor_endpoints_reset(rhport, WUSB_ITF, WUSB_EP_OUT, WUSB_EP_IN);
-          return tud_control_status(rhport, request);
-        }
-        if (itf_num == FRDS_ITF_NUM) {
-          vendor_endpoints_reset(rhport, FRDS_ITF, FRDS_EP_OUT, FRDS_EP_IN);
           return tud_control_status(rhport, request);
         }
       }
@@ -881,6 +926,9 @@ void __us_noreturn core0_loop(void)
 {
   while (1) {
     tud_task_ext(0, false);  /* equals tud_task(); timout_ms already at 0 and is _always_ discarded in osal_none.h */
+#if defined(USE_SID_STREAM)
+    stream_task();  /* SID memory stream, own vendor interface */
+#endif
     #if 0
     cdc_task();  /* Only use this if no callbacks */
     #endif
