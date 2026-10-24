@@ -452,6 +452,29 @@ void __no_inline_not_in_flash_func(cycled_write_operation)(uint8_t address, uint
 }
 
 /**
+ * @brief Check whether a bus read of `address` may update sid_memory
+ *
+ * Per the SID datasheet only $19-$1C are readable. A real or unknown chip
+ * answers a read of any other register with the value left on the data
+ * bus, not with that register: storing it would overwrite the last written
+ * value that sid_memory mirrors. Clone chips can read back all registers.
+ * In mirrored mode both sockets answer, both must be clones.
+ *
+ * @param uint8_t address SID register address, bits 5-6 select the SID
+ * @return bool true to store the read result in sid_memory
+ */
+static __force_inline bool read_updates_mirror(uint8_t address)
+{
+  uint8_t reg = (address & 0x1F);
+  if ((reg >= 0x19) && (reg <= 0x1C)) return true;
+  if (cfg.mirrored) return ((cfg.chip_one > CHIP_UNKNOWN) && (cfg.chip_two > CHIP_UNKNOWN));
+  uint8_t slot = cfg.ids[(address >> 5) & 0x03];
+  if (slot > 3) return false;
+  uint8_t chip = ((slot < 2) ? cfg.chip_one : cfg.chip_two);
+  return (chip > CHIP_UNKNOWN);
+}
+
+/**
  * @brief Read data from the bus at address
  *        and then waits for the DMA to finish blocking
  *        The PIO bus waits n cycles before the read occurs
@@ -483,10 +506,10 @@ uint8_t __no_inline_not_in_flash_func(cycled_read_operation)(uint8_t address, ui
     | 1u << dma_rx_data     /* Read data DMA transfer */
   );
   dma_channel_wait_for_finish_blocking(dma_rx_data);  /* Wait for data */
-  sid_memory[(address & 0x7F)] = (read_data & 0xFF);
+  uint8_t result = (uint8_t)(read_data & 0xFF);
+  if (read_updates_mirror(address)) sid_memory[(address & 0x7F)] = result;
 
   set_sidwriting(false);
-  uint8_t result = sid_memory[(address & 0x7F)];
   spin_unlock(bus_spinlock, bus_irq);
   return result;
 }

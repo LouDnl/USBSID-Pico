@@ -50,6 +50,12 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 * Validate the ASID write order packet: an out of range or duplicate
   position, or a packet that is too short, is ignored and the current order
   is kept
+* Fix SID register reads overwriting the register mirror on real or unknown
+  SID chips. Per the datasheet only `$19-$1C` are readable, a read of any
+  other register returns the last value on the data bus. The read still
+  returns that bus value, the mirror (used by the onboard emulator and the
+  register stream) keeps the last written value. Clone chips keep full
+  register readback.
 * Fix the per port USB control request logging always printing over UART:
   each request stalled playback for milliseconds (audible as a short beep or
   crackle). It only prints with USB IO debugging enabled.
