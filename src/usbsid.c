@@ -200,7 +200,7 @@ void init_logging(void)
  */
 void cdc_write(volatile uint8_t * itf, uint32_t n)
 { /* No need to check if write available with current driver code */
-  usIO("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
+  usCDC("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
   tud_cdc_n_write(*itf, write_buffer, n);  /* write n bytes of data to client */
   tud_cdc_n_write_flush(*itf);
   return;
@@ -218,11 +218,11 @@ void cdc_write(volatile uint8_t * itf, uint32_t n)
  */
 void webserial_write(volatile uint8_t * itf, uint32_t n)
 {
-  usIO("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
+  usVDR("[O %d] [%c] $%02X:%02X\n", n, dtype, sid_buffer[1], write_buffer[0]);
   /* Non zero pending: unsent data in the TX fifo, this reply merges with it */
   uint32_t pending = CFG_TUD_VENDOR_TX_BUFSIZE - tud_vendor_n_write_available(*itf);
   uint32_t wrote = tud_vendor_n_write(*itf, write_buffer, n);
-  usIO("[VDR] TXQ want:%lu wrote:%lu pending_before:%lu\n", n, wrote, pending);
+  usVDR("TXQ want:%lu wrote:%lu pending_before:%lu\n", n, wrote, pending);
   tud_vendor_n_write_flush(*itf);
   return;
 }
@@ -467,7 +467,7 @@ SIDCHANGEDETECTED:;
 void tud_mount_cb(void)
 {
   /* usDBG("[%s]\n", __func__); */
-  usNFO("[CDC] Mount\n");
+  usCDC("Mount\n");
 }
 
 /**
@@ -479,7 +479,7 @@ void tud_umount_cb(void)
 {
   set_receivedata(false), dtype = rtype = ntype;
   /* usDBG("[%s]\n", __func__); */
-  usNFO("[CDC] Unmount\n");
+  usCDC("Unmount\n");
 }
 
 /**
@@ -493,7 +493,7 @@ void tud_suspend_cb(bool remote_wakeup_en)
 {
   /* (void) remote_wakeup_en; */
   /* usDBG("[%s] remote_wakeup_en:%d\n", __func__, remote_wakeup_en); */
-  usNFO("[CDC] remote_wakeup_en:%d\n", remote_wakeup_en);
+  usCDC("remote_wakeup_en:%d\n", remote_wakeup_en);
   set_receivedata(false), dtype = rtype = ntype;
 }
 
@@ -628,7 +628,7 @@ void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
   /* (void) itf; */
   /* (void) rts; */
   /* usDBG("[%s] itf:%x, dtr:%d, rts:%d\n", __func__, itf, dtr, rts); */
-  usNFO("[CDC] Line state itf:%x, dtr:%d, rts:%d\n", itf, dtr, rts);
+  usCDC("Line state itf:%x, dtr:%d, rts:%d\n", itf, dtr, rts);
 
   if ( dtr ) {
     /* Terminal connected */
@@ -651,7 +651,7 @@ void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* p_line_coding)
 {
   /* (void)itf; */
   /* (void)p_line_coding; */
-  usNFO("[CDC] Line coding itf:%x, bit_rate:%u, stop_bits:%u, parity:%u, data_bits:%u\n",
+  usCDC("Line coding itf:%x, bit_rate:%u, stop_bits:%u, parity:%u, data_bits:%u\n",
     itf, (int)p_line_coding->bit_rate, p_line_coding->stop_bits, p_line_coding->parity, p_line_coding->data_bits);
 }
 
@@ -665,7 +665,7 @@ void tud_cdc_send_break_cb(uint8_t itf, uint16_t duration_ms)
 {
   /* (void)itf; */
   /* (void)duration_ms; */
-  usNFO("[CDC] Break its:%x, duration_ms:%x\n", itf, duration_ms);
+  usCDC("Break its:%x, duration_ms:%x\n", itf, duration_ms);
 }
 
 
@@ -738,7 +738,7 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
 void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
 {
   (void)itf;
-  usIO("[VDR] TX %lu\n", sent_bytes);
+  usVDR("TX %lu\n", sent_bytes);
 }
 
 /**
@@ -753,7 +753,7 @@ void tud_vendor_tx_cb(uint8_t itf, uint32_t sent_bytes)
  *       has no clear for it
  *
  * @param uint8_t rhport
- * @param uint8_t itf vendor class index (WUSB_ITF or FRDS_ITF)
+ * @param uint8_t itf vendor class index (WUSB_ITF)
  * @param uint8_t ep_out OUT endpoint address
  * @param uint8_t ep_in IN endpoint address
  */
@@ -766,7 +766,7 @@ static void vendor_endpoints_reset(uint8_t rhport, uint8_t itf, uint8_t ep_out, 
   usbd_edpt_clear_stall(rhport, ep_in);
   usbd_edpt_release(rhport, ep_in);
   tud_vendor_n_read_flush(itf);
-  usDBG("[VDR] SET_INTERFACE itf %u, endpoints $%02X/$%02X reset to DATA0\n", itf, ep_out, ep_in);
+  usVDR("SET_INTERFACE itf %u, endpoints $%02X/$%02X reset to DATA0\n", itf, ep_out, ep_in);
 }
 
 /**
@@ -789,7 +789,7 @@ static void vendor_endpoints_reset(uint8_t rhport, uint8_t itf, uint8_t ep_out, 
  */
 bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_request_t const * request)
 {
-  usNFO("[VDR] XFER stage:%x, rhport:%x, bRequest:0x%x, wValue:%d, wIndex:%x, wLength:%x, bmRequestType:%x, type:%x, recipient:%x, direction:%x\n",
+  usVDR("XFER stage:%x, rhport:%x, bRequest:0x%x, wValue:%d, wIndex:%x, wLength:%x, bmRequestType:%x, type:%x, recipient:%x, direction:%x\n",
     stage, rhport,
     request->bRequest, request->wValue, request->wIndex, request->wLength, request->bmRequestType,
     request->bmRequestType_bit.type, request->bmRequestType_bit.recipient, request->bmRequestType_bit.direction);

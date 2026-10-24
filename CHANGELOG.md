@@ -50,6 +50,9 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 * Validate the ASID write order packet: an out of range or duplicate
   position, or a packet that is too short, is ignored and the current order
   is kept
+* Fix the per port USB control request logging always printing over UART:
+  each request stalled playback for milliseconds (audible as a short beep or
+  crackle). It only prints with USB IO debugging enabled.
 
 #### Version: 0.8.0
 * Add full MIDI implementation overhaul: dedicated flash-backed MIDI config storage, MIDI engine/handler/queue/voice/patch/arp table modules, MIDI clock control, sid bus spinlock
