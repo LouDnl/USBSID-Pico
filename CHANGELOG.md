@@ -2,71 +2,41 @@
 Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on version changes
 
 #### Version: Unreleased
-* Add Network SID Device (NSD) server support over WiFi for `pico_w`/`pico2_w`
-  with UDP discovery, compatible with ACID64Pro, JSidplay2, SIDPlay and  
-  USBSID-Player's network client.
+* Add Network SID Device (NSD) server support over WiFi for `pico_w`/`pico2_w` with UDP discovery, compatible with ACID64Pro, JSidplay2, SIDPlay and USBSID-Player's network client.
   - Add Bluetooth Classic SPP transport for the same NSD protocol
-  - NSD server uses protocol version 5  
-    Adds enabling or disabling FM OPL on a SID socket over the network the 
-    same way the USB config protocol command already does locally.
-  - The builds that have WiFi/Bluetooth with Network SID Device support are
-    compiled with `_net` filename suffix.  
-  - Fix `TRY_READ_EX` accepting an FM OPL address ($DF00-$DFFF) for its read
-    target: the spec dropped that (network_sid_device_V5.adoc), a read there
-    now returns 0x00 same as an unconfigured SID. `TRY_WRITE_EX`, and the
-    write-then-read entries `TRY_READ_EX` itself buffers ahead of the read,
-    are unaffected - only that command's own read target changed.
-* Add an IP-to-Bluetooth NSD bridge example (`examples/nsd_spp_bridge.py`)
-  for TCP-only NSD clients to reach the board's Bluetooth SPP transport
-* Add a dedicated WebSerial CDC interface, a working alternative on Windows
-  where WebUSB can crash the browser.
-* Reduced the number of firmware build types by merging Cynthcart support
-  into the onboard USBSID-Player builds. Both now run through the same 
-  embedded player core and have `_em` filename suffix.  
+  - NSD server uses protocol version 5.  
+    Adds enabling or disabling FM OPL on a SID socket over the network the same way the USB config protocol command already does locally.
+  - The builds that have WiFi/Bluetooth with Network SID Device support are compiled with `_net` filename suffix.  
+  - Fix `TRY_READ_EX` accepting an FM OPL address ($DF00-$DFFF) for its read target: the spec dropped that (network_sid_device_V5.adoc), a read there now returns 0x00 same as an unconfigured SID. `TRY_WRITE_EX`, and the write-then-read entries `TRY_READ_EX` itself buffers ahead of the read, are unaffected - only that command's own read target changed.
+  - Apply the `nsd_enabled`, `nsd_port` and `discovery_enabled` network settings live: the NSD listener and the UDP discovery responder open or close on config apply, no reboot needed. Disabling NSD ends a running TCP NSD session.
+  - Fix the NSD listener failing to bind again after a board initiated close (NSD disabled, WiFi link drop): the connection is aborted instead of left in TIME_WAIT. A failed bind is logged once per port and retried every second.
+  - Fix a race in the NSD pending cycle count between the two cores that lost updates. A SID detect read or `TRY_READ`, `TRY_READ_EX`, `TRY_RESET`, `TRY_SET_CLOCK`, `TRY_SET_SID_COUNT` and `TRY_SET_FM_OPL` no longer overtake queued writes, they wait until the write ring is played out. `TRY_RESET` and `TRY_SET_CLOCK` also wait for the bus to settle.
+  - Fix NSD registers at or above `$80` (SID 5-16) aliasing onto SID 1-4, including a `MUTE` of SID 5-8 that muted SID 1-4. Writes and reads for chips the board lacks, or for disabled sockets, keep their delay and reads return 0x00. `TRY_SET_SID_COUNT` accepts 1-16 SIDs (was 1-8).
+  - `MUTE` also drops the queued writes of a muted voice when they play.
+  - Increase the NSD write ring to 4096 entries. The server reports BUSY above about 160 ms of queued cycles (PAL) and accepts again below about 120 ms. A host polling the board no longer keeps the ring BUSY.
+* Add an IP-to-Bluetooth NSD bridge example (`examples/nsd_spp_bridge.py`) for TCP-only NSD clients to reach the board's Bluetooth SPP transport
+* Add a dedicated WebSerial CDC interface, a working alternative on Windows where WebUSB can crash the browser.
+* Reduced the number of firmware build types by merging Cynthcart support into the onboard USBSID-Player builds. Both now run through the same embedded player core and have `_em` filename suffix.  
 * pico2_w boards have a single `em_net` filename suffix.
 * On pico1_w boards the emulator and wireless are too large to run together.  
   These boards have separate builds for `_em` and `_net` filename suffixes.  
 * Add WiFi/Bluetooth NSD commands to commandline configtool
-* Add Multiboard experimental clock link with other boards as optional 
-  configuration. This is _not_ required for using the new multiboard driver.
-  When enabled on all the boards you use, they will use the clock from the 
-  first board that boots. Booting in order is required here.
-  Connect a wire from the RX/PHI2 pin to all boards. This re-uses the uart
-  RX pin, make sure nothing else is connected to it. 
+* Add the `WIFI_READ_IP` config command: replies with the WiFi state (0 off, 1 down, 2 connecting, 3 connected, 0xFF when not built with WiFi) and the station IPv4 address once connected.
+* Add Multiboard experimental clock link with other boards as optional configuration. This is _not_ required for using the new multiboard driver. When enabled on all the boards you use, they will use the clock from the first board that boots. Booting in order is required here. Connect a wire from the RX/PHI2 pin to all boards. This re-uses the uart RX pin, make sure nothing else is connected to it.
 * Add help menu's from commandline tools to dedicated README's
-* Change `cfg_usbsid` and `send_sid` to use USBSID-Pico-driver instead of
-  their own libusb code: on macOS they use the vendor interface like every
-  other driver client. Both build against `driver-repo/src` beside this
-  repository, `repo/lib/usbsid-driver` (CI) or `-DUS_DRIVER_DIR`
-* Fix `send_sid` sending the play time in a 5 byte packet: the last byte of
-  the 32 bit play time was never sent
-* Fix `send_sid -sid -` losing the tail of the tune read from stdin, and
-  sending a play time of 0 that stopped playback at once
-* Fix ASID write order (0x30) applied to the wrong registers: the order and
-  wait of a register were looked up by its position in the message instead
-  of its ASID register ID, messages without all 28 registers played in the
-  wrong order with the wrong waits
-* Fix ASID writing $00 to SID register 0 on the first message per SID after
-  boot, and dropping a register that had a write order wait of 255 cycles
-* Validate the ASID write order packet: an out of range or duplicate
-  position, or a packet that is too short, is ignored and the current order
-  is kept
-* Add batch READ: a READ packet with a register count reads up to 63
-  registers in one USB round trip. Hosts detect it by firmware version
-  0.8.1 or newer (single byte `USBSID_VERSION` reply of 81 or higher).
-* Add a SID register stream (experimental) on a second vendor interface
-  (interface 7) with up to 1000 frames per second per SID.
-  The register stream is only built with `-DENABLE_SID_STREAM=1` and sets
-  `US_FEATURES` bit 6, default builds have no interface 7.
-* Fix SID register reads overwriting the register mirror on real or unknown
-  SID chips. Per the datasheet only `$19-$1C` are readable, a read of any
-  other register returns the last value on the data bus. The read still
-  returns that bus value, the mirror (used by the onboard emulator and the
-  register stream) keeps the last written value. Clone chips keep full
-  register readback.
-* Fix the per port USB control request logging always printing over UART:
-  each request stalled playback for milliseconds (audible as a short beep or
-  crackle). It only prints with USB IO debugging enabled.
+* Change `cfg_usbsid` and `send_sid` to use USBSID-Pico-driver instead of their own libusb code: on macOS they use the vendor interface like every other driver client. Both build against `driver-repo/src` beside this repository, `repo/lib/usbsid-driver` (CI) or `-DUS_DRIVER_DIR`
+* Fix `send_sid` sending the play time in a 5 byte packet: the last byte of the 32 bit play time was never sent
+* Fix `send_sid -sid -` losing the tail of the tune read from stdin, and sending a play time of 0 that stopped playback at once
+* Fix ASID write order (0x30) applied to the wrong registers: the order and wait of a register were looked up by its position in the message instead of its ASID register ID, messages without all 28 registers played in the wrong order with the wrong waits
+* Fix ASID writing $00 to SID register 0 on the first message per SID after boot, and dropping a register that had a write order wait of 255 cycles
+* Validate the ASID write order packet: an out of range or duplicate position, or a packet that is too short, is ignored and the current order is kept
+* Validate the ASID FM OPL message length: a message with fewer than 2 bytes, more register pairs than fit `fm_registers` or fewer bytes than its pair count implies is dropped instead of read past its end
+* Update the SIDKICK-pico clock profile when the host sets a clock rate or the clock changes, a SIDKICK-pico otherwise keeps assuming the old clock
+* Add batch READ: a READ packet with a register count reads up to 63 registers in one USB round trip. Hosts detect it by firmware version 0.8.1 or newer (single byte `USBSID_VERSION` reply of 81 or higher).
+* Add a SID register stream (experimental) on a second vendor interface (interface 7) with up to 1000 frames per second per SID. The register stream is only built with `-DENABLE_SID_STREAM=1` and sets `US_FEATURES` bit 6, default builds have no interface 7.
+* Fix SID register reads overwriting the register mirror on real or unknown SID chips. Per the datasheet only `$19-$1C` are readable, a read of any other register returns the last value on the data bus. The read still returns that bus value, the mirror (used by the onboard emulator and the register stream) keeps the last written value. Clone chips keep full register readback.
+* Fix the per port USB control request logging always printing over UART: each request stalled playback for milliseconds (audible as a short beep or crackle). It only prints with USB IO debugging enabled.
+* Fix read-only config queries (`READ_CONFIG`, `WIFI_STATUS`, `WIFI_READ_IP`, `US_FEATURES` and others) claiming the SID bus for USB and never releasing it: a host polling the board kept a running NSD stream reporting BUSY.
 
 #### Version: 0.8.0
 * Add full MIDI implementation overhaul: dedicated flash-backed MIDI config storage, MIDI engine/handler/queue/voice/patch/arp table modules, MIDI clock control, sid bus spinlock
@@ -145,13 +115,11 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 * Add initial v1.5 PCB support
   - Fix voltage set order so clone SIDs don't misbehave
   - Fix incorrect packet length on reads (must be 64 bytes for WebUSB)
-* [BREAKING CHANGE] Rewrite configuration logic, improve and clear up logging
-  and SID/chip detection
+* [BREAKING CHANGE] Rewrite configuration logic, improve and clear up logging and SID/chip detection
   - Add limited ARMSID, PDSID and BACKSID support
 * Add SIDEmu detection and support
 * Add FPGASID preset support
-* Change midi->SID control to a user defined channel, save settings per
-  channel (like an instrument)
+* Change midi->SID control to a user defined channel, save settings per channel (like an instrument)
 * Enable direct Midi access even when onboard emulator is present
 * Rename `midi_cc` to `midi_defs`
 * Deprecate `usbsid_doubletap`
@@ -161,8 +129,7 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 * Add stdio_flush during PIO bus setup/sync, fixes memory corruption
 * Add workaround for lingering data in the vendor fifo
 * Fixes for new SKPico firmware versions
-* Stall Core1 until completely finished booting, add Firmware compilation
-  log type
+* Stall Core1 until completely finished booting, add Firmware compilation log type
 
 #### Version: 0.6.4-BETA
 * Fix onboard SID player playback issues
@@ -185,34 +152,27 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 #### Version: 0.6.1-BETA
 * Add config option to flip sockets at runtime (1 <--> 2)
 * Add single SID socket 2 config option
-* Re-introduce ASID (ring)buffer for `write_ordered` messages (e.g.
-  SIDFactoryII), add `set_asid_env`
+* Re-introduce ASID (ring)buffer for `write_ordered` messages (e.g. SIDFactoryII), add `set_asid_env`
 * ASID handling overhaul
 * Fix hardfault/lockup on RP2350 when toggling the mono/stereo pin
-* Fix regression in boot sequence where RP2350 could freeze forever waiting
-  on a semaphore; replaced with native ARM functions, boot sequence
-  rearranged
-* Fix `clockcycle_delay` for RP2040 by chaining two DMA channels together,
-  move functions into bus.c
+* Fix regression in boot sequence where RP2350 could freeze forever waiting on a semaphore; replaced with native ARM functions, boot sequence rearranged
+* Fix `clockcycle_delay` for RP2040 by chaining two DMA channels together, move functions into bus.c
 * Logging overhaul
 * Also reset the writeorder when midi/asid is no longer mounted
 * Add shortcuts to command line arguments
 * Add custom naming parameter to build scripts, add MacOS support
 
 #### Version: 0.6.0-BETA
-* Add first iteration of onboard SID player (PRG support, next/previous
-  tune, buffer)
+* Add first iteration of onboard SID player (PRG support, next/previous tune, buffer)
 * Add first iteration of onboard C64 emulator (emudore based Cynthcart)
   - Add shared memory support between core0/core1
   - Increase midi->cynthcart queue size
 * Overclock RP2350 for onboard SID player, optimize build to -O3
 * Add Pico2 RGB support
 * Fix muting so all volume ($18) registers are masked/muted correctly
-* Add PDSID type switch command, clone SID config commands, config error
-  check + fallback
+* Add PDSID type switch command, clone SID config commands, config error check + fallback
 * Add non-cycled direct PIO write operation
-* Add optional cycled_delayed_write_operation and
-  cycled_write_operation_nondma functions
+* Add optional cycled_delayed_write_operation and cycled_write_operation_nondma functions
 * Split gpio.c into separate files, add clock counter
 * Rework branch prediction, remove endless loop workaround
 * Fix SID register reset
@@ -227,15 +187,13 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 * Add Dual USBSID-Pico C64 Case (by OlefinMakes)
 
 #### Version: 0.5.0-BETA
-* Add autodetection routine to first boot on new firmware and
-  default firmware settings
+* Add autodetection routine to first boot on new firmware and default firmware settings
 * Double tap the reset button to start autodetection routine
   - This only works on Pico1 (rp2040) boards!
 * Improve SID and Clone detection
 * Add custom Sysex command for Stereo/Mono switch (v1.3 PCB only)
 * Add PCB version to USB ProductId
-* Disable fifo buffer for USB Vendor class (WebUSB) for
-  faster writes
+* Disable fifo buffer for USB Vendor class (WebUSB) for faster writes
 * Add support for ordered ASID writes
 * Start rework ASID handling for sidfactory2 (thanks @thomasj)
 * Rework config handling at runtime
@@ -267,8 +225,7 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 * Add support for PCB v1.3 audio switch
 * Add reserverd flash partition for persistent storage
 * Add optional clockrate locking
-  - this locks the clockrate in config so it can no
-    longer be changed
+  - this locks the clockrate in config so it can no longer be changed
 * Add workaround fix for SID3 not always working
 * Add FMOpl support (Clone SID only)
 * Add Pico2W support
@@ -283,8 +240,7 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
   - Fix DMA panic on Pico_w
   - Add syncing of PIO's
   - Add stream buffer support
-  - Add check for Clone type sid to reset_set
-    SKPico does not handle resets very well
+  - Add check for Clone type sid to reset_set SKPico does not handle resets very well
   - Move SID clock functions to GPIO
 * PIO bus overhaul
   - Add support for clock cycle writes
