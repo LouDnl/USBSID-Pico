@@ -81,6 +81,15 @@ static struct tcp_pcb *nsd_client_pcb = NULL;
 static struct udp_pcb *discovery_pcb = NULL;
 static nsd_transport_t tcp_transport;
 
+/* Listener port bookkeeping. tcp_bind() fails with ERR_USE while an
+ * accepted or TIME_WAIT pcb holds the port (SO_REUSE 0): retry from
+ * net_wifi_update() until it binds. */
+static uint16_t nsd_listen_port = 0;      /* Port nsd_listen_pcb is bound to, 0 = closed */
+static uint16_t nsd_listen_want = 0;      /* Requested listener port, 0 = listener off */
+static uint16_t nsd_listen_fail_port = 0; /* Last port a bind failure was logged for */
+static uint64_t nsd_listen_retry_ms = 0;
+#define NSD_LISTEN_RETRY_MS 1000
+
 /* ==================== NSD-over-TCP transport ==================== */
 
 static void tcp_transport_send(void *ctx, const uint8_t *data, uint16_t len)
@@ -101,13 +110,18 @@ static void tcp_transport_send(void *ctx, const uint8_t *data, uint16_t len)
   cyw43_arch_lwip_end();
 }
 
-static void tcp_transport_close_pcb(struct tcp_pcb *pcb)
+/* Returns tcp_close()'s result. On failure the pcb stays allocated with its
+ * callbacks cleared: a caller outside an lwIP callback follows up with
+ * tcp_abort(), a caller inside one ignores it (tcp_abort() there would need
+ * an ERR_ABRT return). */
+static err_t tcp_transport_close_pcb(struct tcp_pcb *pcb)
 {
-  if (!pcb) return;
+  if (!pcb) return ERR_OK;
   tcp_arg(pcb, NULL);
   tcp_recv(pcb, NULL);
   tcp_err(pcb, NULL);
-  tcp_close(pcb);
+  tcp_sent(pcb, NULL);
+  return tcp_close(pcb);
 }
 
 static void tcp_transport_close(void *ctx)
@@ -194,27 +208,96 @@ static err_t nsd_tcp_accept(void *arg, struct tcp_pcb *newpcb, err_t err)
   return ERR_OK;
 }
 
-static void nsd_tcp_listen_start(uint16_t port)
+/**
+ * @brief: Open the NSD TCP listener, caller holds the lwIP lock
+ *
+ * @param uint16_t port TCP port to listen on
+ * @return bool true if listening
+ */
+static bool nsd_tcp_listen_start(uint16_t port)
 {
   struct tcp_pcb *pcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
   if (!pcb) {
     usNSD("tcp_new failed\n");
-    return;
+    return false;
   }
-  if (tcp_bind(pcb, IP_ANY_TYPE, port) != ERR_OK) {
-    usNSD("tcp_bind on port %u failed\n", port);
+  err_t berr = tcp_bind(pcb, IP_ANY_TYPE, port);
+  if (berr != ERR_OK) {
+    if (port != nsd_listen_fail_port) { /* Log once per port, not per retry */
+      usNSD("tcp_bind on port %u failed (%d), retrying\n", port, berr);
+      nsd_listen_fail_port = port;
+    }
     tcp_close(pcb);
-    return;
+    return false;
   }
   struct tcp_pcb *listen_pcb = tcp_listen_with_backlog(pcb, 1);
   if (!listen_pcb) {
     usNSD("tcp_listen failed\n");
     tcp_close(pcb);
-    return;
+    return false;
   }
   nsd_listen_pcb = listen_pcb;
+  nsd_listen_port = port;
+  nsd_listen_fail_port = 0;
   tcp_accept(nsd_listen_pcb, nsd_tcp_accept);
   usNSD("TCP listener up on port %u\n", port);
+  return true;
+}
+
+/**
+ * @brief: Close the NSD TCP listener, caller holds the lwIP lock
+ *
+ * Leaves an accepted client pcb and its session untouched.
+ */
+static void nsd_tcp_listen_close(void)
+{
+  if (!nsd_listen_pcb) return;
+  tcp_accept(nsd_listen_pcb, NULL);
+  tcp_close(nsd_listen_pcb); /* Always ERR_OK for a LISTEN pcb */
+  usNSD("TCP listener on port %u closed\n", nsd_listen_port);
+  nsd_listen_pcb = NULL;
+  nsd_listen_port = 0;
+}
+
+/**
+ * @brief: End the TCP NSD client session and abort its pcb
+ *
+ * Board initiated close (NSD disable, link drop): RST via tcp_abort(), the
+ * pcb frees at once. A graceful close leaves the pcb in TIME_WAIT for
+ * 2 * TCP_MSL holding the NSD port, tcp_bind() fails ERR_USE (SO_REUSE 0).
+ * Callbacks clear before tcp_abort(): no ERR_ABRT nsd_tcp_err() call, no
+ * second nsd_session_close(). No-op unless the TCP transport owns the
+ * session, a Bluetooth session stays open. Main loop context only, not an
+ * lwIP callback.
+ */
+static void nsd_tcp_client_drop(void)
+{
+  if (!nsd_client_pcb) return;
+  struct tcp_pcb *pcb = nsd_client_pcb;
+  nsd_client_pcb = NULL;
+  nsd_session_close();
+  cyw43_arch_lwip_begin();
+  tcp_arg(pcb, NULL);
+  tcp_recv(pcb, NULL);
+  tcp_err(pcb, NULL);
+  tcp_sent(pcb, NULL);
+  tcp_abort(pcb); /* Frees pcb, drop the local copy */
+  cyw43_arch_lwip_end();
+}
+
+/**
+ * @brief: Retry a failed listener bind, rate limited to NSD_LISTEN_RETRY_MS
+ *
+ */
+static void nsd_tcp_listen_service(void)
+{
+  if (nsd_listen_want == 0 || nsd_listen_pcb) return;
+  uint64_t now_ms = time_us_64() / 1000;
+  if (now_ms < nsd_listen_retry_ms) return;
+  nsd_listen_retry_ms = now_ms + NSD_LISTEN_RETRY_MS;
+  cyw43_arch_lwip_begin();
+  nsd_tcp_listen_start(nsd_listen_want);
+  cyw43_arch_lwip_end();
 }
 
 /* ==================== UDP discovery responder ==================== */
@@ -253,19 +336,90 @@ static void udp_discovery_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, c
   pbuf_free(p);
 }
 
+/**
+ * @brief: Open the UDP discovery responder, no-op if already open
+ *
+ * @param uint16_t port UDP port to bind
+ */
 static void udp_discovery_start(uint16_t port)
 {
-  discovery_pcb = udp_new();
-  if (!discovery_pcb) {
+  if (discovery_pcb) return;
+  cyw43_arch_lwip_begin();
+  struct udp_pcb *pcb = udp_new();
+  if (!pcb) {
     usWFI("udp_new failed\n");
-    return;
-  }
-  if (udp_bind(discovery_pcb, IP_ADDR_ANY, port) != ERR_OK) {
+  } else if (udp_bind(pcb, IP_ADDR_ANY, port) != ERR_OK) {
     usWFI("udp_bind on port %u failed\n", port);
-    return;
+    udp_remove(pcb);
+  } else {
+    udp_recv(pcb, udp_discovery_recv, NULL);
+    discovery_pcb = pcb;
+    usWFI("UDP discovery responder up on port %u\n", port);
   }
-  udp_recv(discovery_pcb, udp_discovery_recv, NULL);
-  usWFI("UDP discovery responder up on port %u\n", port);
+  cyw43_arch_lwip_end();
+}
+
+/**
+ * @brief: Close the UDP discovery responder, no-op if closed
+ *
+ */
+static void udp_discovery_stop(void)
+{
+  if (!discovery_pcb) return;
+  cyw43_arch_lwip_begin();
+  udp_remove(discovery_pcb);
+  cyw43_arch_lwip_end();
+  discovery_pcb = NULL;
+  usWFI("UDP discovery responder closed\n");
+}
+
+/* ==================== NSD config apply ==================== */
+
+/**
+ * @brief: Listen for NSD clients on port, reopen the listener on change
+ *
+ * An accepted client session stays open. A failed bind retries from
+ * net_wifi_update().
+ *
+ * @param uint16_t port TCP port, 0 selects NSD_DEFAULT_PORT
+ */
+void net_wifi_set_nsd_port(uint16_t port)
+{
+  if (port == 0) port = NSD_DEFAULT_PORT;
+  nsd_listen_want = port;
+  if (nsd_listen_pcb && nsd_listen_port == port) return;
+  cyw43_arch_lwip_begin();
+  nsd_tcp_listen_close();
+  nsd_tcp_listen_start(port);
+  cyw43_arch_lwip_end();
+  nsd_listen_retry_ms = time_us_64() / 1000 + NSD_LISTEN_RETRY_MS;
+}
+
+/**
+ * @brief: Apply nsd_enabled, nsd_port and discovery_enabled live
+ *
+ * nsd_enabled false closes the listener and ends a TCP NSD session.
+ * Discovery always binds NSD_DEFAULT_PORT. Core 0 only.
+ *
+ * @param const struct NetConfig *cfg network config to apply
+ */
+void net_wifi_apply_nsd_config(const struct NetConfig *cfg)
+{
+  if (!cfg) return;
+  if (cfg->flags.nsd_enabled) {
+    net_wifi_set_nsd_port(cfg->nsd_port);
+  } else {
+    nsd_listen_want = 0;
+    cyw43_arch_lwip_begin();
+    nsd_tcp_listen_close();
+    cyw43_arch_lwip_end();
+    nsd_tcp_client_drop();
+  }
+  if (cfg->flags.discovery_enabled) {
+    udp_discovery_start(NSD_DEFAULT_PORT);
+  } else {
+    udp_discovery_stop();
+  }
 }
 
 /* ==================== Station lifecycle ==================== */
@@ -296,9 +450,8 @@ void net_wifi_init(void)
    * This requires a full restart of the BUS for everything to work again */
   restart_bus();
 
+  /* Listener and discovery open from net_wifi_apply_nsd_config() */
   nsd_init();
-  nsd_tcp_listen_start(NSD_DEFAULT_PORT);
-  udp_discovery_start(NSD_DEFAULT_PORT);
 }
 
 /**
@@ -345,7 +498,8 @@ static void wifi_connect_fail(const char *why, int code)
  * @brief Per-loop update: station (re)connect state machine
  *
  * Runs on whichever core calls cyw43_arch_poll() (usbsid.c's main loop).
- * No-op until net_wifi_start() has been called.
+ * Retries a failed NSD listener bind, station logic no-op until
+ * net_wifi_start() has been called.
  *
  * Non-blocking connect: cyw43_arch_wifi_connect_async() issued once, then
  * WSTATE_CONNECTING polls cyw43_tcpip_link_status() each tick until
@@ -361,6 +515,7 @@ static void wifi_connect_fail(const char *why, int code)
  * is ever touched again. */
 void net_wifi_update(void)
 {
+  nsd_tcp_listen_service();
   if (!wifi_started) return;   /* Radio never powered - see net_wifi_start() */
   if (wifi_ssid[0] == '\0') return; /* Not configured yet */
 
@@ -371,7 +526,12 @@ void net_wifi_update(void)
         usWFI("WiFi link dropped\n");
         wifi_state = WSTATE_DOWN;
         next_connect_attempt_ms = time_us_64() / 1000 + WIFI_RECONNECT_BACKOFF_MS;
-        if (nsd_session_is_active()) nsd_session_close();
+        /* nsd_session_close() leaves the pcb alone: tear it down as well,
+         * else a connection that survives the drop keeps feeding nsd_feed()
+         * with no transport to reply on, and the stale pcb leaks once the
+         * next client is accepted. Abort, not close: a FIN on a dead link
+         * retransmits and holds the NSD port. */
+        nsd_tcp_client_drop();
       }
       break;
     }

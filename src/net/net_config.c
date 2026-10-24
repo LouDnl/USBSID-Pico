@@ -144,7 +144,7 @@ void __no_inline_not_in_flash_func(save_net_config)(NetConfig* config)
 }
 
 /**
- * @brief Load net_cfg and apply WiFi and Bluetooth power state live from it
+ * @brief Load net_cfg and apply WiFi, NSD and Bluetooth state live from it
  *
  */
 void start_net(void)
@@ -153,6 +153,8 @@ void start_net(void)
   load_net_config(&net_cfg);
   net_wifi_set_credentials(net_cfg.ssid, net_cfg.psk);
   net_wifi_set_hostname(net_cfg.hostname);
+  /* Open NSD listener and discovery per net_cfg */
+  net_wifi_apply_nsd_config(&net_cfg);
   /* Powering the WiFi radio measurably disrupts SID chip/model detection
    * on real hardware for as long as it stays on, so only bring it up if
    * the user opted in; a freshly flashed board (wifi_enabled defaults to

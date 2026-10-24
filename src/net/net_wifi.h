@@ -52,8 +52,19 @@ void net_wifi_start(void);
 /* Call every core 0 main-loop iteration alongside cyw43_arch_poll(). A
  * no-op until net_wifi_start() has been called. Drives station
  * (re)connect; does not drain the NSD write ring, that is
- * nsd_drain_task()'s job on core 1. */
+ * nsd_drain_task()'s job on core 1. Retries a failed NSD listener bind
+ * regardless of radio state. */
 void net_wifi_update(void);
+
+struct NetConfig;
+
+/* Listen for NSD clients on port (0 = NSD_DEFAULT_PORT), reopen the
+ * listener on change. Keeps an accepted client session. Core 0 only */
+void net_wifi_set_nsd_port(uint16_t port);
+
+/* Apply cfg's nsd_enabled, nsd_port and discovery_enabled live. NSD off
+ * closes the listener and ends a TCP NSD session. Core 0 only */
+void net_wifi_apply_nsd_config(const struct NetConfig *cfg);
 
 /* True once the station link is up and has an IP address */
 bool net_wifi_is_connected(void);

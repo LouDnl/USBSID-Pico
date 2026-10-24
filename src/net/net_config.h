@@ -37,7 +37,7 @@
 void default_net_config(NetConfig* config);
 void save_net_config(NetConfig *config);
 void load_net_config(NetConfig* config);
-/* Loads net_cfg from flash and applies WiFi and Bluetooth power state
+/* Loads net_cfg from flash and applies WiFi, NSD and Bluetooth state
  * live from it. */
 void start_net(void);
 
