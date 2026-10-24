@@ -1,6 +1,7 @@
 # Changelog
 Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on version changes
 
+#### Version: Unreleased
 * Add Network SID Device (NSD) server support over WiFi for `pico_w`/`pico2_w`
   with UDP discovery, compatible with ACID64Pro, JSidplay2, SIDPlay and  
   USBSID-Player's network client.
