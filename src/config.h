@@ -613,6 +613,7 @@ void        load_config(Config *config);
 void        verify_midiconfig_offset(void);
 void        save_config_ext(void);
 void        handle_config_request(uint8_t *buffer, uint32_t size);
+bool        config_is_query(uint8_t cmd);
 void        print_config(void);
 ConfigError apply_new_presetconfig(void);
 ConfigError apply_config(bool at_boot);

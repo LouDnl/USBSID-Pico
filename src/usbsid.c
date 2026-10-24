@@ -319,6 +319,12 @@ void __no_inline_not_in_flash_func(process_buffer)(volatile uint8_t * itf, volat
   uint8_t command = ((sid_buffer[0] & PACKET_TYPE) >> 6);
   uint8_t subcommand = (sid_buffer[0] & COMMAND_MASK);
   uint8_t n_bytes = (sid_buffer[0] & BYTE_MASK);
+  /* Leave bus ownership alone for read-only config queries */
+  if __us_likely(!((command == COMMAND) && (subcommand == CONFIG)
+    && (*n >= 2) && config_is_query(sid_buffer[1]))) {
+    bus_try_claim(BUS_OWNER_USB); /* USB always wins the claim, see bus.c */
+  }
+  set_vu_action(); /* Keep that shiny Vu blinking! */
   if __us_unlikely(get_reset_state()
     && (command != COMMAND)
     && ((subcommand != CYCLED_READ)

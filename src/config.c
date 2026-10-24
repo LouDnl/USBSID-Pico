@@ -589,6 +589,38 @@ void __no_inline_not_in_flash_func(save_config)(Config* config)
 }
 
 /**
+ * @brief: Check whether a config command only reads state, no bus access
+ *
+ * @param uint8_t cmd config command byte, buffer[0] of handle_config_request()
+ * @return bool true for a read-only query
+ */
+bool config_is_query(uint8_t cmd)
+{
+  switch (cmd) {
+    case READ_CONFIG:
+    case READ_SOCKETCFG:
+    case READ_NUMSIDS:
+    case READ_FMOPLSID:
+    case READ_CONFIGACK:
+    case GET_CLOCK:
+    case WIFI_STATUS:
+    case READ_NETCFG:
+    case WIFI_READ_IP:
+    case USBSID_VERSION:
+    case US_PCB_VERSION:
+    case US_FEATURES:
+    case GET_AUDIO:
+#if defined(ONBOARD_EMULATOR)
+    case SID_PLAYER_MUTED:
+    case SID_PLAYER_TIME:
+#endif
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
  * @brief Handles incoming config request buffers
  *
  * Dispatches on buffer[0] (the command byte) to the whole USB config/control
