@@ -35,12 +35,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-/* Ring buffer configuration - match NSD_RING_ENTRIES for consistency */
-#if PICO_RP2350
+/* Ring depth in entries, power of two, 16 KB RAM. Above NSD_ENTRIES_MIN
+ * (nsd.h) it holds NSD_CYCLES_HIGH at up to ~480 writes per PAL frame */
 #define NET_RING_ENTRIES 4096
-#else
-#define NET_RING_ENTRIES 2048
-#endif
 
 /* Each entry is the raw 4-byte NSD wire quad: {cyc_hi, cyc_lo, reg, data} */
 
@@ -51,17 +48,35 @@ void net_ring_init(void);
  * the ring. Returns false if the ring is full (nothing pushed). */
 bool net_ring_push(const uint8_t quad[4]);
 
-/* Pop the next 4-byte NSD operation quad from the ring.
- * Returns false if the ring is empty. */
-bool net_ring_pop(uint8_t quad[4]);
+/* Read the oldest 4-byte NSD operation quad without removing it. Consumer
+ * only. Sets *dropped when net_ring_clear() dropped the entry: count it, do
+ * not execute it. The entry stays queued until net_ring_advance(). Returns
+ * false if the ring is empty. */
+bool net_ring_peek(uint8_t quad[4], bool *dropped);
 
-/* Number of whole entries currently queued */
+/* Remove the entry net_ring_peek() returned. Consumer only, call after its
+ * bus write returned: the producer sees the ring idle only after that. */
+void net_ring_advance(void);
+
+/* Peek and advance in one call, for entries without a bus write */
+bool net_ring_pop(uint8_t quad[4], bool *dropped);
+
+/* True when the consumer has advanced past every entry, dropped ones
+ * included: no entry queued, no entry in progress */
+bool net_ring_idle(void);
+
+/* Number of whole entries queued, not counting dropped entries */
 uint32_t net_ring_count(void);
 
-/* Number of whole entries that can still be pushed before the ring is full */
+/* Number of dropped entries the consumer has not popped yet */
+uint32_t net_ring_dropped(void);
+
+/* Number of whole entries that can still be pushed before the ring is full.
+ * Dropped entries keep their slot until the consumer pops them. */
 uint32_t net_ring_free(void);
 
-/* Drop everything queued, without executing it */
+/* Drop everything queued, without executing it. Producer only: marks the
+ * entries dropped, the consumer pops them with *dropped set */
 void net_ring_clear(void);
 
 #ifdef __cplusplus

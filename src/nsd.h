@@ -100,9 +100,13 @@ typedef enum {
 
 /* Backpressure thresholds, in PHI1 clock cycles of queued delay, applied to
  * the write ring in net_ring.c/.h. High/low form a hysteresis band so BUSY
- * doesn't chatter once the ring is near full. */
-#define NSD_CYCLES_HIGH  (63 * 312 * 3)  /* ~59k cycles, ~60 ms PAL -> report BUSY */
-#define NSD_CYCLES_LOW   (63 * 312)      /* ~20 ms PAL -> accept again (hysteresis) */
+ * doesn't chatter once the ring is near full. LOW is the least audio left
+ * queued when BUSY clears: the WiFi stall it absorbs. HIGH plus one packet
+ * caps the lead, about the 200 ms a software NSD server buffers, and bounds
+ * the drain wait of commands that need an empty ring (TRY_READ, TRY_RESET).
+ * FLUSH drops the queue at once and is not affected. */
+#define NSD_CYCLES_HIGH  (63 * 312 * 8)  /* ~157k cycles, ~160 ms PAL -> report BUSY */
+#define NSD_CYCLES_LOW   (63 * 312 * 6)  /* ~118k cycles, ~120 ms PAL -> accept again */
 #define NSD_ENTRIES_MIN  256             /* free-entry floor -> report BUSY */
 
 /* Function prototypes */
