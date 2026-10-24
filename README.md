@@ -160,8 +160,13 @@ Any questions about or support with USBSID-Pico can be asked
   - __Note:__ Its more present on v1.0 and v1.3 board, but still there on v1.5 boards. To fix this on the board would require significant layout and pcb changes.  
 
 **Firmware/Software**
-* Switching on readmode and then switching it off again without restarting the PCB and Vice _will_ result in distorted audio  
+* Switching on readmode and then switching it off again without restarting the PCB and Vice _can_ result in distorted audio  
 * Highly demanding, cycle-exact SID tunes (dense per-cycle register writes, e.g. some digi/sample tunes) may not play at full speed on Pico1 or Pico1_w (RP2040) boards, due to the board's hardware limitations. Pico2 or Pico2_w (RP2350) is recommended for these tunes.  
+* Crackles, clicks or short dropouts with highly demanding, cycle-exact SID tunes when the board is connected through a USB hub or a long/poor cable.  
+  - __Cause:__ These tunes send thousands of small USB packets per second and the board only buffers a few writes, any USB delay is audible. Hub type and speed, cable quality and other devices or software on the same connection all add delay.  
+  - __Fix:__ Connect the board directly to a USB port of your computer.  
+  - __Fix:__ When a hub is needed, use a powered USB 2.0 (480 Mbit/s) or newer hub, preferably multi-TT, no chained hubs, and a short, good quality data cable.  
+  - __Note:__ See [USB connection: hubs and cables](doc/USBSID-Pico-software-manual.adoc#usb-connection) in the software manual.  
 
 
 # Project status

@@ -34,6 +34,19 @@ image:images/software/usbsid-config-connect.png[link="https://github.com/LouDnl/
 image:images/software/usbsid-config-checkversion.png[link="https://github.com/LouDnl/USBSID-Pico/blob/master/doc/images/software/usbsid-config-checkversion.png",width="400"] +
 _For more information on how to configure your board, please refer to the https://github.com/LouDnl/USBSID-Pico/blob/master/doc/USBSID-Pico-firmware-manual.adoc[Firmware manual]_
 
+[[usb-connection]]
+=== USB connection: hubs and cables
+Highly demanding, cycle-exact SID tunes (dense register writes, digi/sample tunes) send thousands of small USB packets per second to the board. The board plays each packet as it arrives and only buffers a few writes, any delay on the USB connection is audible as crackles, clicks or short dropouts. +
+How the board is connected matters for these tunes:
+
+- Connect the board directly to a USB port of your computer for the best result.
+- When using a hub, use a USB 2.0 (480 Mbit/s) or newer hub. The board is a full speed (12 Mbit/s) device, a hub converts its traffic for the faster bus and the quality of that conversion differs per hub. A hub with one transaction translator per port (multi-TT) handles this better than a single-TT hub.
+- Do not chain hubs and avoid sharing the hub with busy devices such as audio interfaces, webcams or storage.
+- Use a short, good quality USB data cable, avoid extension cables.
+- Other software that talks to the board while a tune plays (for example a second player or tool polling the board) adds USB traffic and can cause the same artifacts.
+
+Normal tunes are not affected by any of the above.
+
 
 == Supported software
 Each section covers the basic use of USBSID-Pico with the software under that section. For more in depth information please refer to the repective website and or github repo of the software.
