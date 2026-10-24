@@ -607,6 +607,27 @@ bool bus_try_claim(bus_owner_t who) {
 }
 
 /**
+ * @brief: Check whether another active owner holds the bus, claim nothing
+ *
+ * Mirror the bus_try_claim() rules: USB never held off, NONE or `who`
+ * free, any other owner held until idle past BUS_OWNER_IDLE_MS.
+ *
+ * @param who owner asking
+ * @return true if bus_try_claim(who) would fail
+ */
+bool bus_held_by_other(bus_owner_t who) {
+  bool held = false;
+  uint32_t irq = spin_lock_blocking(bus_spinlock);
+  if ((who != BUS_OWNER_USB)
+    && (current_owner != BUS_OWNER_NONE) && (current_owner != who)) {
+    uint32_t now_ms = time_us_64() / 1000;
+    held = ((now_ms - last_touch_time_ms) <= BUS_OWNER_IDLE_MS);
+  }
+  spin_unlock(bus_spinlock, irq);
+  return held;
+}
+
+/**
  * @brief Touch the current owner to refresh idle timer
  *
  * Call this periodically while actively using the bus.
@@ -647,6 +668,18 @@ bus_owner_t bus_current_owner(void) {
   bus_owner_t owner = current_owner;
   spin_unlock(bus_spinlock, irq);
   return owner;
+}
+
+/**
+ * @brief Get the current bus owner without the bus spinlock
+ *
+ * @note For callers that must not wait out a write's cycle delay, the
+ *       value can be one claim behind
+ *
+ * @return current owner, or BUS_OWNER_NONE if bus is free
+ */
+bus_owner_t bus_owner_peek(void) {
+  return current_owner;
 }
 
 /* Heavy-operation exclusion - see the comment on these in bus.h. A counter
