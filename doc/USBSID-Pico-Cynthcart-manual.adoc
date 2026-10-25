@@ -25,9 +25,9 @@ First off thanks go out to Paul Slocum for creating Cynthcart and Mario Ballano 
 == Firmwares with Cynthcart embedded
 Starting with firmware version v0.8.0 firmwares ending with `_em` can run Cynthcart. +
 For example `usbsidpico-v1.0_em.uf2` or `usbsidpico2-rgb-v1.3_em.uf2` +
-Cynthcart runs through the embedded USBSID-Player, so all Cynthcart firmwares _also_ come with the onboard USBSID-Player included. See the `USBSID-Player-manual` file for more information.
+Cynthcart runs through the embedded USBSID-Player, all Cynthcart firmwares come with the onboard USBSID-Player included. See the `USBSID-Player-manual` file for more information.
 
-**WARNING!** Because Cynthcart runs through the embedded USBSID-Player, the Pico MCU is overclocked to 250MHz, regardless of Pico type (rp2040 or rp2350). Passive cooling _might/could_ be needed.
+**WARNING!** Cynthcart runs through the embedded USBSID-Player and overclocks the Pico MCU to 250MHz (rp2040 & rp2350). Passive cooling _might/could_ be needed.
 
 
 == Usage
