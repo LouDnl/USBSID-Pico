@@ -67,7 +67,7 @@ In development is a modular USBSID-Pro featuring 4 SID sockets with 4 mono out p
 
 
 # Swag!
-Do you like swag!? I sure do!! [greyandslate](https://bsky.app/profile/greyandslate.bsky.social) created these great t-shirt designs which are available for purchase in his [Smallrun shop](https://smallrun.net/shop/grey-and-slate-haberdashers), link below.  
+Do you like swag!? Yes please!! [greyandslate](https://bsky.app/profile/greyandslate.bsky.social) created these great t-shirt designs which are available for purchase in his [Smallrun shop](https://smallrun.net/shop/grey-and-slate-haberdashers), link below.  
 **Use coupon code USBSID15 for a 15% discount!**  
 <img src="images/tees/usbsid-pico-tshirt-sids_logo.jpg" width="250em">  
 <img src="images/tees/usbsid-pico-tshirt-board_logo.jpg" width="250em">  
@@ -130,7 +130,7 @@ Into creating chiptunes? USBSID-Pico is your board!
 ## Driver code
 Want to create your own implementation? You can by using the driver code examples below
 - [USBSID-Pico driver](https://github.com/LouDnl/USBSID-Pico-driver) repo is available @ https://github.com/LouDnl/USBSID-Pico-driver and contains `C++`, `Java` and `Javascript` implementation examples
-  - [@sandlbn](https://github.com/sandlbn) has created a driver in `Rust` which is available here [USBSID-Pico-Rust-driver](https://github.com/sandlbn/USBSID-Pico-Rust-driver)
+  - [@sandlbn](https://github.com/sandlbn) has created a driver in `Rust` which is available as [USBSID-Pico-Rust-driver](https://github.com/sandlbn/USBSID-Pico-Rust-driver)
 - [HardSID USB / SidBlaster USB](examples/hardsid-sidblaster) emulation driver example
 
 ## Midi
@@ -161,9 +161,9 @@ Any questions about or support with USBSID-Pico can be asked
 
 **Firmware/Software**
 * Switching on readmode and then switching it off again without restarting the PCB and Vice _can_ result in distorted audio  
-* Highly demanding, cycle-exact SID tunes (dense per-cycle register writes, e.g. some digi/sample tunes) may not play at full speed on Pico1 or Pico1_w (RP2040) boards, due to the board's hardware limitations. Pico2 or Pico2_w (RP2350) is recommended for these tunes.  
+* Highly demanding cycle-exact SID tunes (e.g. some digi/sample tunes) may not play at full speed on Pico1 or Pico1_w (RP2040) boards. Pico2 or Pico2_w (RP2350) is recommended for these tunes.  
 * Crackles, clicks or short dropouts with highly demanding, cycle-exact SID tunes when the board is connected through a USB hub or a long/poor cable.  
-  - __Cause:__ These tunes send thousands of small USB packets per second and the board only buffers a few writes, any USB delay is audible. Hub type and speed, cable quality and other devices or software on the same connection all add delay.  
+  - __Cause:__ These tunes send thousands of small USB packets per second and the board only buffers a few writes. Hub type and speed, cable quality and other devices on the connection add delay.  
   - __Fix:__ Connect the board directly to a USB port of your computer.  
   - __Fix:__ When a hub is needed, use a powered USB 2.0 (480 Mbit/s) or newer hub, preferably multi-TT, no chained hubs, and a short, good quality data cable.  
   - __Note:__ See [USB connection: hubs and cables](doc/USBSID-Pico-software-manual.adoc#usb-connection) in the software manual.  
@@ -227,7 +227,7 @@ See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for driver insta
 # Firmware
 See the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on what's changed and previous releases.  
 
-**WARNING!** Whenever the embedded USBSID-Player or Cynthcart is used, the Pico MCU is overclocked to 250MHz, regardless of Pico type (rp2040 or rp2350). Passive cooling _might/could_ be needed.  
+**WARNING!** Whenever the embedded USBSID-Player or Cynthcart is used the Pico MCU is overclocked to 250MHz (rp2040 & rp2350). Passive cooling _might/could_ be needed.  
 
 ### Configuring your board's firmware
 Use the new official [USBSID-Configtool](https://github.com/LouDnl/USBSID-Configtool) to configure your board.  
@@ -244,7 +244,7 @@ The firmware is still in development so features might change, be added or remov
 - WebUSB support using the same CDC protocol for WebUSB supporting players
   - Play SID files in your browser via [Deepsid](https://deepsid.chordian.net/) by Chordian
   - Play SID files in your browser via [C64jukebox](https://haendel.ddns.net:8443/static/c64jukebox.vue) by Kenchis
-- Dedicated WebSerial CDC interface, a working alternative on Windows where WebUSB can crash the browser
+- Dedicated WebSerial CDC interface for Windows, where WebUSB can crash the browser
 - Midi (in) ASID support (heavily inspired by multiple sources)
   - Play SID files in your (midi supporting) browser via [Deepsid](https://deepsid.chordian.net/) by Chordian
   - Play SID files in your (midi supporting) browser via [IneSID](https://inesid.fazibear.me/) by Fazibear
@@ -268,11 +268,11 @@ The firmware is still in development so features might change, be added or remov
 - Network SID Device (NSD) server over WiFi (`pico_w`/`pico2_w`)
   - Appears on the LAN and is auto-discovered by NSD clients such as ACID 64, JSidplay2 and SIDPlay
   - Configuration of SSID/PSK WIFI/Bluetooth enable via configtool
-  - Plays cycle-exact SID streams on real hardware while USB stays fully functional
-  - Bluetooth Classic SPP transport for the same protocol, via a small host-side bridge ([`examples/nsd_spp_bridge.py`](examples/nsd_spp_bridge.py)) for clients that only speak the TCP variant
-  - Speaks protocol version 5 (up to 16 SIDs and FM OPL registers), routed to this board's own FM OPL socket when one is configured
-  - Lets a v5 client enable or disable FM OPL on a SID socket remotely, the same assignment the USB config protocol/config tool already offers locally
-  - NSD enable and discovery settings apply live without a reboot, WiFi state and IP address can be queried (`cfg_usbsid -wifis`)
+  - Plays cycle-exact SID streams on real hardware, USB stays fully functional
+  - Bluetooth Classic SPP transport for the same protocol via a host-side bridge ([`examples/nsd_spp_bridge.py`](examples/nsd_spp_bridge.py)) for clients that only speak TCP
+  - Speaks protocol version 5 (up to 16 SIDs and FM OPL), routed to the FM OPL socket when configured. `TRY_WRITE_EX` address `$DF40` is the FM OPL address port and `$DF50` the data port
+  - Lets a v5 client enable or disable FM OPL on a SID socket remotely (same as the config tool), enabling a disabled FM OPL resets the chip
+  - NSD enable and discovery settings apply live, WiFi state and IP address can be queried (`cfg_usbsid -wifis`)
 - Optional SID register stream on a second vendor USB interface (build with `-DENABLE_SID_STREAM=1`), plus batch reads of up to 63 registers per USB packet
 #### v1.3+ PCB
 - Audio switch Stereo/Mono control
@@ -320,7 +320,7 @@ An optional volume board to control left and right audio independently.
 Checkout the [manual](doc/USBSID-Volume-daughterboard.adoc) or [PDF](doc/USBSID-Volume-daughterboard.pdf)  
 ![USBSID-Pico](images/volume_daughterboard_seated.jpg)  
 ![USBSID-Pico](images/volume_daughterboard_bottom.jpg)  
-_Yes! I have cats ;-)_  
+_Yes! There are cats ;-)_  
 
 ## Cases
 All USBSID-Pico community created cases are available in the [cases](cases/) directory, direct links below.  
@@ -355,7 +355,7 @@ _Cases for PCB revision v1.5:_
   - Plug and play ready for the new "Volume daughterboard"
   - Ext IN always connected 
     - Be carefull when connecting anything to this pin!
-  - Now includes SID voltage pin
+  - Includes SID voltage pin
 - Includes all other features from v1.3
 ### revision v1.3
 - Supports all MOS SID chips e.g. MOS6581, MOS6582 & MOS8580
