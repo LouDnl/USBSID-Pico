@@ -51,7 +51,7 @@ static btstack_packet_callback_registration_t hci_diag_callback_registration;
 #endif
 
 /* Deferred send: BTstack requires waiting for RFCOMM_EVENT_CAN_SEND_NOW
- * before calling rfcomm_send(). NSD is strict request/response, so a
+ * before calling rfcomm_send(). NSD is strict request/response: a
  * single pending slot is always enough. */
 static uint8_t bt_send_buf[BT_SEND_BUF_SIZE];
 static uint16_t bt_send_len = 0;
@@ -59,7 +59,7 @@ static volatile bool bt_send_pending = false;
 
 /* Generated fresh every boot instead of a fixed published PIN - see
  * setup_bluetooth() below. Only used if a legacy (pre-2.1, non-SSP) client
- * forces a PIN-code pairing; a modern SSP client never triggers this path. */
+ * forces a PIN-code pairing. A modern SSP client never triggers this path. */
 static uint32_t bt_legacy_pin = 0;
 
 static void bt_transport_send(void *ctx, const uint8_t *data, uint16_t len)
@@ -105,7 +105,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
       switch (hci_event_packet_get_type(packet)) {
         case HCI_EVENT_COMMAND_COMPLETE:
           /* Confirms whether the controller accepted HCI_Write_Scan_Enable
-           * (page+inquiry scan); status 0x00 = success. */
+           * (page+inquiry scan). Status 0x00 = success. */
           if (hci_event_command_complete_get_command_opcode(packet) == hci_write_scan_enable.opcode) {
             uint8_t scan_status = hci_event_command_complete_get_return_parameters(packet)[0];
             usBTH("HCI_Write_Scan_Enable status 0x%02x\n", scan_status);
@@ -189,7 +189,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
 #ifdef BT_DIAG_DEBUG
 /* Standalone diagnostic handler: logs every classic connection/pairing
  * lifecycle event packet_handler() above silently drops. Floods the log
- * in normal operation, so opt-in only. */
+ * in normal operation: opt-in only. */
 static void bt_diag_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size)
 {
   (void)channel;
@@ -244,10 +244,10 @@ static void bt_diag_packet_handler(uint8_t packet_type, uint16_t channel, uint8_
  * @brief Bring up the Bluetooth Classic SPP transport for NSD
  *
  * Runs on core 0, before net_wifi_init() (usbsid.c). Sole cyw43_arch_init()
- * owner under USE_NET; net_wifi_init() never calls it. The LED is turned
+ * owner under USE_NET. The net_wifi_init() never calls it. The LED is turned
  * off by net_wifi_init(). One-time stack/service init only - does not
  * power the radio, net_cfg isn't loaded from flash yet at this point in
- * boot; see net_bt_set_power(), called later once it is.
+ * boot. See net_bt_set_power(), called later once it is.
  */
 void setup_bluetooth(void)
 {
@@ -259,7 +259,7 @@ void setup_bluetooth(void)
   }
 
   /* Boot-random PIN, not a fixed one - only matters for the legacy
-   * pairing fallback; the primary path is SSP Just Works (no PIN). */
+   * pairing fallback. The primary path is SSP Just Works (no PIN). */
   bt_legacy_pin = get_rand_32();
 
   l2cap_init();
@@ -273,15 +273,15 @@ void setup_bluetooth(void)
   sdp_register_service(spp_service_buffer);
 
   gap_discoverable_control(1);
-  /* Discoverable alone only enables inquiry scan (so a client can find the
-   * device); incoming connections need page scan too, gated separately by
+  /* Discoverable alone only enables inquiry scan (for a client to find the
+   * device). Incoming connections need page scan too, gated separately by
    * connectable - without this, hci_write_scan_enable never sets the page
    * scan bit and every BR/EDR connect attempt times out at the baseband
    * level even though inquiry/pairing lookup succeeds (see hci.c's
    * new_scan_enable_value = (connectable << 1) | discoverable). */
   gap_connectable_control(1);
   /* Headless device, no display or buttons to confirm/enter a passkey -
-   * Just Works is the only SSP association model that makes sense here. */
+   * Just Works is the only SSP association model that makes sense in this case. */
   gap_ssp_set_io_capability(IO_CAPABILITY_NO_INPUT_NO_OUTPUT);
   gap_set_local_name(BT_LOCAL_NAME);
 

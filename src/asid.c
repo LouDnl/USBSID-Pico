@@ -388,8 +388,8 @@ static inline void set_asid_env(int refresh_rate, int speed_multiplier, int cust
   init_asid_buffer(framedelta_us); /* Init on env set */
   ring_buffer_reset_size();  /* Reset buffer to default size for new tune */
 
-  /* DON'T call reset_arrival_tracking() here */
-  /* Instead, just accept that calculated rate will converge to framedelta */
+  /* DON'T call reset_arrival_tracking() in this function */
+  /* Instead, accept that calculated rate will converge to framedelta */
   return;
 }
 

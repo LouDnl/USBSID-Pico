@@ -281,7 +281,7 @@ void __no_inline_not_in_flash_func(led_runner)(void)
         n_checks = 0, set_receivedata(false), dtype = ntype;  /* NOTE: This sets dtype to 0 which causes buffertask write to go to default and error out with many consecutive reads from the bus */
         offload_ledrunner = false;
         /**
-         * @brief Let's make sure we always reset the write order
+         * @brief Always reset the write order
          * when the interface is no longer mounted
          */
         extern bool tud_midi_n_mounted (uint8_t itf);

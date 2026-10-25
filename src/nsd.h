@@ -37,7 +37,7 @@
 #include <stdbool.h>
 
 /* NSD transport abstraction. `send` runs on whichever core owns the
- * transport (WiFi and Bluetooth SPP both core 0); never called from
+ * transport (WiFi and Bluetooth SPP both core 0). Never called from
  * `nsd_drain_task` (core 1). */
 typedef struct nsd_transport {
   void (*send)(void *ctx, const uint8_t *data, uint16_t len);
@@ -101,7 +101,7 @@ typedef enum {
 #define NSD_PROTOCOL_VERSION 5
 
 /* Backpressure thresholds, in PHI1 clock cycles of queued delay, applied to
- * the write ring in net_ring.c/.h. High/low form a hysteresis band so BUSY
+ * the write ring in net_ring.c/.h. High/low form a hysteresis band: BUSY
  * doesn't chatter once the ring is near full. LOW is the least audio left
  * queued when BUSY clears: the WiFi stall it absorbs. HIGH plus one packet
  * caps the lead, about the 200 ms a software NSD server buffers, and bounds

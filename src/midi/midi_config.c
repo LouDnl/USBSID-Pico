@@ -60,7 +60,7 @@ void midi_config_init(void)
     ch->voice_mask     = 0;  /* disabled unless set below */
     ch->poly_limit     = 1;
     ch->steal_mode     = MIDI_STEAL_OLDEST;
-    ch->transpose      = MIDI_TRANSPOSE;  /* was a compile-time-only default, now per-channel */
+    ch->transpose      = MIDI_TRANSPOSE;  /* was a compile-time-only default, per-channel since */
     ch->bend_range     = 2;
     ch->at_target      = MIDI_AT_FILTER;
     ch->flags          = MIDI_CH_AUTO_GATE;  /* velocity mode off by default */
@@ -96,7 +96,7 @@ void midi_config_init(void)
     ch->lfo2_dest     = MIDI_LFO_DEST_PITCH;
     ch->lfo2_phase    = 0;
     ch->lfo2_sh_seed  = (uint32_t)(c + 1) * 40503u; /* distinct multiplier from lfo_sh_seed's,
-                                                        so LFO1 and LFO2 S&H never lock step */
+                                                        keeping LFO1 and LFO2 S&H from locking step */
     ch->lfo2_sh_value = 0;
 
     ch->arp_mode           = MIDI_ARP_UP;
@@ -129,8 +129,8 @@ void midi_config_init(void)
   }
 
   /* Channels 6-16 (index 5-15): disabled. Empty voice_mask makes every
-   * allocation on that channel a no-op, so no separate "enabled" flag is
-   * needed; nothing else in this file special-cases it. */
+   * allocation on that channel a no-op: no separate "enabled" flag is
+   * needed. Nothing else in this file special-cases it. */
 
   return;
 }
@@ -236,8 +236,8 @@ static midi_flash_write_buf_t __not_in_flash("midi") midi_flash_write_buf;
 /**
  * @brief The actual flash erase + program, run inside flash_safe_execute()
  *
- * Unlike config.c's write_config_lowlevel(), every MIDI slot here is its
- * own whole sector, so each save must erase it every time.
+ * Unlike config.c's write_config_lowlevel(), every MIDI slot in this file is its
+ * own whole sector: each save must erase it every time.
  */
 static void __no_inline_not_in_flash_func(write_midi_config_lowlevel)(void *blob_data)
 { /* No logging in this function to avoid errors, matching write_config_lowlevel() */
@@ -250,7 +250,7 @@ static void __no_inline_not_in_flash_func(write_midi_config_lowlevel)(void *blob
 }
 
 /**
- * @brief Save the current MIDI configuration to the next flash slot
+ * @brief Save the current MIDI configuration to the following flash slot
  *
  * Builds a midi_config_blob_t (channels, patches, arp tables, CC map),
  * stamps it with header/sequence/CRC32, and writes it round-robin.
@@ -296,9 +296,9 @@ void midi_config_save(void)
  *        midi_channels[] from flash
  *
  * The persisted blob keeps the whole live midi_channel_cfg_t rather than a
- * separate persistable-subset struct, so a reboot never resumes mid-glide
+ * separate persistable-subset struct: a reboot never resumes mid-glide
  * or with a note the arpeggiator thinks is still held - every field that
- * would be wrong to resume with gets reset here.
+ * would be wrong to resume with gets reset in this function.
  */
 static void sanitise_loaded_channels(void)
 {
@@ -342,7 +342,7 @@ void midi_config_load(void)
 
   for (uint8_t slot = 0; slot < MIDICONFIG_SAVE_SLOTS; slot++) {
     /* Memory-mapped flash read, same technique load_config() (config.c)
-     * uses - XIP flash is just memory, no flash_range_* API needed. */
+     * uses - XIP flash is plain memory, no flash_range_* API needed. */
     memcpy(&candidate,
       (void *)(XIP_BASE + FLASH_MIDICONFIG_OFFSET + (MIDICONFIG_SLOT_SIZE * slot)),
       sizeof(candidate));

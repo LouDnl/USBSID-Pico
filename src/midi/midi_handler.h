@@ -50,12 +50,12 @@ void midi_tick(void);
 /* Capture channel's current live timbre/LFO/arp/filter state into a patch
  * slot (RAM only) - the inverse of Program Change/apply_patch_to_channel().
  * Caller must range-check channel (< MAX_CHANNELS) and patch_index
- * (< MIDI_PATCH_COUNT) first; see sysex.c's handle_patch_save(). */
+ * (< MIDI_PATCH_COUNT) first. See sysex.c's handle_patch_save(). */
 void midi_handler_capture_patch(uint8_t channel, uint8_t patch_index);
 
-/* midi_handler.c's live CC map is private to that file; these exist so
+/* midi_handler.c's live CC map is private to that file. These exist because
  * midi_config.c's flash persistence can save/restore it. No CC remapping
- * feature yet, so this currently always round-trips compiled-in defaults. */
+ * feature yet. This currently always round-trips compiled-in defaults. */
 void midi_handler_get_ccmap(midi_ccvalues *out);
 void midi_handler_set_ccmap(const midi_ccvalues *in);
 

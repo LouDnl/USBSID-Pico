@@ -39,14 +39,14 @@ static uint8_t __not_in_flash("nsd") ring_buf[NET_RING_BYTES] __aligned(4);
 
 /* Indices count entries, not bytes, and are left to free-run: the gap
  * `write_idx - read_idx` is always the live entry count even after either
- * counter wraps past UINT32_MAX, so there is no separate empty/full flag to
+ * counter wraps past UINT32_MAX: there is no separate empty/full flag to
  * keep in sync. */
 static volatile uint32_t write_idx = 0;
 static volatile uint32_t read_idx = 0;
 
 /* Producer-owned drop mark, set by net_ring_clear(): entries below it are
- * dropped. The consumer still pops them, flagged, and frees their slots;
- * a slot is never reused before the consumer moved past it. */
+ * dropped. The consumer still pops them, flagged, and frees their slots.
+ * A slot is never reused before the consumer moved past it. */
 static volatile uint32_t clear_idx = 0;
 
 /**

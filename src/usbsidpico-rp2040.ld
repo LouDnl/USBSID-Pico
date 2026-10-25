@@ -28,8 +28,8 @@ __PERSISTENT_STORAGE_LEN = 1024k;
  * ADDR_CONFIG keeps the exact same numeric offset the old
  * FLASH_CONFIG_OFFSET macro in config.h already computed at runtime
  * (ADDR_PERSISTENT + (__PERSISTENT_STORAGE_LEN / 4) * 3) - this does not
- * move Config's existing storage, it just also exposes the address as a
- * linker symbol so ADDR_MIDICONFIG can be placed directly after it instead
+ * move Config's existing storage, it also exposes the address as a
+ * linker symbol, letting ADDR_MIDICONFIG be placed directly after it instead
  * of being derived a second, independent way. config.c asserts the two
  * computations agree at boot. */
 __CONFIG_STORAGE_LEN = 4k;   /* 1 sector, 16 x 256B wear-levelled slots (unchanged, Config's own scheme) */

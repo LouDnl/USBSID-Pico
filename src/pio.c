@@ -102,7 +102,7 @@ void setup_vu(void)
   setup_vu_dma();
 #elif defined(CYW43_WL_GPIO_LED_PIN)
 #if !defined(USE_NET)
-  /* For Pico W devices we need to initialise the driver etc, unless
+  /* For Pico W devices the driver etc needs initialising, unless
    * USE_NET is defined, this owns the cyw43_arch_init() call.
    - see the guard in net_wifi.c / net_bluetooth.c's setup_bluetooth() */
   if (cyw43_arch_init()) {
@@ -200,7 +200,7 @@ void clear_bus_fifos(void)
   pio_sm_clear_fifos(bus_pio, sm_control);
   pio_sm_clear_fifos(bus_pio, sm_data);
   pio_sm_clear_fifos(bus_pio, sm_delay);
-  /* NOTE: sm_clkcnt lives on clkcnt_pio (pio1), passing bus_pio here
+  /* NOTE: sm_clkcnt lives on clkcnt_pio (pio1), passing bus_pio in that call
      cleared bus_pio SM3 (sm_delay) a second time and never touched the
      cycle counter fifo at all */
   pio_sm_clear_fifos(clkcnt_pio, sm_clkcnt);
@@ -225,13 +225,13 @@ void sync_pios(bool at_boot)
   usPIO("Restarting PIO's (Pico & Pico_w)\n");
   /* NOTE: `pio_sm_restart` takes a statemachine number and not a mask,
      the previous `pio_sm_restart(bus_pio, 0b1111)` wrote CTRL bit 19,
-     which is reserved, so nothing was ever restarted here.
+     which is reserved: nothing was ever restarted.
      The PHI1 clock statemachine (SM0) is left out on purpose, restarting
      it glitches the SID clock */
   pio_restart_sm_mask(bus_pio, 0b1110);
 #elif PICO_PIO_VERSION > 0  /* NOTE: rp2350 only */
   usPIO("Synchronise PIO's (Pico2 & Pico2_w)\n");
-  /* stdio_flush is required here because pio_clkdiv_restart_sm_multi_mask
+  /* stdio_flush is required at this point because pio_clkdiv_restart_sm_multi_mask
      (RP2350-only) briefly disrupts UART interrupt handling mid-transmission.
      Flush ensures buffer empty before PIO operations.*/
   stdio_flush();
@@ -239,15 +239,15 @@ void sync_pios(bool at_boot)
   // pio_clkdiv_restart_sm_multi_mask(clkcnt_pio, 0, 0b0011, 0); /* TODO: SYNC COUNTER PIO WITH BUS PIO */
   pio_clkdiv_restart_sm_multi_mask(clkcnt_pio, 0, 0b1000, 0);
   /* A clock divider restart does not clear the waiting-on-irq or stall
-     state of a statemachine, so do that seperately (bus SM's only) */
+     state of a statemachine: do that seperately (bus SM's only) */
   pio_restart_sm_mask(bus_pio, 0b1110);
 #endif
   /* A statemachine restart leaves the irq flags untouched, clear both
-     bus handshake flags so no stale token survives the sync */
+     bus handshake flags to leave no stale token after the sync */
   bus_pio->irq = ((1u << PIO_IRQ0) | (1u << PIO_IRQ1));
   if __us_likely(!at_boot) {
     clear_bus_fifos();
-    /* A restart does not reset the program counters either, so put the
+    /* A restart does not reset the program counters either: put the
        bus statemachines back at the start of their programs */
     bus_resync();
   };
@@ -342,7 +342,7 @@ static void init_sidclock(void)
   pio_sm_claim(bus_pio, sm_clock);
   if (usbsid_config.board_clock_link) { /* Mirror the clock output to PHI2 */
     clock_program_init(bus_pio, sm_clock, offset_clock, PHI1, PHI2, sidclock_frequency);
-  } else { /* No clock link, so only 1 output */
+  } else { /* No clock link: only 1 output */
     clock_program_init(bus_pio, sm_clock, offset_clock, PHI1, -1, sidclock_frequency);
   }
 
@@ -385,7 +385,7 @@ static void init_sidclock_link(void)
  * Verifies the configured clock rate is in bounds, then on PCB version
  * 1.0 detects whether an external crystal is driving PHI1: if not, PHI1
  * is disabled as a GPIO and the internal SID clock is initialised via
- * init_sidclock(); if an external clock is detected, external_clock is
+ * init_sidclock(). If an external clock is detected, external_clock is
  * set and clock_rate falls back to CLOCK_DEFAULT (1MHz). On any other
  * PCB version, PHI1 is disabled as a GPIO and the internal clock is
  * always initialised.

@@ -62,8 +62,7 @@
  * Going for the rates specified by Vice it should
  * be 1022730, except in the link about raster time
  * on c64 wiki it's 1022727.
- * I chose to implement both, let's see how this
- * works out
+ * Both are implemented to see how this works out
  *
  * https://sourceforge.net/p/vice-emu/code/HEAD/tree/trunk/vice/src/c64/c64.h
  */
@@ -116,7 +115,7 @@ enum raster_rates
 
 static const enum raster_rates rasterrates[]  = { R_DEFAULT, R_PAL, R_NTSC, R_NTSC, R_NTSC };
 
-/* Masks we use */
+/* Masks in use */
 typedef enum {
   /* How's your counting game? */
   ZERO           =      0,

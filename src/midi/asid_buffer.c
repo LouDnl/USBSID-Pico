@@ -135,7 +135,7 @@ void set_base_rate(uint16_t rate)
  * - 3-SID: rate = base_rate / 3
  * - 4-SID: rate = base_rate / 4
  * - Fast CIA-timed 2-SID: can need up to base_rate / 6
- * Not working, the buffer just overflows:
+ * Not working, the buffer overflows:
  * - 7x speed SID tunes: can need up to base_rate / 7 (Callapse_to_Center.sid Mibri)
  *
  * Allow rate to go as low as base_rate / 6 (~17%) for fast
@@ -176,7 +176,7 @@ uint32_t track_asid_arrival(void)
 
   /* Detect long gap (new tune started without stop/start commands)
    * If gap > 500ms (~500000 based on observed timing values), treat as new tune
-   * Typical frame delta is 16000-20000, so 500000 = ~25-30 frames missed */
+   * Typical frame delta is 16000-20000. 500000 = ~25-30 frames missed */
   if (arrival_count > 0) {
     uint8_t last_idx = (arrival_index + ARRIVAL_HISTORY_SIZE - 1) % ARRIVAL_HISTORY_SIZE;
     uint32_t gap = now - arrival_times[last_idx];
@@ -224,7 +224,7 @@ uint32_t track_asid_arrival(void)
 
   /* If base_rate not set (player skipped env message), auto-detect it ONCE.
    * Don't update base_rate mid-tune - CIA-timed tunes have variable rates
-   * and we should let the dynamic adjustment handle that, not keep changing base_rate. */
+   * and the dynamic adjustment should handle that, not a changing base_rate. */
   if (base_rate == 0) {
     /* Use measured rate as base_rate - only set once */
     base_rate = (uint16_t)avg_delta;
@@ -232,7 +232,7 @@ uint32_t track_asid_arrival(void)
   }
 
   /* Don't validate against base_rate for CIA-timed tunes.
-   * Just use the measured rate directly - the clamping will
+   * Use the measured rate directly - the clamping will
    * keep it within reasonable bounds. */
   calculated_rate = avg_delta;
 
@@ -246,7 +246,7 @@ uint32_t track_asid_arrival(void)
  * @return boolean false ~ if already at max
  *
  * Handles wrapped ring buffer by relocating data:
- * - If write >= read: data is contiguous, just extend size
+ * - If write >= read: data is contiguous, extend size
  * - If write < read: data wrapped, need to move the tail portion
  */
 static bool ring_buffer_grow(void)
@@ -289,7 +289,7 @@ void ring_buffer_reset_size(void)
 }
 
 /**
- * @brief Update SID count when we see a multi-SID message
+ * @brief Update SID count on seeing a multi-SID message
  * @note Call from decode_asid_message when processing SID2/3/4 messages
   *
  * @param uint8_t sid_num ~ The SID number (1-4) from the message type
@@ -298,7 +298,7 @@ void update_sid_count(uint8_t sid_num)
 {
   still_receiving = true;
 
-  /* Reset timeout - we just saw a multi-SID message */
+  /* Reset timeout - a multi-SID message was seen */
   frames_since_multisid = 0;
 
   if (sid_num > sid_count_estimate) {
@@ -329,7 +329,7 @@ void adjust_buffer_rate_dynamic(uint32_t target_rate)
   if (target_rate > 0 && sid_count_estimate > 1) {
     frames_since_multisid++;
     if (frames_since_multisid > MULTISID_TIMEOUT_FRAMES) {
-      /* Haven't seen SID2/3/4 for a while - assume single-SID now */
+      /* Haven't seen SID2/3/4 for a while - assume single-SID */
       usASID("No multi-SID messages for %u frames, resetting to 1-SID\n",
           frames_since_multisid);
       sid_count_estimate = 1;
@@ -408,13 +408,13 @@ void reset_arrival_tracking(void)
   for (int i = 0; i < ARRIVAL_HISTORY_SIZE; i++) {
     arrival_times[i] = 0;
   }
-  /* Note: don't reset base_rate here, it's set from set_buffer_rate() */
+  /* Note: don't reset base_rate in this function, it's set from set_buffer_rate() */
   return;
 }
 
 
 /**
- * Here be IRQ and PIO magic mushrooms
+ * IRQ and PIO magic mushrooms ahead
  */
 
 /**
@@ -430,9 +430,9 @@ void __not_in_flash_func(buffer_irq_handler)(void)
   int current_diff = ring_diff();
   /* Only start if head and tail are not the same */
   if(asid_ringbuffer.ring_read != asid_ringbuffer.ring_write) {
-    // if (current_diff > (diff_size + (28 * 4))) {  // Ensure we keep diff_size bytes after reading
-    /* Only consume if we have enough data AND will stay above minimum */
-    if (current_diff > diff_size) {  // Ensure we keep diff_size bytes after reading
+    // if (current_diff > (diff_size + (28 * 4))) {  // Ensure diff_size bytes remain after reading
+    /* Only consume if enough data is present AND the level stays above minimum */
+    if (current_diff > diff_size) {  // Ensure diff_size bytes remain after reading
       bool bus_claimed = bus_try_claim(BUS_OWNER_MIDI); /* USB still wins if it's active, see bus.c */
       for (size_t pos = 0; pos < 28; pos++) {
         uint8_t reg = ring_get();
@@ -585,7 +585,7 @@ void set_buffer_rate(uint16_t rate)
 
 
 /**
- * Here be ringbuffer shizzle
+ * Ringbuffer shizzle ahead
  */
 
 /**
@@ -608,7 +608,7 @@ static int __not_in_flash_func(ring_diff)(void)
 }
 
 /**
- * @brief Check if buffer would overflow with next write
+ * @brief Check if buffer would overflow with the following write
  *
  * @return boolean ~ true if there's no room for another frame (112 bytes)
  * @return boolean ~ false if there is
@@ -627,7 +627,7 @@ static bool ring_would_overflow(void)
  */
 static void ring_put(uint8_t item)
 {
-  /* Check for overflow - if we're about to overwrite unread data, skip this write */
+  /* Check for overflow - if about to overwrite unread data, skip this write */
   uint16_t next_write = (asid_ringbuffer.ring_write + 1) % ring_size;
   if (next_write == asid_ringbuffer.ring_read) {
     /* Buffer full - would overflow. Drop this byte to prevent corruption. */

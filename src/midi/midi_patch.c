@@ -33,15 +33,15 @@ midi_patch_t midi_patches[MIDI_PATCH_COUNT];
 /**
  * @brief Initialise midi_patches[] with default and factory-preset patches
  *
- * Patch 0 mirrors midi_config_init()'s channel 1 defaults; patches 1-15
- * (bank 0) are curated presets; 16-31 (bank 1) stay zeroed for user saves.
+ * Patch 0 mirrors midi_config_init()'s channel 1 defaults. Patches 1-15
+ * (bank 0) are curated presets. 16-31 (bank 1) stay zeroed for user saves.
  */
 void midi_patch_init(void)
 {
   memset(midi_patches, 0, sizeof(midi_patches));
 
   /* Patch 0 mirrors midi_config_init()'s channel defaults field for field,
-   * so selecting it right after boot is a no-op. */
+   * making selection right after boot a no-op. */
   midi_patches[0].tmpl_contr     = BIT_4;  /* triangle */
   midi_patches[0].tmpl_attdec    = 0x00;
   midi_patches[0].tmpl_susrel    = 0xF0;   /* full sustain, fast release */
@@ -69,7 +69,7 @@ void midi_patch_init(void)
    * tmpl_susrel is sustain|release (set_adsr(), midi_handler.c).
    * filter_routing 0x07 routes all three physical voice positions through
    * the filter - RESFLT's routing bits are wired to position, not to a
-   * logical note, so a patch needs all three set to reliably apply. */
+   * logical note. A patch needs all three set to reliably apply. */
   static const midi_patch_t bank0[] = {
     /* 1: Sawtooth lead */
     { .tmpl_contr = BIT_5, .tmpl_attdec = 0x00, .tmpl_susrel = 0xF0,
@@ -99,7 +99,7 @@ void midi_patch_init(void)
     { .tmpl_contr = BIT_6, .tmpl_pwmhi = 0x03, .tmpl_attdec = 0x02, .tmpl_susrel = 0xB0,
       .bend_range = 2 },
     /* 10: Sync lead - sawtooth with the sync bit set, for pairing with the
-     *     adjacent voice; audible alone too, just without the sync effect */
+     *     adjacent voice. Audible alone too, only without the sync effect */
     { .tmpl_contr = (uint8_t)(BIT_5 | BIT_1), .tmpl_attdec = 0x01, .tmpl_susrel = 0xE0,
       .bend_range = 2 },
     /* 11: Ring mod lead - triangle with the ring mod bit set, same caveat */

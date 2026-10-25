@@ -366,7 +366,7 @@ static uint16_t _desc_str[MAXIMUM_DESCRIPTOR_STRING_ELEMENT_COUNT];
  * `MAXIMUM_DESCRIPTOR_STRING_ELEMENT_COUNT - 1` characters). Out-of-range
  * indices return NULL.
  *
- * @note the returned buffer (`_desc_str`) is static and reused; the caller
+ * @note the returned buffer (`_desc_str`) is static and reused. The caller
  *       must be done with one transfer before this is called again
  *
  * @param uint8_t index

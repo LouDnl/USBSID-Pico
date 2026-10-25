@@ -42,7 +42,7 @@
 #define MIDI_FMOPL_CHANNELS 9
 
 /* 2-operator FM instrument (modulator + carrier, series or parallel).
- * Packed to match the real OPL2 register layout directly, so
+ * Packed to match the real OPL2 register layout directly:
  * fmopl_write_instrument() (midi_fmopl.c) and sysex.c's pack/unpack need
  * no bit-twiddling. Public for SYSEX_FMOPL_PATCH_LOAD/DUMP/DATA (sysex.c). */
 typedef struct {
@@ -54,9 +54,9 @@ typedef struct {
   uint8_t feedback_algo; /* bits3:1=modulator self-feedback (0-7), bit0=algorithm (0=FM/series, 1=additive/parallel) */
 } opl_instrument_t;
 
-/* 32 patches; Program Change selects one directly, programs 32-127 unused
+/* 32 patches. Program Change selects one directly, programs 32-127 unused
  * (same convention as MIDI_PATCH_COUNT, midi_patch.h). Patches 0-5 are the
- * factory instruments (midi_fmopl_patch_init()); 6-31 start zeroed, a
+ * factory instruments (midi_fmopl_patch_init()). 6-31 start zeroed, a
  * safe near-silent default. */
 #define MIDI_FMOPL_PATCH_COUNT 32
 extern opl_instrument_t fmopl_patches[MIDI_FMOPL_PATCH_COUNT];
@@ -72,7 +72,7 @@ void midi_fmopl_note_on(uint8_t channel, uint8_t note, uint8_t velocity);
 void midi_fmopl_note_off(uint8_t channel, uint8_t note, uint8_t velocity);
 
 /* Program Change on an FMOpl-targeted channel: selects a patch from
- * fmopl_patches[] for the channel's next note-on (range-checked,
+ * fmopl_patches[] for the channel's following note-on (range-checked,
  * out-of-range ignored). Already-sounding voices are unaffected. */
 void midi_fmopl_program_change(uint8_t channel, uint8_t program);
 
@@ -109,7 +109,7 @@ void midi_fmopl_pitch_bend(uint8_t channel, uint8_t lsb, uint8_t msb);
 void midi_fmopl_set_clock(uint32_t hz);
 
 /* Silences every sounding OPL voice. Called from all_notes_off()
- * (midi_handler.c) so CC_ASOF/CC_RACT/CC_ANOF cover FMOpl too. No-op if
+ * (midi_handler.c) for CC_ASOF/CC_RACT/CC_ANOF to cover FMOpl too. No-op if
  * cfg.fmopl_enabled is false. */
 void midi_fmopl_all_notes_off(void);
 

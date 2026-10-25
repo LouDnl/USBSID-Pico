@@ -167,7 +167,7 @@ static void nsd_tcp_err(void *arg, err_t err)
   (void)err;
   // usWFI("TCP connection error %d\n", err);
   /* lwIP has already freed the pcb by the time this callback fires - do
-   * not touch it, just drop our reference and tear down the session. */
+   * not touch it, drop the reference and tear down the session. */
   nsd_session_close();
   nsd_client_pcb = NULL;
 }
@@ -434,7 +434,7 @@ static bool wifi_started = false;
  * cyw43_arch_init() (called first in the boot sequence, usbsid.c).
  * This function never calls it.
  * pio.c's setup_vu() likewise skips its own cyw43_arch_init(),
- * so the LED GPIO is set here instead.
+ * meaning the LED GPIO is set in this function instead.
  */
 void net_wifi_init(void)
 {
@@ -442,7 +442,7 @@ void net_wifi_init(void)
   usWFI("Init WiFi\n");
 
   /* Starts OFF: the LED tracks actual connection status
-   * (net_wifi_update()), not just whether the board is powered. */
+   * (net_wifi_update()), not only if the board is powered. */
   cyw43_arch_gpio_put(BUILTIN_LED, false);
 
   /* cyw43_arch_init()'s cyw43_driver_init()+lwip_init() sequence (CYW43_LWIP=1)
@@ -474,7 +474,7 @@ void net_wifi_start(void)
   netif_set_hostname(netif_default, wifi_hostname);
 
   if (wifi_ssid[0] != '\0') {
-    /* Arms net_wifi_update() to connect on its next tick. */
+    /* Arms net_wifi_update() to connect on its following tick. */
     wifi_state = WSTATE_DOWN;
     next_connect_attempt_ms = 0;
   } else {
@@ -503,7 +503,7 @@ static void wifi_connect_fail(const char *why, int code)
  *
  * Non-blocking connect: cyw43_arch_wifi_connect_async() issued once, then
  * WSTATE_CONNECTING polls cyw43_tcpip_link_status() each tick until
- * UP/FAIL/BADAUTH or WIFI_CONNECT_TIMEOUT_MS. A blocking connect call here
+ * UP/FAIL/BADAUTH or WIFI_CONNECT_TIMEOUT_MS. A blocking connect call in this function
  * stalls tud_task_ext() long enough to starve USB EP0 and panic TinyUSB's
  * dcd - do not go back to one.
  *
@@ -529,7 +529,7 @@ void net_wifi_update(void)
         /* nsd_session_close() leaves the pcb alone: tear it down as well,
          * else a connection that survives the drop keeps feeding nsd_feed()
          * with no transport to reply on, and the stale pcb leaks once the
-         * next client is accepted. Abort, not close: a FIN on a dead link
+         * following client is accepted. Abort, not close: a FIN on a dead link
          * retransmits and holds the NSD port. */
         nsd_tcp_client_drop();
       }

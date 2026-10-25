@@ -45,13 +45,13 @@ void net_wifi_init(void);
 /* Call once station mode should come up: after net_cfg is loaded and
  * net_cfg.flags.wifi_enabled is true. The one call that actually powers
  * the radio - confirmed to disrupt SID chip/model detection while
- * powered, hence the explicit opt-in instead of folding into
+ * powered: an explicit opt-in instead of folding into
  * net_wifi_init(). No-op if called more than once. */
 void net_wifi_start(void);
 
 /* Call every core 0 main-loop iteration alongside cyw43_arch_poll(). A
  * no-op until net_wifi_start() has been called. Drives station
- * (re)connect; does not drain the NSD write ring, that is
+ * (re)connect. Does not drain the NSD write ring, that is
  * nsd_drain_task()'s job on core 1. Retries a failed NSD listener bind
  * regardless of radio state. */
 void net_wifi_update(void);
@@ -84,7 +84,7 @@ uint8_t net_wifi_state_code(void);
  * All zero unless NET_WIFI_CODE_CONNECTED. Core 0 only */
 void net_wifi_get_ip4(uint8_t out[4]);
 
-/* Seams for flash-persisted credentials; harmless no-ops/defaults until
+/* Seams for flash-persisted credentials. Harmless no-ops/defaults until
  * NetConfig fills them in. */
 void net_wifi_set_credentials(const char *ssid, const char *psk);
 void net_wifi_set_hostname(const char *hostname);

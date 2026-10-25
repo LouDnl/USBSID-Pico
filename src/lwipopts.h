@@ -2,7 +2,7 @@
  * lwipopts.h - USBSID-Pico Network SID Device (NSD) build
  *
  * Tuned for latency over throughput: the NSD write ring already absorbs
- * bursts (net_ring.c), lwIP just moves small packets off the wire quickly.
+ * bursts (net_ring.c), lwIP moves small packets off the wire quickly.
  * Based on pico-examples/pico_w/wifi/lwipopts_examples_common.h.
  */
 
@@ -55,7 +55,7 @@
 #define LWIP_NETIF_LINK_CALLBACK    1
 
 /* pico_rand is already linked (CMakeLists.txt TARGET_LL) - use it instead
- * of stdlib rand() so this header doesn't need its own <stdlib.h>. */
+ * of stdlib rand(), keeping this header free of its own <stdlib.h>. */
 #include "pico/rand.h"
 #define LWIP_RAND() ((u32_t)get_rand_32())
 

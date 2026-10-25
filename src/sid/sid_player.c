@@ -56,7 +56,7 @@ volatile bool stopping_emulator = false;
 /**
  * @brief Check whether the onboard SID player is currently playing
  *
- * @note Stub used when ONBOARD_EMULATOR is not compiled in; always false
+ * @note Stub used when ONBOARD_EMULATOR is not compiled in. Always false
  *
  * @return bool always false
  */

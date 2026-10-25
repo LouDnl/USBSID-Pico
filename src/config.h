@@ -94,7 +94,7 @@ extern uint32_t ADDR_PERSISTENT[];
  * persistent section after the config one */
 extern uint32_t ADDR_CONFIG[];
 extern uint32_t ADDR_MIDICONFIG[];
-/* Set by verify_midiconfig_offset() at boot; midi_config_save()/load() must
+/* Set by verify_midiconfig_offset() at boot. The midi_config_save()/load() must
  * refuse to touch flash while this is false. */
 extern bool midiconfig_offset_ok;
 #define FLASH_MIDICONFIG_OFFSET ((uint32_t)ADDR_MIDICONFIG - XIP_BASE)
@@ -170,7 +170,7 @@ typedef struct Socket {
 } Socket;
 
 /* NOTE: WiFi/Bluetooth/NSD are explicitely not set in this config */
-typedef struct Config { // TODO: Add overrides for detect_default_config and add 5v/9v/12 overrides so they cannot be changed
+typedef struct Config { // TODO: Add overrides for detect_default_config and add 5v/9v/12 overrides to make them unchangeable
   /* First three items must stay in the same order! */
   uint32_t magic;                /* Contains firmware build magic */
   int      default_config;       /* Defines if config is default config or not */
@@ -466,12 +466,12 @@ enum
   SID_PLAYER_START    = 0xE1,  /* Start SID file play */
   SID_PLAYER_STOP     = 0xE2,  /* Stop SID file play */
   SID_PLAYER_PAUSE    = 0xE3,  /* Pause/Unpause SID file play */
-  SID_PLAYER_NEXT     = 0xE4,  /* Next SID subtune play */
+  SID_PLAYER_NEXT     = 0xE4,  /* Following SID subtune play */
   SID_PLAYER_PREV     = 0xE5,  /* Previous SID subtune play */
   SID_PLAYER_TWO      = 0xE6,  /* Force play to play on socket two or sid two */
   SID_PLAYER_FFWD     = 0xE7,  /* Tune fast forward */
   SID_PLAYER_RWND     = 0xE8,  /* Tune rewind // NOTE: Not implemented */
-  SID_PLAYER_MUTE     = 0xE9,  /* Full mute, mute a voice or just one chip/SID */
+  SID_PLAYER_MUTE     = 0xE9,  /* Full mute, mute a voice or only one chip/SID */
   SID_PLAYER_MUTED    = 0xEA,  /* Read a the muted state */
   SID_PLAYER_TIME     = 0xEB,  /* Read play time of current track */
   TEST_FN2            = 0xEF,  /* TODO: Remove before v1 release */
@@ -628,7 +628,7 @@ void        save_load_config(void);
 void        save_load_apply_config(bool at_boot);
 void        verify_clockrate(void);
 
-/* Defined in net_config.c, declared here since callers throughout this
+/* Defined in net_config.c, declared in this header since callers throughout this
  * file need it and net_config.h doesn't include config.h */
 extern NetConfig net_cfg;
 

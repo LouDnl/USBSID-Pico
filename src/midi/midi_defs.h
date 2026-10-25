@@ -170,8 +170,8 @@ typedef struct midi_ccvalues {
   .CC_ARPO  =  0x0B,  /*  11 ~ Arpeggiator octave range */ \
   .CC_ARPE  =  0x0C,  /*  12 ~ Arpeggiator enable */ \
   /* Default values ~ Arpeggiator tables. Adjacent to CC_ARPM/R/O/E */ \
-  /* above but they were already full 0x06/0x0A-0x0C, so this sits in the */ \
-  /* next free run instead - see temp/cc_collision_check.py's free list. */ \
+  /* above but they were already full 0x06/0x0A-0x0C. This sits in the    */ \
+  /* free run instead - see temp/cc_collision_check.py's free list.      */ \
   .CC_ARPT  =  0x1E,  /*  30 ~ Arpeggiator table select */ \
   /* Default values ~ second LFO. Contiguous with LFO1's own */ \
   /* 0x00/0x02-0x05 block (0x01 is CC_PWM, already taken). */ \

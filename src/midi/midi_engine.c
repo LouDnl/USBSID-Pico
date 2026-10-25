@@ -32,13 +32,13 @@
 #include <midi_engine.h>
 
 
-/* 1kHz modulation tick, re-derived from time_us_64() each pass so a core1
+/* 1kHz modulation tick, re-derived from time_us_64() each pass. A core1
  * stall (e.g. a flash_safe_execute() config save) resumes with a single
  * tick instead of a burst of catch-up ticks. */
 #define MIDI_TICK_PERIOD_US 1000
 static uint64_t next_tick_us = 0;
 
-/* Last midi_queue_dropped() total this task has already reported, so a
+/* Last midi_queue_dropped() total this task has already reported. A
  * player holding notes for minutes does not print the same total on every
  * pass - only the delta since the last time it changed. */
 static uint32_t last_reported_dropped = 0;
@@ -56,14 +56,14 @@ void midi_engine_task(void)
   midi_event_t ev;
   /* Drain everything waiting rather than one per call: core1's loop also
    * services the LED runner, the SID test queue and (optionally) the SID
-   * player, so a single event per pass could starve the ring under a fast
-   * player next to it. */
+   * player. A single event per pass could starve the ring under a fast
+   * player alongside it. */
   while (midi_queue_pop(&ev)) {
     uint8_t buf[3] = { ev.status, ev.d1, ev.d2 };
     process_midi(buf, ev.len);
   }
 
-  /* midi_queue_push() (core0) counts drops on overflow; report only the
+  /* midi_queue_push() (core0) counts drops on overflow. Report only the
    * delta since last time, checked after draining above. */
   uint32_t dropped = midi_queue_dropped();
   if __us_unlikely(dropped != last_reported_dropped) {

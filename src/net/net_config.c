@@ -156,8 +156,8 @@ void start_net(void)
   /* Open NSD listener and discovery per net_cfg */
   net_wifi_apply_nsd_config(&net_cfg);
   /* Powering the WiFi radio measurably disrupts SID chip/model detection
-   * on real hardware for as long as it stays on, so only bring it up if
-   * the user opted in; a freshly flashed board (wifi_enabled defaults to
+   * on real hardware for as long as it stays on: only bring it up if
+   * the user opted in. A freshly flashed board (wifi_enabled defaults to
    * false) must behave identically to a non-WiFi build. */
   if (net_cfg.flags.wifi_enabled) {
     net_wifi_start();

@@ -42,17 +42,17 @@
 
 /* MIDI pitch bend is a 14 bit value sent LSB first, centred at 0x2000 and
  * running to 0x3FFF. Range is per channel (midi_channel_cfg_t.bend_range,
- * default 2 semitones); the centre point itself is protocol-fixed. */
+ * default 2 semitones). The centre point itself is protocol-fixed. */
 #define MIDI_BEND_CENTRE  0x2000
 
 /* Full-depth LFO pitch excursion, in semitones. Not user configurable
- * beyond the 0-127 depth CC scaling within this range; a vibrato deeper
+ * beyond the 0-127 depth CC scaling within this range. A vibrato deeper
  * than this is not a vibrato any more. */
 #define MIDI_LFO_PITCH_MAX_SEMITONES 2
 
 /* Clock scaled note table.
  * `musical_scale_values[]` is generated for a 1.000 MHz SID clock, but the SID
- * frequency register value is f_out * 2^24 / f_clk, so a board configured for
+ * frequency register value is f_out * 2^24 / f_clk. A board configured for
  * PAL (985248 Hz) plays every note about 29 cents sharp when the raw table is
  * used. Rescale once per clock change rather than per note. */
 static uint16_t note_table[count_of(musical_scale_values)];
@@ -101,7 +101,7 @@ static void build_note_table(void)
   uint32_t rate = midi_clockrate();
   for (size_t i = 0; i < count_of(musical_scale_values); i++) {
     /* Round rather than truncate: at the bottom of the range one register
-     * step is over 5 cents, so truncating costs real tuning accuracy there. */
+     * step is over 5 cents. Truncating costs real tuning accuracy there. */
     uint64_t v = ((((uint64_t)musical_scale_values[i] * (uint64_t)CLOCK_DEFAULT) + (rate / 2)) / rate);
     note_table[i] = (uint16_t)(v > 0xFFFF ? 0xFFFF : v);
   }
@@ -184,7 +184,7 @@ static inline void handle_bit_at(uint8_t *target, int bit, uint8_t cc_value)
  *
  * nibble_to_preserve is the mask of the nibble to keep unchanged: when it
  * is R_NIBBLE (preserve the low nibble), val is shifted left 4 bits and
- * written into the high nibble; otherwise val is written into the low
+ * written into the high nibble. Otherwise val is written into the low
  * nibble as-is.
  *
  * @param uint8_t * target
@@ -228,12 +228,12 @@ static void propagate_reg(uint8_t channel, uint8_t reg_offset, uint8_t value, bo
  * @brief Recompute and, if changed, write one voice's frequency registers
  *
  * Combines portamento glide position, the channel's pitch-bend offset, and
- * an optional LFO offset (all in note-index*256 fixed point, so they
- * simply add). Skips the bus write when unchanged, using sid_memory[]
+ * an optional LFO offset (all in note-index*256 fixed point. They
+ * add). Skips the bus write when unchanged, using sid_memory[]
  * itself as the "last written" cache.
  *
  * @param uint8_t slot
- * @param int32_t lfo_offset_x256, 0 if no LFO is targeting pitch right now
+ * @param int32_t lfo_offset_x256, 0 if no LFO is targeting pitch at the moment
  */
 static void write_voice_pitch(uint8_t slot, int32_t lfo_offset_x256)
 {
@@ -244,7 +244,7 @@ static void write_voice_pitch(uint8_t slot, int32_t lfo_offset_x256)
   uint16_t frac_mask = (1u << MIDI_PITCH_FRAC_BITS) - 1;
   uint8_t frac = (uint8_t)(index_x256 & frac_mask);
   if (whole < 0) { whole = 0; frac = 0; }
-  /* Clamped one below the top so `whole + 1` stays a valid interpolation partner */
+  /* Clamped one below the top to keep `whole + 1` a valid interpolation partner */
   if (whole >= SCALE_MAX) { whole = SCALE_MAX - 1; frac = 0xFF; }
 
   uint32_t f_lo = note_table[whole];
@@ -314,7 +314,7 @@ static void set_controlreg(uint8_t channel, uint8_t cc, uint8_t value)
  * @brief Manually set, clear or toggle the gate bit on every voice a channel currently holds
  *
  * Deliberately not part of the CONTR template: a held drone gated open
- * manually should not be silently re-gated by the next CC that happens to
+ * manually should not be silently re-gated by the following CC that happens to
  * touch CONTR on the same voice.
  *
  * @param uint8_t channel
@@ -375,7 +375,7 @@ static void set_voicepwm(uint8_t channel, uint8_t cc, uint8_t value)
  * @brief CC_NOTE: one-shot manual pitch entry on every voice a channel currently holds
  *
  * Snapped in (no glide) through the same pitch machinery as everything
- * else (midi_voice_set_pitch() + write_voice_pitch()), so a subsequent
+ * else (midi_voice_set_pitch() + write_voice_pitch()). A subsequent
  * tick's LFO/portamento pass does not silently overwrite it with a stale
  * target.
  *
@@ -401,7 +401,7 @@ static void set_notefrequency(uint8_t channel, uint8_t cc, uint8_t value)
 /**
  * @brief Set filter cutoff (CC_FFC) on every SID in a channel's mask
  *
- * Remembers the value on midi_channels[channel].filter_cutoff so the
+ * Remembers the value on midi_channels[channel].filter_cutoff. The
  * LFO-cutoff tick has a stable centre to modulate around.
  *
  * @param uint8_t channel
@@ -478,7 +478,7 @@ static void set_modevolume(uint8_t channel, uint8_t cc, uint8_t value)
  * @brief Push a patch's filter cutoff/resonance/routing/mode to every SID
  *        in a channel's mask
  *
- * The chip-register-only half of apply_patch_to_channel(), factored out so
+ * The chip-register-only half of apply_patch_to_channel(), factored out:
  * midi_processor_init() can re-sync these after a config reload without
  * re-running the template/LFO/arp portion.
  *
@@ -500,7 +500,7 @@ static void apply_patch_filter_hw(uint8_t channel, const midi_patch_t *p)
     /* A voice routed into the filter (filter_routing above) has no output
      * at all unless a filter mode (HPF/BPF/LPF, MODVOL's high nibble) is
      * also selected - real SID behaviour, not something to route around.
-     * Read-modify-write so the channel's current volume (low nibble) and
+     * Read-modify-write. The channel's current volume (low nibble) and
      * 3off bit are preserved, not clobbered by a patch that has no opinion
      * on them. */
     uint8_t modvol = (uint8_t)((sid_memory[bases[i]+MODVOL] & (BIT_7 | NIBBLE_MAX)) | p->filter_mode);
@@ -564,8 +564,8 @@ static void apply_patch_to_channel(uint8_t channel, uint8_t patch_index)
  *        inverse of apply_patch_to_channel()/Program Change
  *
  * Filter resonance/routing/mode are read from the first SID in the
- * channel's mask (chip-wide registers, not cached per-channel). RAM only;
- * caller must range-check channel and patch_index first.
+ * channel's mask (chip-wide registers, not cached per-channel). RAM only.
+ * Caller must range-check channel and patch_index first.
  *
  * @param uint8_t channel
  * @param uint8_t patch_index, must be < MIDI_PATCH_COUNT
@@ -617,7 +617,7 @@ void midi_handler_capture_patch(uint8_t channel, uint8_t patch_index)
 
 /* --- CC_SID1-4 / CC_VCE1-3: manual override that narrows the configured
  *     voice_mask at runtime, without altering the configured mask itself.
- *     Value 0 clears the override; anything else selects it, so an old
+ *     Value 0 clears the override. Anything else selects it. An old
  *     controller sending only "select" (typically 127) behaves exactly as
  *     it always has. --------------------------------------------------- */
 
@@ -626,7 +626,7 @@ void midi_handler_capture_patch(uint8_t channel, uint8_t patch_index)
  *
  * Narrows the channel's configured voice_mask at runtime without altering
  * the configured mask itself. value 0 clears the override
- * (MIDI_OVERRIDE_NONE); any other value selects the SID socket matching
+ * (MIDI_OVERRIDE_NONE). Any other value selects the SID socket matching
  * the CC number (CC_SID1..CC_SID4 -> socket 0..3).
  *
  * @param uint8_t channel
@@ -648,7 +648,7 @@ static void set_sid_override(uint8_t channel, uint8_t cc, uint8_t value)
 /**
  * @brief Set or clear a channel's manual voice-within-SID override from CC_VCE1-3
  *
- * value 0 clears the override (MIDI_OVERRIDE_NONE); any other value
+ * value 0 clears the override (MIDI_OVERRIDE_NONE). Any other value
  * selects the voice matching the CC number (CC_VCE1..CC_VCE3 -> voice
  * 0..2).
  *
@@ -667,7 +667,7 @@ static void set_voice_override(uint8_t channel, uint8_t cc, uint8_t value)
   return;
 }
 
-/* --- LFO and portamento CCs. Arpeggiator CCs are further down, next to
+/* --- LFO and portamento CCs. Arpeggiator CCs are further down, beside
  *     the arpeggiator's own functions, since enabling/disabling it needs
  *     note_off() which is not declared yet at this point in the file. --- */
 
@@ -795,13 +795,13 @@ static void set_lfo2_dest(uint8_t channel, uint8_t cc, uint8_t value)
 
 /* --- Unison on/off and detune spread. Turning unison on does not
  *     retouch any note already sounding - like a patch change, it only
- *     governs the next note_on() (midi_handler.c). --------------------- */
+ *     governs the following note_on() (midi_handler.c). --------------------- */
 
 /**
  * @brief Enable or disable unison mode on a channel from a CC value
  *
  * value >= 64 enables unison (MIDI_CH_UNISON), below disables it. Takes
- * effect only on the next note-on; an already-sounding note is not
+ * effect only on the following note-on. An already-sounding note is not
  * retouched.
  *
  * @param uint8_t channel
@@ -845,7 +845,7 @@ static uint8_t mask_popcount(uint16_t mask)
  * @brief Recompute every channel's poly_limit against the SID count
  *        actually present, once that count is known
  *
- * midi_config_init() runs before cfg.numsids is authoritative, so it
+ * midi_config_init() runs before cfg.numsids is authoritative. It
  * hardcodes poly_limit assuming every physical SID slot exists. On a
  * board with fewer SIDs this would leave poly_limit stuck above the
  * pool's real capacity, causing note-on to steal from other channels
@@ -980,8 +980,8 @@ static void handle_aftertouch(uint8_t channel, uint8_t pressure)
     case MIDI_AT_FILTER:  set_filtercutoff(channel, CC.CC_FFC, pressure); break; /* expressive performance tool */
     case MIDI_AT_VOLUME:  set_modevolume(channel, CC.CC_VOL, pressure);   break; /* tremolo */
     case MIDI_AT_VIBRATO:
-      /* Pressure drives LFO depth directly; lfo_dest is whatever CC_LFOT
-       * last set, so real vibrato needs lfo_dest set to pitch first. */
+      /* Pressure drives LFO depth directly, where lfo_dest is whatever CC_LFOT
+       * last set. Real vibrato needs lfo_dest set to pitch first. */
       ch->lfo_depth = pressure;
       break;
   }
@@ -992,9 +992,9 @@ static void handle_aftertouch(uint8_t channel, uint8_t pressure)
  * @brief Scale a held voice's attack/decay and sustain/release nibbles by note velocity
  *
  * No-op if velocity is 0 or MIDI_CH_VELOCITY_MODE is off. High velocity
- * shortens decay (punchy), low velocity lengthens it (soft); sustain
+ * shortens decay (punchy), low velocity lengthens it (soft). Sustain
  * scales alongside decay since sustain, not decay, controls a held SID
- * voice's loudness. Floored at 3 so the softest velocity is quiet, not
+ * voice's loudness. Floored at 3 to keep the softest velocity quiet, not
  * silent.
  *
  * @param uint8_t channel
@@ -1025,13 +1025,13 @@ static void handle_velocity(uint8_t channel, uint8_t slot, uint8_t velocity)
  * @brief Per-tick portamento step, in note-index*256 units
  *
  * `porta_time` 1 (fastest) covers a full semitone in 4 ticks (4ms,
- * effectively instant); 127 (slowest) covers one in 256 ticks (256ms), so a
+ * effectively instant). 127 (slowest) covers one in 256 ticks (256ms). A
  * full octave glide takes a bit over 3 seconds. Deliberately simple linear
  * mapping - tunable later without any caller needing to change.
  */
 static int32_t porta_step_amount(uint8_t porta_time)
 {
-  if (porta_time == 0) return 256; /* not used when off; avoids a 0-length step if ever called */
+  if (porta_time == 0) return 256; /* not used when off. Avoids a 0-length step if ever called */
   return (int32_t)MAP(porta_time, 1, 127, 64, 1);
 }
 
@@ -1040,7 +1040,7 @@ static int32_t porta_step_amount(uint8_t porta_time)
  *        output
  *
  * Parameterised over an explicit (wave, rate, depth, phase, sh_seed,
- * sh_value) tuple so lfo_step()/lfo2_step() below can share one
+ * sh_value) tuple: lfo_step()/lfo2_step() below can share one
  * implementation for LFO1 and LFO2.
  *
  * @return int16_t -1000..+1000 (per-mille), already scaled by depth
@@ -1071,7 +1071,7 @@ static int16_t lfo_step_generic(uint8_t wave, uint8_t rate, uint8_t depth,
       break;
     case MIDI_LFO_SH:
       if (wrapped) {
-        /* Cheap LCG, reseeded per channel at init so channels do not lock
+        /* Cheap LCG, reseeded per channel at init. Channels do not lock
          * step. A new value is drawn once per cycle, held for the rest of
          * it - that is the "hold" half of sample & hold. */
         *sh_seed = *sh_seed * 1103515245u + 12345u;
@@ -1172,7 +1172,7 @@ static void apply_lfo_cutoff(uint8_t channel, int16_t raw_permille)
  * @brief Stamp one voice slot with the channel's current timbre, apply the
  *        given pitch, and gate it - the per-slot body of note_on()
  *
- * Factored out so a unison note-on can call this 3 times (once per
+ * Factored out. A unison note-on can call this 3 times (once per
  * claimed oscillator, each with its own detuned start/target).
  */
 static void note_on_slot(uint8_t channel, uint8_t slot, int32_t start_x256, int32_t target_x256, uint8_t velocity)
@@ -1184,7 +1184,7 @@ static void note_on_slot(uint8_t channel, uint8_t slot, int32_t start_x256, int3
   write_voice_pitch(slot, 0);
 
   /* Stamp the channel's current timbre onto this voice, gate bit off first
-   * so auto_gate (or CC_GATE, manually) is what turns it on. */
+   * since auto_gate (or CC_GATE, manually) is what turns it on. */
   sid_memory[base+CONTR]  = (uint8_t)(ch->tmpl_contr & (uint8_t)~BIT_0);
   midi_bus_operation(base+CONTR, sid_memory[base+CONTR]);
   sid_memory[base+ATTDEC] = ch->tmpl_attdec;
@@ -1231,14 +1231,14 @@ static void note_on(uint8_t channel, uint8_t raw_note, uint8_t velocity)
 
   /* Portamento: glide in from the last note this channel triggered, rather
    * than starting flat at the new pitch. `last_target_x256 < 0` means no
-   * prior note exists yet on this channel, so the very first note never
+   * prior note exists yet on this channel. The very first note never
    * glides from nowhere. */
   int32_t start_x256 = target_x256;
   if (ch->porta_time > 0 && ch->last_target_x256 >= 0) start_x256 = ch->last_target_x256;
 
   if (ch->flags & MIDI_CH_UNISON) {
     /* 3 real oscillators, one note. Detune is baked into each oscillator's
-     * stored cur/target pitch once, here, not applied live every tick -
+     * stored cur/target pitch once, in this branch, not applied live every tick -
      * it's a constant per-oscillator offset from the struck pitch.
      * Position 0 centred, 1 up, 2 down (MBSID's single-spread-value
      * convention). */
@@ -1313,8 +1313,8 @@ static void note_off(uint8_t channel, uint8_t raw_note, uint8_t velocity)
  * @brief Handle a MIDI pitch bend message: compute the channel's bend offset and re-apply pitch to every held voice
  *
  * 14 bit bend value, LSB first, both bytes 7 bit, centre 0x2000. Stores
- * the offset on the channel (bend_x256, read by write_voice_pitch()) so
- * it composes with whatever portamento/LFO is doing on the same voices,
+ * the offset on the channel (bend_x256, read by write_voice_pitch()).
+ * It composes with whatever portamento/LFO is doing on the same voices,
  * and applies immediately to every voice the channel holds.
  *
  * @param uint8_t channel
@@ -1342,9 +1342,9 @@ static void pitch_notefrequency(uint8_t channel, uint8_t lo, uint8_t hi)
  * separate from the voice pool: at most one physical voice is ever gated
  * for the arp at a time (arp_voice_slot), regardless of how many keys are
  * held. Note-on/off on an arp-enabled channel add/remove from this pattern
- * instead of allocating a voice directly (see process_midi()'s dispatch);
- * midi_tick() -> arp_tick() steps through the pattern and gates the next
- * note by calling the ordinary note_on()/note_off(), so a stepped note
+ * instead of allocating a voice directly (see process_midi()'s dispatch):
+ * midi_tick() -> arp_tick() steps through the pattern and gates the following
+ * note by calling the ordinary note_on()/note_off(). A stepped note
  * still gets the channel's usual template stamp, auto_gate handling, and
  * everything else a normal note gets, for free.
  * ------------------------------------------------------------------------- */
@@ -1353,7 +1353,7 @@ static void pitch_notefrequency(uint8_t channel, uint8_t lo, uint8_t hi)
  * @brief Add a held note to a channel's arpeggiator input pattern
  *
  * Ignores a note already in the pattern. Resets the step position and
- * direction when this is the first held key, so a run starts from a known
+ * direction when this is the first held key. A run starts from a known
  * position rather than wherever a previous, fully-released run left it.
  *
  * @param uint8_t channel
@@ -1405,7 +1405,7 @@ static void arp_note_off(uint8_t channel, uint8_t raw_note)
   return;
 }
 
-/* Arpeggiator CCs. Kept here rather than with the LFO/portamento CCs above
+/* Arpeggiator CCs. Kept in this section rather than with the LFO/portamento CCs above
  * because CC_ARPE's toggle needs note_off(), not declared yet up there. */
 
 /**
@@ -1478,7 +1478,7 @@ static void set_arp_octaves(uint8_t channel, uint8_t cc, uint8_t value)
  *
  * 127 forces on, 0 forces off, any other value toggles the current state.
  * Disabling silences whatever the arp was sounding and clears the held
- * pattern, so a stray physically-held key does not resume arpeggiating
+ * pattern. A stray physically-held key does not resume arpeggiating
  * the moment the mode is switched back on.
  *
  * @param uint8_t channel
@@ -1548,7 +1548,7 @@ static void arp_advance_table(uint8_t channel)
  * @brief Step the arpeggiator through one of its shape-based modes (up/down/up-down/random/as-played) and gate the resulting note
  *
  * Delegates to arp_advance_table() when arp_mode is MIDI_ARP_TABLE. The
- * expanded pattern is held_count * (arp_octaves + 1) long; idx % held_count
+ * expanded pattern is held_count * (arp_octaves + 1) long. Idx % held_count
  * and idx / held_count map a position back to note and octave.
  *
  * @param uint8_t channel
@@ -1612,7 +1612,7 @@ static void arp_advance(uint8_t channel)
 
 /**
  * @brief Decide whether this channel's arpeggiator should step this tick,
- *        and if so, step it
+ *        and when due, step it
  *
  * Clock-synced when a MIDI clock is present (arp_rate maps to one of 8
  * coarse PPQN divisions, whole note down to a 32nd), free-running off a
@@ -1658,8 +1658,8 @@ void midi_tick(void)
   for (uint8_t c = 0; c < MAX_CHANNELS; c++) {
     midi_channel_cfg_t *ch = &midi_channels[c];
 
-    /* Arpeggiator may allocate/release a voice; run before the pitch pass
-     * below so a freshly stepped note gets this same tick's LFO/portamento
+    /* Arpeggiator may allocate/release a voice. Run before the pitch pass
+     * below. A freshly stepped note gets this same tick's LFO/portamento
      * applied rather than waiting a full tick period. */
     arp_tick(c);
 
@@ -1721,7 +1721,7 @@ void midi_tick(void)
 /**
  * @brief Bind a CC number to a handler, refusing collisions at runtime
  *
- * A plain runtime check rather than assert(), so a duplicate CC binding
+ * A plain runtime check rather than assert(). A duplicate CC binding
  * is refused the same way on both -DNDEBUG and asserts-on builds.
  *
  * @param const char *name, the CC name, for the log line only
@@ -1744,7 +1744,7 @@ static void assign_func_ptr(const char *name, uint8_t cc, cc_handler_t f_ptr)
   return;
 }
 
-/* Passes the CC name through so a refusal names the culprit */
+/* Passes the CC name through. A refusal names the culprit */
 #define ASSIGN_CC(field, fn)  assign_func_ptr(#field, CC.field, fn)
 
 /**
@@ -1888,7 +1888,7 @@ void midi_processor_init(void)
  *
  * CC_FMEN is handled directly regardless of the channel's current FMOpl
  * target state, since it is the CC that sets that state. For a channel
- * already targeting FMOpl, only CC_VOL and CC_PWM are wired live; every
+ * already targeting FMOpl, only CC_VOL and CC_PWM are wired live. Every
  * other CC is silently ignored. Otherwise dispatches through
  * cc_func_ptr_array[].
  *
@@ -1953,7 +1953,7 @@ void process_midi(uint8_t *buffer, int size)
       break;
     case 0x90:  /* Note On ~ 3-bytes */
       /* Note On with velocity 0 is a Note Off. Keyboards that use running
-       * status send releases this way, so without this notes stick. */
+       * status send releases this way. Without this notes stick. */
       if (midi_channels[channel].flags & MIDI_CH_TARGET_FMOPL) {
         if (buffer[2] == 0) note_off(channel, buffer[1], 0);
         else note_on(channel, buffer[1], buffer[2]);
@@ -1971,7 +1971,7 @@ void process_midi(uint8_t *buffer, int size)
       else pitch_notefrequency(channel, buffer[1], buffer[2]);
       break;
     case 0xC0:  /* Program change ~ 2-bytes, buffer[1]=program number */
-      /* Only 0-31 map to a patch (MIDI_PATCH_COUNT); Bank Select is not
+      /* Only 0-31 map to a patch (MIDI_PATCH_COUNT). Bank Select is not
        * wired, not needed with only 32 patches. */
       if (midi_channels[channel].flags & MIDI_CH_TARGET_FMOPL) {
         midi_fmopl_program_change(channel, buffer[1]);
@@ -1981,7 +1981,7 @@ void process_midi(uint8_t *buffer, int size)
       handle_aftertouch(channel, buffer[1]);
       break;
     case 0xA0:  /* Polyphonic Key Pressure ~ 3-bytes, buffer[1]=note, buffer[2]=pressure */
-      /* Use the same channel-wide handler for now; buffer[1] note could
+      /* Use the same channel-wide handler for the moment. The buffer[1] note could
        * target one specific voice in a future revision. */
       handle_aftertouch(channel, buffer[2]);
       break;

@@ -220,7 +220,7 @@ void disable_sid(void)
 }
 
 /**
- * @brief Write zero to address 0x00 of sidno so the bus is all zeroes
+ * @brief Write zero to address 0x00 of sidno to make the bus all zeroes
  *
  * @param int sidno
  */
@@ -255,7 +255,7 @@ void pause_sid(void)
 /**
  * @brief Toggle pause state, muting/unmuting and pausing/resuming the SID(s)
  *
- * On the transition into pause, mutes first; on the transition out of
+ * On the transition into pause, mutes first. On the transition out of
  * pause, unmutes first. Always calls pause_sid() and flips the paused
  * state afterwards.
  */

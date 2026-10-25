@@ -192,7 +192,7 @@ uint8_t midi_voice_alloc(uint8_t channel, uint8_t note, uint8_t velocity)
 {
   /* Retrigger, don't allocate a second voice: otherwise the one note-off
    * that eventually arrives (midi_voice_find() returns only the first
-   * match) frees just one, orphaning the other forever. Caused reported
+   * match) frees only one, orphaning the other forever. Caused reported
    * stuck notes playing chords in VMPK. */
   uint8_t existing = midi_voice_find(channel, note);
   if (existing != MIDI_VOICE_NONE) {
@@ -254,7 +254,7 @@ uint8_t midi_voice_alloc(uint8_t channel, uint8_t note, uint8_t velocity)
  *
  * Retriggers the existing 3 slots if already gated. Otherwise scans the
  * channel's mask for a SID chip with all MIDI_VOICE_UNISON_COUNT slots
- * free; refuses (no stealing) if no such SID exists.
+ * free. Refuses (no stealing) if no such SID exists.
  *
  * @param uint8_t channel
  * @param uint8_t note

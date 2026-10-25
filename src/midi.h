@@ -99,7 +99,7 @@ void midi_init(void);
 void process_stream(uint8_t *buffer, size_t size);
 void process_usb_midi_packet(uint8_t pkt[4]);
 
-/* MIDI clock, read-only from the engine's side (core1); written only on
+/* MIDI clock, read-only from the engine's side (core1). Written only on
  * core0 by the realtime byte handlers in midi.c. */
 uint32_t midi_clock_bpm_x100(void);     /* BPM * 100, e.g. 12000 = 120.00 BPM */
 bool     midi_clock_running(void);      /* Start seen, no Stop since */

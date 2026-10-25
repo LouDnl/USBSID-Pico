@@ -34,7 +34,7 @@
 #include <stdint.h>
 
 
-/* 32 patches, selected by MIDI Program Change (0-31; 32-127 unmapped, no
+/* 32 patches, selected by MIDI Program Change (0-31, 32-127 unmapped, no
  * Bank Select needed yet). */
 #define MIDI_PATCH_COUNT 32
 #define MIDI_PATCH_NONE  0xFF
@@ -73,7 +73,7 @@ typedef struct {
 
   uint8_t  bend_range;
 
-  /* LFO 2 and unison fields: appended, not inserted, so an old (shorter)
+  /* LFO 2 and unison fields: appended, not inserted. An old (shorter)
    * SysEx dump (sysex.c pack_patch()/unpack_patch()) is refused by the
    * size check rather than misread. */
   uint8_t  lfo2_wave;

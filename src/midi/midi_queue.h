@@ -37,8 +37,8 @@
 
 /* A parsed channel voice message, handed from core0 (parsing) to core1
  * (the MIDI engine, which owns the SID bus writes). Single producer
- * (core0), single consumer (core1), so no lock is needed on the ring
- * itself, only on the SID bus both cores now write to (see bus.c). */
+ * (core0), single consumer (core1). No lock is needed on the ring
+ * itself, only on the SID bus both cores write to (see bus.c). */
 typedef struct {
   uint8_t status;  /* buffer[0] passed to process_midi() */
   uint8_t d1;      /* buffer[1], 0 if len < 2 */
@@ -55,7 +55,7 @@ bool midi_queue_push(const uint8_t *buf, uint8_t len);
 bool midi_queue_pop(midi_event_t *out);
 
 /* Count of events dropped for a full ring since boot. Either core may read
- * this for diagnostics; it is not part of the SPSC contract above. */
+ * this for diagnostics. It is not part of the SPSC contract above. */
 uint32_t midi_queue_dropped(void);
 
 

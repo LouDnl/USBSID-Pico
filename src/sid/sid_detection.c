@@ -633,7 +633,7 @@ ChipType detect_chiptype_at(uint8_t base_address)
     return CHIP_SIDEMU;
   }
 
-  /* This detection routine is known to cause desync, so we do this as last */
+  /* This detection routine is known to cause desync, do this last */
   if (detect_pdsid(base_address)) {
     return CHIP_PDSID;
   }
@@ -717,7 +717,7 @@ static DetectionResult verify_socket_chip(DetectionResult result, const int sock
        || ((result.socket[socket].sid1_type == SID_NA) && (result.socket[socket].sid2_type == SID_UNKNOWN))
        || ((result.socket[socket].sid1_type == SID_UNKNOWN) && (result.socket[socket].sid2_type == SID_NA))) {
 
-      /* Then there must not be a SID Chip present I guess!? */
+      /* Then there must not be a SID Chip present */
       result.socket[socket].chiptype       = CHIP_UNKNOWN;
       result.socket[socket].present        = false;
       result.socket[socket].supports_dual  = false;
@@ -761,7 +761,7 @@ static void update_probe_config_from_detection(DetectionResult result, Config * 
       /* Shift SocketTwo along with it, it still holds the default id 1 @ $20
        * from `default_socket(2)` and is only updated after SocketOne SID
        * detection has finished. Leaving it there gives two slots id 1, and the
-       * ID -> slot map in `apply_runtime_config` is last write wins, so the
+       * ID -> slot map in `apply_runtime_config` is last write wins: the
        * whole $20-$3F range would decode to SocketTwo (CS2, no A5) instead of
        * SocketOne's second SID (CS1, A5 set) for the entire SocketOne SID
        * detection run ~ every read returns 0x00 */
@@ -949,7 +949,7 @@ static ConfigError sid_auto_detect_impl(bool at_boot)
 /**
  * @brief Handles chip and SID detection and configuration changes
  * @note Wraps sid_auto_detect_impl() with bus_heavy_op_begin()/_end()
- * (bus.h) so it always runs despite the impl's several early returns.
+ * (bus.h), making it always run despite the impl's several early returns.
  *
  * @param bool at_boot
  * @return * ConfigError

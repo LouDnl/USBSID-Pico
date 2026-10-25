@@ -83,9 +83,9 @@ static uint8_t net_config_array[FLASH_PAGE_SIZE];
 static uint8_t p_version_array[MAX_BUFFER_SIZE] = {0};
 /* Config magic verification storage */
 static uint32_t cm_verification = 0;
-/* Number of writes to host we need to do on a config read depending on the config_array size */
+/* Number of writes to host needed on a config read depending on the config_array size */
 static int cfg_read_writes = 0;
-/* Number of writes to host we need to do on a config read depending on the net_config_array size */
+/* Number of writes to host needed on a config read depending on the net_config_array size */
 static int net_cfg_read_writes = 0;
 /* Temporary buffer to store incoming data */
 uint8_t * data_buffer = NULL;
@@ -230,7 +230,7 @@ void read_config(Config* config)
   config_array[38] = 0x00; /* Unused */
   config_array[39] = 0x00; /* Unused */
 
-  /* I can see colors! */
+  /* Colors! */
   config_array[40] = (int)config->RGBLED.enabled;
   config_array[41] = (int)config->RGBLED.idle_breathe;
   config_array[42] = config->RGBLED.brightness;
@@ -267,7 +267,7 @@ void read_config(Config* config)
   config_array[62] = END_BYTE; /* Mark end of config */
   config_array[63] = TERMINATION_BYTE; /* Terminator byte */
 
-  /* Yes, I know, I can assign cfg_read_writes manually, but I do not want to keep wondering if I need to change it */
+  /* cfg_read_writes can be assigned manually, but this avoids having to remember to change it */
   for (int n = 0; n < count_of(config_array); n++) { /* Find number of writes by terminator byte */
     static int endbyte = 0;
     if (config_array[n] == END_BYTE) { endbyte = n;
@@ -329,7 +329,7 @@ void read_socket_config(Config* config)
  */
 void read_net_config(NetConfig* config)
 {
-  memset(net_config_array, 0, sizeof net_config_array);  /* Make sure we don't send garbled old data */
+  memset(net_config_array, 0, sizeof net_config_array);  /* Make sure no garbled old data is sent */
 
   net_config_array[0]  = READ_NETCFG;       /* Initiator byte */
   net_config_array[1]  = VERIFICATION_BYTE; /* Verification byte */
@@ -348,7 +348,7 @@ void read_net_config(NetConfig* config)
   net_config_array[62] = END_BYTE; /* Mark end of net_config */
   net_config_array[63] = TERMINATION_BYTE; /* Terminator byte */
 
-  /* Yes, I know, I can assign net_cfg_read_writes manually, but I do not want to keep wondering if I need to change it */
+  /* net_cfg_read_writes can be assigned manually, but this avoids having to remember to change it */
   for (int n = 0; n < count_of(net_config_array); n++) { /* Find number of writes by terminator byte */
     static int endbyte = 0;
     if (net_config_array[n] == END_BYTE) { endbyte = n;
@@ -395,7 +395,7 @@ void read_pcb_version(void)
 /**
  * @brief Reset a Config struct to the compiled-in default configuration
  *
- * Preserves the config's `config_saveid` across the reset so the flash
+ * Preserves the config's `config_saveid` across the reset. The flash
  * save slot bookkeeping stays intact.
  *
  * @param Config* config
@@ -415,9 +415,9 @@ void __no_inline_not_in_flash_func(default_config)(Config* config)
  * `ADDR_CONFIG` (linker symbol, in the .ld scripts) and `FLASH_CONFIG_OFFSET`
  * (the macro above, derived at compile time from `PICO_FLASH_SIZE_BYTES`)
  * compute the identical address two different ways. They have to agree by
- * construction; this just says so out loud at boot, before anything ever
+ * construction. This check reports it at boot, before anything ever
  * writes to the MIDI partition that sits directly after both of them. A
- * mismatch here would mean the two build-time views of the flash layout
+ * mismatch would mean the two build-time views of the flash layout
  * have drifted apart, which is exactly the kind of thing that must be
  * caught before a flash_range_erase() runs anywhere near it.
  */
@@ -444,7 +444,7 @@ void verify_midiconfig_offset(void)
  *
  * Walks the flash save slots (`FLASH_PAGE_SIZE` apart, up to 16 slots)
  * starting at slot 0, following the `config_saveid` chain until it finds a
- * slot whose stored id no longer matches its position; that means the
+ * slot whose stored id no longer matches its position. That means the
  * previous slot holds the latest saved config, which is then copied into
  * `*config`. Falls back to `default_config()` if the loaded config's magic
  * number does not match `MAGIC_SMOKE`.
@@ -473,13 +473,13 @@ AGAIN:
     savelocationid++;  /* Increase id and try again */
     goto AGAIN; /* Always tries again if config is found */
   } else { /* They are not equal, that means this config is an empty save location or corrupted, load the previous config */
-    savelocationid--; /* This will now be the previous config_saveid */
+    savelocationid--; /* This will be the previous config_saveid */
     usCFG("  Found %s configuration at position %u\n",
       ((savelocationid == 255) ? "empty" : "latest"), savelocationid);
     memcpy(config, (void *)(XIP_BASE + (FLASH_CONFIG_OFFSET + (FLASH_PAGE_SIZE * savelocationid))), sizeof(Config));
     stdio_flush();
   }
-  /* Do not assign savelocationid here but he actual saveid from the restored config */
+  /* Do not assign savelocationid at this point but he actual saveid from the restored config */
   config_saveid = usbsid_config.config_saveid;  /* copy saveid into global variable (for later saving use etc.) */
   usCFG("  %s loaded from position %u\n",
     (usbsid_config.config_saveid == 255 ? "Empty configuration" : "Configuration"),
@@ -540,7 +540,7 @@ void __no_inline_not_in_flash_func(write_config_lowlevel)(void* config_data)
  *
  * Copies the config into a `CONFIG_SIZE` local buffer (statically asserted
  * to fit the whole struct), then runs write_config_lowlevel() through
- * flash_safe_execute() so the flash operation is safely coordinated with
+ * flash_safe_execute() to coordinate the flash operation safely with
  * core1, and sleeps 100ms afterwards.
  *
  * @param const Config* config
@@ -562,7 +562,7 @@ void __no_inline_not_in_flash_func(write_config)(const Config* config)
  * @brief Advance the save slot id and persist a Config struct to flash
  *
  * Only proceeds if `usbsid_config.config_saveid` and the local
- * `config_saveid` counter still agree; increments and wraps the id at 0xF
+ * `config_saveid` counter still agree. Increments and wraps the id at 0xF
  * (16 slots), then calls write_config(). Logs an error and returns without
  * writing if the ids have gone out of sync.
  *
@@ -678,7 +678,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       usCFG("READ_NETCFG\n");
 #ifdef USE_NET
       read_net_config(&net_cfg);
-#else /* Write back default config (unchangeable ;) */
+#else /* Write back default config (unchangeable) */
       static NetConfig ndc = NETCONFIG_DEFAULT_INIT;
       read_net_config(&ndc);
 #endif /* USE_NET */
@@ -1041,7 +1041,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       usCFG("RESET_MIDI_STATE\n");
       midi_config_reset();
       break;
-    case WIFI_STATUS: /* Not available on non _w, so always returns 0xFF 0xFF */
+    case WIFI_STATUS: /* Not available on non _w, always returns 0xFF 0xFF */
       usCFG("WIFI_STATUS\n");
       memset(write_buffer_p, 0, 64);
 #ifdef USE_NET
@@ -1592,12 +1592,12 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
 #if defined(ONBOARD_EMULATOR)
     case UPLOAD_SID_START:
       /* REVERT NOTE: this used to stage the incoming file in its own
-       * calloc'd buffer (0x10000 on RP2350, 0x8000 on RP2040) here, then
+       * calloc'd buffer (0x10000 on RP2350, 0x8000 on RP2040), then
        * hand it to load_prg()/load_sidtune() on core1, which copied it a
        * second time into usplayer's own tune buffer before freeing this
-       * one - two copies of one file. usplayer_upload_start()/_feed() now
-       * write straight into usplayer's buffer as packets arrive, so there
-       * is nothing to allocate here any more. See usplayer.h's "Streaming
+       * one - two copies of one file. usplayer_upload_start()/_feed()
+       * write straight into usplayer's buffer as packets arrive. There
+       * is nothing to allocate any more. See usplayer.h's "Streaming
        * upload" block for the replacement API, and git history for this
        * file if the old staged-buffer approach ever needs to come back. */
       usCFG("UPLOAD_SID_START: %d\n",buffer[1]);
@@ -1612,7 +1612,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       if (sidbytes_received == 0) usCFG("UPLOAD_SID_DATA\n");
       if (receiving_sidfile) {
         /* Max buffer size minus command byte (config init byte is already
-         * gone); straight into usplayer's own tune buffer, no local copy. */
+         * gone). Straight into usplayer's own tune buffer, no local copy. */
         if (!usplayer_upload_feed(&buffer[1], 62)) {
           receiving_sidfile = false;
           usERR("More incoming data than usplayer has room for, aborting upload here!\n");
@@ -1629,12 +1629,12 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       break;
     case UPLOAD_SID_SIZE:
       /* REVERT NOTE: used to be stored in sidfile_size and passed to
-       * load_prg()/load_sidtune() as the byte count. Dropped: usplayer now
+       * load_prg()/load_sidtune() as the byte count. Dropped: usplayer
        * tracks the real count itself as bytes stream in, which is more
        * honest than this announced value ever was (see the removed "these
        * are never the same size" note this replaces). The command is still
-       * accepted so the upload sequence on the wire is unchanged; the value
-       * itself just goes nowhere now. */
+       * accepted to keep the upload sequence on the wire unchanged. The value
+       * itself goes nowhere. */
       usCFG("UPLOAD_SID_SIZE\n");
       usDBG("Received file size announcement: %u (no longer used)\n",
         (unsigned)(buffer[1]<<8|buffer[2]));
@@ -1927,7 +1927,7 @@ void save_config_ext(void)
  * @brief Run first-boot auto detection when the loaded config is the default
  *
  * If `usbsid_config.default_config` is set, clears the flag, sets
- * `first_boot` (so the link popup is sent once), runs sid_auto_detect() at
+ * `first_boot` (to send the link popup once), runs sid_auto_detect() at
  * boot (which turns on the socket regulators on v1.5+), forces
  * `need_confirmation`/`detected_sid_change` and turns the regulators back
  * off again on v1.5+, and saves the resulting config.

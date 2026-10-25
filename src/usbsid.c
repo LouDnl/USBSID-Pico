@@ -176,8 +176,8 @@ void reset_reason(void)
 /**
  * @brief Initialise debug logging if enabled
  *
- * Sets up UART stdio for debug output when USBSID_UART is compiled in;
- * no-op otherwise.
+ * Sets up UART stdio for debug output when USBSID_UART is compiled in.
+ * No-op otherwise.
  */
 void init_logging(void)
 {
@@ -237,7 +237,7 @@ void webserial_write(volatile uint8_t * itf, uint32_t n)
  * Called repeatedly by buffer_task to walk sid_buffer in steps of 2 (plain
  * write: register, value) or 4 (cycled write: register, value, cycle count)
  * bytes, issuing one cycled_write_operation per call. Keeps its walk index
- * in a function-local static so successive calls continue where the last
+ * in a function-local static, letting successive calls continue where the last
  * one left off.
  *
  * @param int top
@@ -630,7 +630,7 @@ void tud_cdc_rx_cb(uint8_t itf)
 /**
  * @brief TinyUSB callback fired when the CDC "wanted char" is received
  *
- * @note debug logging left disabled here to avoid possible uart spam
+ * @note debug logging left disabled in this callback to avoid possible uart spam
  *
  * @param uint8_t itf
  * @param char wanted_char
@@ -645,7 +645,7 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char)
 /**
  * @brief TinyUSB callback fired when a queued CDC transmit completes
  *
- * @note debug logging left disabled here to avoid uart spam
+ * @note debug logging left disabled in this callback to avoid uart spam
  *
  * @param uint8_t itf
  */
@@ -743,9 +743,9 @@ void __us_deprecated vendor_task(void)
  * @brief TinyUSB callback fired when WebUSB vendor data is available
  *
  * Read from host to device. With the fifo buffer disabled the buffer
- * contains the newest incoming data; with the fifo buffer enabled the
+ * contains the newest incoming data. With the fifo buffer enabled the
  * buffer contains data from the previous read. The vendor class has no
- * connect check built in, so web_serial_connected is used as a makeshift
+ * connect check built in: web_serial_connected is used as a makeshift
  * check.
  *
  * @param uint8_t itf
@@ -757,7 +757,7 @@ void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
   /* With the fifo buffer disabled the buffer contains the newest incoming data */
   /* If the fifo buffer is enabled the buffer contains data from the previous read */
 
-  /* vendor class has no connect check, so we use a makeshift check */
+  /* vendor class has no connect check, use a makeshift check */
   if __us_likely(itf == WUSB_ITF && web_serial_connected) {
       wusb_itf_num = itf;
       set_receivedata(true), dtype = wusb, rtype = wusb;
@@ -814,7 +814,7 @@ static void vendor_endpoints_reset(uint8_t rhport, uint8_t itf, uint8_t ep_out, 
 /**
  * @brief Handle incoming vendor and WebUSB control transfer requests
  *
- * Only the CONTROL_STAGE_SETUP stage is handled; other stages are
+ * Only the CONTROL_STAGE_SETUP stage is handled. Other stages are
  * acknowledged with no action. Handles the CDC-style SET_CONTROL_LINE_STATE
  * class request (0x22) used by WebSerial to signal connect/disconnect,
  * SET_INTERFACE on the WebUSB interface (endpoints back to DATA0, see
@@ -842,6 +842,24 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
     request->bmRequestType_bit.type, request->bmRequestType_bit.recipient, request->bmRequestType_bit.direction);
   /* Do nothing with IDLE (0), DATA (2) & ACK (3) stages */
   if (stage != CONTROL_STAGE_SETUP) return true;  /* Stage 1 */
+
+  // Commented out, not used right now
+  // switch (stage) {
+  //   case CONTROL_STAGE_IDLE: /* Stage 0 */
+  //     return true;
+  //   case CONTROL_STAGE_SETUP: /* Stage 1 */
+  //     break; /* Fallthrough to following switch */
+  //   case CONTROL_STAGE_DATA: /* Stage 2 */
+  //     return true;
+  //   case CONTROL_STAGE_ACK: /* Stage 3 */
+  //     if (request->bRequest == 0x22) {
+  //       return tud_control_status(rhport, request);
+  //     } else {
+  //       return true;
+  //     }
+  //   default: /* fallback */
+  //     return false;
+  // }
 
   switch (request->bmRequestType_bit.type) { /* BitType */
     case TUSB_REQ_TYPE_STANDARD:  /* 0 */
@@ -923,7 +941,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
 void __us_noreturn core0_loop(void)
 {
   while (1) {
-    tud_task_ext(0, false);  /* equals tud_task(); timout_ms already at 0 and is _always_ discarded in osal_none.h */
+    tud_task_ext(0, false);  /* equals tud_task(). The timout_ms is already at 0 and is _always_ discarded in osal_none.h */
 #if defined(USE_SID_STREAM)
     stream_task();  /* SID memory stream, own vendor interface */
 #endif
@@ -949,11 +967,11 @@ void __us_noreturn core0_loop(void)
     /* LED tracks actual WiFi or Bluetooth connection status
      * - off while neither is connected
      * - on once WiFi is associated with an IP, or a Bluetooth SPP channel is open
-     * Skipped while detected_sid_change is true so it never fights led_fast_blink()'s
+     * Skipped while detected_sid_change is true. It never fights led_fast_blink()'s
      * priority indicator over the same GPIO.
      * Only touches the GPIO on an actual state change, not every loop tick
      * - it's a real SPI transaction to the CYW43439
-     * - always runs on this core so there's no cross-core race */
+     * - always runs on this core: no cross-core race */
     if (!detected_sid_change) {
       static bool wifi_led_on = false;
       bool want_on = usbsid_config.LED.enabled
@@ -1017,7 +1035,7 @@ void __us_noreturn core1_loop(void)
 
     /* Drain the MIDI event ring.
      * Core1 handles SID bus writes for MIDI input
-     * so USB callbacks on Core0 are not interrupted
+     * to keep USB callbacks on Core0 uninterrupted
      */
     #ifdef ONBOARD_EMULATOR
     /* Skip if embedded Cynthcart is running  */
@@ -1038,7 +1056,7 @@ void __us_noreturn core1_loop(void)
 
     /* The Embedded SID player is completely run by Core1 and
      * is mutually exclusive with Cynthcart.
-     * There can be only 1 ;-)
+     * There can be only 1 :-)
      */
     #ifdef ONBOARD_EMULATOR
     if (sidplayer_init && !emulator_running) {
@@ -1180,7 +1198,7 @@ void core1_main(void)
   /* Set core locking for flash saving ~ note this makes SIO_IRQ_PROC1 unavailable */
   flash_safe_execute_core_init();  /* This needs to start before any flash actions take place! */
 
-  /* Signal Core 0 we're ready (sync point 1) */
+  /* Signal Core 0 that core 1 is ready (sync point 1) */
   usBOOT("<CORE 1> Signaling core0 ready ~ 1\n");
   core_sync_state = SYNC_CORE1_STAGE1;
   __dsb();  /* Data Synchronisation Barrier - ensures store completes before SEV */
@@ -1198,7 +1216,7 @@ void core1_main(void)
   /* Init SID test queue, a single entry deep */
   queue_init(&sidtest_queue, sizeof(sidtest_queue_entry_t), 1);
   #ifdef WRITE_DEBUG  /* Only init this queue when needed */
-  /* Init Write logging queue, 16384 entries deep so we don't skip any writes */
+  /* Init Write logging queue, 16384 entries deep to avoid skipping any writes */
   #ifdef RP2350
   queue_init(&logging_queue, sizeof(writelogging_queue_entry_t), 16384);
   #else /* RP2040 */
@@ -1211,7 +1229,7 @@ void core1_main(void)
   init_uart();
   #endif
 
-  /* Signal Core 0 we're ready (sync point 2) */
+  /* Signal Core 0 that core 1 is ready (sync point 2) */
   usBOOT("<CORE 1> Signaling core0 ready ~ 2\n");
   core_sync_state = SYNC_CORE1_STAGE2;
   __dsb(); /* Data Synchronisation Barrier - ensures store completes before SEV */
@@ -1245,7 +1263,7 @@ void core1_main(void)
  *
  * @note runs on core 0, hands control over to `core0_loop` after init.
  *
- * @return int never actually returns; present for the standard C signature
+ * @return int never actually returns. Present for the standard C signature
  */
 int main()
 {
@@ -1366,7 +1384,7 @@ int main()
   usBOOT("Setup DMA channels\n");
   setup_dmachannels();
 
-  /* Claim the bus spinlock before core1 is released to its main loop, so it
+  /* Claim the bus spinlock before core1 is released to its main loop. It
    * exists before anything could contend on it */
   usBOOT("Setup bus lock\n");
   bus_lock_init();
@@ -1419,8 +1437,8 @@ int main()
    * verify_socket_config() during boot.
    * midi_config_init() during midi_init() in the boot sequence ran
    * before that and does not know MAX_SIDS yet. The host has not
-   * been allowed to enumerate yet, tud_connect() runs just before the
-   * main loop, so there is no MIDI traffic this could race against.
+   * been allowed to enumerate yet, tud_connect() runs right before the
+   * main loop: there is no MIDI traffic this could race against.
    */
   midi_config_sync_poly_limits();
 

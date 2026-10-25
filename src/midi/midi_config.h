@@ -88,7 +88,7 @@ typedef enum {
 #define MIDI_CH_UNISON         (1u << 4)
 
 /* Held-note capacity for the arpeggiator's input pattern. A held key beyond
- * this is simply not added to the pattern; the arp still plays whatever
+ * this is not added to the pattern. The arp still plays whatever
  * fits. 8 covers any chord a hand can play plus a few extra. */
 #define MIDI_ARP_MAX_NOTES 8
 
@@ -104,7 +104,7 @@ typedef enum {
 /* Per-channel routing and voice-template state, one entry per MIDI channel. */
 typedef struct {
   uint16_t voice_mask;      /* configured pool slots this channel may use, bit i = slot i */
-  uint8_t  poly_limit;      /* max simultaneously held notes; 1 = mono */
+  uint8_t  poly_limit;      /* max simultaneously held notes. 1 = mono */
   uint8_t  steal_mode;      /* midi_steal_mode_t */
   int8_t   transpose;       /* semitones, replaces the old compile-time MIDI_TRANSPOSE */
   uint8_t  bend_range;      /* pitch bend range in semitones, default 2 */
@@ -114,7 +114,7 @@ typedef struct {
   uint8_t  voice_override;  /* MIDI_OVERRIDE_NONE, or 0..MAX_VOICES-1 */
   /* Per-voice register template. Stamped onto a voice when it is allocated,
    * and pushed live to every voice this channel currently holds whenever a
-   * CC changes it, so held notes reflect timbre changes immediately. Excludes
+   * CC changes it. Held notes reflect timbre changes immediately. Excludes
    * the gate bit of CONTR, which the allocator and CC_GATE own directly. */
   uint8_t  tmpl_contr;
   uint8_t  tmpl_attdec;
@@ -125,18 +125,18 @@ typedef struct {
   /* Unison detune spread (0-255, MBSID's own single-field
    * convention - see mbsidv2_sysex_implementation.txt addr 0x051). Voice 2
    * and 3 of a claimed unison triplet are offset +detune/-detune from the
-   * struck pitch; unused unless MIDI_CH_UNISON is set in `flags`. */
+   * struck pitch. Unused unless MIDI_CH_UNISON is set in `flags`. */
   uint8_t  unison_detune;
 
   /* Pitch bend: current offset in note-index*256 fixed point, updated
-   * immediately on a pitch-bend message and re-applied every tick (so LFO
+   * immediately on a pitch-bend message and re-applied every tick (LFO
    * pitch modulation and portamento glide can stack on top of it without
    * a bend message needing to arrive again). */
   int32_t  bend_x256;
 
   /* Portamento. porta_time 0 = off. `last_target_x256` is the note-index
-   * (fixed point) of the most recently triggered note on this channel; a
-   * freshly allocated voice glides in from here when porta_time > 0, giving
+   * (fixed point) of the most recently triggered note on this channel. A
+   * freshly allocated voice glides in from this position when porta_time > 0, giving
    * classic mono-synth-style glide behaviour even across the flat pool. */
   uint8_t  porta_time;
   int32_t  last_target_x256;
@@ -152,7 +152,7 @@ typedef struct {
   int16_t  lfo_sh_value;
 
   /* A second, fully independent LFO, same shape as above. If both target
-   * the same destination their offsets simply add. */
+   * the same destination their offsets add. */
   uint8_t  lfo2_wave;
   uint8_t  lfo2_rate;
   uint8_t  lfo2_depth;
@@ -163,7 +163,7 @@ typedef struct {
 
   /* Arpeggiator. Held notes are the arp's *input* pattern, separate from
    * the voice pool: only the currently stepped note is ever a gated voice.
-   * `arp_rate` free-runs like the LFO when no MIDI clock is present; when a
+   * `arp_rate` free-runs like the LFO when no MIDI clock is present. When a
    * clock is present it is read as a PPQN division instead (see
    * midi_clock_present() in midi.h). */
   uint8_t  arp_mode;    /* midi_arp_mode_t */
@@ -193,14 +193,14 @@ typedef struct {
 extern midi_channel_cfg_t midi_channels[MAX_CHANNELS];
 
 /* Sets every channel's defaults: channel 1 gets all 12 slots, full poly,
- * oldest-steal; channels 2-5 get one SID each, exclusive, 3-voice poly;
- * channels 6-16 are disabled (empty mask). */
+ * oldest-steal. Channels 2-5 get one SID each, exclusive, 3-voice poly.
+ * Channels 6-16 are disabled (empty mask). */
 void midi_config_init(void);
 
-/* The mask actually available to `channel` right now: the configured
+/* The mask actually available to `channel` at the moment: the configured
  * voice_mask, clipped to SIDs `cfg.numsids` says are present, further
  * narrowed by sid_override / voice_override if either is set. Computed
- * fresh on every call rather than cached, so a config change (numsids,
+ * fresh on every call rather than cached. A config change (numsids,
  * an override) is reflected immediately with nothing to invalidate. */
 uint16_t midi_channel_effective_mask(uint8_t channel);
 
@@ -215,7 +215,7 @@ uint16_t midi_channel_effective_mask(uint8_t channel);
  * valid data from garbage once the ring has wrapped. */
 
 #define MIDI_CONFIG_MAGIC   0x4D494431u  /* 'MID1', fixed, independent of MAGIC_SMOKE */
-#define MIDI_CONFIG_VERSION 3  /* bump whenever the blob layout changes; the
+#define MIDI_CONFIG_VERSION 3  /* bump whenever the blob layout changes. The
                                    size check in midi_config_load() falls
                                    back to defaults on an old blob */
 
@@ -225,7 +225,7 @@ typedef struct {
   uint16_t size;      /* sizeof(midi_config_blob_t) at write time */
   uint32_t crc32;      /* over every byte from `saveid` onward */
   uint8_t  saveid;      /* which of the MIDICONFIG_SAVE_SLOTS slots this was written to */
-  uint32_t sequence;    /* monotonic write counter; highest valid wins on load */
+  uint32_t sequence;    /* monotonic write counter. Highest valid wins on load */
   midi_ccvalues       ccmap;
   midi_channel_cfg_t  channel[MAX_CHANNELS];  /* whole live struct, see midi_config_load()
                                                   for why the transient runtime fields inside

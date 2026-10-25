@@ -38,7 +38,7 @@
 #include <string.h>
 
 /* Largest single NSD packet this device accepts. The reference client caps
- * itself at 1020 B of payload; 1024 gives slack without a heap allocation. */
+ * itself at 1020 B of payload. 1024 gives slack without a heap allocation. */
 #define NSD_MAX_PAYLOAD 1024
 
 /* TRY_SET_SID_COUNT maximum: TRY_WRITE_EX/TRY_READ_EX address 16 SIDs */
@@ -60,14 +60,14 @@
 
 /* v5 TRY_WRITE_EX/TRY_READ_EX register addresses (nsd.h). 0x0000-0x01ff
  * is SID 1-16, 0x20 per chip, the same convention TRY_WRITE's 8-bit register
- * byte already used for SID 1-8 (top bits = chip); 0xdf00-0xdfff is C64 I/O
+ * byte already used for SID 1-8 (top bits = chip). The range 0xdf00-0xdfff is C64 I/O
  * $DF00-$DFFF, where the FM OPL device answers on two ports. */
 #define NSD_EX_SID_MAX    0x0200
 #define NSD_EX_FMOPL_ADDR 0xDF40 /* C64 I/O $DF40: OPL address/index port */
 #define NSD_EX_FMOPL_DATA 0xDF50 /* C64 I/O $DF50: OPL data port */
 
 /* Reassembly state machine. One instance: `nsd_session_open()` refuses a
- * second concurrent session, so there is never more than one packet in
+ * second concurrent session: there is never more than one packet in
  * flight at a time. */
 typedef struct {
   uint8_t  header[4];
@@ -85,13 +85,13 @@ typedef struct {
 static nsd_reassembly_t reasm;
 
 /* Cycle accounting for the write ring - the authoritative BUSY signal, see
- * nsd_pending_cycles(). One writer per counter, no shared read-modify-write;
- * all three free-run and compare wrap-safe, like the net_ring.c indices.
+ * nsd_pending_cycles(). One writer per counter, no shared read-modify-write.
+ * All three free-run and compare wrap-safe, like the net_ring.c indices.
  * nsd_cycles_in:   core 0 only, raised by each entry before its push.
  * nsd_cycles_out:  core 1 only, raised by the cycles of each entry once
  *                  written, dropped, or spent by a later write (muted
  *                  entry carry). Never leads nsd_cycles_in.
- * nsd_cycles_mark: core 0 only, nsd_cycles_in at the last ring reset; the
+ * nsd_cycles_mark: core 0 only, nsd_cycles_in at the last ring reset. The
  *                  cycles below it belong to dropped entries. */
 static uint32_t          nsd_cycles_in = 0;
 static volatile uint32_t nsd_cycles_out = 0;
@@ -125,8 +125,8 @@ static volatile uint8_t nsd_mute_gen = 0;
  * for TRY_RESET's volume-register sweep. */
 static uint8_t nsd_sid_count = 1;
 
-/* Telemetry-only copy of the last SET_SID_HEADER payload; nothing reads it
- * back today, it exists so the info is available if that changes later. */
+/* Telemetry-only copy of the last SET_SID_HEADER payload. Nothing reads it
+ * back today. It exists to keep the info available if that changes later. */
 static uint8_t nsd_psid_header[124];
 
 /* TRY_SET_FM_OPL's own on/off state (spec: "enable or disable FM OPL for
@@ -230,7 +230,7 @@ static void nsd_queue(const uint8_t quad[4])
  * @brief Update and read the ring backpressure latch
  *
  * Hysteresis: once nsd_pending_cycles() crosses NSD_CYCLES_HIGH the latch
- * sticks until it drains back below NSD_CYCLES_LOW, so BUSY doesn't
+ * sticks until it drains back below NSD_CYCLES_LOW. BUSY doesn't
  * chatter around the high threshold on every packet. An empty ring always
  * clears the latch.
  */
@@ -355,7 +355,7 @@ static bool nsd_sid_active(uint16_t addr)
  * @param reg register byte, NSD_RING_RAW allowed
  * @param data data byte
  * @param cycles delay cycles before the write
- * @param direct true: write at once, caller owns the bus; false: queue
+ * @param direct true: write at once, caller owns the bus. False: queue
  */
 static void nsd_emit(uint8_t reg, uint8_t data, uint16_t cycles, bool direct)
 {
@@ -784,7 +784,7 @@ static bool nsd_fmopl_routed(uint16_t addr)
  * @brief TRY_WRITE_EX (19): v5 extended write, up to 16 SIDs or FM OPL
  *
  * Payload is 5*N bytes, each {delay_hi, delay_lo, addr_hi, addr_lo, value}.
- * addr 0x0000-0x01ff addresses SID 1-16 (0x20 per chip); this board only
+ * addr 0x0000-0x01ff addresses SID 1-16 (0x20 per chip). This board only
  * has 4 real sockets: chip 5-16 entries, and entries for a disabled
  * socket, are accepted and keep only their delay. addr 0xdf00-0xdfff is
  * C64 I/O $DF00-$DFFF: $DF40 writes the OPL address port, $DF50 the OPL
@@ -940,7 +940,7 @@ static uint16_t handle_try_set_sid_model(uint8_t sid_number, const uint8_t *payl
     if (nsd_chiptype_for_base(base_address, &chiptype)
       && chiptype != CHIP_REAL && chiptype != CHIP_UNKNOWN) {
       /* set_sidemu_sidtype() (sid_cloneconfig.c) is itself unfinished
-       * upstream; the NSD model index (0=6581, 1=8580) is passed through. */
+       * upstream. The NSD model index (0=6581, 1=8580) is passed through. */
       if (bus_try_claim(BUS_OWNER_NET)) {
         set_sidemu_sidtype(base_address, payload[0]);
         bus_release(BUS_OWNER_NET);
@@ -970,7 +970,7 @@ static uint16_t handle_set_sid_header(const uint8_t *payload, uint16_t payload_l
  *
  * Requires the write ring drained first, same reasoning as TRY_RESET/
  * TRY_SET_CLOCK: it changes how TRY_WRITE_EX routes FMOpl-range entries
- * from here on, and a queued entry from before the switch should not be
+ * from then on, and a queued entry from before the switch should not be
  * reinterpreted after it.
  *
  * Enabling a disabled device runs clear_fmopl_registers_at_addr() (spec).
@@ -1072,7 +1072,7 @@ static void process_nsd_command(const uint8_t *header, const uint8_t *payload, u
     case NSD_CMD_TRY_SET_SAMPLING:
     case NSD_CMD_SET_FADE_IN:
     case NSD_CMD_SET_FADE_OUT:
-      /* Also no-ops here, but "returns BUSY until audio quiescent, otherwise
+      /* Also no-ops in this handler, but "returns BUSY until audio quiescent, otherwise
        * OK" (spec) rather than always OK - distinct from the group above. */
       if (!nsd_quiescent()) { resp_buf[0] = NSD_RESP_BUSY; resp_len = 1; break; }
       resp_buf[0] = NSD_RESP_OK;
@@ -1109,7 +1109,7 @@ static void process_nsd_command(const uint8_t *header, const uint8_t *payload, u
 /**
  * @brief Feed incoming transport bytes to the NSD reassembly state machine
  *
- * Byte at a time, so a TCP/RFCOMM split mid-packet doesn't matter. Always
+ * Byte at a time: a TCP/RFCOMM split mid-packet doesn't matter. Always
  * consumes everything given.
  *
  * @param data incoming bytes
@@ -1127,13 +1127,13 @@ uint16_t nsd_feed(const uint8_t *data, uint16_t len)
 
       reasm.payload_len = (uint16_t)((reasm.header[2] << 8) | reasm.header[3]);
       if (reasm.payload_len > NSD_MAX_PAYLOAD) {
-        /* Too big to buffer (spec allows up to 65,535 B of payload; this
+        /* Too big to buffer (spec allows up to 65,535 B of payload. This
          * board only has room for NSD_MAX_PAYLOAD). Missing/malformed data
          * gets ERROR elsewhere (see the Error Handling section), and a
-         * silent drop here is worse: a client waiting on a response for a
+         * silent drop at this point is worse: a client waiting on a response for a
          * legally-sized packet would otherwise hang forever. Still consume
          * and discard exactly payload_len bytes rather than resetting
-         * outright, so framing stays in sync with a client that already
+         * outright. Framing stays in sync with a client that already
          * committed to sending them - see the `oversized` branch below. */
         uint8_t resp = NSD_RESP_ERROR;
         nsd_send(&resp, 1);
@@ -1221,7 +1221,7 @@ bool nsd_session_is_active(void)
 /**
  * @brief Core 1 task to drain the NSD write ring
  *
- * Called every core 1 loop iteration. Blocking here is fine: core 1 has no
+ * Called every core 1 loop iteration. Blocking in this task is fine: core 1 has no
  * latency obligations while nothing else is queued. Each entry stays in
  * the ring until its bus write returned (net_ring_peek(), then
  * net_ring_advance()): core 0 sees the ring idle only once the last write
@@ -1245,7 +1245,7 @@ void nsd_drain_task(void)
   }
 
   if (net_ring_count() == 0) return;
-  if (!bus_try_claim(BUS_OWNER_NET)) return; /* USB (or MIDI/player) is active, try again next loop */
+  if (!bus_try_claim(BUS_OWNER_NET)) return; /* USB (or MIDI/player) is active, try again on the following loop */
 
   while (net_ring_peek(quad, &dropped)) {
     uint8_t reg = quad[2];

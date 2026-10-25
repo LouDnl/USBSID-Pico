@@ -733,7 +733,7 @@ ConfigError detect_socket_change(void)
   /* Detection mixes fire and forget writes with cpu side irq handling,
      which can leave the bus pipeline one word out of step. Nothing else
      in the boot path re-initialises the bus statemachines after this
-     point, so realign them here or every cycled write from now on gets
+     point. Realign them in this function or every cycled write afterwards gets
      paired with the wrong delay value */
   bus_drain();   /* Let the last register writes land */
   bus_resync();  /* Then put the pipeline back in a known state */
@@ -764,7 +764,7 @@ void apply_socket_config_voltages(void)
       && usbsid_config.socketOne.sid1.type == SID_6581)
       || (usbsid_config.socketTwo.chiptype == CHIP_REAL
       && usbsid_config.socketTwo.sid1.type == SID_6581)) {
-    /* If 12v is needed we disable all voltages and reconfigure the HV */
+    /* If 12v is needed, disable all voltages and reconfigure the HV */
     voltage_state_off();
     /* SocketOne */
     if (usbsid_config.socketOne.enabled) {
@@ -791,7 +791,7 @@ void apply_socket_config_voltages(void)
       }
     }
     voltage_state_on(); /* Turn on regulators */
-  } else { /* Not a real 6581? Then just fire up the 5v and 9v */
+  } else { /* Not a real 6581? Then fire up the 5v and 9v */
     set_base_voltages(100);
   }
 #endif
@@ -832,7 +832,7 @@ void verify_socket_config(void)
       /* Disable SID chips if still enabled */
       voltage_state_off();
     }
-  } else { /* Just go with the flow and live dangerously! */
+  } else { /* Go with the flow and live dangerously! */
     if (usbsid_config.need_confirmation || detected_sid_change) { /* Fallback check to disable these */
       usbsid_config.need_confirmation = detected_sid_change = false;
       /* usSOCK("Saving detection result\n"); */

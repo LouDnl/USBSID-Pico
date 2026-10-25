@@ -240,7 +240,7 @@ static void __no_inline_not_in_flash_func(stream_build_frame)(uint8_t *frame, ui
 /**
  * @brief Build and queue the due tick
  *
- * Advances the sequence by every elapsed tick; ticks missed entirely count
+ * Advances the sequence by every elapsed tick. Ticks missed entirely count
  * as dropped. Queues one frame per active SID in SID order when the ring
  * has room for all of them, else drops the tick, then starts the IN
  * transfer if the endpoint is idle.

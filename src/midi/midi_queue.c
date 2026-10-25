@@ -30,7 +30,7 @@
 
 /* 128 entries, 512 bytes. Deliberately not queue_t: that takes a spinlock
  * per entry, which is exactly the per-message cost this ring exists to
- * avoid. One slot is always left empty so head == tail is unambiguously
+ * avoid. One slot is always left empty: head == tail is unambiguously
  * "empty" without a separate count. */
 #define MIDI_QUEUE_SIZE 128
 #define MIDI_QUEUE_MASK (MIDI_QUEUE_SIZE - 1)
@@ -61,7 +61,7 @@ void midi_queue_init(void)
  *
  * @note single-producer: must only be called from core0 (the USB callback)
  * @note a data memory barrier separates the entry write from publishing
- *       the new head, so the consumer never sees a half-written entry
+ *       the new head. The consumer never sees a half-written entry
  *
  * @param uint8_t const * buf
  * @param uint8_t len number of valid bytes in buf (1 to 3)

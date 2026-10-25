@@ -58,7 +58,7 @@ volatile uint32_t rgb_value = 0;
  * matching bus PIO state machine FIFO. The clock counter uses a single
  * endless-transfer channel on RP2350, and a two-channel ping-pong chain
  * on RP2040 (which lacks native endless transfer support), started
- * immediately so cycle_count_word updates continuously.
+ * immediately, making cycle_count_word update continuously.
  *
  * @note do not manually assign DMA channel numbers, this causes a panic on
  *       the PicoW
@@ -243,7 +243,7 @@ void clear_dma_channels(void)
                       | (1u << dma_counter)    | (1u << dma_counter_chain);
 #endif
   /* RP2040-E13 / RP2350-E5: disable IRQ enables for these channels before
-   * aborting so a pending completion cannot block the abort */
+   * aborting, to prevent a pending completion from blocking the abort */
   uint32_t saved_inte0 = dma_hw->inte0 & abort_mask;
   hw_clear_bits(&dma_hw->inte0, abort_mask);
   /* Atomically abort all four channels */
@@ -253,9 +253,9 @@ void clear_dma_channels(void)
   dma_hw->ints0 = abort_mask;
   /* Restore interrupt enables */
   hw_set_bits(&dma_hw->inte0, saved_inte0);
-  /* Flush PIO FIFOs so no stale data remains for the next transfer */
+  /* Flush PIO FIFOs to leave no stale data for the following transfer */
   clear_bus_fifos();
-  /* The pipeline never ran empty, so the flush above may have truncated
+  /* The pipeline never ran empty. The flush above may have truncated
      an operation halfway, put the bus statemachines back in step */
   if __us_unlikely(!drained) bus_resync();
   dma_hw->multi_channel_trigger =
@@ -275,9 +275,9 @@ void clear_dma_channels(void)
  *        `sync_pios(false)` call, not by this function.
  *
  *        The 4 bus DMA channels stay claimed, configured and enabled across
- *        the abort (`dma_channel_abort` never touches CTRL_EN); each is
+ *        the abort (`dma_channel_abort` never touches CTRL_EN). Each is
  *        re-triggered on demand per bus operation with a freshly written
- *        buffer address (see bus.c), so there is nothing to re-arm
+ *        buffer address (see bus.c). Nothing to re-arm
  *        afterwards. NOTE: never trigger these channels via
  *        `dma_hw->multi_channel_trigger` right after this call, it would
  *        replay whatever stale control/data word was still loaded when
@@ -289,7 +289,7 @@ void abort_dma_bustransfers(void)
   uint32_t abort_mask = (1u << dma_tx_control) | (1u << dma_tx_data)
                       | (1u << dma_rx_data)    | (1u << dma_tx_delay);
   /* RP2040-E13 / RP2350-E5: disable IRQ enables for these channels before
-   * aborting so a pending completion cannot block the abort */
+   * aborting, to prevent a pending completion from blocking the abort */
   uint32_t saved_inte0 = dma_hw->inte0 & abort_mask;
   hw_clear_bits(&dma_hw->inte0, abort_mask);
   /* Atomically abort all four channels */

@@ -44,14 +44,14 @@
 typedef struct {
   int8_t  offsets[MIDI_ARP_TABLE_STEPS];  /* relative semitones from the arp's root note */
   uint8_t loop_start;                      /* step index the table returns to after step_count-1,
-                                               so a table can have a distinct intro before its
+                                               letting a table have a distinct intro before its
                                                repeating tail, e.g. an attack transient */
   uint8_t step_count;                      /* 0 = empty/unauthored, arp_advance_table() no-ops */
 } midi_arp_table_t;
 
 extern midi_arp_table_t arp_tables[MIDI_ARP_TABLE_COUNT];
 
-/* Table 0 is a repeating major triad (0, 4, 7); tables 1-15 start empty. */
+/* Table 0 is a repeating major triad (0, 4, 7). Tables 1-15 start empty. */
 void midi_arp_table_init(void);
 
 
