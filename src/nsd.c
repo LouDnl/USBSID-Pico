@@ -50,10 +50,6 @@
 #define NSD_DELAY_MAX   0xFFFF
 /* Least delay a filler split leaves for the write after the filler */
 #define NSD_DELAY_REST  32
-/* Floor for a negative carry, bounds an endless run of short FM pairs */
-#define NSD_DEBT_MIN    (-16 * NSD_DELAY_MAX)
-/* FM OPL index port to data port gap in cycles, as opl_write() */
-#define NSD_FMOPL_GAP   10
 /* Ring register byte flag: write as is, no mute check (fillers, FM OPL) */
 #define NSD_RING_RAW    0x80
 
@@ -62,14 +58,13 @@
  * of NSD_DELAY_MAX cycles each take ~333 ms PAL */
 #define NSD_SETTLE_US   500000u
 
-/* v5 TRY_WRITE_EX/TRY_READ_EX register address ranges (nsd.h). 0x0000-0x01ff
+/* v5 TRY_WRITE_EX/TRY_READ_EX register addresses (nsd.h). 0x0000-0x01ff
  * is SID 1-16, 0x20 per chip, the same convention TRY_WRITE's 8-bit register
- * byte already used for SID 1-8 (top bits = chip); 0xdf00-0xdfff is a real
- * OPL2's 256-register space at the C64 I/O address an FM OPL cartridge/clone
- * answers on. */
-#define NSD_EX_SID_MAX  0x0200
-#define NSD_EX_FMOPL_LO 0xDF00
-#define NSD_EX_FMOPL_HI 0xDFFF
+ * byte already used for SID 1-8 (top bits = chip); 0xdf00-0xdfff is C64 I/O
+ * $DF00-$DFFF, where the FM OPL device answers on two ports. */
+#define NSD_EX_SID_MAX    0x0200
+#define NSD_EX_FMOPL_ADDR 0xDF40 /* C64 I/O $DF40: OPL address/index port */
+#define NSD_EX_FMOPL_DATA 0xDF50 /* C64 I/O $DF50: OPL data port */
 
 /* Reassembly state machine. One instance: `nsd_session_open()` refuses a
  * second concurrent session, so there is never more than one packet in
@@ -103,10 +98,9 @@ static volatile uint32_t nsd_cycles_out = 0;
 static uint32_t          nsd_cycles_mark = 0;
 static volatile bool     nsd_ring_busy_latched = false;
 
-/* Delay not handed to the bus yet, core 0 only, see nsd_lead(). Positive:
- * cycles of delay-only accesses, at most NSD_DELAY_MAX, added to the
- * following bus write. Negative: cycles an FM OPL pair ran past its delay,
- * taken off the following delays. Pending audio time like the queued entries. */
+/* Delay not handed to the bus yet, core 0 only, see nsd_lead(): cycles of
+ * delay-only accesses, at most NSD_DELAY_MAX, added to the following bus
+ * write. Pending audio time like the queued entries. */
 static int32_t nsd_carry = 0;
 
 /* Core 1 only: cycles of entries muted at play time, added to the
@@ -378,10 +372,11 @@ static void nsd_emit(uint8_t reg, uint8_t data, uint16_t cycles, bool direct)
 /**
  * @brief Register byte for a filler write, a write that only paces a delay
  *
- * Register 0x1E of an active SID, the chip of `hint` first. Without an
- * active SID the FM OPL index port: an index write sets no OPL register,
- * every OPL write sets the index before its data. 0x1E of SID 1 when
- * nothing is active, set_bus_bits() drops it.
+ * Register 0x1E of an active SID, the chip of `hint` first. Never the FM
+ * OPL socket: a filler there would rewrite the OPL address latch between a
+ * client's address and data port writes. Without an active SID 0x1E of
+ * SID 1, or of SID 2 when SID 1 is the FM OPL socket, set_bus_bits()
+ * drops it.
  *
  * @param hint SID address the delay belongs to
  * @return uint8_t register byte
@@ -392,8 +387,8 @@ static uint8_t nsd_filler_reg(uint16_t hint)
   for (uint8_t base = 0x00; base < (NSD_BOARD_SIDS * 0x20); base += 0x20) {
     if (nsd_sid_active(base)) return (uint8_t)(base | 0x1E);
   }
-  if (nsd_fmopl_socket_active()) return nsd_fmopl_base();
-  return 0x1E;
+  /* No active SID: 0x1E of a socket that is not the FM OPL socket */
+  return nsd_fmopl_chip(0) ? 0x3E : 0x1E;
 }
 
 /**
@@ -412,8 +407,8 @@ static void nsd_filler(uint16_t hint, uint16_t cycles, bool direct)
 /**
  * @brief Filler size for a delay above NSD_DELAY_MAX
  *
- * Leave at least NSD_DELAY_REST for the write after the filler: an FM OPL
- * index write right after a filler on the index port could be lost.
+ * Leave at least NSD_DELAY_REST cycles of the delay for the write after the
+ * filler.
  *
  * @param t delay cycles, above NSD_DELAY_MAX
  * @return uint16_t filler delay cycles
@@ -447,11 +442,10 @@ static void nsd_carry_delay(uint16_t hint, uint16_t cycles, bool direct)
 /**
  * @brief Delay of a bus write with the carry added, core 0 only
  *
- * Above NSD_DELAY_MAX emit a filler first. Below zero the write goes with
- * no delay and the rest stays as negative carry.
+ * Above NSD_DELAY_MAX emit a filler first.
  *
  * @param hint SID address of the write
- * @param cycles delay the client asked for, may be negative
+ * @param cycles delay the client asked for
  * @param direct see nsd_emit()
  * @return uint16_t delay for the write
  */
@@ -463,10 +457,6 @@ static uint16_t nsd_lead(uint16_t hint, int32_t cycles, bool direct)
     uint16_t f = nsd_split((uint32_t)t);
     nsd_filler(hint, f, direct);
     t -= f;
-  }
-  if (t < 0) {
-    nsd_carry = (t < NSD_DEBT_MIN) ? NSD_DEBT_MIN : t;
-    t = 0;
   }
   return (uint16_t)t;
 }
@@ -493,31 +483,29 @@ static void nsd_sid_write(uint16_t addr, uint8_t value, uint16_t cycles, bool di
 }
 
 /**
- * @brief FM OPL write as an index port, data port pair
+ * @brief One FM OPL port write, client delay as given (as nsd_sid_write())
  *
- * The data write lands at the caller's delay: the index write takes
- * delay - NSD_FMOPL_GAP. A delay below the gap runs long, the overrun
- * stays as negative carry and shortens the following delays.
+ * $DF40 goes to the FM OPL socket's address port (base + 0x00), $DF50 to
+ * its data port (base + 0x10). The OPL chip holds the address latch.
  *
- * @param reg OPL register
+ * @param addr NSD_EX_FMOPL_ADDR or NSD_EX_FMOPL_DATA
  * @param value data byte
- * @param cycles delay cycles before the data write
+ * @param cycles delay cycles before the write
  * @param direct see nsd_emit()
  */
-static void nsd_fmopl_write(uint8_t reg, uint8_t value, uint16_t cycles, bool direct)
+static void nsd_fmopl_write(uint16_t addr, uint8_t value, uint16_t cycles, bool direct)
 {
-  uint8_t base = nsd_fmopl_base();
-  uint16_t lead = nsd_lead(base, (int32_t)cycles - NSD_FMOPL_GAP, direct);
-  nsd_emit((uint8_t)(base | NSD_RING_RAW), reg, lead, direct);
-  nsd_emit((uint8_t)((base + 0x10) | NSD_RING_RAW), value, NSD_FMOPL_GAP, direct);
+  uint8_t reg = (uint8_t)(nsd_fmopl_base() + (addr == NSD_EX_FMOPL_ADDR ? 0x00 : 0x10));
+  uint16_t lead = nsd_lead(reg, cycles, direct);
+  nsd_emit((uint8_t)(reg | NSD_RING_RAW), value, lead, direct);
 }
 
 /**
  * @brief Whether all queued audio has played, core 0 only
  *
  * Queue a positive carry as a filler first, it is audio time not played
- * yet. A negative carry ends at an idle ring. Idle means core 1 also
- * returned from its last write (net_ring_idle()).
+ * yet. Idle means core 1 also returned from its last write
+ * (net_ring_idle()).
  *
  * @return true when the ring is idle and no delay is carried
  */
@@ -528,7 +516,6 @@ static bool nsd_quiescent(void)
     nsd_carry = 0;
   }
   if (nsd_carry > 0 || !net_ring_idle()) return false;
-  nsd_carry = 0;
   return true;
 }
 
@@ -603,6 +590,9 @@ static uint16_t handle_flush(uint8_t *resp_buf)
   nsd_ring_reset();
   if (bus_try_claim(BUS_OWNER_NET)) { /* USB still wins, see bus.c */
     mute_sid();
+    if (nsd_fmopl_socket_active()) {
+      clear_fmopl_registers_at_addr(nsd_fmopl_base());
+    }
     bus_release(BUS_OWNER_NET);
   }
   resp_buf[0] = NSD_RESP_OK;
@@ -675,6 +665,9 @@ static uint16_t handle_try_reset(uint8_t volume, uint8_t *resp_buf)
     return 1;
   }
   reset_sid();
+  if (nsd_fmopl_socket_active()) {
+    clear_fmopl_registers_at_addr(nsd_fmopl_base());
+  }
   for (uint8_t sid = 0; sid < nsd_sid_count; sid++) {
     uint8_t base = (uint8_t)(sid * 0x20);
     /* "The volume value does not apply to FM OPL" (spec), base+0x18 is
@@ -773,17 +766,17 @@ static uint16_t handle_try_read(const uint8_t *payload, uint16_t payload_len, ui
 }
 
 /**
- * @brief Whether a v5 address is an FM OPL write that reaches the bus
+ * @brief Whether a v5 address is an FM OPL port write that reaches the bus
  *
- * In the 0xdf00-0xdfff range, socket configured as FM OPL, turned on for
- * this connection and its chip select enabled.
+ * $DF40 or $DF50, socket configured as FM OPL, turned on for this
+ * connection and its chip select enabled.
  *
  * @param addr v5 register address
- * @return true to route as an OPL index/data write pair
+ * @return true to route as one OPL port write
  */
 static bool nsd_fmopl_routed(uint16_t addr)
 {
-  return (addr >= NSD_EX_FMOPL_LO && addr <= NSD_EX_FMOPL_HI
+  return ((addr == NSD_EX_FMOPL_ADDR || addr == NSD_EX_FMOPL_DATA)
           && nsd_fmopl_active && nsd_fmopl_socket_active());
 }
 
@@ -793,11 +786,11 @@ static bool nsd_fmopl_routed(uint16_t addr)
  * Payload is 5*N bytes, each {delay_hi, delay_lo, addr_hi, addr_lo, value}.
  * addr 0x0000-0x01ff addresses SID 1-16 (0x20 per chip); this board only
  * has 4 real sockets: chip 5-16 entries, and entries for a disabled
- * socket, are accepted and keep only their delay. addr 0xdf00-0xdfff
- * becomes the two-port index/data write a real OPL2 wants (opl_write(),
- * midi_fmopl.c) when a socket is configured for it AND TRY_SET_FM_OPL has
- * turned it on for this connection (nsd_fmopl_routed()), delay only
- * otherwise. A pair below NSD_FMOPL_GAP cycles carries its overrun.
+ * socket, are accepted and keep only their delay. addr 0xdf00-0xdfff is
+ * C64 I/O $DF00-$DFFF: $DF40 writes the OPL address port, $DF50 the OPL
+ * data port, when a socket is configured for it AND TRY_SET_FM_OPL has
+ * turned it on for this connection (nsd_fmopl_routed()). Any other $DFxx,
+ * or FM OPL off: no write, delay kept.
  */
 static uint16_t handle_try_write_ex(const uint8_t *payload, uint16_t payload_len, uint8_t *resp_buf)
 {
@@ -807,13 +800,8 @@ static uint16_t handle_try_write_ex(const uint8_t *payload, uint16_t payload_len
   }
   uint16_t n_entries = payload_len / 5;
 
-  /* Pre-count net_ring slots needed: an FMOpl entry is two writes (index
-   * port, data port), any other entry at most one, plus one filler */
-  uint32_t n_slots = 1;
-  for (uint16_t i = 0; i < n_entries; i++) {
-    const uint8_t *e = &payload[i * 5];
-    n_slots += nsd_fmopl_routed((uint16_t)((e[2] << 8) | e[3])) ? 2 : 1;
-  }
+  /* net_ring slots needed: each entry at most one write, plus one filler */
+  uint32_t n_slots = (uint32_t)n_entries + 1;
   if (nsd_ring_busy() || net_ring_free() < n_slots) {
     resp_buf[0] = NSD_RESP_BUSY;
     return 1;
@@ -828,10 +816,10 @@ static uint16_t handle_try_write_ex(const uint8_t *payload, uint16_t payload_len
     if (addr < NSD_EX_SID_MAX) { /* SID 5-16, disabled socket: delay only */
       nsd_sid_write(addr, value, delay, false);
     } else if (nsd_fmopl_routed(addr)) {
-      nsd_fmopl_write((uint8_t)(addr & 0xFF), value, delay, false);
+      nsd_fmopl_write(addr, value, delay, false);
     } else {
-      /* FM OPL off, or a register this protocol version does not define:
-       * accepted, delay kept */
+      /* FM OPL off, any other $DFxx, or a register this protocol version
+       * does not define: accepted, delay kept */
       nsd_carry_delay(addr, delay, false);
     }
   }
@@ -867,9 +855,9 @@ static uint16_t handle_try_read_ex(const uint8_t *payload, uint16_t payload_len,
     if (addr < NSD_EX_SID_MAX) {
       nsd_sid_write(addr, value, cycles, true); /* SID 5-16, disabled: delay only */
     } else if (nsd_fmopl_routed(addr)) {
-      nsd_fmopl_write((uint8_t)(addr & 0xFF), value, cycles, true);
+      nsd_fmopl_write(addr, value, cycles, true);
     } else {
-      nsd_carry_delay(addr, cycles, true); /* FM OPL off or undefined: delay kept */
+      nsd_carry_delay(addr, cycles, true); /* FM OPL off, other $DFxx: delay kept */
     }
   }
 
@@ -985,9 +973,7 @@ static uint16_t handle_set_sid_header(const uint8_t *payload, uint16_t payload_l
  * from here on, and a queued entry from before the switch should not be
  * reinterpreted after it.
  *
- * Known gap: spec says "enabling a disabled device resets it" - this does
- * not reset the OPL chip's own registers on enable, only starts routing to
- * it again. The chip keeps whatever state MIDI/ASID left it in.
+ * Enabling a disabled device runs clear_fmopl_registers_at_addr() (spec).
  */
 static uint16_t handle_try_set_fm_opl(const uint8_t *payload, uint16_t payload_len, uint8_t *resp_buf)
 {
@@ -1001,6 +987,17 @@ static uint16_t handle_try_set_fm_opl(const uint8_t *payload, uint16_t payload_l
   }
 
   bool enable = (payload[0] != 0);
+
+  if (enable && nsd_fmopl_socket_active()) {
+    /* spec: "enabling a disabled device resets it" */
+    if (!bus_try_claim(BUS_OWNER_NET)) {
+      resp_buf[0] = NSD_RESP_BUSY;
+      return 1;
+    }
+    clear_fmopl_registers_at_addr(nsd_fmopl_base());
+    bus_release(BUS_OWNER_NET);
+  }
+
   if (enable == nsd_fmopl_active) {
     /* "enabling an already enabled device or disabling an already disabled
      * device returns OK without resetting it or interrupting playback.
@@ -1008,6 +1005,7 @@ static uint16_t handle_try_set_fm_opl(const uint8_t *payload, uint16_t payload_l
     resp_buf[0] = NSD_RESP_OK;
     return 1;
   }
+
   if (enable && !cfg.fmopl_enabled) {
     /* No socket on this board is configured as FM OPL at all: "returns
      * ERROR when enabling FM OPL on a device that does not support it."

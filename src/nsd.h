@@ -67,11 +67,13 @@ typedef enum {
   NSD_CMD_SET_FADE_OUT = 17,
   NSD_CMD_SET_SID_HEADER = 18,
   /* v5: 16-bit register address, up to 16 SIDs (0x0000-0x01ff). TRY_WRITE_EX
-   * also takes FM OPL (0xdf00-0xdfff); TRY_READ_EX's own read target does
-   * not (spec dropped it - a read there returns READ followed by 0x00, same
-   * as an unconfigured SID). Its leading write-then-read entries still take
-   * the full TRY_WRITE_EX range, since they reuse that command's own wire
-   * format. See handle_try_write_ex()/handle_try_read_ex() in nsd.c. */
+   * also takes C64 I/O 0xdf00-0xdfff: $DF40 = FM OPL address port, $DF50 =
+   * FM OPL data port, any other $DFxx keeps only its delay. TRY_READ_EX's
+   * own read target does not (spec dropped it - a read there returns READ
+   * followed by 0x00, same as an unconfigured SID). Its leading
+   * write-then-read entries still take the full TRY_WRITE_EX range, since
+   * they reuse that command's own wire format. See
+   * handle_try_write_ex()/handle_try_read_ex() in nsd.c. */
   NSD_CMD_TRY_WRITE_EX = 19,
   NSD_CMD_TRY_READ_EX = 20,
   /* Enable/disable FM OPL for the current connection (spec: sid number is
