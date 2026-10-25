@@ -25,12 +25,12 @@ image::images/v1.5/v1.5c-top.png[title=PCB top overview]
 
 
 == Extra protection
-The audio out jack and pins are now protected with ESD protection diodes. +
+The audio out jack and pins are protected with ESD protection diodes. +
 And the left and right channel in the audio jack will be pulled to ground with a 10k softpull resistor when no jack is inserted by using the jack switches.
 
 
 == Jumperless design
-The v1.5 board is a jumperless design. This means that settings that were previously controlled with jumpers are now configured with settings in the firmware. The settings can be configured with the USBSID-Configtool. +
+The v1.5 board is a jumperless design. Settings that were controlled with jumpers are configured in the firmware with the USBSID-Configtool. +
 
 
 == Automatic settings
@@ -48,7 +48,7 @@ SID type also controls the filter capacitor setting, the 8580 digiboost resistor
 - 8580 means automatic digiboost and 22nF filter capacitors +
 - 6581 means no digiboost, shunt resistor enabled and 470pF filter capacitors +
 
-Socket voltage control on v1.5+ is more than just the automatic 9v/12v selection above - power to both SID sockets can also be fully switched off and back on again, independent of SID type, through the configtool or firmware settings.
+Socket voltage control on v1.5+ does the automatic 9v/12v selection above and can switch power to both SID sockets off and on again, independent of SID type, through the configtool or firmware settings.
 
 
 == RaspberryPi Pico placement orientation
@@ -64,7 +64,7 @@ This creates more space and can be useful if you want to use a SID clone like FP
 
 == SID placement orientation
 In the PCB overview image at the top of this document each SID socket has a little cut out which indicates the SID placement orientation. +
-Please use your full attention when placing your SID chips on the board so they are in the correct orientation. +
+Please use your full attention when placing your SID chips on the board, ensuring they are in the correct orientation. +
 _Incorrect placement orientation will result in frying your precious SID chip unicorn and creating a nice keychain!_
 *_I am not responsible for your broken SID chips!_*
 
@@ -90,15 +90,15 @@ _(markings are on the bottom of the PCB)_ +
 
 
 == Audio switch
-Same digital audio switch IC as on v1.3, carried forward unchanged. Switching from mono (both SID chips play over left and right) to Stereo (SID1 over the left channel and SID2 over the right channel) and back is handled by the firmware through settings or automatically by supported players. +
-The jumperless v1.5 design has no physical `SW` pin for manual switching - this is configured entirely through the firmware/configtool.
+Same digital audio switch IC as on v1.3. Switching from mono (both SID chips play over left and right) to Stereo (SID1 over the left channel and SID2 over the right channel) and back is handled by the firmware through settings or automatically by supported players. +
+The jumperless v1.5 design has no physical `SW` pin for manual switching ~ this is configured in the firmware/configtool.
 
 
 [%always]
 <<<
 
 == Volume daughterboard
-An optional Volume daughterboard is available for independent left/right channel volume control. It is plug and play compatible with v1.5+ boards - see the `USBSID-Volume-daughterboard` manual for details.
+An optional Volume daughterboard is available for independent left/right channel volume control. It is plug and play compatible with v1.5+ boards ~ see the `USBSID-Volume-daughterboard` manual for details.
 
 == PCB bottom overview
 .Click image for larger view
