@@ -1,5 +1,5 @@
 === Linux Udev rules
-In the https://github.com/LouDnl/USBSID-Pico/blob/master/examples/udev-rules/[examples/udev] directory you can find the https://github.com/LouDnl/USBSID-Pico/blob/master/examples/udev-rules/69-usbsid-permissions.rules[udev rules] that I use on Linux. +
+In the https://github.com/LouDnl/USBSID-Pico/blob/master/examples/udev-rules/[examples/udev] directory you can find the https://github.com/LouDnl/USBSID-Pico/blob/master/examples/udev-rules/69-usbsid-permissions.rules[udev rules] that are used on Linux. +
 This purely an example file that you can use and change to your own needs.
 Steps required for this to work
 [source,bash]
