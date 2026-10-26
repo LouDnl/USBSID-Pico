@@ -1,3 +1,12 @@
+## Verification command
+# run: git ls-files -i -c --exclude-standard
+# remove from tracking: git rm --cached path/to/dir/or/file
+
+## Comments
+# /*   Only files and folders directly inside this directory (1 level deep).
+# /**  Everything recursively (all files and folders, infinitely deep).
+# /**/ Only subdirectories recursively (infinitely deep), excluding files.
+
 # Ignore everything by default
 *
 
@@ -14,6 +23,7 @@
 !*.jpg
 !*.mp3
 !*.pdf
+!*.ico
 !*.png
 !*.svg
 !*.rules
