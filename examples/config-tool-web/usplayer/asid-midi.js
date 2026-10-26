@@ -1,34 +1,27 @@
 /*
- * USBSID-Player: a cycle exact C64 SID player for USBSID-Pico, for command
- * line playback, for embedding on RP2350 (Pico2), and in a browser.
+ * USBSID-Player: a cycle exact C64 SID player for USBSID-Pico,
+ * command line playback, websites and for embedding on RP2040/RP2350.
  *
- * web/asid-midi.js
- * The other transport: ASID over Web MIDI.
+ * asid-midi.js
+ * ASID over Web MIDI transport
  *
- * Carried over from player-repo/web/asid-midi.js, which ports the register
- * packing in player-repo/lib/midi/asid.cpp. Drives a USBSID-Pico, or any other
- * ASID host, over the protocol at https://github.com/thomasj/asid-protocol.
+ * Ports the register packing of player-repo/lib/midi/asid.cpp
+ * Protocol: https://github.com/thomasj/asid-protocol
  *
- * ASID is not cycle exact and cannot be: it sends one snapshot per frame of
- * the registers that changed, so the timing it conveys is the flush cadence,
- * about fifty per second. On the transport interface that is:
+ * Not cycle exact, one snapshot per frame (about 50 per second)
  *
  *   writeCycled(reg, val, cycles)  accumulate the change, ignore the gap
  *   flush()                        emit one 0x4E SysEx for the frame
  *
- * The gap is genuinely dropped rather than approximated. ASID's 0x30 timing
- * extension would carry it and is not implemented here; a digi tune wants the
- * WebUSB transport instead, where the cycles survive.
+ * The 0x30 timing extension is not implemented, use WebUSB for digi tunes
  *
- * What is kept from the C implementation is the gate register shadowing: a
- * voice retriggered twice inside one frame would otherwise arrive as one note,
- * so the second write goes to a shadow register (0x19, 0x1a, 0x1b) that the
- * protocol carries alongside the first.
+ * Gate register shadowing (0x19, 0x1a, 0x1b) keeps a voice retriggered twice
+ * in one frame from arriving as one note
  *
- * SysEx: F0 2D <cmd> <payload> F7, manufacturer 0x2D.
- *   0x4C start, 0x4D stop, 0x4E SID one, 0x50/0x51/0x52 SIDs two to four.
+ * SysEx: F0 2D <cmd> <payload> F7, manufacturer 0x2D
+ *   0x4C start, 0x4D stop, 0x4E SID one, 0x50/0x51/0x52 SIDs two to four
  *
- * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Player)
+ * This file is part of USBSID-Player (https://github.com/LouDnl/USBSID-Player)
  * File author: LouD
  *
  * Copyright (c) 2026 LouD
@@ -47,27 +40,17 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* ASID register order: the index is the bit position, the value is the SID
- * register it stands for. */
+/* ASID register order, index = bit position, value = SID register */
 const REGMAP = [0,1,2,3,5,6,7,8,9,10,12,13,14,15,16,17,19,20,21,22,23,24,4,11,18,25,26,27];
 const SID_CMD = [0x4E, 0x50, 0x51, 0x52];
 
-/* Where a second write to each voice's control register goes. ASID reserves
- * these three positions for exactly that, and the receiver applies them after
- * the register itself, which is what lets a retrigger survive one snapshot. */
+/* Shadow slots for a second control register write in one frame, applied by the receiver after the register */
 const GATE_SHADOW = { 0x04: 0x19, 0x0b: 0x1a, 0x12: 0x1b };
 
-/* FM/OPL, for tunes written for the SFX Sound Expander (YM3526) or FM-YAM
- * (YM3812). ASID carries it in its own message, 0x60, as address and data pairs,
- * so a receiver with an OPL can play it whatever SID chips are attached.
- *
- * The emulation hands these over as registers $80 and $90, which are outside the
- * 0..$7f a SID register lives in: $80 is a write to $df40, the OPL's address
- * port, and $90 a write to $df50, its data port. See Mos6581_8580::io_write.
- *
- * Sixteen pairs per message, which is what the reference implementation uses.
- * The message is sent as soon as it is full and again at the frame boundary, so
- * a burst of OPL writes does not wait for a frame that may be a long way off. */
+/* FM/OPL for SFX Sound Expander (YM3526) and FM-YAM (YM3812) tunes
+ * Sent as message 0x60 with address and data pairs
+ * Registers $80 and $90 are writes to $df40 (OPL address) and $df50 (OPL data), see Mos6581_8580::io_write
+ * 16 pairs per message, sent when full and at the frame boundary */
 const FM_ADDR_REG = 0x80;
 const FM_DATA_REG = 0x90;
 const FM_CMD      = 0x60;
@@ -75,6 +58,11 @@ const FM_MAX_PAIRS = 16;
 const ASID_MFR = 0x2D;
 const ASID_START = 0x4C;
 const ASID_STOP  = 0x4D;
+const ASID_ENV   = 0x31;   /* SID environment: PAL/NTSC, speed, frame delta */
+const ASID_TYPE  = 0x32;   /* SID chip type */
+/* Cycles a second of the PAL and NTSC machine, as EMULATION_CYCLES_PER_SECOND_* in sid_asid.h */
+const CYCLES_PAL  = 985248;
+const CYCLES_NTSC = 1022727;
 
 function makeChip() {
   return { reg: new Uint8Array(32), modified: new Uint8Array(32) };
@@ -91,18 +79,13 @@ export class ASIDMIDITransport {
     this._out = null;
     this._open = false;
     this._chips = [makeChip(), makeChip(), makeChip(), makeChip()];
-    /* FM/OPL: the address last selected, and the pairs waiting to go out. */
+    /* FM/OPL address last selected and pairs waiting to go out */
     this._fmAddr = 0;
     this._fmPairs = [];
 
-    /* ASID carries FM/OPL in its **own** message, 0x60, not inside a SID
-     * snapshot (0x4E, 0x50, 0x51, 0x52). So the emulation must leave $df40 and
-     * $df50 unclaimed, reaching this transport as $80 and $90, rather than
-     * routing them into some chip's register space where they would go out as
-     * ordinary SID data and no receiver would decode them as FM.
-     *
-     * The player checks this flag and forces `fmopl_sid` to -1 for us; this
-     * class has no readBoardConfig() to override that with. */
+    /* FM/OPL goes out as message 0x60, outside the SID snapshots
+     * $df40 and $df50 must reach this transport as $80 and $90
+     * The player forces fmopl_sid to -1 when this flag is set */
     this.fmAsOwnMessage = true;
     this.onWrite = null;
   }
@@ -110,17 +93,13 @@ export class ASIDMIDITransport {
   get isOpen() { return this._open; }
   get productName() { return this._out ? (this._out.name || 'MIDI') : ''; }
 
-  /** The MIDI outputs available, [{ id, name }]. Needs connect() first. */
+  /* MIDI outputs as [{ id, name }], needs connect() first */
   outputs() {
     if (!this._access) return [];
     return [...this._access.outputs.values()].map((o) => ({ id: o.id, name: o.name }));
   }
 
-  /**
-   * Ask for Web MIDI with SysEx and pick an output: the one requested, else
-   * the first whose name looks like a USBSID-Pico, else whatever is first.
-   * Never throws over a stale id.
-   */
+  /* Request Web MIDI with SysEx, pick the given output, else the first USBSID match, else the first output */
   async connect(outputId = null) {
     this._access = await navigator.requestMIDIAccess({ sysex: true });
     const outs = [...this._access.outputs.values()];
@@ -138,7 +117,7 @@ export class ASIDMIDITransport {
     return false;
   }
 
-  /** Pick an output by display name, for following a list a host owns. */
+  /* Pick an output by display name */
   selectOutputByName(name) {
     if (!this._access || !name) return false;
     const o = [...this._access.outputs.values()].find((x) => (x.name || '') === name);
@@ -153,22 +132,58 @@ export class ASIDMIDITransport {
     this._access = null;
   }
 
-  /* ---- the transport interface ----------------------------------------- */
+  /* Transport interface */
 
   playbackStart() { this._basic(ASID_START); }
   playbackStop() { this._basic(ASID_STOP); this._clearAll(); }
 
-  /** Fold one register change into this frame's snapshot. */
+  /**
+   * Tell the receiver the video standard and frame time (ASID 0x31)
+   *
+   * Port of ASIDBackend::sendSIDEnvironment() in sid_asid.cpp: F0 2D 31 <settings>
+   * <framedelta us in 7+7+2 bits, LSB first> F7. Speed 1x, no buffering requested.
+   *
+   * @param {boolean} pal         true for a PAL tune, false for NTSC
+   * @param {number}  multiplier  speed 1 to 16, 1 is normal
+   */
+  sendEnvironment(pal, multiplier = 1) {
+    if (!this._out) return;
+    const mult = Math.min(16, Math.max(1, multiplier | 0));
+    const frameDeltaUs = pal
+      ? Math.floor(1000000 * 63 * 312 / CYCLES_PAL)
+      : Math.floor(1000000 * 65 * 263 / CYCLES_NTSC);
+    this._send([
+      0xF0, ASID_MFR, ASID_ENV,
+      (((mult - 1) & 0x0f) << 1) | (pal ? 0 : 1),
+      frameDeltaUs & 0x7f,
+      (frameDeltaUs >> 7) & 0x7f,
+      (frameDeltaUs >> 14) & 0x03,
+      0xF7,
+    ]);
+  }
+
+  /**
+   * Tell the receiver which SID chip the tune expects (ASID 0x32)
+   *
+   * Port of ASIDBackend::sendSIDType(): F0 2D 32 00 <00 for 6581, 01 otherwise> F7.
+   * Chip index is always 0, as the command line player.
+   *
+   * @param {boolean} is6581  true when the tune header asks for a 6581
+   */
+  sendSidType(is6581) {
+    if (!this._out) return;
+    this._send([0xF0, ASID_MFR, ASID_TYPE, 0x00, is6581 ? 0x00 : 0x01, 0xF7]);
+  }
+
+  /* Add one register change to the frame snapshot */
   writeCycled(reg, val, _cycles) {
     if (!this._open) return;
     if (this.onWrite) this.onWrite(reg, val);
-    const sid = (reg >> 5) & 0x03;    // $00-$1f chip one, $20-$3f chip two...
+    const sid = (reg >> 5) & 0x03;    // $00-$1f chip one, $20-$3f chip two
     const r = reg & 0x1f;
     const data = val & 0xFF;
 
-    /* FM/OPL first: these are not SID registers at all and must not be folded
-     * into a snapshot. $80 selects an OPL register, $90 writes it. Only a
-     * complete pair is worth sending, so an address on its own is remembered. */
+    /* FM/OPL, $80 selects an OPL register, $90 writes it, only complete pairs are sent */
     if (reg === FM_ADDR_REG) { this._fmAddr = data; return; }
     if (reg === FM_DATA_REG) {
       this._fmPairs.push(this._fmAddr, data);
@@ -176,22 +191,8 @@ export class ASIDMIDITransport {
       return;
     }
 
-    /* Only $00 to $18 exist to be written. $19 to $1f are read only on a real
-     * SID, which ignores writes to them, and the emulation passes every write in
-     * the range straight through because for a real chip that is harmless.
-     *
-     * Here it is not harmless, and this is a protocol collision rather than a
-     * nicety. ASID reuses positions $19, $1a and $1b to carry a *second* write
-     * to $04, $0b and $12 inside one frame, which is how a retrigger survives a
-     * snapshot. So a stray write to $d419 arrives at the receiver as "set voice
-     * one's control register again", and the gate is re-applied out of nowhere.
-     *
-     * Tunes do write there. A clear loop over the whole register range,
-     * `lda #0 / sta $d400,x` for x = 0 to $1f, is a common way to silence a SID
-     * in an init routine or between frames, and every one of those hits all
-     * three shadow slots. That is heard as a small repeat of a previous gate
-     * write in some parts of a tune and not others, which is exactly what it is.
-     */
+    /* Drop writes to $19-$1f, ASID uses $19, $1a and $1b as shadow slots for $04, $0b and $12
+     * Tunes clear the whole range with sta $d400,x for x = 0 to $1f, this would repeat a gate write */
     if (r > 0x18) return;
 
     const c = this._chips[sid];
@@ -200,27 +201,13 @@ export class ASIDMIDITransport {
       c.modified[r] = 1;
       return;
     }
-    /* Written more than once this frame, which a snapshot cannot express on its
-     * own. Three ways out, one per kind of register.
-     *
-     * The gate registers get a shadow slot each, $19, $1a and $1b, which the
-     * receiver applies after the register itself. That is what carries a
-     * gate off followed by a gate on, so a retrigger inside one frame survives.
-     *
-     * A **third** write has nowhere left to go: the frame is cut short instead,
-     * flushing what is there and starting a new snapshot with the new value.
-     * Dropping the first of the three values instead (shuffling the second down
-     * into the primary slot) loses notes whose onset falls in that frame: gate
-     * on, gate off, gate off in one frame would keep only the two offs.
-     *
-     * Filter and volume have no shadow and are flushed at once, because their
-     * order within the frame is audible.
-     */
+    /* Written more than once this frame
+     * Gate registers use the shadow slot for the second write
+     * A third write flushes the frame and starts a new snapshot
+     * Filter and volume have no shadow and are flushed at once, order is audible */
     switch (r) {
       case 0x04: case 0x0b: case 0x12: {
-        /* Not an arithmetic offset: the three control registers are 7 apart and
-         * their shadows are 1 apart. Spelled out so it cannot be "simplified"
-         * into a wrong sum. */
+        /* Control registers are 7 apart, shadows are 1 apart, no arithmetic offset */
         const shadow = GATE_SHADOW[r];
         if (c.modified[shadow] !== 0) {
           this.flush();
@@ -238,12 +225,8 @@ export class ASIDMIDITransport {
     }
   }
 
-  /**
-   * The FM/OPL message: F0 2D 60 <pairs-1> <msb bytes> <7 bit data> F7.
-   *
-   * One mask byte per seven data bytes, holding their high bits, since SysEx
-   * data has to stay under $80. The layout is the reference implementation's.
-   */
+  /* FM/OPL message: F0 2D 60 <pairs-1> <msb bytes> <7 bit data> F7
+   * One mask byte per 7 data bytes holds their high bits (SysEx data stays under $80) */
   _flushFm() {
     const n = this._fmPairs.length;
     if (n === 0) return;
@@ -259,18 +242,12 @@ export class ASIDMIDITransport {
     this._fmPairs.length = 0;
   }
 
-  /** Emit one snapshot per SID and start the next frame. */
+  /* Emit one snapshot per SID and start the following frame */
   flush() {
     if (!this._open) return;
-    /* Before the SID snapshots, so an OPL note and the SID writes around it stay
-     * in the order the tune made them. */
+    /* FM first, keeps the order of the tune */
     this._flushFm();
-    /* Every chip that has something to say, not the first `nosids` of them:
-     * stopping at a header-derived chip count silently drops any chip the
-     * emulation wrote to but the header didn't count, unlike WebUSB/serial
-     * which send by address and never consult a count. The stream follows
-     * the writes instead - a chip nothing wrote to has an empty mask and is
-     * skipped a line below, the same saving without the guess. */
+    /* All chips, a chip without writes has an empty mask and is skipped */
     for (let sid = 0; sid < this._chips.length; sid++) {
       const c = this._chips[sid];
       let mask = 0, msb = 0;
@@ -293,11 +270,11 @@ export class ASIDMIDITransport {
     }
   }
 
-  /** The player asking for silence: leaving ASID mode is what does it. */
+  /* Silence by leaving ASID mode */
   resetSID() { this.playbackStop(); }
   reset()    { this._clearAll(); }
 
-  /* ---- internals -------------------------------------------------------- */
+  /* Internals */
 
   _clearAll() {
     for (const c of this._chips) c.modified.fill(0);

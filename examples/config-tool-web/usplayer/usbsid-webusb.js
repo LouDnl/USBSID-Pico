@@ -1,34 +1,28 @@
 /*
- * USBSID-Player: a cycle exact C64 SID player for USBSID-Pico, for command
- * line playback, for embedding on RP2350 (Pico2), and in a browser.
+ * USBSID-Player: a cycle exact C64 SID player for USBSID-Pico,
+ * command line playback, websites and for embedding on RP2040/RP2350.
  *
- * web/usbsid-webusb.js
+ * usbsid-webusb.js
  * The cycle exact transport: WebUSB straight to a USBSID-Pico.
  *
- * Carried over from player-repo/web/usbsid-webusb.js, whose connect sequence
- * and packet format come in turn from repo/examples/config-tool-web's
- * usbsid-driver.js, the driver that is known to work on a board.
+ * Connect sequence and packet format from 
+ * USBSID-Pico repo: examples/config-tool-web/usbsid-driver.js
  *
  * Packet format (repo/src/usbsid.c handle_buffer_task, globals.h):
- *   byte 0    command. Top two bits are the type, CYCLED_WRITE is 0b10 = 0x80.
- *             The lower six bits are the payload BYTE count, writes * 4.
- *   byte 1..  that many bytes: [reg, value, cycles_hi, cycles_lo] each.
- *   Fifteen writes is the most that fits: 1 + 15 * 4 = 61, under the 64 byte
- *   packet.
+ *   byte 0    command, top two bits are the type, CYCLED_WRITE is 0b10 = 0x80
+ *             lower six bits are the payload BYTE count, writes * 4
+ *   byte 1..  that many bytes: [reg, value, cycles_hi, cycles_lo] each
+ *   Max 15 writes: 1 + 15 * 4 = 61, under the 64 byte packet
  *
- * The firmware treats a command byte whose low six bits are zero, a bare 0x80,
- * as a *single* cycled write and ignores the rest of the packet. So a batch has
- * to carry the byte count; `{ batch: false }` uses the single write form and
- * one transfer per write.
+ * A command byte with the low six bits zero (bare 0x80) is a single cycled write,
+ * the rest of the packet is ignored. A batch has to carry the byte count
+ * { batch: false } sends one write per transfer
  *
- * Throughput is the whole difficulty here, and it is the number of transferOut
- * calls rather than the bytes: each one is a round trip through the browser's
- * USB plumbing. So several are in flight at once (MAX_INFLIGHT) and several
- * commands ride in each (COALESCE). Both numbers were set from measurements
- * taken with web/bench.html on a real board; see their comments. Falling behind
- * drops the oldest queued packet rather than lagging by seconds.
+ * Throughput depends on the number of transferOut calls
+ * Several transfers are in flight (MAX_INFLIGHT), several commands ride in each
+ * (COALESCE). Falling behind drops the oldest queued packet
  *
- * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Player)
+ * This file is part of USBSID-Player (https://github.com/LouDnl/USBSID-Player)
  * File author: LouD
  *
  * Copyright (c) 2026 LouD
@@ -64,21 +58,16 @@ const RESET_SID = 14;
 const CONFIG    = 18;                 /* the sub type carrying config commands */
 const CFG_CMD   = (CMD | CONFIG);     /* 0xD2 */
 const SET_CLOCK = 0x50;
-/* The board's audio switch, v1.3+ PCBs only. Same [CFG_CMD, command, item, ...]
- * shape as SET_CLOCK. Here rather than only in the app's config panels because
- * those are WebUSB only, and this has to work over Web Serial too. */
+/* Board audio switch, v1.3+ PCBs only. Same [CFG_CMD, command, item, ...] shape as SET_CLOCK */
 const SET_AUDIO    = 0x89;   /* item: 0 mono, 1 stereo */
 const TOGGLE_AUDIO = 0x88;
 const GET_AUDIO    = 0x91;
-/* What the firmware was compiled with, one byte of flags. config.h: bit 0
- * Pico2, 1 wifi/bluetooth, 2 RGB LED, 3 PIO UART, 6 Cynthcart, **bit 7 the
- * embedded SID player**. */
+/* Firmware feature flags, one byte. config.h: bit 0 Pico2, 1 wifi/bluetooth,
+ * 2 RGB LED, 3 PIO UART, 6 Cynthcart, 7 embedded SID player */
 const US_FEATURES  = 0x82;
 export const FEATURE_SIDPLAYER = 1 << 7;
 
-/* The onboard player: upload a file, then drive it. Same sub commands and the
- * same 64 byte slots as the serial transport uses, because it is the same
- * firmware answering; only the way a packet reaches it differs. */
+/* Onboard player: upload a file, then drive it. Same sub commands and 64 byte slots as the serial transport */
 const UPLOAD_SID_START    = 0xD0;
 const UPLOAD_SID_DATA     = 0xD1;
 const UPLOAD_SID_END      = 0xD2;
@@ -91,20 +80,16 @@ const SID_PLAYER_PAUSE    = 0xE3;
 const SID_PLAYER_NEXT     = 0xE4;
 const SID_PLAYER_PREV     = 0xE5;
 const SID_PLAYER_TWO      = 0xE6;
-/* 0xE7 SID_PLAYER_FFWD is deliberately absent: the firmware marks it non
-   functional and its emu_ffwd() call is commented out, because on the device the
-   SID writes are the pacing and there is nothing to skip until the embedded build
-   has a pacer. Nothing should offer a control for it. */
+/* 0xE7 SID_PLAYER_FFWD is absent, marked non functional in the firmware */
 const SID_PLAYER_MUTE     = 0xE9;
 const SID_PLAYER_MUTED    = 0xEA;
 const SID_PLAYER_TIME     = 0xEB;
 const SLOT                = 64;
-/* Config reads. The 12 byte socket buffer's layout is the driver's: byte 2 is
- * socket one, byte 5 socket two, high nibble 1 for present and low nibble 1
- * for a socket carrying two chips. See USBSID_GetSocketNumSIDS(). */
+/* Config reads. Socket buffer is 12 bytes: byte 2 is socket one, byte 5 socket two,
+ * high nibble 1 = present, low nibble 1 = two chips. See USBSID_GetSocketNumSIDS() */
 const READ_SOCKETCFG = 0x37;
 const READ_FMOPLSID  = 0x3A;
-/** Clock ids, the same order the firmware's own table uses. */
+/* Clock ids, same order as the firmware table */
 export const CLOCK = { DEFAULT: 0, PAL: 1, NTSC: 2, DREAN: 3, NTSC2: 4 };
 
 const WRITE_BYTES = 4;
@@ -112,38 +97,13 @@ const MAX_PACKET  = 64;
 /* Reads per reply before giving up on zero length packets, see _transferInReply() */
 const ZLP_READ_ATTEMPTS = 4;
 const MAX_FRAMES  = 15;   /* 1 + 15 * 4 = 61 bytes */
-/* Queued but unsent packets, about a kilobyte. At rest this holds one or two;
- * a sustained overflow means we are behind the device, and dropping the oldest
- * caps the latency instead of letting it grow without bound. */
+/* Max queued unsent packets, about 1 KB. Overflow drops the oldest */
 const MAX_QUEUE   = 256;
-/* Transfers submitted but not yet completed. See _pump() for why this is not
- * one: a digi needs about 2200 packets a second and a serialised round trip
- * cannot do half of it. Eight was measured not enough either, with
- * web/bench.html on a digi: transfers were not completing fast enough to
- * keep the queue from growing, even though emulation load was nowhere near
- * the bottleneck. */
+/* Max transfers submitted but not completed, see _pump()
+ * A digi needs about 2200 packets a second, 8 was not enough (bench.html) */
 const MAX_INFLIGHT = 32;
 
-/**
- * How long to wait for an answer to a config read.
- *
- * `transferIn` does not time out. If the board never answers, and a config
- * command the firmware does not implement is exactly that, the promise never
- * settles and whoever awaited it waits for ever. That is not hypothetical: it
- * hung the worker player's `init` indefinitely, which looked like the worker
- * failing to start, because `readBoardConfig()` asks two questions and the
- * second went unanswered.
- *
- * The board replies in well under a millisecond when it is going to reply at
- * all, so this is generous rather than tight.
- */
-/**
- * Whether to trace every config read.
- *
- * The reads that matter happen while the page is loading, so a flag set from the
- * console is always too late. `localStorage.setItem('usbsid-debug-reads', '1')`
- * survives the reload, which is the only way to see a connect from the start.
- */
+/* Trace config reads, enable with window.USBSID_DEBUG_READS or localStorage 'usbsid-debug-reads' = '1' */
 function debugReads() {
   if (typeof window === 'undefined') return false;
   if (window.USBSID_DEBUG_READS) return true;
@@ -151,69 +111,33 @@ function debugReads() {
   catch (_) { return false; }
 }
 
+/* Wait for a config read answer, transferIn has no timeout */
 const CONFIG_TIMEOUT_MS = 2000;
-/* How long a read may go unanswered before it is worth saying so. It is not a
- * deadline: nothing is given up on when it passes. See _configRead(). */
+/* Report a read unanswered after this long, never gives up on it. See _configRead() */
 const CONFIG_STUCK_MS = 10000;
 
-/**
- * Commands sent in one transferOut.
- *
- * The bottleneck is the number of calls, not the bytes: each transferOut is a
- * round trip through Chrome's USB plumbing. The firmware reads with
- * `CFG_TUD_VENDOR_RX_BUFSIZE 0`, so `tud_vendor_rx_cb` fires once per 64 byte
- * endpoint packet and handles each on its own (repo/src/usbsid.c). A bulk
- * transfer larger than the endpoint is split into full 64 byte packets by the
- * host, so several commands travel together and arrive as separate commands, as
- * long as each is padded to exactly 64 so the split lands between them.
- *
- * A partly filled batch never waits longer than a frame: flush() empties it at
- * every frame boundary. The batch always ends on a short packet, never on a
- * whole multiple of 64; see _flushBatch() for why that matters.
- *
- * Set `coalesce: 1` on the transport to send one command per transfer, which is
- * what this did before, if a board ever disagrees about the packet split.
- */
+/* Commands sent in one transferOut, each transferOut is a round trip through the browser USB stack
+ * Firmware (CFG_TUD_VENDOR_RX_BUFSIZE 0) handles each 64 byte endpoint packet on its own in
+ * tud_vendor_rx_cb (repo/src/usbsid.c). The host splits a bulk transfer into 64 byte packets,
+ * each command is padded to exactly 64 for the split to land between commands
+ * flush() empties a partial batch at every frame boundary
+ * The batch ends on a short packet, see _flushBatch()
+ * coalesce: 1 sends one command per transfer */
 const COALESCE = 8;
 
-/**
- * Whether every command fills a whole 64 byte packet, last one included.
- *
- * This tracks the board's firmware and the two cannot disagree:
- *
- *   FIFO on  (CFG_TUD_VENDOR_RX_BUFSIZE > 0, USE_VENDOR_BUFFER): true.
- *     The FIFO is a byte stream with no packet framing. The firmware reads a
- *     chunk and `process_buffer` consumes only the count in the header,
- *     dropping the remainder, so one short packet desynchronises every read
- *     after it. A zero length packet is harmless here, because nothing
- *     reprocesses a stale buffer.
- *
- *   FIFO off: false.
- *     `tud_vendor_rx_cb` gets the packet directly and has no zero length
- *     guard, so a transfer that is a whole multiple of 64 risks a terminating
- *     zero length packet re-running the previous command. Ending short avoids
- *     it.
- *
- * **False**, and deliberately so even though the firmware now has the FIFO on.
- * Short packets combined with a FIFO is the combination actually measured
- * working; the desync above is a hazard on paper that did not appear in
- * practice, since a batch's short packet lands where the reader has caught
- * up, not mid stream. Switching this to true would trade a verified setting
- * for an unverified one.
- *
- * If a desync ever does show, garbled registers rather than timing, this is the
- * first thing to try.
- *
- * The FIFO itself is what removed the crackle: without it the firmware could
- * not accept the next packet until it had finished the last, and that gap
- * landed on top of the next write's pre delay. No amount of host side
- * coalescing reached it on its own.
- */
+/* Pad every command to a whole 64 byte packet, last one included
+ * FIFO on (CFG_TUD_VENDOR_RX_BUFSIZE > 0, USE_VENDOR_BUFFER): true wanted. The FIFO is a byte
+ * stream, process_buffer consumes only the header count and drops the rest, a short packet
+ * desyncs all later reads. A ZLP is harmless
+ * FIFO off: false. tud_vendor_rx_cb has no zero length guard, a transfer of a multiple of 64
+ * can end in a ZLP that re-runs the previous command
+ * False although the firmware has the FIFO on, short packets with FIFO is the combination
+ * measured working. On garbled registers try true first */
 const FULL_PACKETS = false;
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Chips per socket, out of the board's 12 byte socket buffer. */
+/* Chips per socket from the 12 byte socket buffer */
 function parseSocketConfig(b) {
   const chips = (byte) =>
     (((byte & 0xf0) >> 4) === 1) ? (((byte & 0x0f) === 1) ? 2 : 1) : 0;
@@ -224,16 +148,11 @@ function parseSocketConfig(b) {
 export class USBSIDWebUSBTransport {
   /**
    * @param {object} opts
-   *   opts.batch     false to put one write in a packet (default: batched)
-   *   opts.coalesce  commands per transferOut (default: COALESCE, 1 disables)
-   *   opts.fullPackets  pad every command to 64, including the last. Defaults
-   *                  to FULL_PACKETS, which tracks the firmware: true with the
-   *                  vendor FIFO enabled, false without. Set it explicitly for
-   *                  a board running older firmware.
-   *   opts.device  an already open USBSID device to share instead of opening
-   *                one of our own. Must have writeArrayAwait, writeArray or
-   *                write taking a Uint8Array. This is how the player slots
-   *                into an app that has already connected to the board.
+   *   opts.batch        false for one write per packet (default batched)
+   *   opts.coalesce     commands per transferOut (default COALESCE, 1 disables)
+   *   opts.fullPackets  pad every command to 64, default FULL_PACKETS
+   *   opts.device       open USBSID device to share, needs writeArrayAwait, writeArray
+   *                     or write taking a Uint8Array
    */
   constructor(opts = {}) {
     this.batch = opts.batch !== false;
@@ -245,8 +164,7 @@ export class USBSIDWebUSBTransport {
     this._open = false;
     this._pkt = new Uint8Array(MAX_PACKET);
     this._pktFrames = 0;
-    /* Optional tap: called with (reg, value) for every write, so a host can
-     * mirror the register state in a display. */
+    /* Optional tap, called with (reg, value) for every write */
     this.onWrite = null;
     this._coalesce = Math.max(1, opts.coalesce || COALESCE);
     this._fullPackets = (opts.fullPackets === undefined)
@@ -272,11 +190,8 @@ export class USBSIDWebUSBTransport {
     return this._dev ? (this._dev.productName || '') : '';
   }
 
-  /**
-   * Ask for a USBSID-Pico and open it. Must be called from a user gesture:
-   * navigator.usb.requestDevice shows a picker and the browser refuses to
-   * show one otherwise. With a device injected this only confirms it is there.
-   */
+  /* Ask for a USBSID-Pico and open it, needs a user gesture (device picker)
+   * With an injected device this only confirms it is there */
   async connect() {
     if (this._extDev) { this._open = true; return this.isOpen; }
     if (this._open) return true;
@@ -286,19 +201,8 @@ export class USBSIDWebUSBTransport {
     return this._openDevice();
   }
 
-  /**
-   * Open a board the user has already granted, without a picker.
-   *
-   * `requestDevice()` shows a picker, so it needs a user gesture and a
-   * document, which a worker has neither of. Permission is per origin though,
-   * not per thread, so once the page has asked once `getDevices()` returns the
-   * board anywhere. That is what lets the emulation and the USB writes live in
-   * a worker together, which is the whole point of the worker: a backgrounded
-   * main thread stops feeding the board, and switching tabs is audible.
-   *
-   * Returns false when nothing has been granted yet, which is the caller's cue
-   * to ask on the main thread first.
-   */
+  /* Open an already granted board without a picker, usable in a worker
+   * Returns false when nothing is granted yet */
   async connectGranted() {
     if (this._extDev) { this._open = true; return this.isOpen; }
     if (this._open) return true;
@@ -311,9 +215,7 @@ export class USBSIDWebUSBTransport {
     return this._openDevice();
   }
 
-  /* Close and unlatch after a failed open (claimInterface refused etc.), or
-   * every later _openDevice() returns early on a device nobody can use. The
-   * error still reaches the caller: its name (NetworkError = in use) matters. */
+  /* Close and unlatch after a failed open, rethrows (NetworkError = in use) */
   async _openDevice() {
     if (this.deviceOpened || this.openingDevice)
       return;
@@ -340,9 +242,8 @@ export class USBSIDWebUSBTransport {
 
     if (this._dev.configuration === null) await this._dev.selectConfiguration(1);
 
-    /* Walk the configuration for the vendor interface and its bulk endpoints
-     * rather than assuming numbers: they move between firmware builds. The
-     * first vendor (0xFF) interface is the WebUSB command interface. */
+    /* Walk the configuration for the vendor interface and its bulk endpoints, numbers
+     * move between firmware builds. First 0xFF interface is the WebUSB command interface */
     this._ifaceNum = null;
     for (const iface of this._dev.configuration.interfaces) {
       for (const alt of iface.alternates) {
@@ -362,13 +263,10 @@ export class USBSIDWebUSBTransport {
     }
 
     await this._dev.claimInterface(this._ifaceNum);
-    /* No selectAlternateInterface(): the interface has only alt 0, and
-     * SET_INTERFACE resets the host's data toggles but not the firmware's.
-     * The first packet after it is then ACKed and dropped as a duplicate. */
-    /* Crashes the whole browser process on Windows (Chrome/Edge/Canary), confirmed
-     * via crash dump analysis - a Chromium-internal CHECK() in the Windows USB
-     * backend, not something this driver can work around other than not calling
-     * it. Filed upstream at issues.chromium.org/issues/557605844. */
+    /* No selectAlternateInterface(), only alt 0 exists and SET_INTERFACE resets the host data
+     * toggles but not the firmware's, the first packet is then dropped as a duplicate */
+    /* clearHalt crashes the browser process on Windows (Chromium CHECK(),
+     * issues.chromium.org/issues/557605844) */
     //try { await this._dev.clearHalt('out', this._epOut); } catch (_) {}
     //try { await this._dev.clearHalt('in',  this._epIn);  } catch (_) {}
     await this._dev.controlTransferOut({
@@ -378,8 +276,7 @@ export class USBSIDWebUSBTransport {
       value:       CTRL_ENABLE,
       index:       this._ifaceNum,
     });
-    /* SET_INTERFACE resets the bulk endpoints, and the first OUT after it can
-     * be swallowed. Settle before the tune's first writes go out. */
+    /* Settle, the first OUT after the reset can be swallowed */
     await delay(100);
     this._open = true;
     return true;
@@ -389,9 +286,7 @@ export class USBSIDWebUSBTransport {
     this._open = false;
     this.deviceOpened = false;
     this.openingDevice = false;
-    /* A fresh chain for the next connection: the old one may still hold a read
-     * that will never be answered now, and everything queued behind it would
-     * wait on a device that has gone. */
+    /* New chain for the following connection, the old one may hold a read that never gets answered */
     this._cfgReadChain = null;
     this._q.length = 0;
     this._batchCount = 0;
@@ -411,10 +306,7 @@ export class USBSIDWebUSBTransport {
 
   writeCycled(reg, val, cycles) {
     if (!this._open) return;
-    /* $80 and above are the FM/OPL addresses that no SID claimed, which the
-     * emulation forwards so the ASID transport can carry them in its own
-     * message. They are not SID registers and this transport talks to a board,
-     * so it drops them: sending $80 as a register would be junk on the bus. */
+    /* $80 and above are FM/OPL addresses for the ASID transport. Drop them */
     if (reg >= 0x80) return;
     if (this.onWrite) this.onWrite(reg, val);
     const chi = (cycles >> 8) & 0xFF;
@@ -431,7 +323,7 @@ export class USBSIDWebUSBTransport {
     if (++this._pktFrames >= MAX_FRAMES) this._flushPacket();
   }
 
-  /** Frame boundary: push a partly filled packet rather than holding it. */
+  /* Frame boundary, push a partly filled packet */
   flush() {
     if (this.batch) this._flushPacket();
     this._flushBatch();
@@ -445,16 +337,12 @@ export class USBSIDWebUSBTransport {
 
   _command(sub, b1 = 0) {
     if (!this._open) return;
-    this._flushBatch();   /* ordering: it must not overtake queued writes */
+    this._flushBatch();   /* Must not overtake queued writes */
     this._send(new Uint8Array([CMD | (sub & 0x3F), b1, 0, 0, 0, 0]));
   }
 
-  /**
-   * Silence. Drops the backlog first, so nothing plays after the stop and the
-   * reset is not queued behind it. b1 = 1 zeroes every register including the
-   * volume, which is what actually stops a sustained note: pulsing the RES
-   * line alone does not reliably do it.
-   */
+  /* Silence. Drops the backlog first, b1 = 1 zeroes every register incl. the volume
+   * (a RES pulse alone does not reliably stop a sustained note) */
   resetSID() {
     this._pktFrames = 0;
     this._batchCount = 0;
@@ -465,7 +353,7 @@ export class USBSIDWebUSBTransport {
   mute()   { if (this.batch) this._flushPacket(); this._command(MUTE); }
   unmute() { this._command(UNMUTE); }
 
-  /** Set the board's SID clock. See the CLOCK map for the ids. */
+  /* Set the board SID clock, ids in CLOCK */
   setClock(rateId) {
     if (!this._open) return;
     this._flushBatch();
@@ -473,10 +361,7 @@ export class USBSIDWebUSBTransport {
   }
 
   /**
-   * Mono or stereo on the board's audio switch. v1.3+ PCBs only; older boards
-   * ignore it, which is why nothing here checks the PCB version: a board that
-   * cannot do it is not harmed by being asked.
-   *
+   * Mono or stereo audio switch, v1.3+ PCBs only. Older boards ignore it
    * @param {boolean} stereo true for stereo, false for mono
    */
   setAudioSwitch(stereo) {
@@ -485,7 +370,7 @@ export class USBSIDWebUSBTransport {
     this._send(new Uint8Array([CFG_CMD, SET_AUDIO, stereo ? 1 : 0, 0, 0, 0]));
   }
 
-  /** Flip whatever the audio switch currently is. */
+  /* Flip the audio switch */
   toggleAudioSwitch() {
     if (!this._open) return;
     this._flushBatch();
@@ -493,38 +378,19 @@ export class USBSIDWebUSBTransport {
   }
 
   /**
-   * Ask the board a config question and read the answer.
+   * Ask the board a config question and read the answer
+   * @param sub  config command
+   * @param len  bytes to ask for, match the firmware reply: SID_PLAYER_TIME and
+   *             SID_PLAYER_MUTED answer 4, config and socket reads a full packet
    *
-   * transferIn asks for a whole packet, not the byte or twelve actually
-   * wanted: Chrome's WebUSB on Linux does not reliably complete a bulk IN
-   * shorter than wMaxPacketSize, which the config tool's own driver ran into
-   * and documents. Returns null when there is nothing to ask, which includes
-   * a shared device, whose owner does its own reads.
-   */
-  /**
-   * @param sub  the config command
-   * @param len  how many bytes to ask for. Match what the firmware sends for that
-   *             command: SID_PLAYER_TIME and SID_PLAYER_MUTED answer with 4, the
-   *             config and socket reads with a full packet. Asking for more than
-   *             the board sends is not free, so the callers say.
-   */
-  /**
-   * Ask the board something and wait for the answer.
-   *
-   * **Never raced, and always serialised.** WebUSB has no way to cancel a
-   * `transferIn`, so a read given up on is not aborted, it is *abandoned*:
-   * the reply still arrives and is handed to whoever reads next. Racing a
-   * read against a timeout therefore puts every later read one reply behind
-   * for the rest of the session, with the backlog only growing. So a
-   * timeout here only *reports*; abandoning is what breaks the session. And
-   * every read goes through one chain, because two readers on one endpoint
-   * take each other's replies.
-   *
-   * A caller that must not block waits on the promise this returns with a
-   * timeout of its own. That is safe in a way racing the transfer is not: the
-   * read stays on the chain and its reply is still consumed by the reader that
-   * asked for it, so nothing is left dangling for the next question to trip over.
-   * See `readBoardConfig()`.
+   * transferIn is asked for a full packet, Chrome on Linux does not reliably complete
+   * a bulk IN shorter than wMaxPacketSize. Returns null when there is nothing to ask,
+   * incl. a shared device (the owner does its own reads)
+   * transferIn cannot be cancelled, a read given up on still gets its reply and the following
+   * read receives it. Reads are never raced against a timeout, a timeout only reports
+   * All reads go through one chain, two readers on one endpoint take each other's replies
+   * A caller that must not block waits on the returned promise with its own timeout,
+   * see readBoardConfig()
    */
   async _configRead(sub, len = MAX_PACKET) {
     if (!this._open || this._extDev || !this._dev) return null;
@@ -534,15 +400,9 @@ export class USBSIDWebUSBTransport {
     return await mine;
   }
 
-  /**
-   * Read one reply from the IN endpoint, skipping zero length packets.
-   *
-   * A reply of exactly 64 bytes ends with a zero length packet, which arrives
-   * as an empty result on the following read. A retry follows an empty result only:
-   * the reply it waits for is already on its way.
-   *
-   * @returns {Promise<Uint8Array|null>} the reply, null when every attempt was empty
-   */
+  /* Read one reply from the IN endpoint, skipping zero length packets
+   * A 64 byte reply is followed by a ZLP, seen as an empty result on the following read
+   * Retry only after an empty result. Returns null when every attempt was empty */
   async _transferInReply() {
     for (let i = 0; i < ZLP_READ_ATTEMPTS; i++) {
       const r = await this._dev.transferIn(this._epIn, MAX_PACKET); /* Vendor is fixed at 64 bytes */
@@ -556,8 +416,7 @@ export class USBSIDWebUSBTransport {
   async _configReadOnce(sub, len) {
     if (!this._open || this._extDev || !this._dev) return null;
     this._flushBatch();
-    /* Says so if a read never comes back, without giving up on it. Reads are
-     * serialised, so a stuck one holds the others rather than burying them. */
+    /* Report a read that never comes back, without giving up on it */
     if (debugReads()) {
       console.debug('[usbsid-webusb] read 0x' + (sub & 0xff).toString(16) +
                     ' issued, open=' + this._open + ' ext=' + !!this._extDev);
@@ -565,7 +424,7 @@ export class USBSIDWebUSBTransport {
     const stuck = setTimeout(() => {
       console.warn('[usbsid-webusb] config read 0x' + (sub & 0xff).toString(16) +
                    ' has not answered after ' + (CONFIG_STUCK_MS / 1000) +
-                   's, still waiting (reads are serialised, so nothing else' +
+                   's, still waiting (reads are serialised, nothing else' +
                    ' will run until it does)');
     }, CONFIG_STUCK_MS);
     try {
@@ -579,8 +438,7 @@ export class USBSIDWebUSBTransport {
       }
       return out;
     } catch (e) {
-      /* Quiet until now, which hid a read that failed rather than timed out:
-       * the caller sees null either way and the two want different fixes. */
+      /* Caller sees null for a failed and a timed out read, the log tells them apart */
       console.warn('[usbsid-webusb] config read 0x' + (sub & 0xff).toString(16) +
                    ' failed: ' + (e && e.message ? e.message : e));
       return null;
@@ -589,14 +447,8 @@ export class USBSIDWebUSBTransport {
     }
   }
 
-  /**
-   * Wait on a config read, but not for ever, without abandoning the read.
-   *
-   * For the connect path, where a board that will not answer must not stop the
-   * page coming up. The read itself carries on to completion on the chain, so
-   * its reply is consumed by it and the next question still gets its own answer.
-   * Only this caller stops waiting.
-   */
+  /* Wait on a config read with a timeout, the read stays on the chain and its reply
+   * is consumed there. For the connect path, a silent board must not block the page */
   async _configReadBounded(sub, len = MAX_PACKET, ms = CONFIG_TIMEOUT_MS) {
     const name = '0x' + (sub & 0xff).toString(16);
     const t0 = (typeof performance !== 'undefined') ? performance.now() : Date.now();
@@ -614,14 +466,8 @@ export class USBSIDWebUSBTransport {
     } finally {
       clearTimeout(timer);
       if (gaveUp) {
-        /* Say what actually happened rather than only that it did not arrive in
-         * time. The read is still on the chain and still going to be answered,
-         * so whether it lands a moment later or never lands at all are two very
-         * different faults and this is the only place that can tell them apart.
-         *
-         * `waiting` is how many reads were already queued when this one was
-         * asked for: a read that is simply behind a slow one is not the same
-         * problem as a read that is first in line and still does not answer. */
+        /* Say what happened, the read stays on the chain and still gets answered
+         * waiting = reads already queued ahead of this one */
         console.warn('[usbsid-webusb] config read ' + name + ' gave up after ' +
                      ms + 'ms, ' + waiting + ' read(s) were queued ahead of it');
         read.then((late) => {
@@ -638,18 +484,13 @@ export class USBSIDWebUSBTransport {
     }
   }
 
-  /**
-   * What the firmware was built with, or null when it will not say.
-   *
-   * See FEATURE_SIDPLAYER: a board without the embedded player takes an upload
-   * and plays nothing, which looks exactly like a bad file.
-   */
+  /* Firmware feature flags or null, see FEATURE_SIDPLAYER. A board without the embedded player takes an upload and plays nothing */
   async features() {
     const r = await this._configRead(US_FEATURES);
     return (r && r.length >= 1) ? r[0] : null;
   }
 
-  /** Does this board carry the onboard SID player? null when it will not say. */
+  /* Board carries the onboard SID player? null when unknown */
   async hasSidPlayer() {
     const f = await this.features();
     return (f === null) ? null : (f & FEATURE_SIDPLAYER) !== 0;
@@ -657,19 +498,9 @@ export class USBSIDWebUSBTransport {
 
   /* ---- the onboard player ---------------------------------------------- */
 
-  /**
-   * One command packet, now, past the write queue entirely.
-   *
-   * **Not `_send()`.** That queue is for register writes, and when it is full it
-   * drops its oldest entry rather than lag the tune, which is right for sound
-   * and ruinous for a file: a 61566 byte tune is 993 packets posted back to
-   * back, and the board received 17422 bytes of it. `uploadSIDFile()` over Web
-   * Serial had always been correct because that transport writes each packet
-   * straight out and waits for it.
-   *
-   * So this waits for each transfer. It is slower than the queue by design; an
-   * upload is a second of one-off work, not something in the audio path.
-   */
+  /* Send one command packet immediately, bypassing the write queue
+   * The queue drops its oldest entry when full, fine for sound but not for a file
+   * (61566 byte tune = 993 packets). Waits for each transfer, slower than the queue */
   async _sendNow(sub, payload = null) {
     if (!this._open) return false;
     this._flushBatch();
@@ -682,13 +513,8 @@ export class USBSIDWebUSBTransport {
   }
 
   playerLoadTune(subtune) {
-    /* Two bytes, and the order of them is the whole point: the file id
-     * first, 0 being the one just uploaded, then the subtune, which the
-     * firmware counts from zero. `config.c` reads it as `tuneno =
-     * buffer[2]` with the config init byte already stripped, so that is
-     * this packet's byte 3 - leaving the file id out shifts the subtune
-     * into the wrong byte and the firmware reads a subtune of zero
-     * regardless of what was asked for. */
+    /* Two bytes: file id (0 = last uploaded), then the subtune counted from zero
+     * config.c reads tuneno = buffer[2] after the config init byte, this packet's byte 3 */
     const t = new Uint8Array([0, subtune & 0xFF]);
     return this._sendNow(SID_PLAYER_TUNE, t);
   }
@@ -699,14 +525,9 @@ export class USBSIDWebUSBTransport {
   playerPrev()      { return this._sendNow(SID_PLAYER_PREV); }
   playerSocketTwo() { return this._sendNow(SID_PLAYER_TWO); }
 
-  /**
-   * How long the tune just uploaded should run, in milliseconds.
-   *
-   * Send after the upload. Without it the board stops after five minutes, which
-   * is its own default and not the tune's length. UPLOAD_SID_START zeroes both the
-   * position and the maximum, and SID_PLAYER_STOP puts the maximum back to five
-   * minutes, so this belongs with every upload rather than once per session.
-   */
+  /* Set the play time of the last uploaded tune in milliseconds, send after the upload
+   * Board default is five minutes. UPLOAD_SID_START zeroes position and maximum,
+   * SID_PLAYER_STOP restores five minutes, send with every upload */
   playerSetPlaytime(ms) {
     const v = Math.max(0, Math.round(ms)) >>> 0;
     return this._sendNow(UPLOAD_SID_PLAYTIME, new Uint8Array([
@@ -714,18 +535,10 @@ export class USBSIDWebUSBTransport {
     ]));
   }
 
-  /**
-   * The board's play position in milliseconds, or null when it will not say.
-   *
-   * The firmware only samples the player while it is playing, so the value holds
-   * at the last live reading once playback stops rather than dropping to zero.
-   * UPLOAD_SID_START resets it, so it cannot carry a stale position from the
-   * previous tune into a new one.
-   *
-   * One read at a time. `_configRead()` leaves a timed out read pending, and a
-   * late reply then satisfies the *next* one, so a caller polling this must not
-   * let two overlap: hence the guard rather than trusting the caller.
-   */
+  /* Board play position in milliseconds, null when unknown
+   * Firmware samples the player only while playing, the value holds at the last
+   * reading after stop. UPLOAD_SID_START resets it
+   * One read at a time, a timed out read leaves a late reply for the following one */
   async playerTime() {
     if (this._timeBusy) return null;
     this._timeBusy = true;
@@ -738,39 +551,25 @@ export class USBSIDWebUSBTransport {
     }
   }
 
-  /**
-   * Mute or unmute one voice, or everything.
-   *
+  /* Mute or unmute one voice or everything
    *   chip 1..4, voice 1..3   that voice, masked on the way out
-   *   chip 1..4, voice 0      that whole chip, by dropping its writes
-   *   chip 0,    voice 0      every chip and every voice
-   *
-   * Two mechanisms, not degrees of one. A voice mute masks the gate and the
-   * sustain and lets every other write through. A chip mute drops the chip's
-   * writes, which is the only one of the two that reaches $18, so it is what
-   * silences a tune playing samples through the volume register.
-   */
+   *   chip 1..4, voice 0      whole chip, its writes are dropped
+   *   chip 0,    voice 0      every chip and voice
+   * Voice mute masks gate and sustain. Chip mute is the only one reaching $18,
+   * it silences tunes playing samples through the volume register */
   playerMute(chip, voice, mute) {
     return this._sendNow(SID_PLAYER_MUTE,
       new Uint8Array([chip & 0xFF, voice & 0xFF, mute ? 1 : 0]));
   }
 
-  /** Every voice of every chip. */
+  /* Every voice of every chip */
   playerMuteAll(mute) { return this.playerMute(0, 0, mute); }
 
-  /**
-   * One whole chip, in one command.
-   *
-   * Sent as voice 0, which set_mutestate() routes to usplayer_set_chip_mute().
-   * This used to send the three voices, because the firmware had no chip form.
-   */
+  /* Whole chip in one command, voice 0 goes to usplayer_set_chip_mute() via set_mutestate() */
   playerMuteChip(chip, mute) { return this.playerMute(chip, 0, mute); }
 
-  /**
-   * The mute state as one bitmask per chip, bits 0 to 2 for voices 1 to 3, or
-   * null. Reads zeros for every chip while nothing is playing: the firmware only
-   * asks the player when it is running.
-   */
+  /* Mute state as a bitmask per chip, bits 0 to 2 = voices 1 to 3, or null
+   * All zero while nothing plays */
   async playerMuteState() {
     if (this._timeBusy) return null;
     this._timeBusy = true;
@@ -784,12 +583,9 @@ export class USBSIDWebUSBTransport {
   }
 
 
-  /**
-   * Send a whole file to the board's own player and start it.
-   *
-   * Seven steps in this order: stop, START, the data in 62 byte pieces, END,
-   * SIZE, load the subtune, start. 62 and not 64 because two bytes of every
-   * packet are the command and the sub command.
+  /* Send a whole file to the board player and start it
+   * Order: stop, START, data in 62 byte pieces (2 of the 64 bytes are command and
+   * sub command), END, SIZE, load subtune, start
    *
    * @param {Uint8Array} bytes     the file
    * @param {number} subtune       counted from one, as a host counts songs
@@ -819,32 +615,16 @@ export class USBSIDWebUSBTransport {
     return await this.playerStart();
   }
 
-  /**
-   * What the board is carrying: chips per socket, and which one answers the
-   * FM/OPL addresses.
-   *
-   * The command line player reads exactly this at connect and hands it to the
-   * emulation, which is how `$df40`/`$df50` reach a chip at all. Without it an
-   * FM/OPL tune plays its SID voices and none of its OPL.
-   *
-   * A shared device is asked through its own driver rather than behind its
-   * back, since that is the object the host app is already talking to.
-   */
+  /* Chips per socket and which one answers the FM/OPL addresses
+   * Emulation needs this to route $df40/$df50 to a chip, without it FM/OPL tunes
+   * play their SID voices only. A shared device is asked through the host app driver */
   async readBoardConfig() {
     if (this._extDev) {
-      /* Through the host's own driver. It has readFMOplSID() but no socket
-       * read of its own, so the socket buffer goes through its generic
-       * configCmdRead(), which answers with an array of packets. */
+      /* Ask the host driver */
       const d = this._extDev;
       try {
-        /* The driver's own helpers, not its generic `configCmdRead()`.
-         *
-         * `readSocketConfig()` answers `{one, two}` already counted, so there is
-         * nothing here to parse; the old route asked `configCmdRead()` for the
-         * raw buffer and ran it through this file's `parseSocketConfig()`, which
-         * duplicated the driver's own logic and read the wrong shape back from
-         * it. Both of these go through the driver's serialised config read, which
-         * is the only path that recovers from a lost reply. */
+        /* Host driver helpers, readSocketConfig() answers {one, two} already counted
+         * Both use the driver serialised config read, which recovers from a lost reply */
         let parsed = null;
         if (typeof d.readSocketConfig === 'function') {
           parsed = await d.readSocketConfig();
@@ -862,17 +642,12 @@ export class USBSIDWebUSBTransport {
       }
     }
 
-    /* Bounded, because this runs on the connect path and a board that will not
-     * answer must not stop the page coming up. Bounded at this level and not at
-     * the transfer: the reads stay on the chain and their replies are still
-     * consumed there, so a slow answer costs one unknown value rather than every
-     * value after it. */
+    /* Bounded, runs on the connect path and a silent board must not block the page
+     * Reads stay on the chain, a slow answer costs one unknown value */
     const cfg = await this._configReadBounded(READ_SOCKETCFG);
     if (!cfg) return null;
     const parsed = parseSocketConfig(cfg);
-    /* If this one goes unanswered the sockets are still known and worth having:
-     * only FM/OPL is lost, and an fmoplSid of -1 is the same as a board with no
-     * FM chip. Reporting the sockets beats reporting nothing. */
+    /* If this goes unanswered only FM/OPL is lost, fmoplSid -1 = no FM chip */
     const fm = await this._configReadBounded(READ_FMOPLSID);
     if (!fm) {
       console.warn('[usbsid-webusb] the board did not answer the FM/OPL read; ' +
@@ -893,13 +668,9 @@ export class USBSIDWebUSBTransport {
     this._pktFrames = 0;
   }
 
-  /**
-   * Add one command to the batch, and send the batch when it is full.
-   *
-   * Each command occupies a whole 64 byte slot so the host's split into
-   * endpoint packets lands exactly between commands. The firmware reads the
-   * byte count out of the header and ignores the padding.
-   */
+  /* Add one command to the batch, send it when full
+   * Each command takes a 64 byte slot for the host split to land between commands,
+   * the firmware ignores the padding */
   _queueCommand(cmd) {
     if (this._coalesce <= 1) { this._send(cmd.slice()); return; }
 
@@ -908,40 +679,25 @@ export class USBSIDWebUSBTransport {
       this._batchCount = 0;
     }
     this._batch.set(cmd, this._batchCount * MAX_PACKET);
-    /* the tail of the slot is whatever was there before, so clear it */
+    /* Clear the tail of the slot */
     this._batch.fill(0, this._batchCount * MAX_PACKET + cmd.length,
                      (this._batchCount + 1) * MAX_PACKET);
     this._batchLast = cmd.length;
     if (++this._batchCount >= this._coalesce) this._flushBatch();
   }
 
-  /**
-   * Send the batch, ending on a short packet.
-   *
-   * The length is `(n - 1) * 64 + the last command's own length`, never a whole
-   * multiple of the endpoint size. That is deliberate. A transfer that is an
-   * exact multiple may be terminated with a zero length packet, and the
-   * firmware's receive callback has no guard for one:
-   *
+  /* Send the batch, ending on a short packet
+   * Length is (n - 1) * 64 + last command length, never a multiple of 64
+   * A transfer of an exact multiple may end with a ZLP, the firmware rx callback has no guard:
    *     webread = bufsize;
    *     memcpy(sid_buffer, buffer, bufsize);   // bufsize 0 copies nothing
    *     process_buffer(wusb_itf, &webread);    // still reads sid_buffer[0]
-   *
-   * so a zero length packet re-runs whatever command was left in the buffer:
-   * a duplicated burst of writes carrying stale cycle counts, which on a cycle
-   * exact digi is precisely the artefact this transport exists to avoid. A
-   * final short packet terminates the transfer on its own and the question
-   * never arises. Every command still starts on a 64 byte boundary, so the
-   * host's split still lands between them.
-   *
-   * `fullPackets` inverts this, and must be set if the board's vendor FIFO is
-   * ever enabled (CFG_TUD_VENDOR_RX_BUFSIZE and USE_VENDOR_BUFFER). A FIFO is a
-   * byte stream with no packet framing: `vendor_task()` reads 64 bytes and
-   * `process_buffer` consumes only the count in the header, dropping the rest,
-   * so one short packet in the middle desynchronises every read after it. With
-   * the FIFO on, a zero length packet is harmless instead, because nothing
-   * reprocesses a stale buffer. The two settings go together, both or neither.
-   */
+   * A ZLP re-runs the command left in the buffer, a duplicated burst with stale cycle counts
+   * Every command still starts on a 64 byte boundary
+   * fullPackets must be set when the vendor FIFO is enabled (CFG_TUD_VENDOR_RX_BUFSIZE and
+   * USE_VENDOR_BUFFER). The FIFO is a byte stream, vendor_task() reads 64 bytes and
+   * process_buffer consumes only the header count, a short packet desyncs later reads
+   * With the FIFO a ZLP is harmless. Both or neither */
   _flushBatch() {
     if (this._batch === null || this._batchCount === 0) return;
     const bytes = this._fullPackets
@@ -951,12 +707,7 @@ export class USBSIDWebUSBTransport {
     this._batchCount = 0;
   }
 
-  /**
-   * How many packets are waiting to go out. The player reads this to decide
-   * whether to emulate another frame: once the board is this far behind, more
-   * frames only make the backlog deeper, and a backlog is a stretch of tune
-   * that plays after the page thinks it stopped.
-   */
+  /* Packets waiting to go out, the player stops emulating frames when the board is behind */
   get queueDepth() { return this._q.length + this._inflight; }
   get queueLimit() { return this._maxQ; }
 
@@ -966,19 +717,11 @@ export class USBSIDWebUSBTransport {
     this._pump();
   }
 
-  /**
-   * Keep several transfers in flight.
-   *
-   * One at a time is a throughput ceiling, not backpressure. A round trip to
-   * `transferOut` is half a millisecond to a millisecond, so serialised it caps
-   * out somewhere near a thousand packets a second. A digi writing 650
-   * registers a frame needs 44 packets a frame, 2170 a second, so the queue
-   * grew without bound and playback was throttled to whatever USB managed. The
-   * host controller queues submissions on an endpoint in order and completes
-   * them in order, which is the same thing the libusb driver relies on for its
-   * async transfers, so the writes stay in sequence. The real backpressure is
-   * the queue depth, which the player reads.
-   */
+  /* Keep several transfers in flight
+   * A transferOut round trip is 0.5 to 1 ms, serialised that caps near 1000 packets a second
+   * A digi writing 650 registers a frame needs 44 packets a frame, 2170 a second
+   * The host controller completes submissions on an endpoint in order, writes stay in sequence
+   * Backpressure is the queue depth */
   _pump() {
     while (this._inflight < this._maxInflight && this._q.length > 0) {
       const buf = this._q.shift();
@@ -996,20 +739,9 @@ export class USBSIDWebUSBTransport {
     }
   }
 
-  /**
-   * Whether the pipe to the board ever actually runs dry.
-   *
-   * The player's own numbers stop at the queue: they say whether writes were
-   * produced and handed over on time, not whether they kept flowing out. If
-   * JavaScript cannot keep a board fed the way a dedicated libusb thread can,
-   * this is where it shows, and it shows as `emptied`: transfers completing
-   * with nothing submitted behind them, which is the pipe draining and the
-   * board being left to finish what it has.
-   *
-   * `maxGap` is the longest a completion ever went unanswered by another,
-   * which is the same quantity for a pipe that is merely stuttering rather
-   * than emptying.
-   */
+  /* Track whether the pipe to the board runs dry
+   * emptied = transfers completing with nothing submitted behind them
+   * maxGap = longest time between two completions */
   _noteCompletion() {
     const s = this._usb;
     const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
@@ -1040,15 +772,13 @@ export class USBSIDWebUSBTransport {
       emptied: s.emptied,
       maxCompletionGap: s.maxGap,
       minInflight: s.minInflight,
-      /* This one really does keep transfers outstanding, up to MAX_INFLIGHT, so
-       * `emptied` and `minInflight` mean what they say here. */
+      /* Transfers stay outstanding up to MAX_INFLIGHT, emptied and minInflight are meaningful */
       pipelined: true,
     };
   }
 
-  /* One transfer, resolving when the device has taken the packet, which is
-   * the backpressure. A shared device may only offer the fire and forget
-   * writeArray, which resolves early; that still works, it just queues less. */
+  /* One transfer, resolves when the device took the packet (backpressure)
+   * A shared device may only have the fire and forget writeArray, resolves early */
   _transfer(buf) {
     if (this._extDev) {
       const fn = this._extDev.writeArrayAwait

@@ -1,15 +1,14 @@
 /*
- * USBSID-Player: a cycle exact C64 SID player for USBSID-Pico, for command
- * line playback, for embedding on RP2350 (Pico2), and in a browser.
+ * USBSID-Player: a cycle exact C64 SID player for USBSID-Pico,
+ * command line playback, websites and for embedding on RP2040/RP2350.
  *
- * web/usplayer-scope.js
- * Oscilloscope boxes for software audio: one canvas per voice, drawn from the
- * adapter's scope frames (see usplayer-softaudio.js).
+ * usplayer-scope.js
+ * Oscilloscope boxes for software audio, one canvas per voice (see usplayer-softaudio.js)
  *
- * VoiceScope draws one voice. ScopeMosaic lays out the boxes for a tune: three
- * rows for one chip, a column per chip and a row per voice for more.
+ * VoiceScope draws one voice
+ * ScopeMosaic lays out the boxes, 3 rows for one chip, a column per chip for more
  *
- * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Player)
+ * This file is part of USBSID-Player (https://github.com/LouDnl/USBSID-Player)
  * File author: LouD
  *
  * Copyright (c) 2026 LouD
@@ -28,15 +27,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Most chips a mosaic shows: the worker sends four chips' voices at most. */
+/* Max chips in a mosaic */
 const MAX_CHIPS = 4;
 
-/**
- * One voice's oscilloscope on a canvas.
- *
- * The data runs a 45th of a second longer than shown; in sync mode the window
- * starts at the last rising crossing of the wave's midline in that extra part,
- * which holds a periodic wave in place.
+/*
+ * Oscilloscope of one voice on a canvas
+ * Data runs 1/45 s longer than shown, sync mode starts at the last rising
+ * midline crossing in that part to hold a periodic wave in place
  */
 export class VoiceScope {
   /**
@@ -56,13 +53,13 @@ export class VoiceScope {
   }
 
   /**
-   * Set how much time the box shows: zoom + 1 sixtieths of a second.
+   * Set the time shown, (zoom + 1) / 60 s
    *
    * @param {number} zoom 1 (closest) to 5 (farthest)
    */
   setZoom(zoom) { this.zoom = Math.min(5, Math.max(1, zoom | 0)); }
 
-  /** Size the drawing buffer to the canvas' size on screen. */
+  /* Size the drawing buffer to the canvas size on screen */
   fit() {
     const r = window.devicePixelRatio || 1;
     const w = Math.max(1, Math.round(this.canvas.clientWidth * r));
@@ -71,7 +68,7 @@ export class VoiceScope {
     if (this.canvas.height !== h) this.canvas.height = h;
   }
 
-  /** Draw the latest output of the voice. */
+  /* Draw the latest output of the voice */
   draw() {
     const rate = this.source.scopeRate();
     const scan = Math.floor(rate / 45);
@@ -93,7 +90,7 @@ export class VoiceScope {
       }
     }
 
-    /* A full swing of one voice spans about 1, drawn at 90% of the height. */
+    /* Full swing is about 1, drawn at 90% of the height */
     const w = this.canvas.width, h = this.canvas.height;
     const scale = h * 0.9, step = w / shown, center = h / 2;
     const ctx = this.ctx;
@@ -109,7 +106,7 @@ export class VoiceScope {
     ctx.stroke();
   }
 
-  /** Draw a faded midline, for a stopped or paused tune. */
+  /* Draw a faded midline for a stopped or paused tune */
   idle() {
     const w = this.canvas.width, h = this.canvas.height;
     const ctx = this.ctx;
@@ -124,11 +121,9 @@ export class VoiceScope {
   }
 }
 
-/**
- * The oscilloscope boxes of a tune, in a container element.
- *
- * Builds `canvas.usp-scope` elements inside a `div.usp-scope-mosaic` grid with
- * `--usp-scope-cols` set to the column count; the page's CSS sizes them.
+/*
+ * Oscilloscope boxes of a tune in a container element
+ * Builds canvas.usp-scope elements in a div.usp-scope-mosaic grid, --usp-scope-cols = column count
  */
 export class ScopeMosaic {
   /**
@@ -150,7 +145,7 @@ export class ScopeMosaic {
   }
 
   /**
-   * Lay out the boxes for a chip count, when it differs from the current one.
+   * Lay out the boxes for a chip count if it changed
    *
    * @param {number} chips 1 to 4
    */
@@ -163,7 +158,7 @@ export class ScopeMosaic {
     const grid = document.createElement('div');
     grid.className = 'usp-scope-mosaic';
     grid.style.setProperty('--usp-scope-cols', String(chips));
-    /* Row by row: voice 1 of every chip, then voice 2, then voice 3. */
+    /* Row by row, voice 1 of all chips, then voice 2, then voice 3 */
     for (let voice = 1; voice <= 3; voice++) {
       for (let chip = 1; chip <= chips; chip++) {
         const canvas = document.createElement('canvas');
@@ -219,7 +214,7 @@ export class ScopeMosaic {
   }
 
   /**
-   * Draw every animation frame until stop().
+   * Draw every animation frame until stop()
    *
    * @param {function(): boolean} playing  false draws idle midlines
    */
@@ -238,7 +233,7 @@ export class ScopeMosaic {
     this._raf = requestAnimationFrame(frame);
   }
 
-  /** Stop drawing. */
+  /* Stop drawing */
   stop() {
     if (this._raf) cancelAnimationFrame(this._raf);
     this._raf = 0;

@@ -1,32 +1,18 @@
 /*
- * USBSID-Player: software audio in the browser.
+ * USBSID-Player: a cycle exact C64 SID player for USBSID-Pico,
+ * command line playback, websites and for embedding on RP2040/RP2350.
  *
- * The page synthesises with reSIDfp inside the wasm and plays it through an
- * AudioWorklet, so a tune can be heard with no board attached at all.
+ * Synthesis by reSIDfp in the wasm, played through an AudioWorklet.
+ * No board needed.
  *
- * THE CONSTRAINT THAT SHAPES THIS FILE
+ * An AudioWorkletProcessor cannot call into the wasm module, it runs on the
+ * audio thread. Samples are pulled on the main thread (or a worker) and posted:
+ * usp_audio_take()  ->  postMessage(Int16Array)  ->  ring  ->  process()
  *
- * An AudioWorkletProcessor **cannot call into the wasm module**. It runs on the
- * audio rendering thread; the module lives on the main thread or in a worker.
- * So samples cannot be pulled from inside `process()`, which is what a naive
- * design would do. Instead:
+ * The worklet plays what is in its ring. When it runs dry it emits silence
+ * and counts it.
  *
- *   main thread            worklet (audio thread)
- *   -----------            ----------------------
- *   usp_audio_take()  ->   postMessage(Int16Array)  ->  ring
- *                                                       process() drains it
- *
- * The worklet keeps its own ring and plays whatever it has been given. If it
- * runs dry it emits silence and counts it, because silence that is quietly
- * inserted is indistinguishable from a quiet tune.
- *
- * `postMessage` and not a SharedArrayBuffer, which was the decision taken when
- * this was planned: SAB would let the worklet read the wasm heap directly with
- * no copy, and needs COOP/COEP response headers that the usual local dev server
- * does not send. The copy is a few hundred samples a frame and is not the
- * expensive part of anything here.
- *
- * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Player)
+ * This file is part of USBSID-Player (https://github.com/LouDnl/USBSID-Player)
  * File author: LouD
  *
  * Copyright (c) 2026 LouD
@@ -45,13 +31,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* The processor, as source, because an AudioWorklet module has to be fetched by
- * URL and a blob is how a single file library ships one. Deliberately small: it
- * owns a ring and nothing else, since anything it gets wrong is heard.
- *
- * Exported so a test can run the real ring outside an AudioWorklet, which is
- * the only way any of this can be exercised without a device: see
- * temp/ring_sim.mjs. */
+/* AudioWorklet processor source, loaded from a blob URL */
 export const PROCESSOR_SRC = `
 class UspAudio extends AudioWorkletProcessor {
   constructor(options) {
@@ -59,32 +39,19 @@ class UspAudio extends AudioWorkletProcessor {
     const opt = (options && options.processorOptions) || {};
     const cap = opt.capacity || 32768;
     this._buf = new Float32Array(cap);
-    /* Right channel: a copy of _buf for mono chunks, see _onMessage(). */
+    /* Right channel, a copy of _buf for mono chunks */
     this._bufR = new Float32Array(cap);
     this._head = 0;   /* written by onmessage */
     this._tail = 0;   /* read by process() */
     this._starved = 0;
-    /* How full this wants to be kept, and how often it is allowed to say so.
-     * The ring asking for what it is short of is the whole flow control: the
-     * page cannot work the level out for itself without either a round trip or
-     * arithmetic on currentTime that drifts by exactly the amount of any
-     * silence that has already been invented. */
+    /* Fill level to keep ~ the ring requests what it is short of (flow control) */
     this._target = opt.target || 8192;
     this._since = 0;
-    /* A second port, when the page hands one over.
-     *
-     * Samples normally arrive from the main thread, which is where the
-     * emulation runs. A hidden page throttles that thread hard while this one
-     * is never throttled, so the ring empties and the tune stutters with the
-     * screen off. The cure is to run the emulation in a worker and let it talk
-     * to this ring **directly**, with the main thread not in the path at all.
-     *
-     * So both ends of the conversation move: samples come in on _peer and the
-     * requests for more go out on it, while this.port stays for the page's own
-     * commands (flush, target) and for the stats it displays. */
+    /* Optional second port from a worker ~ a hidden page throttles the main
+     * thread and the ring runs dry. Samples come in on _peer and requests go
+     * out on it, this.port keeps the page commands (flush, target) and stats */
     this._peer = null;
-    /* Samples received per sender, reported back: lets each sender tell what
-     * is still in flight however stale a report is by the time it lands. */
+    /* Samples received per sender, reported back to track what is in flight */
     this._recvPort = 0;
     this._recvPeer = 0;
     this.port.onmessage = (e) => this._onMessage(e, false);
@@ -92,9 +59,7 @@ class UspAudio extends AudioWorkletProcessor {
 
   _onMessage(e, fromPeer) {
       const d = e.data;
-      /* The worker's end of the channel. Kept as a port rather than a flag: a
-       * transferred MessagePort is the only way into this thread that does not
-       * go through the main thread's task queue. */
+      /* Worker channel, a transferred MessagePort bypasses the main thread */
       if (d && d.cmd === 'peer' && d.port) {
         this._peer = d.port;
         this._peer.onmessage = (ev) => this._onMessage(ev, true);
@@ -106,32 +71,20 @@ class UspAudio extends AudioWorkletProcessor {
         this.port.postMessage({ starved: this._starved, queued: this._queued() });
         return;
       }
-      /* Throw away everything not yet played.
-       *
-       * The page can drop what it has rendered but not yet sent; only this
-       * side can drop what has already been sent. Without it a new tune is
-       * appended behind up to a second of the old one, and the ring stays
-       * above target so it asks for nothing more: the new tune is queued
-       * rather than switched to. _since is set so the next process() reports
-       * at once, otherwise the page waits up to four quanta to be told the
-       * ring is empty. */
-      /* How full the page should keep this. Raised while the page is hidden:
-       * see setTarget() on the class. Only the level changes, nothing is
-       * dropped, so it takes effect as the ring fills. */
+      /* Fill level, raised while the page is hidden. Nothing is dropped */
       if (d && d.cmd === 'target' && typeof d.value === 'number') {
         this._target = Math.max(2048, Math.min(d.value | 0, this._buf.length - 1));
         this._since = 4;
         return;
       }
-      /* Drop the oldest samples down to 'keep', skipping ahead. For a host
-       * returning from hidden with a deep ring that wants controls to answer
-       * at once rather than after the ring drains. */
+      /* Drop the oldest samples down to 'keep' */
       if (d && d.cmd === 'trim' && typeof d.keep === 'number') {
         const excess = this._queued() - Math.max(0, d.keep | 0);
         if (excess > 0) this._tail = (this._tail + excess) % this._buf.length;
         this._since = 4;
         return;
       }
+      /* Throw away everything not yet played, report at once */
       if (d && d.cmd === 'flush') {
         this._head = 0;
         this._tail = 0;
@@ -139,19 +92,17 @@ class UspAudio extends AudioWorkletProcessor {
         this._since = 4;
         return;
       }
-      /* A bare Int16Array is mono, { stereo: Int16Array } is L/R pairs.
-       * Counts and ring positions are frames either way. */
+      /* A bare Int16Array is mono, { stereo: Int16Array } is L/R pairs */
       const ch = (d && d.stereo instanceof Int16Array) ? 2 : 1;
       const pcm = (ch === 2) ? d.stereo : d;
       if (!(pcm instanceof Int16Array)) return;
       const frames = (ch === 2) ? (pcm.length >> 1) : pcm.length;
       if (fromPeer) this._recvPeer += frames;
       else this._recvPort += frames;
-      /* Int16 to float here rather than on the main thread: it is the audio
-       * thread's own format and doing it here keeps the transfer half the size. */
+      /* Int16 to float on this thread, halves the transfer size */
       for (let i = 0; i < frames; i++) {
         const next = (this._head + 1) % this._buf.length;
-        if (next === this._tail) break;   /* full: drop, the page is too far ahead */
+        if (next === this._tail) break;   /* Full, drop the rest */
         const l = pcm[i * ch] / 32768;
         this._buf[this._head] = l;
         this._bufR[this._head] = (ch === 2) ? pcm[i * 2 + 1] / 32768 : l;
@@ -180,13 +131,7 @@ class UspAudio extends AudioWorkletProcessor {
       this._starved += out.length - n;
     }
 
-    /* Ask for more when short, at most every fourth quantum so a busy page is
-     * not buried in messages it cannot answer. The starve count rides along
-     * because the page has no other way to know it happened. */
-    /* Report every fourth quantum whether or not anything is wanted. Reporting
-     * only when short leaves the page holding a stale zero for as long as the
-     * ring is full, which reads as "nothing has ever gone wrong" and is the one
-     * thing a diagnostic must not do. */
+    /* Report every fourth quantum, wanted or not. The starve count rides along */
     if (++this._since >= 4) {
       this._since = 0;
       const q = this._queued();
@@ -196,9 +141,7 @@ class UspAudio extends AudioWorkletProcessor {
         queued: q,
         starved: this._starved,
       };
-      /* To the worker when there is one, since it is the thing that can act on
-       * it, and to the page as well for its status line. Each gets its own
-       * received count. */
+      /* To the worker if present, and to the page for its status line */
       if (this._peer) this._peer.postMessage(Object.assign({ received: this._recvPeer }, report));
       this.port.postMessage(Object.assign({ received: this._recvPort }, report));
     }
@@ -208,96 +151,45 @@ class UspAudio extends AudioWorkletProcessor {
 registerProcessor('usp-audio', UspAudio);
 `;
 
-/* How much audio to keep ready, in seconds.
- *
- * The emulation runs on the **main thread**, driven by the worklet asking for
- * samples. The audio thread is never throttled; the main thread is throttled
- * hard as soon as the page is hidden, and on Android Firefox with the screen
- * off it barely runs at all. A fifth of a second of buffer is then nowhere near
- * enough: the ring empties between callbacks and the tune stutters.
- *
- * So when the page goes away the target becomes seconds rather than a fifth of
- * one, and each callback is allowed to emulate far more before returning. There
- * is no interactive cost to a long buffer while nobody is looking, and blocking
- * a hidden page's main thread for 40 ms at a time costs nothing either.
- */
+/* Seconds of audio to keep ready. A hidden page throttles the main thread
+ * (Android Firefox with the screen off barely runs it). The target goes up
+ * to seconds and one fill may emulate far more */
 const VISIBLE_SECONDS = 0.2;
 const HIDDEN_SECONDS  = 2.0;
-/* Frames of emulation one fill may do: about 160 ms visible, 2 s hidden. */
+/* Frames of emulation one fill may do: about 160 ms visible, 2 s hidden */
 const VISIBLE_STEPS = 8;
 const HIDDEN_STEPS  = 100;
 
-/* The longest a single _fill() burst may run, in wall clock ms, whatever
- * maxSteps says. Only reached on the main thread fallback: a many-SID tune
- * behind on real time can cost far more per frame than VISIBLE_STEPS assumes,
- * and every one of those frames runs before this function gives the thread
- * back - the same thread a tune switch's own click handler is queued on. See
- * usplayer-worker.js's AUDIO_FILL_BUDGET_MS for the same bound in the worker,
- * where this normally runs instead. */
+/* Max wall clock ms of one _fill() burst, whatever maxSteps says. Main thread
+ * fallback only, see AUDIO_FILL_BUDGET_MS in usplayer-worker.js */
 const FILL_BUDGET_MS = 8;
 
-/* Running through a tune's silent lead-in.
- *
- * Plenty of RSID tunes are a loader: the machine boots, BASIC RUNs a program and
- * that program spends up to a minute filling memory with samples before a note
- * is played. Emulated at one second per second, that is a minute of silence with
- * nothing to say it is working. The tune is not broken and neither is the
- * player, but nobody waits a minute to find that out.
- *
- * So the lead-in is run as fast as the machine will go and its audio thrown
- * away, and the moment the output stops being silent the player drops back to
- * real time. Only the lead-in: once a tune has made a sound this never engages
- * again, so a rest in the middle of a piece is played, not skipped.
- *
- * Measured rather than guessed (temp/silence_profile.mjs). Switching the chip on
- * is a step into the filter and rings down over about the first 25 frames,
- * reaching 13009 peak to peak on the first frame, so a decision cannot be taken
- * until that has passed. After it, a silent loader is *exactly* flat, 0 peak to
- * peak, and the first frame of music is 11094. A threshold of 128 sits three
- * orders of magnitude below the music and above nothing at all, which is why it
- * does not matter that it is not tuned finely.
- */
+/* Skip a silent lead-in
+ * RSID loaders can spend up to a minute filling memory before the first note.
+ * Run it at full speed with the audio thrown away, drop back to real time at
+ * the first sound. Only the lead-in, once a tune made a sound this never engages again.
+ * Switch-on rings down over the first ~25 frames (13009 peak to peak on the first),
+ * a silent loader is 0 peak to peak after that, the first music frame is 11094.
+ * Threshold 128 sits far below the music */
 const SKIP_SETTLE_FRAMES = 50;    /* about a second, well past the ring down */
 const SKIP_THRESHOLD     = 128;   /* int16 peak to peak, about -54 dBFS */
-/* Give up after this much emulated silence and play on at one times speed.
- * It has to exist, because a tune that makes no sound at all would
- * otherwise be run through at speed for its whole length. A skip that runs
- * through a tune is worth being suspicious of the *player* for first, not
- * the tune: `ResidFpSidBackend::attach()` once built a chip with the volume
- * at zero for any tune attached after its registers were already set,
- * which looked exactly like this from here.
- *
- * Giving up is not free: the tune's clock is now this far in, so a five
- * minute tune has that much less to play. Ninety seconds is chosen against
- * the case this feature is for, loaders of "up to sixty seconds", with
- * margin, against the cost of being wrong (a minute and a half of a tune
- * that was not going to be heard anyway). */
+/* Give up after this much emulated silence and play on at normal speed.
+ * Chosen against loaders of up to sixty seconds with margin */
 const SKIP_MAX_SECONDS   = 90;
-/* How long one call may spend on this. It runs on the main thread, and the
- * worklet asks for samples about every 11 ms, so this is the share of the thread
- * the skip takes: enough to run perhaps fifty frames a call, tens of times
- * faster than real time, while leaving the page usable. */
+/* Max ms per call on the main thread, about fifty frames a call at tens of
+ * times real time */
 const SKIP_BUDGET_MS     = 8;
-/* How often the synthesis is switched back on for one frame to look at the
- * output, when nothing else suggests looking.
- *
- * Running through a lead-in costs 0.39 ms a frame with the synthesis off and
- * 3.81 ms with it on (temp/cost.mjs), so what this interval really sets is the
- * speed: one probe in eight is about 24x real time, one in four about 16x.
- *
- * It is a floor, not the rule. Every frame that writes the SID is probed
- * whichever frame it falls on, because a write is the only way a silent chip
- * can start making a noise and the counter is free to read. Measured on
- * c64_mp3.sid, whose loader writes the SID exactly **zero** times in its 11 s
- * lead-in and then 38 times on the frame the music starts, so in practice the
- * music is found on the frame it begins. The interval is what catches the
- * cases that are not like that. */
+/* Frames between probes of the output while skipping
+ * Skipping costs 0.39 ms a frame with synthesis off and 3.81 ms with it on,
+ * one probe in eight is about 24x real time, one in four about 16x.
+ * A frame that writes the SID is always probed (c64_mp3.sid writes 0 times in
+ * its 11 s lead-in and 38 times on the first music frame) */
 const SKIP_PROBE_EVERY   = 8;
 
 /**
- * Software audio output for USBSIDPlayerWeb.
+ * Software audio output for USBSIDPlayerWeb
  *
- * Usage, once a tune is loaded so the clock is known:
+ * Usage:
  *
  *   const audio = new UsPlayerAudio(player);
  *   await audio.start({ chips: 1, model: 0 });
@@ -334,8 +226,7 @@ export class UsPlayerAudio {
     this._onVisibility = null;
     this._keepAlive = 0;
     this._handedOver = false;
-    /* Running through a silent lead-in: see _skipSilence(). Per tune, set in
-     * run(), and never set again once the tune has made a sound. */
+    /* Silent lead-in skip, see _skipSilence(). Armed per tune in run() */
     this._skipping = false;
     this._speed = 1;       /* last speed handed to the synthesis, see _applySpeed() */
     this._skippedFrames = 0;
@@ -343,17 +234,15 @@ export class UsPlayerAudio {
     this._skipSince = 0;      /* frames since the output was last looked at */
     this._skipWrites = 0;     /* the SID write count at the last frame */
     this._skipFrom = null;    /* the frame the skip began at, once it has */
-    /* Called with a reason when a skip ends, for a host that wants to say so. */
+    /* Called with a reason when a skip ends */
     this.onSkipEnd = null;
   }
 
   get running() { return this.node !== null; }
 
   /**
-   * Point the synthesis at a tune. Also resets the cost counters, which are
-   * per tune: a 3SID tune's ms/frame says nothing about the 1SID one before it.
-   *
-   * @returns {boolean} false when reSIDfp refuses the rate
+   * Point the synthesis at a tune and reset the cost counters
+   * Return false when reSIDfp refuses the rate
    */
   _configure(opts, rate) {
     const ok = this.M._usp_audio_configure(
@@ -367,42 +256,28 @@ export class UsPlayerAudio {
   }
 
   /**
-   * Open an AudioContext and configure the synthesis for its real rate.
+   * Open an AudioContext and configure the synthesis for its rate
+   * Resolve false when that fails
    *
    * @param {object} opts { chips = 1, quality = 1 (sinc), model = 0 (6581) }
-   * @returns {Promise<boolean>}
    */
   async start(opts = {}) {
     const M = this.M;
     if (typeof M._usp_audio_configure !== 'function') {
       throw new Error('this wasm has no software audio: rebuild with reSIDfp');
     }
-    /* Already up: reconfigure for the new tune rather than returning early.
-     * Chip count, model and clock all come from the tune, so a second tune
-     * loaded into a running context would otherwise be synthesised with the
-     * first one's settings, and a 2SID tune after a 1SID one would play as
-     * one. The context and the worklet are kept: they are per device, not per
-     * tune, and tearing them down costs a gesture we may not have. */
+    /* Already up: reconfigure for the new tune, keep the context and worklet */
     if (this.node) {
       this.unrun();
-      /* flush and not discard: the worklet's own ring has to go too, or the
-       * previous tune plays on and the new one waits behind it. */
+      /* Flush the worklet ring too */
       this.flush();
       return this._configure(opts, this.ctx.sampleRate | 0);
     }
 
-    /* Must follow a user gesture, which is not this file's business to arrange
-     * but is the first thing to check when nothing plays: iOS in particular
-     * gives a context that stays suspended for ever otherwise. A bare await
-     * here hung load() forever on a context the browser will not let start -
-     * silently, since resume() never rejects either, it just never settles.
-     * Racing it against a timeout is what _startAudioClock() (usplayer-web.js)
-     * already does for the same reason; this path wants the same guard. */
+    /* Needs a user gesture, iOS keeps the context suspended otherwise.
+     * resume() never rejects, race it against a timeout */
     this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-    /* Browsers only expose audioWorklet in a secure context: https://, or
-     * http://localhost / 127.0.0.1. A page on plain http under any other host
-     * name gets a context without it, and addModule below would fail with a
-     * bare "audioWorklet is undefined" that says nothing about the cause. */
+    /* audioWorklet only exists in a secure context (https or localhost) */
     if (!this.ctx.audioWorklet) {
       this.ctx.close().catch(() => {});
       this.ctx = null;
@@ -417,23 +292,15 @@ export class UsPlayerAudio {
       new Blob([PROCESSOR_SRC], { type: 'application/javascript' }));
     await this.ctx.audioWorklet.addModule(this._url);
 
-    /* The device's rate, not a wish. Asking for 44100 on a context fixed at
-     * 48000 gets a resampler for free whether or not that was wanted, so the
-     * synthesis is configured for what the context actually runs at. */
+    /* Use the device rate, the synthesis is configured for what the context runs at */
     const rate = this.ctx.sampleRate | 0;
     if (!this._configure(opts, rate)) {
       await this.stop();
       return false;
     }
 
-    /* Target a fifth of a second while the page is visible: long enough to ride
-     * out a slow frame on a two or three chip tune, short enough that a stop is
-     * not heard a beat later.
-     *
-     * Capacity is four seconds, well beyond that, because the target is raised
-     * to seconds while the page is hidden and the ring has to be able to hold
-     * it. See setTarget(). Four seconds of 48 kHz floats is 768 kB per
-     * channel, 1.5 MB for the two, which is nothing beside the wasm heap. */
+    /* Target 0.2 s while visible. Capacity is 4 s (768 kB per channel at 48 kHz),
+     * the target goes up to seconds while hidden, see setTarget() */
     const target = Math.max(2048, Math.round(rate * VISIBLE_SECONDS));
     this.node = new AudioWorkletNode(this.ctx, 'usp-audio', {
       numberOfInputs: 0,
@@ -443,18 +310,13 @@ export class UsPlayerAudio {
     });
     this._target = target;
     this.node.port.onmessage = (e) => this._onReport(e.data);
-    /* A processor that throws is removed and simply stops being called, with no
-     * other sign than the audio ending. Saying so beats silence. */
+    /* A throwing processor is removed and the audio stops, log it */
     this.node.onprocessorerror = (e) => {
       console.error('[usplayer-audio] the worklet processor failed', e);
     };
-    /* Through a gain stage rather than straight out, so a host with a volume
-     * control has something to turn. The emulation cannot do it: the tune owns
-     * $d418 and writes it constantly, a digi tune hundreds of times a frame, so
-     * anything written there is gone by the next frame and scaling it would
-     * change the tune rather than its loudness. This is after the synthesis and
-     * affects nothing the emulation does. Unity by default, so a host that never
-     * touches it hears exactly what it heard before. */
+    /* Gain stage for the host volume control. Scaling $d418 in the emulation
+     * would change the tune (written constantly, digis hundreds of times a frame).
+     * Unity by default */
     this.gain = this.ctx.createGain();
     this.gain.gain.value = this._volume;
     this.node.connect(this.gain);
@@ -465,12 +327,10 @@ export class UsPlayerAudio {
   }
 
   /**
-   * How loud, 0 to 1.
+   * Set the volume, 0 to 1
+   * Remembered when set before there is a graph
    *
-   * Remembered when it is set before there is a graph to set it on, which is
-   * what happens when a host restores a stored volume during startup.
-   *
-   * @param {number} value 0 for silence, 1 for the synthesis as it comes out
+   * @param {number} value 0 silence, 1 unity
    */
   setVolume(value) {
     const v = Math.max(0, Math.min(1, Number(value)));
@@ -479,17 +339,12 @@ export class UsPlayerAudio {
   }
 
   /**
-   * How loud the reSIDfp (SID) side of the mix is, independent of the FM/OPL
-   * side - see usp_audio_set_sid_volume() (web_api.cpp). Unlike setVolume(),
-   * this scales inside the wasm mix before the two chips are summed, so it
-   * balances one against the other rather than turning both down together;
-   * a post-mix WebAudio GainNode cannot do that.
+   * Set the SID side of the mix, independent of FM/OPL
    *
-   * Applied straight to the wasm module rather than remembered for a graph
-   * that has to exist first - this._sidVolume just survives a call made
-   * before the module is loaded (typeof guard below), not before a graph.
+   * Scales inside the wasm mix before the chips are summed, see
+   * usp_audio_set_sid_volume() (web_api.cpp). Applied straight to the module.
    *
-   * @param {number} percent 100 is unity (the default), 0 silences it
+   * @param {number} percent 100 is unity (default), 0 silences it
    */
   setSidVolume(percent) {
     const v = Number(percent);
@@ -500,9 +355,9 @@ export class UsPlayerAudio {
   }
 
   /**
-   * How loud the FM/OPL side of the mix is, independent of the SID side.
-   * See setSidVolume() - same idea, the other chip. Default 50: the OPL is
-   * the louder of the two in practice - see OplChip::set_gain().
+   * Set the FM/OPL side of the mix, independent of SID
+   *
+   * Default 50, the OPL is louder, see OplChip::set_gain()
    *
    * @param {number} percent 100 is unity, 0 silences it
    */
@@ -515,15 +370,9 @@ export class UsPlayerAudio {
   }
 
   /**
-   * A report from the worklet: how full its ring is, and how much silence it
-   * has had to invent.
+   * Handle a worklet report (ring fill level and starve count)
    *
-   * A method rather than the closure it used to be so that it can be driven
-   * without an AudioWorklet. No headless browser will run one (`addModule`
-   * never completes), so the whole flow control below was untestable, and it is
-   * the part that has been got wrong twice: once by acting on stale reports and
-   * once by rendering nothing at all during a silent passage. See
-   * temp/ring_sim.mjs, which drives this against the real processor source.
+   * A method, to drive it without an AudioWorklet
    *
    * @param {{need:number, queued:number, starved:number}} d
    */
@@ -534,39 +383,25 @@ export class UsPlayerAudio {
     if (typeof d.starved === 'number') this.starved = d.starved;
     if (typeof d.queued === 'number') this.queued = d.queued;
     if (this._driven && typeof d.queued === 'number') {
-      /* How short the ring is, counting what is already on its way to it.
-       *
-       * `d.need` alone is what the ring was short of *when the report was
-       * posted*. That is fine while the page is keeping up and wrong the
-       * moment it is not: anything that blocks the main thread, rendering a
-       * directory change for instance, leaves several reports queued, and
-       * each one is then acted on as though the ring were still empty. The
-       * ring fills, the worklet drops what will not fit, and dropped samples
-       * are heard as the tune skipping ahead: "changing directories while
-       * playing speeds it up".
-       *
-       * Subtracting what has been posted since the last report makes a stale
-       * report harmless: it can only ever ask for what is genuinely missing. */
+      /* Shortfall minus what is in flight. Stale queued reports would each ask
+       * for the same shortfall, overfilling the ring and dropping samples
+       * (heard as the tune skipping ahead) */
       const owed = this._target - d.queued - this._inFlight(d);
       this._sentSince = 0;
       this._owed = owed > 0 ? owed : 0;
-      /* While a lead-in is being skipped there is nothing on its way to the ring
-       * and the ring is not being asked for, so the report that starts the skip
-       * off may well say it wants nothing. Run anyway: this is the only thing
-       * that drives the skip forward. */
+      /* While skipping nothing is in flight and the ring asks for nothing,
+       * keep running, this drives the skip */
       if (this._owed > 0 || this._skipping) this._fill();
     }
   }
 
   /**
-   * Samples posted to the worklet and not yet received by it.
+   * Return samples posted to the worklet and not yet received by it
    *
-   * Exact when the worklet reports a received count: a backlog of stale
-   * reports then cannot ask for the same shortfall twice. Falls back to the
-   * posted-since-last-report estimate for a worklet without one.
+   * Exact with a received count in the report, else estimated from the
+   * posted since last report count.
    *
-   * @param {object|null} d a worklet report, or null to use the last one seen
-   * @returns {number} samples in flight
+   * @param {object|null} d worklet report, null for the last one seen
    */
   _inFlight(d) {
     if (d && typeof d.received === 'number') this._received = d.received;
@@ -575,9 +410,7 @@ export class UsPlayerAudio {
   }
 
   /**
-   * Move whatever has been synthesised to the worklet. Call after each step.
-   *
-   * Cheap when there is nothing: one call into the wasm that returns zero.
+   * Move synthesised audio to the worklet, call after each step
    */
   pump() {
     if (!this.node || !this._ptr) return 0;
@@ -586,15 +419,11 @@ export class UsPlayerAudio {
     for (;;) {
       const n = M._usp_audio_take(this._ptr, this._max);
       if (n <= 0) break;
-      /* A copy, because the heap view is reused on the next call and may be
-       * detached entirely if the heap grows. */
+      /* Copy, the heap view is reused and detaches when the heap grows */
       const chunk = new Int16Array(
         M.HEAPU8.buffer, this._ptr, n).slice();
       this.node.port.postMessage(chunk, [chunk.buffer]);
-      /* Samples the worklet has been sent but has not reported back on yet.
-       * See the message handler: without this, a report that was already in
-       * flight when these were posted is read as if the ring were still that
-       * empty, and the ring is filled twice over. */
+      /* In flight until the worklet reports back */
       this._sentSince += n;
       this._sentTotal += n;
       moved += n;
@@ -604,76 +433,47 @@ export class UsPlayerAudio {
   }
 
   /**
-   * Clock a player from the ring instead of from the wall clock.
+   * Clock a player from the ring, not the wall clock
    *
-   * WHY THIS EXISTS, because it looks like duplication of the player's own
-   * clock and is not.
+   * USBSIDPlayerWeb._tick() caps at two frames and discards the remainder
+   * (_acc = period). Fine for a board, wrong for the ring: it is the clock and a
+   * frame never emulated is a hole in the audio (2SID tunes show it as bursts
+   * and silence). The player is started with externalClock: true and stepped
+   * in this module until the ring has what it asked for.
    *
-   * `USBSIDPlayerWeb._tick()` advances by however much real time has passed,
-   * capped at two frames, and then **discards the remainder**
-   * (`if (this._acc > period) this._acc = period`). For a board that is right:
-   * its queue is the buffer, and a burst of frames sent late is heard late and
-   * cannot be taken back, so dropping is better than overshooting.
-   *
-   * For software audio it is exactly wrong. Here the ring **is** the clock, and
-   * a frame that is never emulated is not a frame played late, it is a hole in
-   * the audio. On a two SID tune, where a frame costs about twice what it does
-   * on one, that shows up as a burst of sound, a long silence, another burst.
-   *
-   * So the player is started with `externalClock: true` and stepped from here,
-   * on demand, until the ring has what it asked for. Falling behind then
-   * self corrects instead of compounding: the ring asks for more, and more is
-   * what it gets. The command line player does the same thing by setting
-   * `no_device` so its pacer never paces.
-   *
-   * @param {object} player started with `{ externalClock: true }`
-   * @param {object} opts   { maxSteps } frames per fill, the guard against
-   *                        blocking the main thread for an unbounded time
+   * @param {object} player started with { externalClock: true }
+   * @param {object} opts { maxSteps } frames per fill
    */
   run(player, opts = {}) {
     this._driven = player;
     this._watchVisibility();
-    /* Eight frames, about 160 ms of audio, is the most this will emulate in one
-     * go. It runs on the main thread, so the cap is what stops a slow tune from
-     * blocking the page for as long as it takes to fill a whole buffer. */
+    /* Cap the frames per fill, this runs on the main thread */
     this._maxSteps = opts.maxSteps || (this._hidden ? HIDDEN_STEPS : VISIBLE_STEPS);
     this._owed = 0;
-    /* Arm the lead-in skip for this tune. Off when a worker owns the ring: the
-     * filling happens there and this thread is not in the path.
-     *
-     * `skipSilence: false` turns it off for a caller that wants every second of
-     * a tune played, whatever it sounds like. */
+    /* Arm the lead-in skip. Off when a worker owns the ring or skipSilence is false */
     this._skipping = (opts.skipSilence !== false) && !this._handedOver;
     this._skippedFrames = 0;
     this._starveBase = 0;
     this._skipSince = 0;
     this._skipFrom = null;
     this._skipWrites = player.sidWrites();
-    /* A previous tune may have been stopped mid skip. */
+    /* A previous tune may have been stopped mid skip */
     if (typeof this.M._usp_audio_render === 'function') this.M._usp_audio_render(1);
-    /* Prime it, so playback does not start on an empty ring and a starve. */
+    /* Prime the ring */
     this._owed = Math.max(2048, Math.round(this.ctx.sampleRate * 0.2));
     this._fill();
   }
 
   /**
-   * Hand the ring over to a worker, and stop driving it from here.
+   * Hand the ring over to a worker and stop driving it in this module
    *
-   * Returns the worker's end of a MessageChannel. The processor gets the other
-   * end and from then on the two talk directly: reports out, samples back, with
-   * the main thread not in the path. That is the whole point, because a hidden
-   * page's main thread is throttled to the point where it cannot keep a ring
-   * fed and the audio thread is never throttled at all.
-   *
-   * The page keeps its own port for commands and for the stats it displays, so
-   * nothing on screen changes.
-   *
-   * @returns {MessagePort|null} to be transferred to the worker
+   * Return the worker's end of a MessageChannel (null without a node), to be
+   * transferred to the worker. The processor gets the other end. A hidden
+   * page throttles the main thread, the audio thread is not throttled.
    */
   handOver() {
     if (!this.node) return null;
-    /* Nothing on this thread should be clocking a player any more: two things
-     * filling one ring would each see the other's samples as their own. */
+    /* Two fillers on one ring would see each other's samples */
     this.unrun();
     const ch = new MessageChannel();
     this.node.port.postMessage({ cmd: 'peer', port: ch.port2 }, [ch.port2]);
@@ -682,23 +482,20 @@ export class UsPlayerAudio {
   }
 
   /**
-   * Drop buffered audio beyond the current target, oldest first.
-   *
-   * Skips the tune ahead by the excess; used on return from hidden to drop
-   * the deep hidden ring at once instead of letting it drain.
+   * Drop buffered audio beyond the current target, oldest first
+   * Used on return from hidden
    */
   trim() {
     if (!this.node) return;
     this.node.port.postMessage({ cmd: 'trim', keep: this._target });
   }
 
-  /** True once a worker owns the ring. */
+  /** True once a worker owns the ring */
   get handedOver() { return !!this._handedOver; }
 
   /**
-   * How much audio to keep ready, in seconds, and how much work one fill may
-   * do. Sent to the worklet, which only changes the level it asks for: nothing
-   * already rendered is touched.
+   * Set seconds of audio to keep ready and the work one fill may do
+   * Only the level changes, rendered audio is kept
    */
   setTarget(seconds, maxSteps) {
     if (!this.node || !this.ctx) return;
@@ -706,23 +503,16 @@ export class UsPlayerAudio {
     this._target = want;
     this._maxSteps = maxSteps;
     this.node.port.postMessage({ cmd: 'target', value: want });
-    /* The worker keeps its own idea of how full to keep the ring, since it is
-     * the side doing the filling. Whoever handed the ring over sets this. */
+    /* Worker needs the target too, the host sets it through this hook */
     if (this.onTargetChange) this.onTargetChange(want, maxSteps);
   }
 
   /**
-   * Follow the page going away and coming back.
+   * Follow the page going hidden and visible
    *
-   * Hidden, the main thread is throttled and the audio thread is not, so the
-   * ring has to be deep enough to survive between whatever callbacks we still
-   * get. Visible, a deep buffer would mean a stop is heard two seconds late, so
-   * it goes back to a fifth of a second: the ring drains to the new level by
-   * itself, which is why nothing needs to be discarded here.
-   *
-   * `visibilitychange` rather than blur or focus: it is the event that fires
-   * for the screen going off and for switching app, which is the case being
-   * fixed, and it does not fire for merely clicking another window.
+   * Hidden: deeper ring, the main thread is throttled. Visible: back to 0.2 s,
+   * the ring drains to the new level. Uses visibilitychange, it fires for
+   * screen off and app switch.
    */
   _watchVisibility() {
     if (this._onVisibility || typeof document === 'undefined') return;
@@ -732,16 +522,12 @@ export class UsPlayerAudio {
       this._hidden = hidden;
       this.setTarget(hidden ? HIDDEN_SECONDS : VISIBLE_SECONDS,
                      hidden ? HIDDEN_STEPS : VISIBLE_STEPS);
-      /* Going away, fill the deeper buffer now, while the thread still runs at
-       * full speed. Waiting for the worklet to ask means the first request
-       * arrives already throttled, which is the gap being closed. */
+      /* Hidden: fill the deeper buffer at once while the thread still runs at full speed */
       if (hidden && this._driven) {
         this._owed = this._target;
         this._fill();
       }
-      /* A worker feeds the ring itself and is not throttled the way this thread
-       * is, so none of the main thread's compensation applies to it. The target
-       * still moves, because a deeper ring is worth having either way. */
+      /* A worker is not throttled, no keep alive for it. The target still moves */
       if (hidden && !this._handedOver) this._startKeepAlive();
       else this._stopKeepAlive();
     };
@@ -749,17 +535,11 @@ export class UsPlayerAudio {
   }
 
   /**
-   * Top the ring up on a timer while the page is hidden.
+   * Top up the ring on a timer while the page is hidden
    *
-   * The worklet asking for samples is the flow control, and it is enough while
-   * the page is visible. Hidden, those messages land on a throttled main thread
-   * and may be delivered late or in bursts, which is precisely when the ring is
-   * emptying. A timer is throttled too, to about once a second, but once a
-   * second is plenty when a single fill may render two seconds.
-   *
-   * The arithmetic is the message handler's, so it cannot over-produce: what is
-   * wanted, less what is already on its way. The worklet drops anything that
-   * will not fit anyway, and dropped samples are heard.
+   * Worklet requests land late on a throttled main thread. Timers run about
+   * once a second, enough when one fill renders two seconds. Same arithmetic
+   * as the report handler: wanted minus in flight.
    */
   _startKeepAlive() {
     if (this._keepAlive) return;
@@ -782,17 +562,14 @@ export class UsPlayerAudio {
     this._stopKeepAlive();
   }
 
-  /** Stop clocking a player. The context and node stay up. */
+  /** Stop clocking a player, context and node stay up */
   unrun() {
     this._driven = null;
     this._owed = 0;
     this._sentSince = 0;
     this._stopKeepAlive();
-    /* A skip in progress leaves the synthesis switched off between slices, and
-     * letting go of the player is one of the ways a skip ends without reaching
-     * its own end. Switching it back on here means the flag can only ever be off
-     * while a skip is actually running: it is a global on the backend, and
-     * everything after it would otherwise be silent. */
+    /* A skip leaves the synthesis off between slices, switch it back on
+     * (global on the backend) */
     this._skipping = false;
     if (this.M && typeof this.M._usp_audio_render === 'function') {
       this.M._usp_audio_render(1);
@@ -800,23 +577,14 @@ export class UsPlayerAudio {
   }
 
   /**
-   * Emulate until the worklet has what it asked for.
-   *
-   * Bounded by `maxSteps` because this runs on the main thread: a tune that
-   * cannot be synthesised in realtime would otherwise never give the page back.
-   * Whatever is left over is asked for again a few quanta later, so a machine
-   * that is merely slow degrades into a shorter buffer rather than a freeze.
+   * Emulate until the worklet has what it asked for, bounded by maxSteps
+   * (main thread). Leftover is asked for again a few quanta later.
    */
   /**
-   * Take one chunk of rendered audio and say how loud it is.
+   * Take one chunk of rendered audio, return samples taken and peak to peak
    *
-   * Peak to peak and not peak, because a silent chip is not a zero line: reSIDfp
-   * has a DC offset that the external filter walks back towards zero over the
-   * first half second, so measuring against zero would call the loudest thing in
-   * the whole lead-in "sound". The difference between the extremes ignores any
-   * offset, however large.
-   *
-   * @returns {{n: number, pp: number}} samples taken, and their peak to peak
+   * Peak to peak because reSIDfp has a DC offset that the external filter
+   * walks back to zero over the first half second.
    */
   _takeMeasured() {
     const n = this.M._usp_audio_take(this._ptr, this._max);
@@ -832,16 +600,10 @@ export class UsPlayerAudio {
   }
 
   /**
-   * Run through a silent lead-in, throwing its audio away.
+   * Run through a silent lead-in, throwing its audio away
    *
-   * See the SKIP_ constants for why this exists and how the numbers were
-   * arrived at. Nothing is posted to the ring while this runs, so the worklet
-   * plays the silence it invents for itself, which is exactly what the tune
-   * would have sounded like anyway.
-   *
-   * Time budgeted, and continued on the next report rather than run to
-   * completion, because it is on the main thread and a minute long loader would
-   * otherwise freeze the page until it finished.
+   * See the SKIP_ constants. Nothing is posted to the ring, the worklet
+   * invents silence. Time budgeted, continued on the following report.
    */
   _skipSilence() {
     const p = this._driven;
@@ -852,9 +614,7 @@ export class UsPlayerAudio {
     const limit = Math.round(p.refreshHz() * SKIP_MAX_SECONDS);
 
     try {
-      /* Where the skip actually began, which is not frame zero: the first second
-       * plays normally while the switch-on transient rings out. Without this the
-       * settle counts as skipped and every tune reports a skip. */
+        /* Skip starts after the first second, the switch-on transient plays normally */
       if (this._skipFrom === null) this._skipFrom = p.frames();
 
       while (this._skipping) {
@@ -862,15 +622,10 @@ export class UsPlayerAudio {
           this._endSkip(`nothing after ${SKIP_MAX_SECONDS}s, playing on`);
           return;
         }
-        if (now() - t0 >= SKIP_BUDGET_MS) return;  /* more on the next report */
+        if (now() - t0 >= SKIP_BUDGET_MS) return;  /* more on the following report */
 
-        /* Look at the output on this frame, or run it through blind?
-         *
-         * A silent chip can only start sounding if something writes to it, and
-         * the write counter costs nothing to read, so a frame that wrote is
-         * always looked at. The interval is the floor for everything else: an
-         * older wasm with no render switch has no choice and looks at all of
-         * them, which is simply the old speed. */
+        /* Probe the output on a frame that wrote the SID, else every
+         * SKIP_PROBE_EVERY frames. Older wasm without render switch probes all */
         const writes = p.sidWrites();
         const wrote = writes !== this._skipWrites;
         this._skipWrites = writes;
@@ -887,8 +642,7 @@ export class UsPlayerAudio {
           const { n, pp } = this._takeMeasured();
           if (n <= 0) break;
           if (pp >= SKIP_THRESHOLD) {
-            /* The tune has started. Keep this frame: it is the first music, and
-             * dropping it would clip the attack off the first note. */
+            /* Music started, keep this frame to not clip the first attack */
             const chunk = new Int16Array(M.HEAPU8.buffer, this._ptr, n).slice();
             this.node.port.postMessage(chunk, [chunk.buffer]);
             this._sentSince += n;
@@ -901,38 +655,32 @@ export class UsPlayerAudio {
         }
       }
     } finally {
-      /* Never leave the synthesis switched off, whatever happened above: it is
-       * a global on the backend and everything that comes after would be
-       * silent. */
+      /* Always switch the synthesis back on, it is global on the backend */
       if (canSkipRender && !this._skipping) M._usp_audio_render(1);
     }
   }
 
-  /** Stop skipping, and stop counting the silence against the ring. */
+  /** Stop skipping and exclude the silence from the starve count */
   _endSkip(why) {
     if (!this._skipping) return;
     this._skipping = false;
     if (typeof this.M._usp_audio_render === 'function') this.M._usp_audio_render(1);
     this._skippedFrames = (this._driven && this._skipFrom !== null)
       ? this._driven.frames() - this._skipFrom : 0;
-    /* The ring ran dry for the whole skip and invented silence to fill it,
-     * which is correct output and not a fault. Counting it would leave a
-     * five figure starve total on the status line for the rest of the tune,
-     * which is the number that says "this is not keeping up". */
+    /* The ring invented silence for the whole skip, do not count it as starved */
     this._starveBase = this.starved;
     if (this.onSkipEnd) this.onSkipEnd(why, this._skippedFrames);
   }
 
-  /** True while a silent lead-in is being run through. */
+  /** True while a silent lead-in is being run through */
   get skipping() { return !!this._skipping; }
 
   /**
-   * Follow a player speed change with the synthesis output rate.
+   * Follow a player speed change with the synthesis output rate
    *
-   * Faster yields fewer samples per frame and slower more, played at the
-   * context rate: pitch follows speed. See usp_audio_set_speed().
+   * Pitch follows speed, see usp_audio_set_speed().
    *
-   * @param {number} mult the player's speed multiplier
+   * @param {number} mult player speed multiplier
    */
   _applySpeed(mult) {
     if (mult === this._speed) return;
@@ -946,10 +694,7 @@ export class UsPlayerAudio {
     const p = this._driven;
     if (!p || !this.node || this._filling) return;
     if (p.paused) return;
-    /* A silent lead-in is run through before anything is posted, and the ring is
-     * left to invent its own silence meanwhile. Once it ends the normal fill
-     * below runs in the same call, so the music starts without waiting for the
-     * next report. */
+    /* Run a silent lead-in first, the normal fill follows in the same call */
     if (this._skipping && p.frames() >= SKIP_SETTLE_FRAMES) {
       this._filling = true;
       try { this._skipSilence(); } finally { this._filling = false; }
@@ -978,33 +723,24 @@ export class UsPlayerAudio {
   }
 
   /**
-   * @returns {object} what the output is doing, for a status line.
+   * Return what the output is doing, for a status line
    *
-   * `starved` is the one that matters. It counts samples of silence the worklet
-   * had to invent, and a number that climbs while playing means the emulation
-   * is not keeping up: not a wrong note anywhere, just holes, which at this
-   * granularity is heard as crackle rather than as a gap.
+   * starved counts samples of silence the worklet invented. Climbing while
+   * playing means the emulation is not keeping up (heard as crackle).
    */
   stats() {
     const rate = this.ctx ? this.ctx.sampleRate : 48000;
-    /* Milliseconds of work per emulated frame, against the frame's own budget
-     * of about 20 ms on PAL. Above that and no buffer can save it: the ring
-     * drains faster than it can be refilled, for ever. This is the number that
-     * says "too slow" as opposed to "badly paced", and the average over the
-     * whole run rather than the last fill, so the first fill's cold code does
-     * not stand for the steady state. */
+    /* ms of work per emulated frame, averaged over the run. Above the
+     * ~20 ms PAL frame the ring cannot keep up */
     const perFrame = this._frames > 0 ? (this._cpuMs / this._frames) : 0;
-    /* Older wasm builds have no clipped counter, so ask rather than assume. */
+    /* Older wasm builds have no clipped counter */
     const clipped = (typeof this.M._usp_audio_clipped === 'function')
                   ? this.M._usp_audio_clipped() : -1;
-    /* Silence invented while a lead-in was being skipped is not a fault and is
-     * not counted: see _endSkip(). */
+    /* Skip silence is not counted, see _endSkip() */
     const starved = Math.max(0, this.starved - this._starveBase);
     return {
       clipped,
-      /* The FM/OPL side, straight from the emulation: an OPL is built inside
-       * the wasm the first time a tune writes $df40, and the count staying at
-       * zero simply means this tune has no FM. */
+      /* FM/OPL writes, zero means no FM in this tune */
       fmWrites: (typeof this.M._usp_audio_fm_writes === 'function')
         ? this.M._usp_audio_fm_writes() : 0,
       skipping: !!this._skipping,
@@ -1020,18 +756,16 @@ export class UsPlayerAudio {
     };
   }
 
-  /** Ask the worklet how it is doing. Answer arrives on the message handler. */
+  /** Ask the worklet for stats, the answer arrives on the message handler */
   requestStats() {
     if (this.node) this.node.port.postMessage({ cmd: 'stats' });
   }
 
   /**
-   * Drop what the synthesis has rendered and the page has not yet sent.
+   * Drop what the synthesis rendered and the page has not sent
    *
-   * Only half of "throw the audio away": whatever has already been posted to
-   * the worklet is on the audio thread and out of reach from here. Use
-   * `flush()` for a hard reset and keep this for the fast forward path, where
-   * the queued audio is deliberately left playing while the emulation seeks.
+   * Audio already posted to the worklet stays. Use flush() for a hard reset,
+   * this one is for fast forward where queued audio keeps playing.
    */
   discard() {
     if (this.M && typeof this.M._usp_audio_discard === 'function') {
@@ -1040,14 +774,10 @@ export class UsPlayerAudio {
   }
 
   /**
-   * Throw away everything not yet heard, both sides of the port.
+   * Throw away everything not yet heard, both sides of the port
    *
-   * For a stop, and for loading another tune into a running context. The
-   * worklet's ring holds up to a second, so without this a new tune is
-   * appended behind the old one and, worse, the ring stays above target and
-   * therefore asks for nothing more: the emulation advances by the priming
-   * fill and then stalls. That is a switch that behaves like a queue, and each
-   * further switch adds another slice behind the last.
+   * For a stop and for loading a tune into a running context. Without it the
+   * new tune queues behind the old ring and the ring stays above target.
    */
   flush() {
     this.discard();
@@ -1061,6 +791,9 @@ export class UsPlayerAudio {
     this.unrun();
     this._unwatchVisibility();
     this._handedOver = false;
+    /* Give the machine back to the web backend, a later ASID or WebUSB play
+     * in this page writes to the ring again (older wasm has no release) */
+    if (this.M && typeof this.M._usp_audio_release === 'function') this.M._usp_audio_release();
     if (this.node) { try { this.node.disconnect(); } catch (_) {} this.node = null; }
     if (this.gain) { try { this.gain.disconnect(); } catch (_) {} this.gain = null; }
     if (this.ctx) { try { await this.ctx.close(); } catch (_) {} this.ctx = null; }

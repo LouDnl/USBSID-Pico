@@ -1,19 +1,18 @@
 /*
- * USBSID-Player: a cycle exact C64 SID player for USBSID-Pico, for command
- * line playback, for embedding on RP2350 (Pico2), and in a browser.
+ * USBSID-Player: a cycle exact C64 SID player for USBSID-Pico,
+ * command line playback, websites and for embedding on RP2040/RP2350.
  *
- * web/usplayer-softaudio.js
- * Oscilloscope, stereo panning and filter of software audio (reSIDfp in the
- * worker), shared by usplayer-adapter.js and usplayer-adapter-deepsid.js.
+ * usplayer-softaudio.js
+ * Oscilloscope, stereo panning and filter of software audio (reSIDfp in the worker)
+ * Shared by usplayer-adapter.js and usplayer-adapter-deepsid.js
  *
- * applySoftAudio() adds the methods to an adapter class. They use the
- * adapter's own `_isAudio`, `_worker`, `_call()`, `_drainRegisters()`,
- * `_audio`, `_player` and `_snap`. The adapter calls `_softAudioInit()` in its
- * constructor, `_softAudioReplay()` after the worker's `audioConfigure`,
- * `_scopeClear()` on a stop or a new tune, and `_scopeAppend()` when it
- * applies a register report that carries `scope` frames.
+ * applySoftAudio() adds the methods to an adapter class
+ * Uses _isAudio, _worker, _call(), _drainRegisters(), _audio, _player and _snap
+ * Adapter calls _softAudioInit() in the constructor, _softAudioReplay() after
+ * the worker audioConfigure, _scopeClear() on stop or new tune and
+ * _scopeAppend() for a register report with scope frames
  *
- * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Player)
+ * This file is part of USBSID-Player (https://github.com/LouDnl/USBSID-Player)
  * File author: LouD
  *
  * Copyright (c) 2026 LouD
@@ -32,49 +31,39 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Scope frames kept per voice: a power of two, a third of a second at
- * 48 kHz, more than the widest oscilloscope window. */
+/* Scope frames kept per voice, power of two (1/3 s at 48 kHz) */
 export const SCOPE_RING = 16384;
 
-/** Milliseconds on the clock the adapters time register reports with. */
+/* Milliseconds on the clock used for register report timing */
 function _now() {
   return (typeof performance !== 'undefined') ? performance.now() : Date.now();
 }
 
-/** The methods applySoftAudio() adds; never constructed itself. */
+/* Methods added by applySoftAudio(), never constructed */
 class SoftAudio {
-  /** Set up the state, from the adapter's constructor. */
+  /* Set up the state from the adapter constructor */
   _softAudioInit() {
-    /* Oscilloscope frames from the worker's reports, see setScope(). One ring
-     * per voice; `_scopeEnd` counts frames ever appended, `_scopeDue` and
-     * `_scopeChunk` are the audible moment and size of the latest report. */
+    /* Scope frames from worker reports, one ring per voice, see setScope()
+     * _scopeEnd = frames appended, _scopeDue and _scopeChunk = audible time and size of the latest report */
     this._scopeWanted = false;
     this._scopeRing = [];
     this._scopeEnd = 0;
     this._scopeDue = 0;
     this._scopeChunk = 0;
-    /* Stereo panning and reSIDfp filter as last set, replayed per tune: see
-     * setPanning() and setFilter(). Null until a host sets them. */
+    /* Last set panning and filter, replayed per tune, null until set */
     this._panning = null;
     this._filter = null;
   }
 
-  /** Send the panning, filter and scope wishes to the worker, per tune. */
+  /* Send panning, filter and scope settings to the worker per tune */
   async _softAudioReplay() {
     if (this._panning) await this._call('panning', this._panning).catch(() => {});
     if (this._filter) await this._call('filter', this._filter).catch(() => {});
     if (this._scopeWanted) await this._call('scope', { on: true }).catch(() => {});
   }
 
-  /**
-   * Record each voice's own output for an oscilloscope, or stop.
-   *
-   * Software audio in a worker only: the frames come with the worker's register
-   * reports, timed to the audio. Remembered across tunes.
-   *
-   * @param {boolean} on true to record, false to stop
-   * @returns {boolean} true when this mode can record
-   */
+  /* Record voice output for the oscilloscope or stop, returns true when this mode can record
+   * Software audio in a worker only, remembered across tunes */
   setScope(on) {
     this._scopeWanted = !!on;
     if (!on) this._scopeClear();
@@ -84,12 +73,11 @@ class SoftAudio {
   }
 
   /**
-   * Place the chips in the stereo mix. Software audio in a worker only.
-   * Remembered across tunes.
+   * Place the chips in the stereo mix, returns true when this mode can pan
+   * Software audio in a worker only, remembered across tunes
    *
    * @param {object} p { stereo: bool, layout: -1 tune or 0-3, mode: -1 tune or
    *                   0-3, single: 0 left, 1 center, 2 right }
-   * @returns {boolean} true when this mode can pan
    */
   setPanning(p) {
     this._panning = {
@@ -102,17 +90,17 @@ class SoftAudio {
     return true;
   }
 
-  /** Stereo position per chip as playing, 0 left, 1 center, 2 right. */
+  /* Stereo position per chip as playing, 0 left, 1 center, 2 right */
   panning() {
     return (this._snap && this._snap.pans) ? this._snap.pans : [];
   }
 
   /**
-   * Set the reSIDfp filter. Software audio only. Remembered across tunes.
+   * Set the reSIDfp filter, returns true when this mode has a filter
+   * Software audio only, remembered across tunes
    *
    * @param {object} f { enabled: bool, curve6581, range6581, curve8580: 0-1,
    *                   waveforms: 0 average, 1 weak, 2 strong }
-   * @returns {boolean} true when this mode has a filter to set
    */
   setFilter(f) {
     this._filter = {
@@ -130,35 +118,34 @@ class SoftAudio {
     return true;
   }
 
-  /** Is a tune sounding: the worker says playing and the host has not paused? */
+  /* Tune is sounding when the worker is playing and not paused */
   scopeLive() {
     return !!(this._snap && this._snap.playing) && !this._paused;
   }
 
-  /** Voices in the scope frames, three per chip, 0 when nothing arrived. */
+  /* Voices in the scope frames, 3 per chip, 0 when nothing arrived */
   scopeVoices() {
     this._drainRegisters();
     return this._scopeRing.length;
   }
 
-  /** Sample rate of the scope frames, the audio output's. */
+  /* Sample rate of the scope frames (audio output rate) */
   scopeRate() {
     return (this._audio && this._audio.ctx) ? this._audio.ctx.sampleRate : 48000;
   }
 
   /**
-   * Fill `out` with one voice's latest scope samples, up to the audible point.
+   * Fill out with the latest scope samples of one voice, up to the audible point
+   * Returns false when there is no data for the voice
    *
    * @param {number} voice      0-based, chip 1 voices 1-3 first
    * @param {Float32Array} out  receives out.length samples, -1 to 1, oldest first
-   * @returns {boolean} false when there is no data for this voice
    */
   scopeData(voice, out) {
     this._drainRegisters();
     const ring = this._scopeRing[voice];
     if (!ring) return false;
-    /* The latest report is due when its last frame is heard: walk through it
-     * at the audio rate rather than jump a report at a time. */
+    /* Walk through the latest report at the audio rate, due when its last frame is heard */
     const elapsed = Math.floor((_now() - this._scopeDue) * this.scopeRate() / 1000);
     const end = this._scopeEnd - this._scopeChunk +
                 Math.max(0, Math.min(this._scopeChunk, elapsed));
@@ -171,7 +158,7 @@ class SoftAudio {
   }
 
   /**
-   * Append one report's scope frames to the voice rings.
+   * Append the scope frames of one report to the voice rings
    *
    * @param {Int16Array} data  frames * voices values, interleaved by frame
    * @param {number} voices    values per frame
@@ -194,7 +181,7 @@ class SoftAudio {
     this._scopeChunk = frames;
   }
 
-  /** Forget the scope frames, on a stop, a new tune or setScope(false). */
+  /* Forget the scope frames on stop, new tune or setScope(false) */
   _scopeClear() {
     this._scopeRing = [];
     this._scopeEnd = 0;
@@ -203,7 +190,7 @@ class SoftAudio {
 }
 
 /**
- * Add the soft audio methods to an adapter class.
+ * Add the soft audio methods to an adapter class
  *
  * @param {Function} cls  the adapter class
  */

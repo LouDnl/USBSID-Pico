@@ -1,32 +1,20 @@
 /*
- * USBSID-Player: a cycle exact C64 SID player for USBSID-Pico, for command
- * line playback, for embedding on RP2350 (Pico2), and in a browser.
+ * USBSID-Player: a cycle exact C64 SID player for USBSID-Pico,
+ * command line playback, websites and for embedding on RP2040/RP2350.
  *
- * web/usplayer-worker.js
- * The emulation and the USB writes, off the main thread.
+ * usplayer-worker.js
+ * Emulation and USB writes in a worker, off the main thread
  *
- * Why: the main thread is not a reliable clock. Playing on it, the tune
- * crackled slightly while the tab was in front and audibly broke up when the
- * tab went to the back, because a backgrounded page stops feeding the board and
- * the board runs out of writes. The AudioWorklet clock already ran on the audio
- * thread, but it could only hand a tick to the main thread, which is where the
- * work was.
+ * A backgrounded page on the main thread stops feeding the board, the tune breaks up
  *
- * So the work moves here. This is a module worker holding the same
- * `USBSIDPlayerWeb` the page would have used, with two differences:
+ * Module worker holding the USBSIDPlayerWeb the page would have used
+ *   - clock ticks come straight from the audio thread over a MessageChannel
+ *   - board is opened in the worker, WebUSB permission belongs to the origin,
+ *     getDevices() finds the board without a picker, see connectGranted()
  *
- *   - the clock reaches it directly. The page transfers one end of a
- *     MessageChannel into the AudioWorkletProcessor and the other end here, so
- *     the audio thread posts ticks straight to this worker and the main thread
- *     is not in the path at all.
- *   - the board is opened here. WebUSB permission belongs to the origin rather
- *     than to a thread, so once the page has asked once, `getDevices()` finds
- *     the board from a worker without a picker. See connectGranted().
+ * Web MIDI has no worker API, ASID runs on the main thread, see usplayer-worker-client.js
  *
- * Web MIDI has no worker API, so ASID cannot come along; the page falls back to
- * running on the main thread for that. See usplayer-worker-client.js.
- *
- * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Player)
+ * This file is part of USBSID-Player (https://github.com/LouDnl/USBSID-Player)
  * File author: LouD
  *
  * Copyright (c) 2026 LouD
@@ -53,13 +41,10 @@ let transport = null;
 let clockPort = null;
 
 /**
- * Instantiate the wasm module, fetching usbsid.wasm with wasmUrl's query.
- *
- * The loader resolves usbsid.wasm without the cache buster, and a cached wasm
- * from an older build breaks the minified export names of a newer loader.
+ * Instantiate the wasm module, usbsid.wasm is fetched with the query of wasmUrl
+ * (the loader skips the cache buster, a cached older wasm breaks the export names)
  *
  * @param {string} wasmUrl  URL of usbsid.esm.js, cache buster included
- * @returns {Promise<object>} the module
  */
 async function loadModule(wasmUrl) {
   const { default: USBSIDPlayer } = await import(wasmUrl);
@@ -73,43 +58,34 @@ async function loadModule(wasmUrl) {
   });
 }
 
-/* Software audio, when the worker is synthesising rather than driving a board.
- *
- * The ring lives in the AudioWorkletProcessor and asks for what it is short of.
- * Those requests arrive on `clockPort`, the same channel a board build uses for
- * its ticks, and the samples go back down it. The main thread is not involved,
- * which is the reason any of this is here: it is throttled hard while the page
- * is hidden and the audio thread never is, so a ring fed from the main thread
- * empties with the screen off and the tune stutters. */
+/* Software audio (worker synthesises, no board)
+ * The ring lives in the AudioWorkletProcessor and requests samples on clockPort
+ * Samples go back on the same port, the main thread is throttled when the page is hidden */
 let audioMode = false;
 let audioPtr = 0;              /* scratch in the wasm heap for take() */
 let audioMax = 8192;
 let audioOwed = 0;
 let audioSent = 0;             /* posted since the ring last reported */
 let audioSentTotal = 0;        /* posted to the ring, ever */
-let audioSteps = 24;           /* frames one fill may emulate */
+let audioSteps = 24;           /* max frames per fill */
 let audioFilling = false;
-let audioRate = 48000;         /* the ring's sample rate, for the register lead */
+let audioRate = 48000;         /* ring sample rate, for the register lead */
 let audioChannels = 1;         /* samples per frame from _usp_audio_take() */
-let audioCpuMs = 0;            /* time spent emulating, since audioConfigure */
-let audioFrames = 0;           /* frames emulated, since audioConfigure */
+let audioCpuMs = 0;            /* emulation time since audioConfigure */
+let audioFrames = 0;           /* frames emulated since audioConfigure */
 
-/* SID register mirror reported to the page in audio mode, which feeds its
- * piano, graph and register views: the page's own player never steps.
- * Four chips at most, the size of the adapter's shadow. */
+/* SID register mirror for the page in audio mode (piano, graph and register views), 4 chips max */
 const REG_CHIPS_MAX = 4;
 let regChips = 1;
 
-/* RAM pages the page is reading (memory view), appended to each register
- * report to keep the page's mirror in step with this machine. Set by memWatch. */
+/* RAM pages for the memory view, appended to each register report, set by memWatch */
 const MEM_PAGES_MAX = 16;
 let memPages = new Uint8Array(0);
 let memPtr = 0;                /* MEM_PAGES_MAX pages of scratch in the wasm heap */
 
-/* Per voice output for an oscilloscope, set by the scope message. Taken in
- * step with the audio and sent with the following register report: the page
- * shows it when the audio it belongs to is heard. At most SCOPE_VOICES_MAX
- * values per frame: chip 1 voices 1-3 first. */
+/* Per voice scope output, set by the scope message
+ * Taken with the audio and sent with the following register report
+ * SCOPE_VOICES_MAX values per frame max, chip 1 voices 1-3 first */
 const SCOPE_VOICES_MAX = REG_CHIPS_MAX * 3;
 let scopeOn = false;
 let scopePtr = 0;              /* audioMax frames of scratch in the wasm heap */
@@ -117,17 +93,11 @@ let scopeVoices = 0;           /* values per frame in scopeChunks */
 let scopeChunks = [];          /* Int16Array per audio chunk since the last report */
 let scopeFrames = 0;
 
-/* The longest a single audioFill() burst may run, in wall clock ms, whatever
- * audioSteps says. A many-SID tune's frame cost scales with chip count, and
- * audioSteps alone does not: at VISIBLE_STEPS (8), a 15SID tune already
- * behind on real time could spend the better part of a second inside one
- * synchronous burst, and every control message this worker is sent - a tune
- * switch among them - waits in this thread's own queue until that burst
- * returns. Bounding the burst by time as well makes that wait a few
- * milliseconds instead, on any chip count: see audioFill(). */
+/* Max wall clock ms of one audioFill() burst, frame cost scales with chip count
+ * A long burst delays control messages (tune switch), see audioFill() */
 const AUDIO_FILL_BUDGET_MS = 8;
 
-/** Everything the page shows, in one message rather than a call per field. */
+/* All page state in one message */
 function snapshot() {
   if (player === null) return null;
   const info = player.info();
@@ -145,37 +115,26 @@ function snapshot() {
     song: info.song,
     songs: info.songs,
     stats: player.stats(),
-    /* Read here because in audio mode the page has no player of its own to
-     * ask. Emulated time, not wall clock: see USBSIDPlayerWeb.playtimeMs(). */
+    /* Emulated time (see USBSIDPlayerWeb.playtimeMs()), read in the worker, the page has no player in audio mode */
     playtimeMs: (typeof player.playtimeMs === 'function') ? player.playtimeMs() : 0,
     timing: (typeof player.timing === 'function') ? player.timing() : null,
-    /* FM/OPL writes of this tune: non zero marks an FM tune, with or without
-     * the v5 header flag. */
+    /* FM/OPL writes of this tune, non zero = FM tune (with or without the v5 header flag) */
     fmWrites: (audioMode && typeof player.M._usp_audio_fm_writes === 'function')
       ? player.M._usp_audio_fm_writes() : 0,
-    /* Mean ms of emulation per frame since the tune was configured, against a
-     * frame's budget of about 20 ms; audio mode only. */
+    /* Mean ms of emulation per frame since configure (budget about 20 ms), audio mode only */
     msPerFrame: audioFrames > 0 ? audioCpuMs / audioFrames : 0,
     clipped: (audioMode && typeof player.M._usp_audio_clipped === 'function')
       ? player.M._usp_audio_clipped() : 0,
-    /* Stereo position per chip, 0 left, 1 center, 2 right: see panning. */
+    /* Stereo position per chip, 0 left, 1 center, 2 right */
     pans: (audioMode && typeof player.M._usp_audio_pan === 'function')
       ? info.sids.map((_, c) => player.M._usp_audio_pan(c + 1)) : [],
   };
 }
 
-/**
- * Emulate until the ring has what it asked for, then send it.
- *
- * Bounded by `audioSteps` frames and by `AUDIO_FILL_BUDGET_MS` wall clock time,
- * whichever comes first, so one request cannot run for an unbounded time and
- * cannot hold this thread's own message queue - the one a tune switch's RPCs
- * arrive on - for longer than a few milliseconds regardless of chip count.
- * Whatever is left of `audioOwed` is asked for again on the next report,
- * possibly the very next one: a worker blocking itself briefly and often is
- * far less serious than the main thread blocking, but a tune that cannot be
- * synthesised in real time should degrade to a shorter buffer rather than to
- * a worker that is unresponsive for as long as it takes to catch up.
+/*
+ * Emulate until the ring has what it asked for, then send it
+ * Limited by audioSteps frames and AUDIO_FILL_BUDGET_MS, whichever comes first
+ * The remainder of audioOwed is requested again on the following report
  */
 function audioFill() {
   if (!audioMode || player === null || audioFilling || !clockPort) return 0;
@@ -193,9 +152,7 @@ function audioFill() {
       for (;;) {
         const n = M._usp_audio_take(audioPtr, audioMax);
         if (n <= 0) break;
-        /* A copy, because the heap view is reused on the next call and may be
-         * detached entirely if the heap grows. Transferred, so the audio thread
-         * does not copy it again. */
+        /* Copy, the heap view is reused and detaches when the heap grows, transferred to the audio thread */
         const chunk = new Int16Array(M.HEAPU8.buffer, audioPtr, n * audioChannels).slice();
         clockPort.postMessage(audioChannels === 2 ? { stereo: chunk } : chunk, [chunk.buffer]);
         if (scopeOn) takeScope(n);
@@ -213,7 +170,7 @@ function audioFill() {
 }
 
 /**
- * Take the scope frames belonging to the last audio chunk sent.
+ * Take the scope frames of the last audio chunk sent
  *
  * @param {number} frames  frames in that audio chunk
  */
@@ -228,11 +185,7 @@ function takeScope(frames) {
   scopeFrames += k;
 }
 
-/**
- * Join the scope chunks taken since the last report and start over.
- *
- * @returns {Int16Array|null} frames * scopeVoices values, null when none
- */
+/* Join the scope chunks taken since the last report, returns frames * scopeVoices values or null */
 function drainScope() {
   if (scopeFrames === 0) return null;
   const out = new Int16Array(scopeFrames * scopeVoices);
@@ -244,8 +197,7 @@ function drainScope() {
 }
 
 /**
- * Send the SID register mirror to the page, with how far ahead of the audible
- * output it is.
+ * Send the SID register mirror to the page with its lead on the audible output
  *
  * @param {number} leadSamples  samples between the ring's playhead and the
  *                              point the emulation has reached
@@ -276,11 +228,7 @@ function postRegisters(leadSamples) {
   self.postMessage({ type: 'regs', payload }, transfer);
 }
 
-/**
- * Read the watched RAM pages, in memPages order.
- *
- * @returns {Uint8Array|null} 256 bytes per page, null when none are watched
- */
+/* Read the watched RAM pages in memPages order, returns 256 bytes per page or null */
 function readWatchedPages() {
   const n = memPages.length;
   if (n === 0) return null;
@@ -302,8 +250,8 @@ function readWatchedPages() {
 }
 
 /**
- * Apply a speed multiplier to the player and, in audio mode, to the
- * synthesis output rate. See usp_audio_set_speed().
+ * Apply a speed multiplier to the player and in audio mode to the synthesis output rate
+ * See usp_audio_set_speed()
  *
  * @param {number} mult speed multiplier, 1 is normal
  */
@@ -312,19 +260,17 @@ function applySpeed(mult) {
   applyAudioSpeed();
 }
 
-/** Follow the player's speed with the synthesis output rate, audio mode only. */
+/* Follow the player speed with the synthesis output rate, audio mode only */
 function applyAudioSpeed() {
   if (audioMode && typeof player.M._usp_audio_set_speed === 'function') {
     player.M._usp_audio_set_speed(player.speed);
   }
 }
 
-/** A report from the ring: how short it is, counting what is already on its way. */
+/* Ring report, how short it is minus what is already on its way */
 function onAudioReport(d) {
   if (!d || typeof d.queued !== 'number') return;
-  /* In flight from the ring's own received count when it has one: a backlog
-   * of stale reports after the worker was throttled then asks for the
-   * shortfall once, not once per report. */
+  /* In flight from the received count of the ring, a backlog of stale reports asks once */
   const inFlight = (typeof d.received === 'number')
     ? Math.max(0, audioSentTotal - d.received) : audioSent;
   const owed = audioTarget - d.queued - inFlight;
@@ -334,9 +280,7 @@ function onAudioReport(d) {
     postRegisters(d.queued + ((typeof d.received === 'number')
       ? Math.max(0, audioSentTotal - d.received) : audioSent));
   }
-  /* The page has no player of its own in this mode, so everything it displays
-   * comes from here. Reports arrive about ninety times a second; this is three
-   * times a second, which is what a clock and a status line need. */
+  /* The page displays this worker state, about 90 reports per second, post 3 per second */
   if (++sinceReport >= 32) {
     sinceReport = 0;
     post('state', snapshot());
@@ -349,13 +293,9 @@ function post(type, payload, id) {
   self.postMessage({ type, payload, id });
 }
 
-/* The tick has to be cheap and must never throw into the audio thread's port,
- * so the state the page wants is sampled on a slow beat rather than every one
- * of the ~344 ticks a second. */
+/* The tick must be cheap and never throw, state is sampled every 32 of the ~344 ticks per second */
 let sinceReport = 0;
-/* Report once, so "did a tick ever arrive" is answerable from the page log
- * rather than only from a debugger. Every way of losing the clock looks the
- * same from outside: nothing plays and nothing complains. */
+/* Log the first tick once */
 let firstTick = true;
 
 function onTick() {
@@ -374,27 +314,19 @@ function onTick() {
 let fallbackTimer = 0;
 
 const handlers = {
-  /**
-   * Load the wasm and open the board. `wasmUrl` is passed in rather than
-   * hard coded because the page decides where the build artefacts live.
-   */
+  /* Load the wasm and open the board, wasmUrl is set by the page */
   async init({ wasmUrl, prefer }) {
     const M = await loadModule(wasmUrl);
-    /* WebUSB where it exists, Web Serial where it does not, which is Firefox.
-     * Both re-acquire what the page was granted without a picker. `prefer`
-     * overrides, which is how bench.html measures one against the other. */
+    /* WebUSB, else Web Serial (Firefox), both re-acquire the granted device without a picker
+     * prefer overrides (bench.html) */
     transport = createTransport({ prefer });
     post('log', { message: 'transport built: ' +
                            (transport ? transport.kind : 'none') });
     const opened = transport ? await transport.connectGranted() : false;
     post('log', { message: 'board ' + (opened ? 'opened' : 'NOT opened') });
     player = new USBSIDPlayerWeb(M, transport);
-    /* The worker owns the board here, so it is the only one that can ask what
-     * is in it. Done at init, before any tune loads.
-     *
-     * Never let it stop the worker coming up: reading the board is a
-     * convenience, and without it the sockets default and FM/OPL is off,
-     * which is a worse tune, not a dead player. */
+    /* Read the board config at init before any tune loads
+     * A failure must not stop the worker, sockets default and FM/OPL is off */
     let board = null;
     if (opened) {
       try { board = await player.applyBoardConfig(); }
@@ -404,15 +336,9 @@ const handlers = {
     return { opened, board, transport: transport ? transport.kind : null };
   },
 
-  /**
-   * Pace the worker from its own timer instead of the audio thread.
-   *
-   * The audio clock is the one that matters, because a worker's timers are
-   * throttled in a backgrounded tab and that is the whole reason the worker
-   * exists. This is the fallback for when no ticks arrive at all: a page with no
-   * Web Audio, or an AudioContext the browser never allowed to start, or a
-   * browser that will not hand a MessagePort to an AudioWorkletProcessor.
-   * Without it, any of those is silence with nothing logged.
+  /*
+   * Fallback clock, a worker timer (throttled in a background tab)
+   * For no Web Audio, an AudioContext that never starts or a refused MessagePort transfer
    */
   fallbackClock({ on }) {
     if (fallbackTimer) { clearInterval(fallbackTimer); fallbackTimer = 0; }
@@ -421,19 +347,16 @@ const handlers = {
     return { ok: true, on: !!fallbackTimer };
   },
 
-  /** The audio thread's end of the clock. */
+  /* Audio thread end of the clock */
   clock({ port }) {
-    /* If a browser will not transfer a MessagePort this far, `port` is not one
-     * and the silence starts here rather than at the audio thread. Worth saying
-     * which, because the two need different fixes. */
+    /* port is not a MessagePort when the browser refuses the transfer */
     const kind = Object.prototype.toString.call(port);
     post('log', { message: 'clock port received: ' + kind });
     if (!port || typeof port.postMessage !== 'function') {
       return { ok: false, kind };
     }
     clockPort = port;
-    /* In audio mode the same channel carries the ring's reports one way and the
-     * samples the other. A board build gets a bare tick and nothing else. */
+    /* Audio mode, ring reports one way and samples the other, a board build gets bare ticks */
     clockPort.onmessage = audioMode
       ? (e) => onAudioReport(e.data)
       : onTick;
@@ -441,14 +364,7 @@ const handlers = {
     return { ok: true, kind };
   },
 
-  /**
-   * Come up with no board at all: reSIDfp in this worker, out through the
-   * page's AudioWorklet.
-   *
-   * Separate from init() because that one builds a transport and opens a board,
-   * which is exactly what this mode does not want: a picker, a permission and a
-   * device that would sit claimed for nothing.
-   */
+  /* Start without a board, reSIDfp in this worker out through the page AudioWorklet */
   async audioInit({ wasmUrl }) {
     const M = await loadModule(wasmUrl);
     transport = null;
@@ -459,12 +375,7 @@ const handlers = {
     return { ok: true, audio: true };
   },
 
-  /**
-   * Point the synthesis at a tune, and say how full to keep the ring.
-   *
-   * `target` and `steps` come from the page because it is the side that knows
-   * whether it is visible: hidden, it asks for a deeper ring and bigger fills.
-   */
+  /* Point the synthesis at a tune and set the ring fill, target and steps come from the page (hidden = deeper ring, bigger fills) */
   audioConfigure({ chips, rate, quality, model, target, steps, stereo }) {
     if (player === null) return { ok: false };
     if (typeof player.M._usp_audio_set_stereo === 'function') {
@@ -489,14 +400,14 @@ const handlers = {
     return { ok };
   },
 
-  /** A deeper ring while the page is hidden, and bigger fills to match. */
+  /* Deeper ring and bigger fills while the page is hidden */
   audioTarget({ target, steps }) {
     if (target) audioTarget = target | 0;
     if (steps) audioSteps = steps | 0;
     return { ok: true, target: audioTarget, steps: audioSteps };
   },
 
-  /** Drop what has been rendered and not yet sent, on a stop or a new tune. */
+  /* Drop rendered audio not yet sent, on stop or new tune */
   audioDiscard() {
     if (player && player.M && player.M._usp_audio_discard) {
       player.M._usp_audio_discard();
@@ -508,10 +419,7 @@ const handlers = {
     return { ok: true };
   },
 
-  /**
-   * Place the chips in the stereo mix, see usp_audio_set_panning(). Kept
-   * across tunes by the wasm.
-   */
+  /* Place the chips in the stereo mix, see usp_audio_set_panning(), kept across tunes by the wasm */
   panning({ stereo, layout, mode, single }) {
     if (player === null || typeof player.M._usp_audio_set_panning !== 'function') {
       return { ok: false };
@@ -520,10 +428,7 @@ const handlers = {
     return { ok: true, info: snapshot() };
   },
 
-  /**
-   * Set the reSIDfp filter, see usp_audio_set_filter(). Kept across tunes by
-   * the wasm.
-   */
+  /* Set the reSIDfp filter, see usp_audio_set_filter(), kept across tunes by the wasm */
   filter({ enabled, curve6581, range6581, curve8580, waveforms }) {
     if (player === null || typeof player.M._usp_audio_set_filter !== 'function') {
       return { ok: false };
@@ -533,11 +438,7 @@ const handlers = {
     return { ok: true };
   },
 
-  /**
-   * Record each voice's own output for an oscilloscope, or stop.
-   *
-   * Frames go out with the register reports, see postRegisters().
-   */
+  /* Record the output of each voice for the oscilloscope or stop, frames go out with the register reports */
   scope({ on }) {
     if (player === null || !audioMode ||
         typeof player.M._usp_audio_scope !== 'function') {
@@ -552,7 +453,7 @@ const handlers = {
     return { ok: true, on: scopeOn };
   },
 
-  /** The Songlengths key of what is loaded, and the lookup, both in here. */
+  /* Songlengths key of the loaded tune */
   md5() {
     return { key: (player && player._bytesForMd5)
       ? player.md5(player._bytesForMd5) : '' };
@@ -560,8 +461,7 @@ const handlers = {
 
   loadSID({ bytes, subtune }) {
     const buf = new Uint8Array(bytes);
-    /* Kept for md5(): the Songlengths key is the digest of the whole file, and
-     * the page cannot compute one because WebCrypto leaves MD5 out. */
+    /* Kept for md5(), the Songlengths key is the digest of the file (WebCrypto has no MD5) */
     player._bytesForMd5 = buf;
     const ok = player.loadSID(buf, subtune || 0);
     regChips = Math.min(REG_CHIPS_MAX, Math.max(1, player.info().sids.length));
@@ -583,19 +483,17 @@ const handlers = {
   stop() { player.stop(); return { ok: true }; },
   pause({ on }) { player.pause(!!on); return { ok: true }; },
 
-  /* The worker holds the player that is actually sounding, so a voice held down
-   * on the page's copy would silence nothing. */
+  /* The worker holds the sounding player */
   voiceMute({ chip, voice, muted }) {
     player.setVoiceMute(chip, voice, !!muted);
     return { ok: true };
   },
-  /* Same reason as voiceMute above: the worker holds the player that is sounding. */
+  /* Chip mute, see voiceMute */
   chipMute({ chip, muted }) {
     player.setChipMute(chip, !!muted);
     return { ok: true };
   },
-  /* The SID and FM sides of the mix are scaled inside the wasm that renders,
-   * which in audio mode is this one. See usp_audio_set_sid_volume(). */
+  /* SID and FM volume are scaled in the rendering wasm, see usp_audio_set_sid_volume() */
   sidVolume({ percent }) {
     if (player && player.M._usp_audio_set_sid_volume) {
       player.M._usp_audio_set_sid_volume(percent | 0);
@@ -614,7 +512,7 @@ const handlers = {
     applyAudioSpeed();
     return { ok: true, speed: player.speed };
   },
-  /* RAM pages to report with the registers, see readWatchedPages(). */
+  /* RAM pages to report with the registers, see readWatchedPages() */
   memWatch({ pages }) {
     const list = Array.from(pages || []).slice(0, MEM_PAGES_MAX);
     memPages = Uint8Array.from(list, (pg) => pg & 0xff);
