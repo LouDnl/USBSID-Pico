@@ -383,7 +383,6 @@ static inline void set_asid_env(int refresh_rate, int speed_multiplier, int cust
       true);
   }
   reset_sid_registers();
-  reset_sid();
 
   init_asid_buffer(framedelta_us); /* Init on env set */
   ring_buffer_reset_size();  /* Reset buffer to default size for new tune */

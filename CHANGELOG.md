@@ -1,7 +1,7 @@
 # Changelog
 Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on version changes
 
-#### Version: Unreleased
+* Remove reset SID when already resetting SID registers before the call
 * Add Network SID Device (NSD) server over WiFi for pico_w/pico2_w
   - Add Bluetooth Classic SPP transport for the same NSD protocol
   - NSD server uses protocol version 5  

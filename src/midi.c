@@ -133,7 +133,6 @@ void midi_init(void)
  */
 void emulator_queue_init(void)
 {
-  /* emudore */
   queue_init(&cynthcart_queue, sizeof(cynthcart_queue_entry_t), 128); /* 128 entries as buffer */
 }
 
@@ -145,9 +144,7 @@ void emulator_queue_init(void)
  */
 inline void emulator_queue_deinit(void)
 {
-  /* emudore */
   queue_free(&cynthcart_queue);
-  reset_sid();
   reset_sid_registers();
 }
 
