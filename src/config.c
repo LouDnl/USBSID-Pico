@@ -611,6 +611,7 @@ bool config_is_query(uint8_t cmd)
     case US_PCB_VERSION:
     case US_FEATURES:
     case GET_AUDIO:
+    case TOGGLE_AUDIO:
 #if defined(ONBOARD_EMULATOR)
     case SID_PLAYER_MUTED:
     case SID_PLAYER_TIME:
