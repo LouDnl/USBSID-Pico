@@ -1,7 +1,8 @@
 # Changelog
 Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on version changes
 
-#### Version: Unreleased
+* Fix toggle mono/stereo causing a playing freeze
+* Add ffwd for the onboard player
 * Remove reset SID when already resetting SID registers before the call
 * Update web config tool with new USBSID-Player code
 * Add Network SID Device (NSD) server over WiFi for pico_w/pico2_w
