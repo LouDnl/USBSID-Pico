@@ -1685,10 +1685,10 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       usCFG("SID_PLAYER_TWO\n");
       force_socktwo();
       break;
-    case SID_PLAYER_FFWD: /* Non functional */
+    case SID_PLAYER_FFWD: /* Applied by the player on core 1 at a frame boundary */
       usCFG("SID_PLAYER_FFWD: %s\n",
         (buffer[1] ? "ON" : "OFF"));
-      /* emu_ffwd((bool)buffer[1]); */
+      emu_ffwd((bool)buffer[1]);
       break;
     case SID_PLAYER_RWND: /* Not implemented */
       break;
