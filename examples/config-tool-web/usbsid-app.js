@@ -651,13 +651,15 @@ function placeVisualsBoxes(inVisuals) {
 }
 
 /* Workaround to always subtract 1 from subtune as the player expects this */
-function _loadTune(subtune, timeout, file, callback) {
+function _loadTune(subtune, timeout, file, callback, song) {
   const p = _player;  /* use existing player only - do NOT call getPlayer() here, as that
                         would create a new player for the current (possibly wrong) emulator */
   if (!p) return;
   subtune = (subtune != 0 ? (subtune - 1) : subtune);
   /* usbsidLog(subtune, timeout, file, callback); */
-  p.load(subtune, timeout, file, callback);
+  /* song counts from one and is only for the usplayer adapter: song 1 has no
+   * spelling in subtune, where 0 is the default song of the tune */
+  p.load(subtune, timeout, file, callback, song);
   /* A load in usplayer-serial mode may have opened the port itself, in which
    * case nothing else has told the UI. See syncSerialUi(). */
   syncSerialUi();
@@ -839,6 +841,7 @@ async function stopPlay() {
       try { await sendsidDev().playerStop(); } catch (e) { usbsidLog('sendsid stop error:', e); }
     }
     _sendsidPlaying = false;
+    resetFfwdUi();  /* the board ends its own fast forward on stop */
     /* Polling stops, the last position stays on screen. The firmware freezes its
      * own figure the same way, so the two agree. */
     stopSendsidTimeTimer();
@@ -875,7 +878,8 @@ async function prevSubtune() {
     if (!p) return;
     if (p && _currentFile) {
       // p.load(_currentSubtune, 1000, _currentFile.url, null);
-      _loadTune(_currentSubtune, 1000, _currentFile.url, null);
+      _loadTune(_currentSubtune, 1000, _currentFile.url, null,
+                _currentSubtune === 1 ? 1 : undefined);
       p.setVolume(userVolume());
     }
     updateSubtuneDisplay();
@@ -3226,6 +3230,14 @@ function syncSerialUi() {
   }
 }
 
+/** Clear the FFWD hold state and highlight, for events the board answers by ending its own fast forward. */
+function resetFfwdUi() {
+  const ff = document.getElementById('btn-ffwd');
+  if (!ff) return;
+  ff._held = false;
+  ff.classList.remove('c64-btn-warn');
+}
+
 /**
  * Wire the two controls the transport row was missing.
  *
@@ -3239,19 +3251,34 @@ function wireExtraTransport() {
   const ff = document.getElementById('btn-ffwd');
   if (ff && !ff._wired) {
     ff._wired = true;
-    let held = false;
+    ff._held = false;
     const set = (on) => {
       /* Idempotent. The first version logged on every event, which is what showed
        * up the bug: `off` lines arrived with no `on` before them, because
        * pointerleave fires on plain hover-out and not only during a press. */
-      if (on === held) return;
+      if (on === ff._held) return;
+      /* SendSID: the board plays and the board fast forwards. It applies the
+       * command at a frame boundary, ends it on stop, init and new upload, and
+       * keeps it across next and previous subtune. */
+      if (_emulator === 'sendsid') {
+        const dev = sendsidDev();
+        if (!dev || typeof dev.playerFfwd !== 'function') {
+          usbsidLog('FFWD: no SendSID device with playerFfwd (connect first)');
+          return;
+        }
+        ff._held = on;
+        ff.classList.toggle('c64-btn-warn', on);
+        Promise.resolve(dev.playerFfwd(on)).catch(e => usbsidLog('sendsid ffwd error:', e));
+        usbsidLog('FFWD (board): ' + (on ? 'on' : 'off'));
+        return;
+      }
       if (!_player) { usbsidLog('FFWD: no player'); return; }
       if (typeof _player.fastForward !== 'function' &&
           typeof _player.setSpeed !== 'function') {
         usbsidLog('FFWD: this player has neither fastForward nor setSpeed');
         return;
       }
-      held = on;
+      ff._held = on;
       if (typeof _player.fastForward === 'function') _player.fastForward(on);
       else _player.setSpeed(on ? 4 : 1);
       ff.classList.toggle('c64-btn-warn', on);
@@ -3345,6 +3372,7 @@ async function uploadCurrentSID() {
      * tune is already running against the board's five minute default, and the
      * UART showed exactly that: SID_PLAYER_START, then UPLOAD_SID_PLAYTIME. */
     const lenMs = _songLengths ? currentSongLengthMs() : 0;
+    resetFfwdUi();  /* the board ends its own fast forward on a new upload */
     const upOk = await sendsidDev().uploadSIDFile(_loadedBytes, _currentSubtune, 0x01, (sent, total) => {
       if (statusEl) statusEl.textContent = Math.round(sent / total * 100) + '%';
     }, lenMs);

@@ -410,9 +410,8 @@
       </div>
       <!-- Onboard player mute, per voice.
            Rows are generated per chip by buildOnboardMuteGrid(), because how many
-           chips there are depends on the board. FFWD is deliberately absent: the
-           firmware marks SID_PLAYER_FFWD non functional and its emu_ffwd() call is
-           commented out, so a button for it could only mislead. -->
+           chips there are depends on the board. btn-ffwd is shared with the
+           local player: in SendSID mode it drives SID_PLAYER_FFWD on the board. -->
       <div id="sendsid-mute-btns" style="display:none;margin-top:6px">
         <div id="sendsid-mute-row1" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <span class="np-stil-label">Mute</span>

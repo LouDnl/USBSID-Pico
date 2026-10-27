@@ -459,11 +459,11 @@ const handlers = {
       ? player.md5(player._bytesForMd5) : '' };
   },
 
-  loadSID({ bytes, subtune }) {
+  loadSID({ bytes, subtune, song }) {
     const buf = new Uint8Array(bytes);
     /* Kept for md5(), the Songlengths key is the digest of the file (WebCrypto has no MD5) */
     player._bytesForMd5 = buf;
-    const ok = player.loadSID(buf, subtune || 0);
+    const ok = player.loadSID(buf, subtune || 0, song || 0);
     regChips = Math.min(REG_CHIPS_MAX, Math.max(1, player.info().sids.length));
     return { ok, info: snapshot() };
   },

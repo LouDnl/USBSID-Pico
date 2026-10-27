@@ -177,6 +177,9 @@ export class USBSIDPlayerWeb {
     this._alloc          = M.cwrap('usp_alloc', 'number', ['number']);
     this._freeBuf        = M.cwrap('usp_free', null, ['number']);
     this._loadSidtune    = M.cwrap('usp_load_sidtune', 'number', ['number', 'number', 'number']);
+    /* Absent in a wasm older than the song 1 fix */
+    this._loadSidtuneSong = typeof M._usp_load_sidtune_song === 'function'
+      ? M.cwrap('usp_load_sidtune_song', 'number', ['number', 'number', 'number']) : null;
     this._loadPrg        = M.cwrap('usp_load_prg', 'number', ['number', 'number']);
     this._initSidplayer  = M.cwrap('usp_init_sidplayer', null, []);
     this._start          = M.cwrap('usp_start', null, []);
@@ -259,11 +262,16 @@ export class USBSIDPlayerWeb {
   /**
    * Load a PSID or RSID (Uint8Array), subtune 0 is the file's default
    * Return falsy if the bytes are not a SID file, try loadPRG then
+   *
+   * song counts from one and picks that song, 0 keeps subtune. Song 1 has no
+   * spelling in subtune, where 0 is the default (Action_Biker starts at song 2)
    */
-  loadSID(bytes, subtune = 0) {
+  loadSID(bytes, subtune = 0, song = 0) {
     if (this._running) this.stop();   // never leave a tune half playing
     const ptr = this._stage(bytes);
-    const ok = this._loadSidtune(ptr, bytes.length, subtune);
+    const ok = (song > 0 && this._loadSidtuneSong)
+      ? this._loadSidtuneSong(ptr, bytes.length, song)
+      : this._loadSidtune(ptr, bytes.length, subtune);
     this._asidTune = ok ? { is6581: headerIs6581(bytes) } : null;
     if (ok) {
       this._initSidplayer();

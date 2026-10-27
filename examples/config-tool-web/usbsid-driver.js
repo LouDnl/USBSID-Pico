@@ -174,7 +174,7 @@ const SID_PLAYER_PAUSE = 0xE3;
 const SID_PLAYER_NEXT  = 0xE4;
 const SID_PLAYER_PREV  = 0xE5;
 const SID_PLAYER_TWO   = 0xE6;
-const SID_PLAYER_FFWD  = 0xE7;   /* non functional, see playerFfwd() */
+const SID_PLAYER_FFWD  = 0xE7;
 const SID_PLAYER_MUTE  = 0xE9;
 const SID_PLAYER_MUTED = 0xEA;
 const SID_PLAYER_TIME  = 0xEB;
@@ -1093,12 +1093,9 @@ class USBSIDDevice {
   /**
    * Fast forward on or off.
    *
-   * **Does nothing.** The firmware marks the case `/* Non functional *\/` and the
-   * `emu_ffwd()` call is commented out, because emu_ffwd() was itself an empty
-   * stub: on the device the SID writes are the pacing, so there is nothing to
-   * skip until the embedded build has a pacer. Kept so the wiring is ready, and
-   * deliberately absent from the UI: a control that cannot work invites being
-   * pressed repeatedly.
+   * The board applies it at a frame boundary. It ends the fast forward itself on
+   * stop, init and a new upload, and keeps it across a subtune change. Needs
+   * firmware with `emu_ffwd()` implemented.
    */
   async playerFfwd(on) {
     await this.configCmd(SID_PLAYER_FFWD, on ? 1 : 0);

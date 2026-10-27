@@ -99,7 +99,7 @@ const SID_PLAYER_PAUSE = 0xE3;
 const SID_PLAYER_NEXT  = 0xE4;
 const SID_PLAYER_PREV  = 0xE5;
 const SID_PLAYER_TWO   = 0xE6;
-/* 0xE7 SID_PLAYER_FFWD is absent, marked non functional in the firmware */
+const SID_PLAYER_FFWD  = 0xE7;
 const SID_PLAYER_MUTE  = 0xE9;
 const SID_PLAYER_MUTED = 0xEA;
 const SID_PLAYER_TIME  = 0xEB;
@@ -451,6 +451,11 @@ export class USBSIDWebSerialTransport {
   playerNext()      { return this._sendNow(SID_PLAYER_NEXT); }
   playerPrev()      { return this._sendNow(SID_PLAYER_PREV); }
   playerSocketTwo() { return this._sendNow(SID_PLAYER_TWO); }
+
+  /* Fast forward on or off, the board applies it at a frame boundary */
+  playerFfwd(on) {
+    return this._sendNow(SID_PLAYER_FFWD, new Uint8Array([on ? 1 : 0]));
+  }
 
   /* Set the play time of the last uploaded tune in milliseconds, send after the upload
    * Board default is five minutes. UPLOAD_SID_START zeroes position and maximum,

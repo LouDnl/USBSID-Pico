@@ -726,8 +726,10 @@ export class USPlayerAdapter {
    * @param {number} timeout  unused
    * @param {string} url      file to fetch
    * @param {function} callback  called when the tune runs
+   * @param {number} song     optional, counts from one, a song picked with prev or next
+   *                          Song 1 cannot be said with subtune, 0 is the default there
    */
-  async load(subtune, timeout, url, callback) {
+  async load(subtune, timeout, url, callback, song) {
     /* A newer load() supersedes a running one, gen is checked before each worker RPC
      * overlapping loads must not interleave on the worker */
     const gen = ++this._loadGen;
@@ -760,7 +762,7 @@ export class USPlayerAdapter {
       if (!this._isAudio && typeof this._player.M._usp_audio_release === 'function') {
         this._player.M._usp_audio_release();
       }
-      const ok = sid ? this._player.loadSID(bytes, subtune || 0)
+      const ok = sid ? this._player.loadSID(bytes, subtune || 0, song || 0)
                      : this._player.loadPRG(bytes);
       if (!ok) throw new Error('neither a SID nor a program');
 
@@ -783,7 +785,7 @@ export class USPlayerAdapter {
         sidAddresses: (i.sids || []).map((c) => c.addr),
       };
 
-      this._subtune = subtune || 0;
+      this._subtune = song > 0 ? song - 1 : (subtune || 0);
 
       /* New tune starts from an unwritten chip */
       this._shadow.fill(0xff);
@@ -840,7 +842,7 @@ export class USPlayerAdapter {
           if (stale()) return;
           const copy = bytes.slice();
           await this._call('loadSID',
-                           { bytes: copy.buffer, subtune: subtune || 0 },
+                           { bytes: copy.buffer, subtune: subtune || 0, song: song || 0 },
                            [copy.buffer]);
           if (stale()) return;
           await this._call('audioConfigure', {
