@@ -51,6 +51,7 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
   - only $19-$1C are readable, clone chips keep full readback
 * Fix USB control request logging printing over UART during play
 * Fix read-only config queries claiming the SID bus and never releasing it
+* Add command to get the state of the audio switch (v1.3+ only)
 
 #### Version: 0.8.0
 * Add full MIDI implementation overhaul

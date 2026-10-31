@@ -165,7 +165,7 @@ int detect_clocksignal(void)
 
 /**
  * @brief Toggle the audio switch on <-> off
- * @note only applicable for PCB v1.3
+ * @note only applicable for PCB v1.3+
  *
  */
 void toggle_audio_switch(void)
@@ -174,6 +174,7 @@ void toggle_audio_switch(void)
   if (!usbsid_config.lock_audio_sw) {
     int audio_state = (read_bus(1) & bPIN(AU_SW)) >> AU_SW; /* Pinpoint current audio switch state */
     audio_state ^= 1;
+    usbsid_config.stereo_en = (bool)audio_state; /* Set the state in config aswell */
     usPIN("Toggle audio switch to: %d (%s)\n", (int)audio_state, monostereo_str((int)audio_state));
     tPIN(AU_SW);  /* toggle mono <-> stereo */
   } else {
@@ -187,7 +188,7 @@ void toggle_audio_switch(void)
 
 /**
  * @brief Set the audio switch to on or off
- * @note only applicable for PCB v1.3
+ * @note only applicable for PCB v1.3+
  *
  * @param bool state (false == off, true == on)
  */
@@ -208,6 +209,23 @@ void set_audio_switch(bool state)
   (void)state;
 #endif
   return;
+}
+
+/**
+ * @brief Get the audio switch state, switch wins over setting
+ * @note only applicable for PCB v1.3+
+ *
+ * @param bool state (false == off, true == on)
+ */
+bool get_audio_switch(void)
+{ /* Get the SPST switch state */
+#if PCB_VERSION_INT >= 13
+  bool audio_state = (bool)(read_bus(1) & bPIN(AU_SW)) >> AU_SW; /* Pinpoint current audio switch state */
+  usbsid_config.stereo_en = audio_state; /* Set the config state to what the actual pin returns */
+  return audio_state;
+#else
+  return false;
+#endif
 }
 
 /**
