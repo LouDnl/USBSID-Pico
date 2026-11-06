@@ -70,4 +70,13 @@
 #define ETHARP_DEBUG                LWIP_DBG_ON
 #endif
 
+#if defined(USE_USB_NET)
+/* USB CDC-NCM build: driven by net_usb_task() from core 0 after tud_task()
+ * instead of cyw43_arch_poll(). One spare UDP pcb beside the DHCP client
+ * or DHCP server and the discovery responder, for the client to server
+ * switch. */
+#undef  MEMP_NUM_UDP_PCB
+#define MEMP_NUM_UDP_PCB            3
+#endif
+
 #endif /* _LWIPOPTS_H */

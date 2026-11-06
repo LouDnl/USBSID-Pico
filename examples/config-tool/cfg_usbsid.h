@@ -142,6 +142,9 @@ enum
   READ_NETCFG      = 0x7A,  /* Read net config as bytes */
   WIFI_READ_IP     = 0x7B,  /* Returns {state, ip0..ip3}, needs US_FEATURES bit 1 */
   DISCOVERY_ENABLE = 0x7C,  /* buffer[1] = 0/1, needs US_FEATURES bit 1 */
+  USBNET_IP_MODE   = 0x7D,  /* buffer[1] = 0 DHCP client / 1 static / 2 DHCP server (default), USB network build only, persisted by WIFI_APPLY */
+  USBNET_SET_STATIC= 0x7E,  /* buffer[1..4] ip, [5..8] netmask, [9..12] gateway, USB network build only, persisted by WIFI_APPLY */
+  USBNET_READ_IPCFG= 0x7F,  /* Returns {mode, ip[4], netmask[4], gateway[4]} */
 
   USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
   US_PCB_VERSION   = 0x81,  /* Read PCB version */
@@ -215,6 +218,7 @@ const char * error_type[]  = { "ERROR" };
 const char * enabled[]     = { "Disabled", "Enabled" };
 const char * intext[]      = { "Internal", "External" };
 const char * onoff[]       = { "Off", "On" };
+const char * usbnet_ip_modes[] = { "dhcp", "static", "server" };
 const char * truefalse[]   = { "False", "True" };
 const char * locked[]      = { "Unlocked", "Locked" };
 const char * us_socket[]   = { "Single SID", "Dual SID" };
@@ -253,6 +257,7 @@ typedef struct NetConfig {
     bool bt_nsd_enabled    : 1;
     bool discovery_enabled : 1;
   } flags;
+  uint8_t usbnet_ip_mode;  /* USB network build only, 0 dhcp / 1 static / 2 server (default), flags byte bits 4-5 */
 } NetConfig;
 
 typedef struct Config {
@@ -415,6 +420,8 @@ f_help_menu help_menus[] = {
 /* NSD declarations */
 static const char * const wifi_states[4] = { "Off", "Down", "Connecting", "Connected" };
 bool board_has_net(void);
+bool board_has_nsd(void);
+bool require_net_support(void);
 bool read_us_features(void);
 
 

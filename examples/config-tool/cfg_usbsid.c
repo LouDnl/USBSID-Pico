@@ -869,6 +869,7 @@ void set_netcfg_from_buffer(const uint8_t * buff, size_t len)
   net_cfg.flags.nsd_enabled       = ((buff[61] & 0b10) >> 1);
   net_cfg.flags.bt_nsd_enabled    = ((buff[61] & 0b100) >> 2);
   net_cfg.flags.discovery_enabled = ((buff[61] & 0b1000) >> 3);
+  net_cfg.usbnet_ip_mode          = ((buff[61] & 0b110000) >> 4);
 
   return;
 }
@@ -910,6 +911,65 @@ static void print_wifi_ip_line(const uint8_t * ip)
   return;
 }
 
+static bool require_usbnet_support(const char * opt)
+{ /* USB network (NCM) builds report NSD (bit 5) without WiFi/Bluetooth (bit 4) */
+  if (!require_net_support()) return false;
+  if (!board_has_nsd() || board_has_net()) {
+    printf("This USBSID-Pico was not built with USB network (NCM) support, %s unavailable!\n", opt);
+    return false;
+  }
+  return true;
+}
+
+static bool read_usbnet_ipcfg(uint8_t * out)
+{ /* Read USBNET_READ_IPCFG reply into out[13], false on bad reply */
+  write_config_command(USBNET_READ_IPCFG, 0x0, 0x0, 0x0, 0x0);
+
+  int len;
+  memset(out, 0, 13);
+  len = read_chars(out, 13);
+  if (debug == 1) printf("Read %d bytes of data, byte 0 = %02X\n", len, out[0]);
+  return (len == 13);
+}
+
+static void print_usbnet_ipcfg(void)
+{
+  uint8_t ipcfg[13];
+  if (!read_usbnet_ipcfg(ipcfg)) {
+    printf("Could not read USB network IP config, update firmware\n");
+    return;
+  }
+  printf("USB network IP config:\n");
+  printf("  IP mode:       %s%s\n", (ipcfg[0] < 3 ? usbnet_ip_modes[ipcfg[0]] : "invalid"), (ipcfg[0] == 2 ? " (default)" : ""));
+  printf("  Static IP:     %u.%u.%u.%u\n", ipcfg[1], ipcfg[2], ipcfg[3], ipcfg[4]);
+  printf("  Netmask:       %u.%u.%u.%u\n", ipcfg[5], ipcfg[6], ipcfg[7], ipcfg[8]);
+  printf("  Gateway:       %u.%u.%u.%u\n", ipcfg[9], ipcfg[10], ipcfg[11], ipcfg[12]);
+  return;
+}
+
+static bool parse_usbnet_static(const char * arg, uint8_t * out)
+{ /* "ip,netmask[,gateway]" dotted quads into out[12], gateway defaults to 0.0.0.0 */
+  char tmp[64];
+  if (strlen(arg) >= sizeof(tmp)) return false;
+  strcpy(tmp, arg);
+  memset(out, 0, 12);
+  char * save = NULL;
+  int fields = 0;
+  for (char * tok = strtok_r(tmp, ",", &save); tok != NULL; tok = strtok_r(NULL, ",", &save)) {
+    if (fields >= 3) return false;
+    unsigned a, b, c, d;
+    int n = 0;
+    if (sscanf(tok, "%u.%u.%u.%u%n", &a, &b, &c, &d, &n) != 4 || tok[n] != '\0') return false;
+    if (a > 255 || b > 255 || c > 255 || d > 255) return false;
+    out[fields * 4 + 0] = (uint8_t)a;
+    out[fields * 4 + 1] = (uint8_t)b;
+    out[fields * 4 + 2] = (uint8_t)c;
+    out[fields * 4 + 3] = (uint8_t)d;
+    fields++;
+  }
+  return (fields >= 2);
+}
+
 void print_wifi_status(void)
 {
   write_config_command(WIFI_STATUS, 0x0, 0x0, 0x0, 0x0);
@@ -933,7 +993,7 @@ void print_wifi_status(void)
 
   if (!read_us_features()) {
     printf("WiFi state:   unknown (could not read feature byte)\n");
-  } else if (board_has_net()) {
+  } else if (board_has_net() || board_has_nsd()) {
     uint8_t ip[5];
     if (!read_wifi_ip(ip)) {
       printf("Could not read WiFi state\n");
@@ -957,7 +1017,8 @@ void print_net_config(void)
   printf("  Discovery:     %s\n", enabled[(int)net_cfg.flags.discovery_enabled]);
   if (!read_us_features()) {
     printf("  IP address:    unknown (could not read feature byte)\n");
-  } else if (board_has_net()) {
+  } else if (board_has_net() || board_has_nsd()) {
+    if (!board_has_net()) printf("  IP mode:       %s%s\n", (net_cfg.usbnet_ip_mode < 3 ? usbnet_ip_modes[net_cfg.usbnet_ip_mode] : "invalid"), (net_cfg.usbnet_ip_mode == 2 ? " (default)" : ""));
     uint8_t ip[5];
     if (!read_wifi_ip(ip)) printf("  IP address:    could not read\n");
     else if (ip[0] == 3) printf("  IP address:    %u.%u.%u.%u\n", ip[1], ip[2], ip[3], ip[4]);
@@ -1019,6 +1080,19 @@ bool board_has_emulator(void)
 }
 
 bool require_net_support(void)
+{
+  if (!read_us_features()) {
+    printf("Could not query board features, network command aborted!\n");
+    return false;
+  }
+  if (!board_has_net() && !board_has_nsd()) {
+    printf("This USBSID-Pico was not built with network support, network command unavailable!\n");
+    return false;
+  }
+  return true;
+}
+
+bool require_wifi_support(void)
 {
   if (!read_us_features()) {
     printf("Could not query board features, network command aborted!\n");
@@ -1906,7 +1980,7 @@ void print_help_features(void)
   printf("  -sau,     --set-audio N       : Set and save the mono/stereo audio switch (PCB v1.3+ only!)\n");
   printf("                                  0: %s, 1:%s\n", mono_stereo[0], mono_stereo[1]);
   printf("  -lau N,   --lock-audio N      : Lock and the audio switch in it's current state until reboot: True (1) False (0)\n");
-  printf("  -sad N,   --sock-autodetect N : Disable/enable and save the automatic socket change detection on boot (PCB v1.5+ only!)\n");
+  printf("  -sad N,   --sock-autodetect N : Disable/enable and save the automatic socket change detection on boot (PCBv1.5+ only!)\n");
   printf("                                  0: %s, 1:%s\n", enabled[0], enabled[1]);
   printf("  -pad N,   --preset-detect N   : Disable/enable and save the silent automatic socket detection on preset selection\n");
   printf("                                  0: %s, 1:%s\n", enabled[0], enabled[1]);
@@ -1926,6 +2000,16 @@ void print_help_network(void)
   printf("  -nsden N, --nsd-enable N      : Enable (1) or Disable (0) Network SID Device (NSD)\n");
   printf("  -discen N,--disc-enable N     : Enable (1) or Disable (0) UDP discovery, applied live, persisted by -wapply\n");
   printf("  -nsdp N,  --nsd-port N        : Set the Network SID Device port to N\n");
+  printf("  -unipm <server|dhcp|static>,\n");
+  printf("    --usbnet-ip-mode M          : Set the USB network (NCM) IP mode (or 2/0/1), persisted and applied by -wapply\n");
+  printf("                                  server (default): board 192.168.65.1/24, serves the USB link only\n");
+  printf("                                  dhcp: needs a host bridge from the USB net interface to the LAN\n");
+  printf("                                  static: needs host routing/proxy ARP or a bridge (set addresses with -unst)\n");
+  printf("                                  Do not bridge the USB net interface into a LAN while in server mode\n");
+  printf("  -unst I,N,G,\n");
+  printf("    --usbnet-static I,N,G       : Set the USB network (NCM) static IP, netmask and gateway (dotted, gateway optional),\n");
+  printf("                                  persisted and applied by -wapply\n");
+  printf("  -unipc,   --usbnet-ipcfg      : Read and print the USB network (NCM) IP mode and stored static IP config\n");
   printf("  -wapply,  --wifi-apply        : Persist WiFi/NSD config to flash and apply live\n");
   printf("  -wforget, --wifi-forget       : Erase stored WiFi credentials and reset network config to defaults\n");
   printf("  -bten N,  --bt-nsd-enable N   : Enable (1) or Disable (0) Bluetooth Network SID Device (SPP transport)\n");
@@ -2317,7 +2401,7 @@ void config_usbsidpico(int argc, char **argv)
       break;
     }
     if (!strcmp(argv[param_count], "-ssid") || !strcmp(argv[param_count], "--wifi-ssid")) {
-      if (!require_net_support()) goto exit;
+      if (!require_wifi_support()) goto exit;
       param_count++;
       if (argv[param_count] == NULL) {
         printf("No SSID supplied\n");
@@ -2328,7 +2412,7 @@ void config_usbsidpico(int argc, char **argv)
       break;
     }
     if (!strcmp(argv[param_count], "-psk") || !strcmp(argv[param_count], "--wifi-psk")) {
-      if (!require_net_support()) goto exit;
+      if (!require_wifi_support()) goto exit;
       param_count++;
       if (argv[param_count] == NULL) {
         printf("No PSK supplied\n");
@@ -2339,7 +2423,7 @@ void config_usbsidpico(int argc, char **argv)
       break;
     }
     if (!strcmp(argv[param_count], "-host") || !strcmp(argv[param_count], "--wifi-hostname")) {
-      if (!require_net_support()) goto exit;
+      if (!require_wifi_support()) goto exit;
       param_count++;
       if (argv[param_count] == NULL) {
         printf("No hostname supplied\n");
@@ -2350,7 +2434,7 @@ void config_usbsidpico(int argc, char **argv)
       break;
     }
     if (!strcmp(argv[param_count], "-wen") || !strcmp(argv[param_count], "--wifi-enable")) {
-      if (!require_net_support()) goto exit;
+      if (!require_wifi_support()) goto exit;
       param_count++;
       int en = atoi(argv[param_count]);
       if (en > 1) {
@@ -2401,6 +2485,50 @@ void config_usbsidpico(int argc, char **argv)
       write_config_command(NSD_SET_PORT, ((port >> 8) & 0xFF), (port & 0xFF), 0x0, 0x0);
       break;
     }
+    if (!strcmp(argv[param_count], "-unipm") || !strcmp(argv[param_count], "--usbnet-ip-mode")) {
+      if (!require_usbnet_support("-unipm")) goto exit;
+      param_count++;
+      if (argv[param_count] == NULL) {
+        printf("No IP mode supplied, use dhcp, static or server\n");
+        goto exit;
+      }
+      int mode;
+      if (!strcmp(argv[param_count], "dhcp") || !strcmp(argv[param_count], "0")) mode = 0;
+      else if (!strcmp(argv[param_count], "static") || !strcmp(argv[param_count], "1")) mode = 1;
+      else if (!strcmp(argv[param_count], "server") || !strcmp(argv[param_count], "2")) mode = 2;
+      else {
+        printf("%s is not an IP mode, use dhcp, static or server!\n", argv[param_count]);
+        goto exit;
+      }
+      printf("Set USB network IP mode to: %s (use -wapply to persist and apply)\n", usbnet_ip_modes[mode]);
+      write_config_command(USBNET_IP_MODE, mode, 0x0, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-unst") || !strcmp(argv[param_count], "--usbnet-static")) {
+      if (!require_usbnet_support("-unst")) goto exit;
+      param_count++;
+      uint8_t addr[12] = { 0 };
+      if (argv[param_count] == NULL || !parse_usbnet_static(argv[param_count], addr)) {
+        printf("Use -unst <ip>,<netmask>[,<gateway>] with dotted quads, e.g. 192.168.65.1,255.255.255.0,192.168.65.254\n");
+        goto exit;
+      }
+      if ((addr[0] == 0 && addr[1] == 0 && addr[2] == 0 && addr[3] == 0)
+        || (addr[0] == 255 && addr[1] == 255 && addr[2] == 255 && addr[3] == 255)) {
+        printf("IP address %u.%u.%u.%u is not usable!\n", addr[0], addr[1], addr[2], addr[3]);
+        goto exit;
+      }
+      printf("Set USB network static IP to: %u.%u.%u.%u netmask %u.%u.%u.%u gateway %u.%u.%u.%u (use -wapply to persist and apply)\n",
+        addr[0], addr[1], addr[2], addr[3], addr[4], addr[5], addr[6], addr[7], addr[8], addr[9], addr[10], addr[11]);
+      uint8_t buf[14] = { (uint8_t)((COMMAND << 6) | CONFIG), USBNET_SET_STATIC };
+      memcpy(&buf[2], addr, 12);
+      write_chars(buf, count_of(buf));
+      break;
+    }
+    if (!strcmp(argv[param_count], "-unipc") || !strcmp(argv[param_count], "--usbnet-ipcfg")) {
+      if (!require_usbnet_support("-unipc")) goto exit;
+      print_usbnet_ipcfg();
+      break;
+    }
     if (!strcmp(argv[param_count], "-wapply") || !strcmp(argv[param_count], "--wifi-apply")) {
       if (!require_net_support()) goto exit;
       printf("Persisting and applying network config\n");
@@ -2414,7 +2542,7 @@ void config_usbsidpico(int argc, char **argv)
       break;
     }
     if (!strcmp(argv[param_count], "-bten") || !strcmp(argv[param_count], "--bt-nsd-enable")) {
-      if (!require_net_support()) goto exit;
+      if (!require_wifi_support()) goto exit;
       param_count++;
       int en = atoi(argv[param_count]);
       if (en > 1) {

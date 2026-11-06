@@ -76,6 +76,9 @@ set(ENABLE_NET 0 CACHE STRING "ENABLE_NET")
 ### Enable / Disable build with the SID register stream (vendor interface 7)
 set(ENABLE_SID_STREAM 0 CACHE STRING "ENABLE_SID_STREAM")
 
+### Enable / Disable build with the USB network (CDC-NCM) NSD debug transport, pico2 only
+set(ENABLE_USB_NET 0 CACHE STRING "ENABLE_USB_NET")
+
 
 
 #######################################
@@ -123,6 +126,9 @@ endif()
 if(ENABLE_SID_STREAM)
   list(APPEND FEATURE_LIST "${Cyan}${ColorBold}SID Stream${ColorReset}")
 endif()
+if(ENABLE_USB_NET)
+  list(APPEND FEATURE_LIST "${Cyan}${ColorBold}USB Net (NSD debug)${ColorReset}")
+endif()
 
 ### Replace the semi colon in the list (This will not work: list(JOIN FEATURE_LIST ", " FEATURE_STRING))
 string(REPLACE ";" ", " FEATURE_STRING "${FEATURE_LIST}")
@@ -164,6 +170,18 @@ else()
   else()
     message(WARNING "${Green}${ColorBold}PICO_PLATFORM${ColorReset} not defined, defaulting to ${Yellow}${ColorBold}'rp2040'${ColorReset}")
     set(PICO_PLATFORM rp2040)
+  endif()
+endif()
+
+### USB network build guards, accepts 1 or ON
+if(ENABLE_USB_NET)
+  # USB net and WiFi/Bluetooth NSD are mutually exclusive
+  if(ENABLE_NET)
+    message(FATAL_ERROR "ENABLE_USB_NET cannot be combined with ENABLE_NET, set one of them to 0")
+  endif()
+  # USB net is supported on pico2 (rp2350-arm-s) only
+  if(NOT (PICO_BOARD STREQUAL "pico2" AND PICO_PLATFORM STREQUAL "rp2350-arm-s"))
+    message(FATAL_ERROR "ENABLE_USB_NET requires PICO_BOARD pico2 with PICO_PLATFORM rp2350-arm-s, got PICO_BOARD '${PICO_BOARD}' PICO_PLATFORM '${PICO_PLATFORM}'")
   endif()
 endif()
 
@@ -639,6 +657,53 @@ if(USBSID_W_BOARD)
     endforeach()
     set(FILENAMES ${FILENAMES_net})
   endif()
+endif()
+
+### USB network (CDC-NCM) NSD debug transport additions, accepts 1 or ON
+if(ENABLE_USB_NET)
+  ## Network SID Device over lwIP NO_SYS=1 on the USB link
+  add_compile_definitions(USE_USB_NET=1)
+  add_compile_definitions(USE_NSD=1)
+  add_compile_definitions(NSD_DEFAULT_PORT=6581)
+
+  set(SOURCEFILES
+    ${SOURCEFILES}
+    ${CMAKE_CURRENT_LIST_DIR}/src/nsd.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/net/net_ring.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/net/net_config.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/net/net_usb.c
+  )
+
+  ## DHCP server always compiled in, factory default IP mode, serves the USB link only
+  ## PICO_SDK_PATH is unset before pico_sdk_import on a fresh build dir, fall back to the env
+  if(DEFINED PICO_SDK_PATH AND NOT PICO_SDK_PATH STREQUAL "")
+    set(USB_NET_TINYUSB_PATH ${PICO_SDK_PATH}/lib/tinyusb)
+  else()
+    set(USB_NET_TINYUSB_PATH $ENV{PICO_SDK_PATH}/lib/tinyusb)
+  endif()
+  if(NOT EXISTS "${USB_NET_TINYUSB_PATH}/lib/networking/dhserver.c")
+    message(FATAL_ERROR "ENABLE_USB_NET needs ${USB_NET_TINYUSB_PATH}/lib/networking/dhserver.c, check PICO_SDK_PATH")
+  endif()
+  set(SOURCEFILES
+    ${SOURCEFILES}
+    ${USB_NET_TINYUSB_PATH}/lib/networking/dhserver.c  # DHCP server, not part of any pico-sdk library
+  )
+  set(TARGET_INCLUDE_DIRS
+    ${TARGET_INCLUDE_DIRS}
+    ${USB_NET_TINYUSB_PATH}/lib/networking
+  )
+
+  ## lwIP core + arch + NO_SYS sys_now/sys_arch_protect, no cyw43
+  set(TARGET_LL
+    ${TARGET_LL}
+    pico_lwip_nosys
+  )
+
+  ## Add filename for build type
+  foreach(FILENAME ${FILENAMES})
+    list(APPEND FILENAMES_usbnet "${FILENAME}_usbnet")
+  endforeach()
+  set(FILENAMES ${FILENAMES_usbnet})
 endif()
 
 ### Pio files

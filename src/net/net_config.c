@@ -26,8 +26,10 @@
 #include <globals.h>
 #include <config.h>
 #include <logging.h>
+#ifdef USE_NET
 #include <net_wifi.h>
 #include <net_bluetooth.h>
+#endif /* USE_NET */
 
 /* WiFi/Bluetooth config, kept out of Config on purpose - see config.h's
  * FLASH_NET_OFFSET comment and WIFI_SET_PSK's write-only handling below. */

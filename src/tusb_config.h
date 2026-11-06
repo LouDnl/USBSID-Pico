@@ -135,6 +135,15 @@
 #define CFG_TUD_VENDOR_RX_BUFSIZE 64  /* Set to 0 to disable buffering (the fifo is not used) */
 #define CFG_TUD_VENDOR_TX_BUFSIZE 64  /* Set to 0 to disable buffering (the fifo is not used) */
 
+#if defined(USE_USB_NET)
+// CDC-NCM network interface (NSD over USB), callbacks in net/net_usb.c
+#define CFG_TUD_NCM                   1
+#define CFG_TUD_NCM_IN_NTB_MAX_SIZE   3200  /* Device to host NTB size, must be > MTU */
+#define CFG_TUD_NCM_OUT_NTB_MAX_SIZE  3200  /* Host to device NTB size, Linux minimum 2048 */
+#define CFG_TUD_NCM_IN_NTB_N          3     /* TX NTBs, 3 keeps tud_network_can_xmit() from blocking */
+#define CFG_TUD_NCM_OUT_NTB_N         2     /* RX NTBs, 2 adds throughput at full speed */
+#endif
+
 
 #ifdef __cplusplus
   }

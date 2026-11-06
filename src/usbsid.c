@@ -49,10 +49,13 @@
 #include <net_bluetooth.h>
 #include <net_wifi.h>
 #include <net_config.h>
+#endif /* USE_NET */
 #ifdef USE_NSD
 #include <nsd.h>
 #endif /* USE_NSD */
-#endif /* USE_NET */
+#ifdef USE_USB_NET
+#include <net_usb.h>
+#endif /* USE_USB_NET */
 #if defined(ONBOARD_EMULATOR)
 #include <sid_player.h>
 #include <usplayer.h>
@@ -945,6 +948,9 @@ void __us_noreturn core0_loop(void)
 #if defined(USE_SID_STREAM)
     stream_task();  /* SID memory stream, own vendor interface */
 #endif
+#if defined(USE_USB_NET)
+    net_usb_task();  /* USB network (NCM): lwIP input, timers, TX flush */
+#endif
     #if 0
     cdc_task();  /* Only use this if no callbacks */
     #endif
@@ -1410,6 +1416,11 @@ int main()
    * Run exactly once, unconditionally, on core 0 at boot. */
   start_net();
   #endif /* USE_NET */
+  #ifdef USE_USB_NET
+  /* Loads net_cfg, sets up the USB network netif and NSD listener.
+   * Runs before tud_connect(): the NCM MAC string needs the MAC. */
+  net_usb_init();
+  #endif /* USE_USB_NET */
 
   /* Init SID states */
   usBOOT("Init SID states\n");

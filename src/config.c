@@ -47,10 +47,14 @@
 #include <net_wifi.h>
 #include <net_config.h>
 #include <net_bluetooth.h>
+#endif /* USE_NET */
+#ifdef USE_USB_NET
+#include <net_config.h>
+#include <net_usb.h>
+#endif /* USE_USB_NET */
 #ifdef USE_NSD
 #include <nsd.h>
 #endif /* USE_NSD */
-#endif /* USE_NET */
 
 /* SID player */
 #if defined(ONBOARD_EMULATOR)
@@ -329,6 +333,11 @@ void read_socket_config(Config* config)
  */
 void read_net_config(NetConfig* config)
 {
+#if defined(USE_USB_NET)
+  static_assert(sizeof(NetConfig) == 144, "[NETCONFIG] LAYOUT ERROR: NetConfig size changed, USB net flash page layout must stay 144 bytes");
+#else
+  static_assert(sizeof(NetConfig) == 132, "[NETCONFIG] LAYOUT ERROR: NetConfig size changed, flash page layout must stay 132 bytes");
+#endif /* USE_USB_NET */
   memset(net_config_array, 0, sizeof net_config_array);  /* Make sure no garbled old data is sent */
 
   net_config_array[0]  = READ_NETCFG;       /* Initiator byte */
@@ -343,7 +352,8 @@ void read_net_config(NetConfig* config)
     config->flags.wifi_enabled
   | (config->flags.nsd_enabled << 1)
   | (config->flags.bt_nsd_enabled << 2)
-  | (config->flags.discovery_enabled << 3));
+  | (config->flags.discovery_enabled << 3)
+  | (config->flags.usbnet_ip_mode << 4));  /* Bits 4-5 */
 
   net_config_array[62] = END_BYTE; /* Mark end of net_config */
   net_config_array[63] = TERMINATION_BYTE; /* Terminator byte */
@@ -612,6 +622,9 @@ bool config_is_query(uint8_t cmd)
     case US_FEATURES:
     case GET_AUDIO:
     case TOGGLE_AUDIO:
+#if defined(USE_USB_NET)
+    case USBNET_READ_IPCFG:
+#endif
 #if defined(ONBOARD_EMULATOR)
     case SID_PLAYER_MUTED:
     case SID_PLAYER_TIME:
@@ -677,12 +690,12 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case READ_NETCFG:
     {
       usCFG("READ_NETCFG\n");
-#ifdef USE_NET
+#if defined(USE_NET) || defined(USE_USB_NET)
       read_net_config(&net_cfg);
 #else /* Write back default config (unchangeable) */
       static NetConfig ndc = NETCONFIG_DEFAULT_INIT;
       read_net_config(&ndc);
-#endif /* USE_NET */
+#endif /* USE_NET || USE_USB_NET */
       print_cfg(net_config_array, count_of(net_config_array), false);
       memset(write_buffer_p, 0, 64);
       /* Account for the Config array size with a loop */
@@ -1045,8 +1058,10 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case WIFI_STATUS: /* Not available on non _w, always returns 0xFF 0xFF */
       usCFG("WIFI_STATUS\n");
       memset(write_buffer_p, 0, 64);
-#ifdef USE_NET
+#if defined(USE_NET)
       write_buffer_p[0] = (uint8_t)net_wifi_is_connected();
+#elif defined(USE_USB_NET)
+      write_buffer_p[0] = (uint8_t)(net_usb_link_state() == NET_USB_CODE_CONNECTED);
 #else
       write_buffer_p[0] = 0xFF; /* Not built with WiFi/Bluetooth support */
 #endif /* USE_NET */
@@ -1060,9 +1075,15 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case WIFI_READ_IP: /* Replies on every build, 0xFF state on non _w */
       usCFG("WIFI_READ_IP\n");
       memset(write_buffer_p, 0, 64);
-#ifdef USE_NET
+#if defined(USE_NET)
       write_buffer_p[0] = net_wifi_state_code();
       net_wifi_get_ip4(&write_buffer_p[1]);
+#elif defined(USE_USB_NET)
+      {
+        write_buffer_p[0] = net_usb_link_state();
+        uint32_t ip = net_usb_ip_addr(); /* Network order, first octet in lowest byte */
+        if (write_buffer_p[0] == NET_USB_CODE_CONNECTED) memcpy(&write_buffer_p[1], &ip, 4);
+      }
 #else
       write_buffer_p[0] = 0xFF; /* Not built with WiFi/Bluetooth support */
 #endif /* USE_NET */
@@ -1150,6 +1171,60 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       net_bt_set_power(net_cfg.flags.bt_nsd_enabled);
 #endif /* USE_NET */
       break;
+#if defined(USE_USB_NET)
+    case NSD_ENABLE:
+      usCFG("NSD_ENABLE: %u\n", buffer[1]);
+      if (buffer[1] <= 1) net_cfg.flags.nsd_enabled = (bool)buffer[1];
+      /* Doesn't require WIFI_APPLY to have been sent first */
+      net_usb_apply_nsd();
+      break;
+    case DISCOVERY_ENABLE:
+      usCFG("DISCOVERY_ENABLE: %u\n", buffer[1]);
+      if (buffer[1] <= 1) net_cfg.flags.discovery_enabled = (bool)buffer[1];
+      /* Doesn't require WIFI_APPLY to have been sent first */
+      net_usb_apply_nsd();
+      break;
+    case NSD_SET_PORT:
+      usCFG("NSD_SET_PORT\n");
+      net_cfg.nsd_port = (uint16_t)((buffer[1] << 8) | buffer[2]);
+      break; /* Applied by WIFI_APPLY */
+    case USBNET_IP_MODE:
+      usCFG("USBNET_IP_MODE: %u\n", buffer[1]);
+      if (buffer[1] <= USBNET_IP_MODE_DHCP_SERVER) {
+        net_cfg.flags.usbnet_ip_mode = buffer[1];
+      }
+      break; /* Applied by WIFI_APPLY */
+    case USBNET_SET_STATIC:
+      usCFG("USBNET_SET_STATIC\n");
+      if (size < 13) {
+        usUNET("USBNET_SET_STATIC needs 12 address bytes, got %u\n", (unsigned)(size > 0 ? size - 1 : 0));
+        break;
+      }
+      memcpy(net_cfg.usbnet_ip, &buffer[1], 4);
+      memcpy(net_cfg.usbnet_netmask, &buffer[5], 4);
+      memcpy(net_cfg.usbnet_gateway, &buffer[9], 4);
+      break; /* Applied by WIFI_APPLY */
+    case USBNET_READ_IPCFG:
+      usCFG("USBNET_READ_IPCFG\n");
+      memset(write_buffer_p, 0, 64);
+      write_buffer_p[0] = net_cfg.flags.usbnet_ip_mode;
+      memcpy(&write_buffer_p[1], net_cfg.usbnet_ip, 4);
+      memcpy(&write_buffer_p[5], net_cfg.usbnet_netmask, 4);
+      memcpy(&write_buffer_p[9], net_cfg.usbnet_gateway, 4);
+      write_back_data(13);
+      break;
+    case WIFI_APPLY:
+      usCFG("WIFI_APPLY\n");
+      save_net_config(&net_cfg);
+      net_usb_apply();
+      break;
+    case WIFI_FORGET:
+      usCFG("WIFI_FORGET\n");
+      default_net_config(&net_cfg);
+      save_net_config(&net_cfg);
+      net_usb_apply();
+      break;
+#endif /* USE_USB_NET */
     case SET_CLOCK:         /* Change SID clock frequency by array id */
       usCFG("SET_CLOCK\n");
       /* locked clockrate check is done in apply_clockrate */

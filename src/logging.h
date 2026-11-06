@@ -165,6 +165,12 @@ do {                   \
 #define usNSD(...) ((void)0)
 #endif
 
+#ifdef USE_USB_NET
+#define usUNET(fmt, ...) __DBG("[UNET] " fmt __VA_OPT__(,) __VA_ARGS__)
+#else
+#define usUNET(...) ((void)0)
+#endif
+
 
 /* Global logging queue */
 #ifdef WRITE_DEBUG

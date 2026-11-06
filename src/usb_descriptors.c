@@ -37,6 +37,9 @@
 #include "tusb.h"
 
 #include <globals.h>
+#if defined(USE_USB_NET)
+#include <net_usb.h>
+#endif
 
 
 /* MCU */
@@ -65,8 +68,11 @@ tusb_desc_device_t const desc_device =
     .idVendor           = USB_VID,
     .idProduct          = USB_PID,
     /* Needs a bump when Vendor itf number changes due to Windows registry caching:
-       0x0100 = layout without the SID stream itf 7, 0x0101 = with it (USE_SID_STREAM) */
-#if defined(USE_SID_STREAM)
+       0x0100 = layout without SID stream itf 7, 0x0101 = with (USE_SID_STREAM),
+       0x0102 = with CDC-NCM network itf pair (USE_USB_NET, stream on or off) */
+#if defined(USE_USB_NET)
+    .bcdDevice          = 0x0102,  /* Device release number in binary-coded decimal */
+#elif defined(USE_SID_STREAM)
     .bcdDevice          = 0x0101,  /* Device release number in binary-coded decimal */
 #else
     .bcdDevice          = 0x0100,  /* Device release number in binary-coded decimal */
@@ -106,6 +112,10 @@ enum
   ITF_NUM_CDC_3,      /* USB UART */
   ITF_NUM_CDC_DATA_3, /* USB UART */
 #endif
+#if defined(USE_USB_NET)
+  ITF_NUM_NCM,        /* CDC-NCM -> USB network, always last */
+  ITF_NUM_NCM_DATA,   /* CDC-NCM data */
+#endif
   ITF_NUM_TOTAL
 };
 
@@ -129,11 +139,19 @@ enum
 #define EPNUM_CDC3_OUT    0x09 /* USB UART */
 #define EPNUM_CDC3_IN     0x89 /* USB UART */
 #endif
+#if defined(USE_USB_NET)
+#define EPNUM_NCM_NOTIF   0x8A /* USB network notification */
+#define EPNUM_NCM_OUT     0x0B /* USB network */
+#define EPNUM_NCM_IN      0x8B /* USB network */
+#endif
 
 #define USBD_CDC_CMD_MAX_SIZE         8
 #define USBD_CDC_IN_OUT_MAX_SIZE     64
 #define USBD_MIDI_IN_OUT_MAX_SIZE    64
 #define USBD_VENDOR_IN_OUT_MAX_SIZE  64
+#if defined(USE_USB_NET)
+#define USBD_NCM_NOTIF_MAX_SIZE      64
+#endif
 
 #if defined(USE_SID_STREAM)
 #define STREAM_DESC_LEN TUD_VENDOR_DESC_LEN
@@ -145,6 +163,11 @@ enum
 #else
 #define CDC3_DESC_LEN 0
 #endif
+#if defined(USE_USB_NET)
+#define NCM_DESC_LEN TUD_CDC_NCM_DESC_LEN
+#else
+#define NCM_DESC_LEN 0
+#endif
 #define CONFIG_TOTAL_LEN ( \
   TUD_CONFIG_DESC_LEN +    \
   TUD_CDC_DESC_LEN +       \
@@ -152,7 +175,8 @@ enum
   TUD_VENDOR_DESC_LEN +    \
   TUD_CDC_DESC_LEN +       \
   STREAM_DESC_LEN +        \
-  CDC3_DESC_LEN)
+  CDC3_DESC_LEN +          \
+  NCM_DESC_LEN)
 
 /* String descriptor indexes after the WebSerial CDC (7) */
 #if defined(USE_SID_STREAM)
@@ -160,6 +184,17 @@ enum
 #define STRID_CDC_3    9
 #else
 #define STRID_CDC_3    8
+#endif
+#if defined(USE_USB_NET)
+/* NCM strings follow the last existing string index */
+#if defined(USB_PRINTF)
+#define STRID_NCM      (STRID_CDC_3 + 1)
+#elif defined(USE_SID_STREAM)
+#define STRID_NCM      (STRID_VENDOR_2 + 1)
+#else
+#define STRID_NCM      8
+#endif
+#define STRID_NCM_MAC  (STRID_NCM + 1)
 #endif
 
 
@@ -190,6 +225,11 @@ uint8_t const desc_fs_configuration[] =
   // Interface number, string index, EP notification address and size, EP data address (out, in) and size.
   TUD_CDC_DESCRIPTOR(ITF_NUM_CDC_3, STRID_CDC_3, EPNUM_CDC3_NOTIF, USBD_CDC_CMD_MAX_SIZE, EPNUM_CDC3_OUT, EPNUM_CDC3_IN, USBD_CDC_IN_OUT_MAX_SIZE),
 #endif
+
+#if defined(USE_USB_NET)
+  // Interface number, string index, MAC string index, EP notification address and size, EP data address (out, in), size, max segment size.
+  TUD_CDC_NCM_DESCRIPTOR(ITF_NUM_NCM, STRID_NCM, STRID_NCM_MAC, EPNUM_NCM_NOTIF, USBD_NCM_NOTIF_MAX_SIZE, EPNUM_NCM_OUT, EPNUM_NCM_IN, CFG_TUD_NET_ENDPOINT_SIZE, CFG_TUD_NET_MTU),
+#endif
 };
 
 /* Some Microsoft mumbo jumbo 🪄 */
@@ -200,7 +240,12 @@ uint8_t const desc_fs_configuration[] =
 #else
 #define MS_OS_20_FUNC_SUBSETS     1  /* WebUSB */
 #endif
-#define MS_OS_20_DESC_LEN         (0x0A + 0x08 + (MS_OS_20_FUNC_SUBSETS * MS_OS_20_FUNC_SUBSET_LEN))
+#if defined(USE_USB_NET)
+#define MS_OS_20_NCM_SUBSET_LEN   (0x08 + 0x14)  /* Function header + WINNCM compatible ID */
+#else
+#define MS_OS_20_NCM_SUBSET_LEN   0
+#endif
+#define MS_OS_20_DESC_LEN         (0x0A + 0x08 + (MS_OS_20_FUNC_SUBSETS * MS_OS_20_FUNC_SUBSET_LEN) + MS_OS_20_NCM_SUBSET_LEN)
 #define BOS_TOTAL_LEN             (TUD_BOS_DESC_LEN + TUD_BOS_WEBUSB_DESC_LEN + TUD_BOS_MICROSOFT_OS_DESC_LEN)
 
 /* BOS Descriptor is required for WebUSB */
@@ -276,6 +321,18 @@ uint8_t const desc_ms_os_20[] =
   '9', 0x00, '7', 0x00, '2', 0x00, 'B', 0x00, '-', 0x00, '3', 0x00, 'A', 0x00, '2', 0x00, 'E', 0x00, '5', 0x00,
   '8', 0x00, '0', 0x00, 'F', 0x00, '1', 0x00, '7', 0x00, 'B', 0x00, '5', 0x00, '}', 0x00, 0x00, 0x00, 0x00, 0x00
 #endif /* USE_SID_STREAM */
+#if defined(USE_USB_NET)
+#if defined(USE_SID_STREAM)
+  ,
+#endif
+  /* Function subset NCM: USB network interface, Windows inbox WINNCM driver */
+  // Function Subset header: length, type, first interface, reserved, subset length
+  U16_TO_U8S_LE(0x0008), U16_TO_U8S_LE(MS_OS_20_SUBSET_HEADER_FUNCTION), ITF_NUM_NCM, 0, U16_TO_U8S_LE(MS_OS_20_NCM_SUBSET_LEN),
+
+  // MS OS 2.0 Compatible ID descriptor: length, type, compatible ID, sub compatible ID
+  U16_TO_U8S_LE(0x0014), U16_TO_U8S_LE(MS_OS_20_FEATURE_COMPATBLE_ID), 'W', 'I', 'N', 'N', 'C', 'M', 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  // sub-compatible
+#endif /* USE_USB_NET */
 };
 
 TU_VERIFY_STATIC(sizeof(desc_ms_os_20) == MS_OS_20_DESC_LEN, "Incorrect size");
@@ -284,6 +341,27 @@ TU_VERIFY_STATIC(ITF_NUM_VENDOR == WUSB_ITF_NUM, "WUSB_ITF_NUM out of sync");
 #if defined(USE_SID_STREAM)
 TU_VERIFY_STATIC(ITF_NUM_VENDOR_2 == STREAM_ITF_NUM, "STREAM_ITF_NUM out of sync");
 #endif
+#if defined(USE_USB_NET)
+/* NCM pair is appended last, existing interfaces keep their numbers */
+#if defined(USE_SID_STREAM) && defined(USB_PRINTF)
+#define ITF_NUM_NCM_EXPECTED 10
+#elif defined(USB_PRINTF)
+#define ITF_NUM_NCM_EXPECTED 9
+#elif defined(USE_SID_STREAM)
+#define ITF_NUM_NCM_EXPECTED 8
+#else
+#define ITF_NUM_NCM_EXPECTED 7
+#endif
+TU_VERIFY_STATIC(ITF_NUM_CDC_2 == 5, "CDC2 itf number moved");
+TU_VERIFY_STATIC(ITF_NUM_NCM == ITF_NUM_NCM_EXPECTED, "NCM itf number out of sync");
+TU_VERIFY_STATIC(ITF_NUM_NCM_DATA == ITF_NUM_NCM + 1, "NCM data itf must follow NCM itf");
+TU_VERIFY_STATIC(ITF_NUM_NCM_DATA + 1 == ITF_NUM_TOTAL, "NCM itf pair must be last");
+#if defined(USE_SID_STREAM)
+TU_VERIFY_STATIC(MS_OS_20_DESC_LEN == 366, "MS OS 2.0 length out of sync");
+#else
+TU_VERIFY_STATIC(MS_OS_20_DESC_LEN == 206, "MS OS 2.0 length out of sync");
+#endif
+#endif /* USE_USB_NET */
 
 extern uint8_t const desc_ms_os_20[];
 
@@ -331,11 +409,17 @@ static const char * const string_desc_arr[] =
 #if defined(USB_PRINTF)
     "USBSID-Pico USB Uart",      // STRID_CDC_3: CDC Interface
 #endif
+#if defined(USE_USB_NET)
+    "USBSID-Pico NSD Net",       // STRID_NCM: CDC-NCM Interface
+    "USES-NCM-MAC",              // STRID_NCM_MAC: MAC address, uses tud_network_mac_address
+#endif
 };
 
 /* automatically update if an additional string is later added to the table */
 #define STRING_DESC_ARR_ELEMENT_COUNT (sizeof(string_desc_arr)/sizeof(string_desc_arr[0]))
-#if defined(USB_PRINTF)
+#if defined(USE_USB_NET)
+#define STRID_COUNT (STRID_NCM_MAC + 1)
+#elif defined(USB_PRINTF)
 #define STRID_COUNT (STRID_CDC_3 + 1)
 #elif defined(USE_SID_STREAM)
 #define STRID_COUNT (STRID_VENDOR_2 + 1)
@@ -361,9 +445,10 @@ static uint16_t _desc_str[MAXIMUM_DESCRIPTOR_STRING_ELEMENT_COUNT];
  *
  * Index 0 returns the supported language id. Index 3 is special-cased to
  * build the USB serial number from the 64-bit MCU unique id, encoded as 16
- * hex nibbles. Any other in-range index is looked up in `string_desc_arr`
- * and converted from ASCII to UTF-16 (capped at
- * `MAXIMUM_DESCRIPTOR_STRING_ELEMENT_COUNT - 1` characters). Out-of-range
+ * hex nibbles. With USE_USB_NET, index `STRID_NCM_MAC` returns
+ * `tud_network_mac_address` as 12 hex nibbles. Any other in-range index is
+ * looked up in `string_desc_arr` and converted from ASCII to UTF-16 (capped
+ * at `MAXIMUM_DESCRIPTOR_STRING_ELEMENT_COUNT - 1` characters). Out-of-range
  * indices return NULL.
  *
  * @note the returned buffer (`_desc_str`) is static and reused. The caller
@@ -394,6 +479,20 @@ uint16_t const* tud_descriptor_string_cb(uint8_t index, uint16_t langid)
       _desc_str[16-t] = nibble < 10 ? '0' + nibble : 'A' + nibble - 10;
     }
     chr_count = 16;
+#if defined(USE_USB_NET)
+  } else if ( index == STRID_NCM_MAC ) { // special-case for NCM MAC address
+    //  1x  uint16_t for length/type
+    // 12x  uint16_t to encode 48-bit MAC as hex (12x nibbles)
+    static_assert(MAXIMUM_DESCRIPTOR_STRING_ELEMENT_COUNT >= 13);
+    net_usb_mac_setup();
+    for ( uint_fast8_t t = 0; t < 6; t++ ) {
+      uint8_t hi = (tud_network_mac_address[t] >> 4) & 0xF;
+      uint8_t lo = tud_network_mac_address[t] & 0xF;
+      _desc_str[1+(t*2)] = hi < 10 ? '0' + hi : 'A' + hi - 10;
+      _desc_str[2+(t*2)] = lo < 10 ? '0' + lo : 'A' + lo - 10;
+    }
+    chr_count = 12;
+#endif
   } else if ( index >= STRING_DESC_ARR_ELEMENT_COUNT ) { // if not in table, return NULL
     return NULL;
   } else

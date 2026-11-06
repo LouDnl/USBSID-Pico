@@ -31,7 +31,9 @@
   extern "C" {
 #endif
 
+#ifdef USE_NET
 #include <net_wifi.h>
+#endif /* USE_NET */
 
 
 void default_net_config(NetConfig* config);

@@ -135,8 +135,35 @@ typedef struct NetConfig {
     bool nsd_enabled       : 1;
     bool bt_nsd_enabled    : 1;
     bool discovery_enabled : 1;
+    uint8_t usbnet_ip_mode : 2;  /* USB net only: USBNET_IP_MODE_* */
   } flags;
+#if defined(USE_USB_NET)
+  /* USB net static mode addresses, dotted order, 0.0.0.0 = unset */
+  uint8_t usbnet_ip[4];
+  uint8_t usbnet_netmask[4];
+  uint8_t usbnet_gateway[4];  /* 0.0.0.0 = no gateway */
+#endif /* USE_USB_NET */
 } NetConfig;
+
+/* NetConfig.flags.usbnet_ip_mode values.
+ * DHCP server (factory default): board 192.168.65.1/24, serves USB link only
+ * DHCP broadcasts never cross host routing or proxy ARP.
+ * DHCP client: needs a host bridge from USB link to LAN.
+ * Static: needs host routing, proxy ARP or a bridge.
+ * Do not bridge the USB network interface into a LAN that has its own DHCP
+ * server while in DHCP server mode. */
+enum {
+  USBNET_IP_MODE_DHCP_CLIENT = 0,  /* Lease from a LAN DHCP server via host bridge */
+  USBNET_IP_MODE_STATIC      = 1,  /* usbnet_ip / usbnet_netmask / usbnet_gateway */
+  USBNET_IP_MODE_DHCP_SERVER = 2,  /* Factory default, serves the USB link only */
+};
+
+/* Factory default IP mode, 0 on builds without USB net (flags byte unchanged) */
+#if defined(USE_USB_NET)
+#define USBNET_IP_MODE_DEFAULT USBNET_IP_MODE_DHCP_SERVER
+#else
+#define USBNET_IP_MODE_DEFAULT USBNET_IP_MODE_DHCP_CLIENT
+#endif
 
 #define NETCONFIG_DEFAULT_INIT { \
   .magic = MAGIC_SMOKE, \
@@ -151,6 +178,7 @@ typedef struct NetConfig {
     .nsd_enabled = true, \
     .bt_nsd_enabled = false, \
     .discovery_enabled = true, \
+    .usbnet_ip_mode = USBNET_IP_MODE_DEFAULT, \
   }, \
 }
 
@@ -416,7 +444,8 @@ enum
   RESET_MIDI_STATE = 0x63,
 
   /* Network SID Device (WiFi/Bluetooth) provisioning. Only meaningfully
-   * handled when USE_NET is compiled in.
+   * handled when USE_NET is compiled in. USE_USB_NET handles NSD,
+   * discovery, apply, forget and USBNET_* subset.
    * pico/pico2 build replies ERROR (see handle_config_request()). */
   WIFI_STATUS      = 0x70,  /* Returns {link_up, session_active} */
   WIFI_SET_SSID    = 0x71,  /* buffer[1] = length, buffer[2..] = SSID bytes */
@@ -431,6 +460,9 @@ enum
   READ_NETCFG      = 0x7A,  /* Read net config as bytes */
   WIFI_READ_IP     = 0x7B,  /* Returns {state, ip0, ip1, ip2, ip3}, every build */
   DISCOVERY_ENABLE = 0x7C,  /* buffer[1] = 0/1, applied live, persisted by WIFI_APPLY */
+  USBNET_IP_MODE   = 0x7D,  /* buffer[1] = USBNET_IP_MODE_*, USB net only, persisted by WIFI_APPLY */
+  USBNET_SET_STATIC= 0x7E,  /* buffer[1..4] ip, [5..8] netmask, [9..12] gateway, USB net only, persisted by WIFI_APPLY */
+  USBNET_READ_IPCFG= 0x7F,  /* Returns {mode, ip[4], netmask[4], gateway[4]}, USB net only */
 
   USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
   US_PCB_VERSION   = 0x81,  /* Read PCB version */
