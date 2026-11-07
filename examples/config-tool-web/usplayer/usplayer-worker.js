@@ -137,7 +137,7 @@ function snapshot() {
  * The remainder of audioOwed is requested again on the following report
  */
 function audioFill() {
-  if (!audioMode || player === null || audioFilling || !clockPort) return 0;
+  if (!audioMode || player === null || audioFilling || !clockPort || !player._running) return 0;
   audioFilling = true;
   let steps = 0;
   try {

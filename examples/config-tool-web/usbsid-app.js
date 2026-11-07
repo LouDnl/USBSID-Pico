@@ -819,15 +819,19 @@ function _loadTune(subtune, timeout, file, callback, song) {
   /* usbsidLog(subtune, timeout, file, callback); */
   /* song counts from one and is only for the usplayer adapter: song 1 has no
    * spelling in subtune, where 0 is the default song of the tune */
-  p.load(subtune, timeout, file, callback, song);
+  const done = p.load(subtune, timeout, file, callback, song);
   /* A load in usplayer-serial mode may have opened the port itself, in which
    * case nothing else has told the UI. See syncSerialUi(). */
   syncSerialUi();
+  return done;
 }
 
 /* Core load - url must be a full URL (blob: or http:) */
 async function doLoadSID(url, displayName, subtune, lengths) {
   if (loadRefused()) return;
+  /* Same URL again: the bytes are held, restart without a fetch. Read before
+   * _currentFile is overwritten. */
+  const sameUrl = !!(_currentFile && _currentFile.url === url && _loadedBytes);
   _currentFile    = { url, name: displayName };
   _currentSubtune = subtune != null ? subtune : 1;
   /* Song lengths, if the caller has them. A tune out of the served library
@@ -852,9 +856,11 @@ async function doLoadSID(url, displayName, subtune, lengths) {
     setNowPlayingName(displayName);
     usbsidSetStatus('Fetching: ' + displayName + '\u2026');
     try {
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      _loadedBytes = new Uint8Array(await resp.arrayBuffer());
+      if (!sameUrl) {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        _loadedBytes = new Uint8Array(await resp.arrayBuffer());
+      }
     } catch (e) {
       usbsidSetStatus('Fetch failed: ' + e.message, 'red');
       usbsidLog('sendsid fetch error:', e);
@@ -888,12 +894,11 @@ async function doLoadSID(url, displayName, subtune, lengths) {
   usbsidSetStatus('Loading: ' + displayName);
 
   p.setVolume(userVolume());
-  /* p.load(_currentSubtune, 1000, url, null); */
-  _loadTune(_currentSubtune, 1000, url, null);
   webusbplaying = true;
-
-  /* Give the player time to parse the file headers */
-  setTimeout(() => {
+  /* Runs when the load finished: the tune's own info, driver address and play
+   * state exist only then. A failed or superseded load never calls it. */
+  const afterLoad = () => {
+    if (gen !== _loadGen) return;
     try {
       const info = p.getSongInfo();
       _maxSubtunes = Math.max(1, (info.maxSubsong || 0) + 1);
@@ -907,9 +912,8 @@ async function doLoadSID(url, displayName, subtune, lengths) {
       usbsidSetStatus('Playing: ' + displayName, 'green');
     } catch (_) {}
     setPlayerButtons(true);
-    /* Only the newest load may declare itself playing. A slower earlier fetch
-     * landing after a later one must not take the counter back. */
-    if (gen === _loadGen) _loading = false;
+    updatePlayButton(p);
+    _loading = false;
     updatePlaytimeDisplay();
     /* Not awaited: see resolveSongLengths(). A tune out of the library arrived
      * with its lengths already and needs nothing here. */
@@ -917,7 +921,12 @@ async function doLoadSID(url, displayName, subtune, lengths) {
     /* Unconditional, unlike the lengths: nothing arrives with its STIL notes
      * already, and the lookup needs only the MD5 the player just computed. */
     resolveStil();
-  }, 100);
+  };
+  const done = _loadTune(_currentSubtune, 1000, url, afterLoad);
+  /* A failed load never calls afterLoad, release the loading flag anyway */
+  Promise.resolve(done).then(() => {
+    if (gen === _loadGen && _loading) { _loading = false; updatePlaytimeDisplay(); }
+  });
 }
 
 /* Load from local <input type=file> - wraps binary in a Blob URL */
@@ -979,7 +988,8 @@ async function playPause() {
         p.play();
       } else {
         // p.load(_currentSubtune, 1000, _currentFile.url, null);
-        _loadTune(_currentSubtune, 1000, _currentFile.url, null);
+        _loadTune(_currentSubtune, 1000, _currentFile.url,
+                  () => updatePlayButton(p));
       }
       webusbplaying = true;
       syncSerialUi();   /* the resume path too, see syncSerialUi() */
@@ -1038,7 +1048,7 @@ async function prevSubtune() {
     if (!p) return;
     if (p && _currentFile) {
       // p.load(_currentSubtune, 1000, _currentFile.url, null);
-      _loadTune(_currentSubtune, 1000, _currentFile.url, null,
+      _loadTune(_currentSubtune, 1000, _currentFile.url, () => updatePlayButton(p),
                 _currentSubtune === 1 ? 1 : undefined);
       p.setVolume(userVolume());
     }
@@ -1067,7 +1077,7 @@ async function nextSubtune() {
     if (!p) return;
     if (p && _currentFile) {
       // p.load(_currentSubtune, 1000, _currentFile.url, null);
-      _loadTune(_currentSubtune, 1000, _currentFile.url, null);
+      _loadTune(_currentSubtune, 1000, _currentFile.url, () => updatePlayButton(p));
       p.setVolume(userVolume());
     }
     updateSubtuneDisplay();

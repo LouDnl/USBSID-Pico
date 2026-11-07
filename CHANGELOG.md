@@ -56,6 +56,7 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 * Add build gated CDC-NCM firmware feature for testing NSD over USB on non WiFi capable Pico boards
 * Add config panels over Web Serial to the web config tool
 * Fix case fallthrough in embedded player config commands and remove misplaced boolean
+* Fix PSIDdrv value, play button state and refetch in the web player
 
 #### Version: 0.8.0
 * Add full MIDI implementation overhaul

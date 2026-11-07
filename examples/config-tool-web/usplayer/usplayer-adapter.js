@@ -795,9 +795,12 @@ export class USPlayerAdapter {
       if (typeof this._audio.flush === 'function') this._audio.flush();
     }
     try {
-      const bytes = await this._fetch(url);
+      /* Same URL as the loaded tune: restart from the held bytes, no fetch */
+      const bytes = (this._bytes && this._bytesUrl === url) ? this._bytes
+                                                            : await this._fetch(url);
       if (stale()) return;
       this._bytes = bytes;
+      this._bytesUrl = url;
 
       const sid = isSidHeader(bytes) && !/\.(prg|p00)(\?|$)/i.test(url);
       const nsids = sid ? countSids(bytes) : 1;
@@ -893,9 +896,11 @@ export class USPlayerAdapter {
           }
           if (stale()) return;
           const copy = bytes.slice();
-          await this._call('loadSID',
-                           { bytes: copy.buffer, subtune: subtune || 0, song: song || 0 },
-                           [copy.buffer]);
+          const r = await this._call('loadSID',
+                                     { bytes: copy.buffer, subtune: subtune || 0, song: song || 0 },
+                                     [copy.buffer]);
+          /* Fresh timing and driver address of the new tune, ahead of the following state post */
+          if (r && r.info) this._snap = r.info;
           if (stale()) return;
           await this._call('audioConfigure', {
             chips: nsids,
