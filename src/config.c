@@ -1728,13 +1728,13 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       usCFG("Subtune %d\n", tuneno);
       unmute_sid(); /* Must unmute before play start or some tunes will be silent */
       sidplayer_init = true;
+      break;
     case SID_PLAYER_START:
       usCFG("SID_PLAYER_START %d\n", sidplayer_init);
       if (sidplayer_init) {
         offload_ledrunner = true;
         sidplayer_start = true;
       }
-      sidplayer_init = false;
       break;
     case SID_PLAYER_STOP:
       usCFG("SID_PLAYER_STOP\n");
