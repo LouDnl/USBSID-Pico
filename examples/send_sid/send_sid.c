@@ -51,30 +51,6 @@ extern uint32_t find_songlenth_db(bool is_sid, int tune_no, const char * filenam
 
 
 enum {
-  /* Command bytes */
-  PACKET_TYPE      = 0xC0,  /* 0b11000000 ~ 192  */
-  CONFIG           = 0x12,  /*    0b10010 ~ 0x12 */
-
-  /* Internal SID player upload */
-  UPLOAD_SID_START    = 0xD0,  /* Start command for USBSID to go into receiving mode */
-  UPLOAD_SID_DATA     = 0xD1,  /* Init byte for each packet containing data */
-  UPLOAD_SID_END      = 0xD2,  /* End command for USBSID to exit receiving mode */
-  UPLOAD_SID_SIZE     = 0xD3,  /* Packet containing the actual file size */
-  UPLOAD_SID_PLAYTIME = 0xD4,  /* Provide max playtime for current tune, will run 5 minutes otherwise */
-
-  /* Internal SID player control */
-  SID_PLAYER_LOAD  = 0xE0,  /* Load SID file into SID player memory and initialize internal SID player */
-  SID_PLAYER_START = 0xE1,  /* Start SID file play */
-  SID_PLAYER_STOP  = 0xE2,  /* Stop SID file play */
-  SID_PLAYER_PAUSE = 0xE3,  /* Pause/Unpause SID file play */
-  SID_PLAYER_NEXT  = 0xE4,  /* Next SID subtune play */
-  SID_PLAYER_PREV  = 0xE5,  /* Previous SID subtune play */
-  SID_PLAYER_TWO   = 0xE6,  /* Force play to play on socket two or sid two */
-
-  SID_PLAYER_MUTE  = 0xE9,  /* Full mute, mute a voice or just one chip/SID */
-  SID_PLAYER_MUTED = 0xEA,  /* Read a the muted state */
-  SID_PLAYER_TIME  = 0xEB,  /* Read play time of current track */
-
   FROM_STDIN       = 0x00,  /* Read data from stdin */
   SID_FILE         = 0x01,  /* File is SID */
   PRG_FILE         = 0x02,  /* File is PRG */
@@ -413,10 +389,7 @@ void print_help(void)
 int main(int argc, char* argv[])
 {
   int result = EXIT_FAILURE;
-  int arg;
   FILE* input_f = NULL;
-  const char* filename = NULL;
-  const char* name = "data";
 
   /* Board selection, removed from argv to keep it out of the file and option parsers */
   const char *board = NULL;
