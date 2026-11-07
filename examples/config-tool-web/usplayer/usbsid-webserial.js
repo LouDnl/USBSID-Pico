@@ -58,7 +58,7 @@ const USBSID_VID = 0xcafe;
 const USBSID_PID = 0x4011;
 
 /* Required by the API, ignored over USB CDC */
-const BAUD_RATE = 115200;
+export const BAUD_RATE = 115200;
 
 /* Narrow the port picker to USBSID-Pico ids, set true only if getInfo() reports them
  * False since a port without reported ids matches nothing and the picker then says
@@ -171,6 +171,9 @@ export class USBSIDWebSerialTransport {
     this._rx = new Uint8Array(0);
     this._rxWaiters = [];
 
+    /* Tail of the config exchange chain, one question in flight at a time */
+    this._cfgChain = Promise.resolve();
+
     this.resetUsbStats();
   }
 
@@ -219,6 +222,38 @@ export class USBSIDWebSerialTransport {
     return this._openPort();
   }
 
+  /* Open any granted port that answers as a USBSID-Pico, no picker
+   * A board exposes several CDC ports with one VID/PID and a replugged board gives new
+   * SerialPort objects: scan every match, keep the first that passes the probe
+   * Force the probe: a UART instance opens fine and never answers
+   * Return false when nothing granted answers, _port stays null for a later scan */
+  async connectGrantedAny() {
+    if (this._open) return true;
+    if (this._adopted) return this._openPort();
+    if (!webSerialAvailable()) return false;
+    /* Drop a dead port object from an earlier session */
+    if (this._port) await this._teardown();
+    this._port = null;
+    let ports = [];
+    try { ports = await navigator.serial.getPorts(); } catch (_) { ports = []; }
+    const probeWas = this._probeOnConnect;
+    this._probeOnConnect = true;
+    try {
+      for (const p of ports) {
+        const i = p.getInfo ? p.getInfo() : null;
+        if (!i || i.usbVendorId !== USBSID_VID || i.usbProductId !== USBSID_PID) continue;
+        this._port = p;
+        if (await this._openPort()) return true;
+        this._port = null;
+      }
+    } finally {
+      this._probeOnConnect = probeWas;
+    }
+    this._port = null;
+    if (!this.lastError) this.lastError = 'no granted port answered as a USBSID-Pico';
+    return false;
+  }
+
   async _openPort() {
     try {
       if (!this._adopted) {
@@ -237,6 +272,9 @@ export class USBSIDWebSerialTransport {
       await this._teardown();
       return false;
     }
+
+    /* Bytes left from an earlier session must not pass as the first reply */
+    await this._discardInput(50, 300);
 
     /* Without a picker filter any serial port can be chosen and the board has other CDC
      * interfaces (USB UART). Refusing a port that does not answer gives a clear message
@@ -387,17 +425,82 @@ export class USBSIDWebSerialTransport {
    */
   async _configRead(sub, len = 12) {
     if (!this._open) return null;
+    /* Socket buffer is 12 bytes, single value replies are 1. Wait for the larger
+     * and settle for what arrived when the wait runs out */
+    const frame = new Uint8Array(SLOT);
+    frame[0] = CFG_CMD;
+    frame[1] = sub & 0xFF;
+    return this._cfgRun(() => this._cfgExchange(frame, len, REPLY_TIMEOUT_MS));
+  }
+
+  /**
+   * Send one config frame and read the reply
+   * @param frame      command bytes (byte 0 0xD2, byte 1 sub, then args), zero padded to 64
+   * @param replyLen   >0 exact bytes wanted, 0 fire and forget (null), <0 unknown length
+   *                   (returns once 30 ms pass without new bytes after the first)
+   * @param timeoutMs  partial bytes are returned when it runs out, null when none arrived
+   * Requests are serialised with _configRead, a late reply never reaches a later caller
+   */
+  async configRequest(frame, replyLen, timeoutMs = 250) {
+    const src = (frame instanceof Uint8Array) ? frame : Uint8Array.from(frame);
+    if (src.length > SLOT) throw new Error('config frame longer than ' + SLOT + ' bytes');
+    const pkt = new Uint8Array(SLOT);
+    pkt.set(src, 0);
+    return this._cfgRun(() => this._cfgExchange(pkt, replyLen, timeoutMs));
+  }
+
+  /* Run fn after every earlier exchange settled, a failure leaves the chain usable */
+  _cfgRun(fn) {
+    const p = this._cfgChain.then(fn);
+    this._cfgChain = p.then(() => {}, () => {});
+    return p;
+  }
+
+  async _cfgExchange(pkt, replyLen, timeoutMs) {
+    if (!this._open) return null;
+    /* Pending SID writes go first, the frame then leaves as its own 64 byte write */
     this._flushBatch();
     /* Discard stale bytes, a late reply to a previous question must not pass as this answer */
     this._rx = new Uint8Array(0);
-    this._queueCommand(new Uint8Array([CFG_CMD, sub, 0, 0, 0, 0]));
+    this._queueCommand(pkt);
     this._flushBatch();
+    if (replyLen === 0) return null;
     try {
-      /* Socket buffer is 12 bytes, single value replies are 1. Wait for the larger
-       * and settle for what arrived when the wait runs out */
-      return await this._expect(len, REPLY_TIMEOUT_MS, 1);
+      if (replyLen > 0) return await this._expect(replyLen, timeoutMs, 1);
+      return await this._collectQuiet(timeoutMs, 30);
     } catch (_) {
       return null;
+    }
+  }
+
+  /* Bytes until quietMs pass without news after the first byte, null when none by timeoutMs */
+  async _collectQuiet(timeoutMs, quietMs) {
+    const t0 = Date.now();
+    let last = 0;
+    let len = 0;
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 5));
+      if (!this._open) break;
+      const now = Date.now();
+      if (this._rx.length !== len) { len = this._rx.length; last = now; }
+      if (len > 0 && now - last >= quietMs) break;
+      if (now - t0 >= timeoutMs) break;
+    }
+    if (this._rx.length === 0) return null;
+    const out = this._rx.slice(0, this._rx.length);
+    this._rx = new Uint8Array(0);
+    return out;
+  }
+
+  /* Drop incoming bytes until quietMs pass without any, give up after capMs */
+  async _discardInput(quietMs, capMs) {
+    const t0 = Date.now();
+    let last = t0;
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 10));
+      const now = Date.now();
+      if (this._rx.length > 0) { this._rx = new Uint8Array(0); last = now; }
+      if (now - last >= quietMs || now - t0 >= capMs) break;
     }
   }
 

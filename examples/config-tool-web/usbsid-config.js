@@ -420,8 +420,12 @@ const configButtonMap = {
   },
   'btn-save-reboot':       async () => {
     await usbsidDevice.saveConfig();
+    if (usbsidDevice.isSerial) {   /* serial retry reconnects and reloads the config */
+      usbsidSetStatus('Config saved, rebooting... (reconnects over Web Serial)');
+      return;
+    }
     usbsidSetStatus('Config saved, rebooting\u2026');
-    setTimeout(() => window.location.reload(), 3000);
+    setTimeout(() => (typeof reloadToCurrentTab === 'function' ? reloadToCurrentTab() : window.location.reload()), 3000);
   },
   'btn-reset-config':      async () => {
     await usbsidDevice.resetConfig();
@@ -461,14 +465,19 @@ const debugButtonMap = {
   'btn-debug-reset-sids':    async () => { await usbsidDevice.resetSID();      usbsidSetStatus('SIDs reset'); },
   'btn-debug-reset-mcu':     async () => {
     await usbsidDevice.resetMCU();
+    if (usbsidDevice.isSerial) {   /* serial retry reconnects and reloads the config */
+      usbsidSetStatus('MCU resetting... (reconnects over Web Serial)');
+      return;
+    }
     usbsidSetStatus('MCU resetting\u2026');
-    setTimeout(() => window.location.reload(), 3000);
+    setTimeout(() => (typeof reloadToCurrentTab === 'function' ? reloadToCurrentTab() : window.location.reload()), 3000);
   },
   'btn-debug-bootloader': async () => {
     const CC = (3 << 6) | 18;
+    if (typeof noteBootloaderSent === 'function') noteBootloaderSent();   /* BOOTSEL: no CDC to re-open */
     await usbsidDevice.write([CC, BOOTLOADER, 0, 0, 0, 0]);
     usbsidSetStatus('Entering bootloader\u2026');
-    setTimeout(() => window.location.reload(), 3000);
+    setTimeout(() => (typeof reloadToCurrentTab === 'function' ? reloadToCurrentTab() : window.location.reload()), 3000);
   },
 };
 

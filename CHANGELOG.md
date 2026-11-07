@@ -1,6 +1,7 @@
 # Changelog
 Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on version changes
 
+#### Version: Unreleased
 * Fix toggle mono/stereo causing a playing freeze
 * Add ffwd for the onboard player
 * Remove reset SID when already resetting SID registers before the call
@@ -53,6 +54,7 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 * Fix read-only config queries claiming the SID bus and never releasing it
 * Add command to get the state of the audio switch (v1.3+ only)
 * Add build gated CDC-NCM firmware feature for testing NSD over USB on non WiFi capable Pico boards
+* Add config panels over Web Serial to the web config tool
 
 #### Version: 0.8.0
 * Add full MIDI implementation overhaul

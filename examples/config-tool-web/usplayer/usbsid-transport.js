@@ -6,11 +6,12 @@
  * Transport selection and transport interface
  *
  *   usbsid-webusb.js     Chromium only, vendor interface, endpoints 0x04/0x84
- *   usbsid-webserial.js  Firefox 151+ and Chromium, CDC ACM interface, endpoints 0x02/0x82
+ *   usbsid-webserial.js  Firefox 151+ and Chromium,
+ *                        either CDC ACM interface (0x02/0x82 or 0x06/0x86)
  *
  * Byte rate is equal on both, Web Serial has better queue depth and drain gap
- * WebUSB is preferred, it leaves the CDC interface free for the command line player
- * Web Serial takes the CDC interface and getting it back costs a replug
+ * WebUSB is preferred, it leaves a CDC interface free for the command line player
+ * Web Serial takes a CDC interface and getting it back costs a replug
  *
  * This file is part of USBSID-Player (https://github.com/LouDnl/USBSID-Player)
  * File author: LouD

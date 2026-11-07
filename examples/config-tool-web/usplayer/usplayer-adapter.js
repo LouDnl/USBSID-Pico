@@ -126,6 +126,10 @@ export class USPlayerAdapter {
     this._audio = null;
     this._player = null;
     this._transport = null;
+    /* Open Web Serial transport handed in by the host, see adoptSerial()
+     * The host owns it, the adapter never closes it */
+    this._adoptedSerial = null;
+    this._serialAdopted = false;
     this._bytes = null;
     this._info = { maxSubsong: 0, songName: '', songAuthor: '', songReleased: '', numSids: 1 };
     this._ready = null;
@@ -399,22 +403,33 @@ export class USPlayerAdapter {
           else await this._transport.connectGranted();
         } catch (e) { this._log('WebUSB: ' + e.message); }
         if (!this._transport.isOpen) {
-          this._transport = new USBSIDWebSerialTransport();
-          try {
-            const ok = await this._transport.connectGranted();
-            if (!ok) this._log('no board granted yet, press Connect');
-          } catch (e) { this._log('Web Serial: ' + e.message); }
+          if (this._adoptedSerial && this._adoptedSerial.isOpen) {
+            this._transport = this._adoptedSerial;
+            this._serialAdopted = true;
+          } else {
+            this._transport = new USBSIDWebSerialTransport();
+            try {
+              const ok = await this._transport.connectGranted();
+              if (!ok) this._log('no board granted yet, press Connect');
+            } catch (e) { this._log('Web Serial: ' + e.message); }
+          }
         }
         await this._checkSidPlayer();
       } else if (this._isSerial) {
         /* Both use the CDC interface, serial streams register writes, sendsid sends the file once
          * Only a granted port, connect() calls requestPort() which needs a user gesture
          * The picker belongs to the Connect button of the host */
-        this._transport = new USBSIDWebSerialTransport();
-        try {
-          const ok = await this._transport.connectGranted();
-          if (!ok) this._log('no serial port granted yet, press Connect');
-        } catch (e) { this._log('Web Serial: ' + e.message); }
+        if (this._adoptedSerial && this._adoptedSerial.isOpen) {
+          /* Host port already open, no second transport on the same port */
+          this._transport = this._adoptedSerial;
+          this._serialAdopted = true;
+        } else {
+          this._transport = new USBSIDWebSerialTransport();
+          try {
+            const ok = await this._transport.connectGranted();
+            if (!ok) this._log('no serial port granted yet, press Connect');
+          } catch (e) { this._log('Web Serial: ' + e.message); }
+        }
       } else {
         this._transport = new USBSIDWebUSBTransport({ device: this._device });
         try {
@@ -502,6 +517,40 @@ export class USPlayerAdapter {
   }
 
   /**
+   * Use an already open Web Serial transport of the host instead of opening a port
+   * Only for the usplayer-serial and usplayer-sendsid modes, other modes ignore it
+   * The host keeps ownership: disconnect() drops the reference and never closes it
+   * A transport from an earlier _ensure() is replaced, the player is rebuilt on the following use
+   *
+   * Return true when the transport was taken
+   */
+  adoptSerial(transport) {
+    if (!(this._isSerial || this._isSendsid)) return false;
+    if (!transport || !transport.isOpen) return false;
+    this._adoptedSerial = transport;
+    if (this._ready && this._transport !== transport) {
+      if (this._transport && !this._serialAdopted &&
+          typeof this._transport.disconnect === 'function') {
+        try { this._transport.disconnect(); } catch (_) {}
+      }
+      this._stopReporting();
+      this._transport = null;
+      this._player = null;
+      this._ready = null;
+    }
+    return true;
+  }
+
+  /* Forget the adopted transport without closing it, the host owns the port */
+  _dropAdopted() {
+    this._adoptedSerial = null;
+    this._serialAdopted = false;
+    this._transport = null;
+    this._player = null;
+    this._ready = null;
+  }
+
+  /**
    * Let go of the board, the port or the MIDI output
    * Software audio has nothing to release and returns false
    * Transport and _ready stay, connect() shows a picker again
@@ -513,7 +562,9 @@ export class USPlayerAdapter {
     /* SendSID plays on the board, stop it before closing the link */
     if (this._isSendsid) { try { this.stop(); } catch (_) { /* going anyway */ } }
     this._stopBoardPoll();
-    if (this._transport && typeof this._transport.disconnect === 'function') {
+    if (this._serialAdopted) {
+      this._dropAdopted();
+    } else if (this._transport && typeof this._transport.disconnect === 'function') {
       try { await this._transport.disconnect(); }
       catch (e) { this._log('disconnect: ' + (e && e.message ? e.message : e)); }
     }
@@ -624,6 +675,7 @@ export class USPlayerAdapter {
               'play the file. Disconnected. Build the firmware with ' +
               'ONBOARD_EMULATOR=1, or use one of the other modes.');
     this._status('no onboard player on this board, disconnected');
+    if (this._serialAdopted) { this._dropAdopted(); return; }
     try { await this._transport.disconnect(); } catch (_) {}
   }
 
