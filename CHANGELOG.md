@@ -61,6 +61,7 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 * Skip save and reboot when LINK_CLOCK value is unchanged
 * Add USB RX ringbuffer setting to the web config
 * Fix cfg_usbsid preset detect and clock list, add clock link option
+* Add preset auto detect and two preset buttons to the web config
 
 #### Version: 0.8.0
 * Add full MIDI implementation overhaul

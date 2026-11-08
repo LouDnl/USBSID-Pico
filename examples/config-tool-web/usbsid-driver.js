@@ -181,6 +181,7 @@ const SID_PLAYER_TIME  = 0xEB;
 
 const CONFIG_ACK       = 0xFA;  /* Acknowledge the current configuration and switch on regulators (v1.5+ boards only) */
 const SET_RX_RING      = 0x83;  /* USB RX ringbuffer off/on (arg 0/1); firmware saves + reboots when the value changes */
+const PRESET_DETECT    = 0xFE;  /* Silent socket detection when a preset is applied (arg 0/1, saved) */
 const SOCKET_DETECT    = 0xFD;  /* Disable/enable automatic socket change detection on boot (v1.5+ boards only) */
 
 /* Config write sub-types */
@@ -940,6 +941,8 @@ class USBSIDDevice {
   async setTripleSIDTwo()  { await this.configCmd(TRIPLE_SID_TWO); }
   async setQuadSID()       { await this.configCmd(QUAD_SID); }
   async setMirroredSID()   { await this.configCmd(MIRRORED_SID); }
+  async setSingleSIDTwo()  { await this.configCmd(SINGLE_SID, 1); }
+  async setDualMirrored()  { await this.configCmd(MIRRORED_SID, 1); }
   async setDualSocket1()   { await this.configCmd(DUAL_SOCKET1); }
   async setDualSocket2()   { await this.configCmd(DUAL_SOCKET2); }
   async setDualFlipped()   { await this.configCmd(DUAL_FLIPPED); }
@@ -1073,6 +1076,13 @@ class USBSIDDevice {
    * val: 0 = detection enabled (default), 1 = detection disabled */
   async setSocketDetect(val) {
     await this.configCmd(SOCKET_DETECT, val & 1);
+  }
+
+  /* Enable/disable silent socket detection when a preset is applied.
+   * val: 0 = off, 1 = on. Firmware reads buffer[2], so the value goes in b3
+   * (b2 mirrored for safety). Saved by the firmware, no reboot. */
+  async setPresetDetect(val) {
+    await this.configCmd(PRESET_DETECT, val & 1, val & 1);
   }
 
   /* SID register write (plain, 3 bytes: cmd, reg, val) */

@@ -188,6 +188,7 @@ function buildAllSelectOptions() {
   const srr = get('sel-rx-ring');       if (srr)  buildSelectOptions(srr, VA_ENABLED);
 
   /* v1.5+: socket change detection (0=Enabled, 1=Disabled) */
+  const psd = get('sel-preset-detect'); if (psd) buildSelectOptions(psd, ['Disabled', 'Enabled']);
   const ssd = get('sel-socket-detect'); if (ssd) buildSelectOptions(ssd, ['Enabled', 'Disabled']);
 }
 
@@ -303,6 +304,7 @@ function presentConfig(cfgData) {
   const rxNote = document.getElementById('rx-ring-note');
   if (rxNote) rxNote.style.display = rxOk ? 'none' : '';
   setSelectIndex('sel-socket-detect', cfgData[cfgmap.CFG_DISABLE_CHANGEDETECT] ? 1 : 0);
+  setSelectIndex('sel-preset-detect', (cfgData[cfgmap.CFG_PRESET_AUTO_DETECT] & 0x80) ? 1 : 0);
 
   /* Enable v1.5 controls now that config is loaded */
   const btnConfirm = document.getElementById('btn-confirm-config');
@@ -317,6 +319,10 @@ function presentConfig(cfgData) {
   const selDetect = document.getElementById('sel-socket-detect');
   if (selDetect && !selDetect.closest('#box-v15').classList.contains('c64-hidden')) {
     selDetect.disabled = false;
+  }
+  const selPDetect = document.getElementById('sel-preset-detect');
+  if (selPDetect && !selPDetect.closest('#box-v15').classList.contains('c64-hidden')) {
+    selPDetect.disabled = false;
   }
 
   /* Sync warning banner with current need_confirmation value */
@@ -417,6 +423,8 @@ function attachSelectListeners() {
 /* Preset buttons */
 const presetButtonMap = {
   'btn-preset-single':   async () => { await usbsidDevice.setSingleSID();   usbsidSetStatus('Preset: Single SID'); },
+  'btn-preset-single2':  async () => { await usbsidDevice.setSingleSIDTwo();  usbsidSetStatus('Preset: Single SID (socket 2)'); },
+  'btn-preset-dualmirror': async () => { await usbsidDevice.setDualMirrored(); usbsidSetStatus('Preset: Dual SID (mirrored)'); },
   'btn-preset-dual':     async () => { await usbsidDevice.setDualSID();     usbsidSetStatus('Preset: Dual SID'); },
   'btn-preset-mirrored': async () => { await usbsidDevice.setMirroredSID(); usbsidSetStatus('Preset: Mirrored SID'); },
   'btn-preset-triple':   async () => { await usbsidDevice.setTripleSID();   usbsidSetStatus('Preset: Triple SID (dual in socket 1)'); },
@@ -549,6 +557,8 @@ function applyV15UI(pcbver) {
   if (btn) { btn.disabled = true; btn.classList.remove('c64-btn-glow'); }
   const sel = document.getElementById('sel-socket-detect');
   if (sel) sel.disabled = true;
+  const psel = document.getElementById('sel-preset-detect');
+  if (psel) psel.disabled = true;
   const confirmEl = document.getElementById('cfg-need-confirm');
   if (confirmEl) { confirmEl.textContent = '-'; confirmEl.style.color = ''; }
 }
@@ -594,6 +604,17 @@ function initConfigUI() {
       const val = parseInt(selSocketDetect.value, 10);
       await usbsidDevice.setSocketDetect(val);
       usbsidSetStatus('Socket detect: ' + (val ? 'Disabled' : 'Enabled'));
+    });
+  }
+
+  /* Preset auto detect change sends PRESET_DETECT command immediately */
+  const selPresetDetect = document.getElementById('sel-preset-detect');
+  if (selPresetDetect) {
+    selPresetDetect.addEventListener('change', async () => {
+      if (!usbsidDevice.isOpen) { usbsidSetStatus('Not connected', 'red'); return; }
+      const val = parseInt(selPresetDetect.value, 10);
+      await usbsidDevice.setPresetDetect(val);
+      usbsidSetStatus('Preset auto detect: ' + (val ? 'Enabled' : 'Disabled'));
     });
   }
 }

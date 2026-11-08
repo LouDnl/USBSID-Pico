@@ -603,6 +603,10 @@
         <label title="Disable automatic socket change detection on boot. When disabled the board skips socket comparison and applies the saved config voltages directly.">Socket Detect</label>
         <select id="sel-socket-detect" class="c64-select" disabled></select>
       </div>
+      <div class="config-row">
+        <label title="Silent socket detection when a preset is applied. When enabled the board detects the installed SID types without asking for confirmation.">Preset Auto Detect</label>
+        <select id="sel-preset-detect" class="c64-select" disabled></select>
+      </div>
     </div>
 
     <!-- Retry notice (always visible) -->
@@ -617,7 +621,9 @@
         <span class="preset-label">Layout:</span>
         <button id="btn-preset-single"   class="c64-btn c64-btn-sm">SINGLE</button>
         <button id="btn-preset-dual"     class="c64-btn c64-btn-sm">DUAL</button>
+        <button id="btn-preset-single2"  class="c64-btn c64-btn-sm">SINGLE (S2)</button>
         <button id="btn-preset-mirrored" class="c64-btn c64-btn-sm">MIRRORED</button>
+        <button id="btn-preset-dualmirror" class="c64-btn c64-btn-sm">DUAL MIRRORED</button>
         <button id="btn-preset-triple"   class="c64-btn c64-btn-sm">TRIPLE (S1)</button>
         <button id="btn-preset-triple2"  class="c64-btn c64-btn-sm">TRIPLE (S2)</button>
         <button id="btn-preset-quad"     class="c64-btn c64-btn-sm">QUAD</button>
