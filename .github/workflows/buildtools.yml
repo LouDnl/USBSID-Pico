@@ -66,7 +66,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Forces checkout of the branch head instead of a specific commit SHA
           ref: ${{ github.ref }}
@@ -91,14 +91,14 @@ jobs:
       # Both tools link USBSID-Pico-driver, found by examples/usbsid-driver.cmake
       # in repo/lib/usbsid-driver.
       - name: 📇 Checkout USBSID-Pico-driver
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: LouDnl/USBSID-Pico-driver
           path: repo/lib/usbsid-driver
 
       - name: 📇 Checkout USBSID-Player
         if: ${{ matrix.directory == 'send_sid' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: loudnl/usbsid-player
           path: repo/lib/usbsid-player
@@ -138,7 +138,7 @@ jobs:
           popd
 
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: tools-${{ matrix.buildname }}-${{ matrix.os }}
           path: |
