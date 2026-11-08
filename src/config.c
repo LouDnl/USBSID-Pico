@@ -1484,6 +1484,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       break;
     case LINK_CLOCK:
       usCFG("LINK_CLOCK %d\n", buffer[1]);
+      if (usbsid_config.board_clock_link == (bool)buffer[1]) break;  /* Unchanged, no save and no reboot */
       usbsid_config.board_clock_link = (bool)buffer[1];
       usCFG("Saving config\n");
       save_config_ext();
