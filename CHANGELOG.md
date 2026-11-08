@@ -57,6 +57,7 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 * Add config panels over Web Serial to the web config tool
 * Fix case fallthrough in embedded player config commands and remove misplaced boolean
 * Fix PSIDdrv value, play button state and refetch in the web player
+* Add USB RX ringbuffer for incoming USB CDC and Vendor (WebUSB) packets
 
 #### Version: 0.8.0
 * Add full MIDI implementation overhaul

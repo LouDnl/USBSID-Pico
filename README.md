@@ -274,6 +274,7 @@ The firmware is still in development so features might change, be added or remov
   - Lets a v5 client enable or disable FM OPL on a SID socket remotely (same as the config tool), enabling a disabled FM OPL resets the chip
   - NSD enable and discovery settings apply live, WiFi state and IP address can be queried (`cfg_usbsid -wifis`)
 - Optional SID register stream on a second vendor USB interface (build with `-DENABLE_SID_STREAM=1`), plus batch reads of up to 63 registers per USB packet
+- USB RX ringbuffer (default on): up to 8 incoming USB packets are buffered and played from the main loop: a host USB scheduling delay no longer leaves the SID idle (no cracks on write-heavy tunes). Applies to CDC and WebUSB, rp2040 and rp2350, takes effect after a reboot
 #### v1.3+ PCB
 - Audio switch Stereo/Mono control
 #### v1.5+ PCB

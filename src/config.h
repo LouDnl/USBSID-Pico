@@ -248,6 +248,7 @@ typedef struct Config { // TODO: Add overrides for detect_default_config and add
   bool socket_change_detect : 1; /* (PCB v1.5+) disables socket change detection on boot */
   bool preset_auto_detect : 1;   /* disables silent auto detection before present change, default disabled on v1.0~v1.3, default enabled on v1.5+ */
   bool board_clock_link : 1;     /* uses GPIO17 as external clock detection, PHI1 wil generate based on the inpu */
+  bool rx_ring : 1;              /* USB RX ringbuffer, latched at boot (save and reboot to apply) */
 } Config;
 
 /* Fixed defaults that differ between Pico1 and Pico2 */
@@ -344,6 +345,7 @@ typedef struct Config { // TODO: Add overrides for detect_default_config and add
   .socket_change_detect = true, /* WARNING: This setting _can_ and _will_ fry your 9v SID if config is set to 6581 (12v) */ \
   .preset_auto_detect = PRESET_AUTO_DETECT_DEFAULT, /* Default disabled on v1.0~v1.3, default enabled on v1.5+ */ \
   .board_clock_link = false, /* Disabled by default */ \
+  .rx_ring = true, /* Enabled by default */ \
 } \
 
 typedef struct RuntimeCFG {
@@ -467,6 +469,7 @@ enum
   USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
   US_PCB_VERSION   = 0x81,  /* Read PCB version */
   US_FEATURES      = 0x82,  /* Read USBSID compiled features */
+  SET_RX_RING      = 0x83,  /* Enable/Disable the USB RX ringbuffer (auto save and reboot) */
 
   LINK_CLOCK       = 0x84,  /* Enable/Disable link with external clock feature (auto save and reboot) */
   RESTART_BUS      = 0x85,  /* Restart DMA & PIO */
@@ -580,6 +583,7 @@ enum {
   BOARD_MIXED     = 14,
   BOARD_SDETECT   = 15, /* (PCB v1.5+) Automatic socket change detection */
   BOARD_PADETECT  = 16, /* (PCB v1.5+) Preset automatic detection */
+  BOARD_RXRING    = 17, /* USB RX ringbuffer, applied after save and reboot */
 };
 
 /* Global variables from config.c */

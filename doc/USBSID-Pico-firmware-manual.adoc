@@ -183,6 +183,7 @@ CDC Enabled: `True` +
 WebUSB Enabled: `True` +
 Asid Enabled: `True` +
 Midi Enabled: `True` +
+USB RX ringbuffer: `True` +
 WiFi Enabled: `False` (`_w` boards only) +
 NSD Enabled: `True` (`_w` boards only, needs WiFi Enabled) +
 Discovery Enabled: `True` (`_w` boards only) +
@@ -356,6 +357,41 @@ Available options are: +
 
 === Midi Enabled
 Disable or enable MIDI input handling (note/CC/voice control of the SID(s)). +
+Available options are: +
+`False`, `True`
+
+=== USB RX ringbuffer
+The firmware keeps up to 8 incoming USB packets (64 bytes each, USB OUT transfers from host to device) in a ring and plays them from the main loop, USB keeps receiving between SID writes. +
+Without the ring, one packet is playing and one is waiting in the USB controller, which is about 160 us of writes in hand at 94k writes/s. A host USB scheduling delay longer than that (busy USB bus, mouse) leaves the SID idle, which is audible as a crack on write-heavy tunes (digis, e.g. Justinblue_tune_6 at about 94k writes/s). +
+With the ring about 1.4 ms of writes are in hand at that rate. +
+Applies to the CDC and WebUSB (vendor) interfaces and therefore to all host software (usplayer, VICE, sidplayfp, web player). +
+Default is `True` on all boards and Pico types (rp2040 and rp2350). When set to `False` the original receive path is used. +
+The change applies after a reboot, the setting is latched at boot. +
+Notes: +
+MIDI and ASID input arriving while a USB packet is playing is handled right after that packet. +
+Reads and commands queue in arrival order behind up to 8 packets. +
+On rp2040 a very write-heavy tune (about 94k writes/s) plays about 0.12% behind real time (inaudible), rp2350 shows no drift. +
+Resource use: the ringbuffer costs about 0.6 KB RAM and about 1.5 KB flash on every board type (v1.5 firmware, measured against the same firmware without the ringbuffer). RAM figures include the reserved stack and heap, they are an upper bound. +
+
+[cols="2,>1,>1,>1,>1,>1", options="header"]
+|===
+| Firmware | Flash (bytes) | Flash delta | RAM (bytes) | RAM delta | RAM of chip
+| pico | 148988 | +1464 | 35932 | +608 | 13.3%
+| pico _em | 248400 | +1488 | 225124 | +604 | 83.3%
+| pico_w | 390936 | +1464 | 38232 | +604 | 14.1%
+| pico_w _net | 564336 | +1504 | 125868 | +608 | 46.6%
+| pico2 | 144816 | +1352 | 36704 | +592 | 6.9%
+| pico2 _em | 239312 | +1544 | 226120 | +588 | 42.5%
+| pico2_w | 388436 | +1352 | 39220 | +588 | 7.4%
+| pico2_w _em_net | 648420 | +1488 | 316128 | +588 | 59.4%
+|===
+
+How to change it: +
+`cfg_usbsid -rxring 0` (off) or `cfg_usbsid -rxring 1` (on), the board saves and reboots when the value changes. Inside a `-w` write chain the same option sets the config value, it applies after save and reboot. +
+Web config: `USB RX ringbuffer` in the `USB` box, changing it saves the config and reboots the board. +
+Configtool: `USB RX ringbuffer` in the Features section (advanced), applies after writing and saving the config. +
+All three tools offer the setting on firmware newer than v0.8.1. +
+Protocol details for host tool authors: config field `rx_ring`, set with `SET_CONFIG` item 17 (`BOARD_RXRING`) or with the dedicated command `0x83` (`SET_RX_RING`, value 0 or 1) which saves the config and reboots, a value equal to the current setting does nothing. The setting is read back in the `READ_CONFIG` reply byte 59 (0 or 1). +
 Available options are: +
 `False`, `True`
 

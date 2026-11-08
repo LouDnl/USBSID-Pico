@@ -263,8 +263,18 @@ int __no_inline_not_in_flash_func(do_buffer_tick)(int top, int step)
   return 0;
 }
 
+/* usbsid_config.rx_ring latched once at boot in main, core 0 only */
+static bool rx_ring_on = false;
+/* Set by rx_ring_task around process_buffer, core 0 only */
+static volatile bool rx_nested = false;
+/* MIDI interfaces with data held back while rx_nested */
+static volatile uint8_t midi_rx_pending = 0;
+
 /**
  * @brief Drive do_buffer_tick until the whole incoming buffer has been written
+ *
+ * Runs tud_task between writes ith USB RX ringbuffer enabled (usbsid_config.rx_ring).
+ * The rx callbacks queue the following packets while this one plays.
  *
  * @param int n_bytes
  * @param int step
@@ -275,6 +285,9 @@ void __no_inline_not_in_flash_func(buffer_task)(int n_bytes, int step)
   do {
     set_vu_action(); /* Keep that shiny Vu blinking! */
     state = do_buffer_tick(n_bytes, step);
+    if (rx_nested && (state != 1) && tud_task_event_ready()) {
+      tud_task_ext(0, false);  /* Callbacks only queue, see rx_ring_task */
+    }
   } while (state != 1);
 }
 
@@ -496,6 +509,105 @@ SIDCHANGEDETECTED:;
 }
 
 
+/* USB RX RINGBUFFER */
+
+/* Slots between the rx callbacks and playback, core 0 only, power of 2, max 128 */
+#ifndef RX_RING_SLOTS
+#define RX_RING_SLOTS 8
+#endif
+_Static_assert(((RX_RING_SLOTS & (RX_RING_SLOTS - 1)) == 0) && (RX_RING_SLOTS <= 128),
+  "RX_RING_SLOTS must be a power of 2, max 128");
+
+typedef struct {
+  char kind;    /* cdc or wusb, 0 = dropped */
+  uint8_t itf;  /* CDC or vendor interface index */
+  uint8_t len;
+  uint8_t data[MAX_BUFFER_SIZE];
+} rx_slot_t;
+
+static rx_slot_t rx_ring[RX_RING_SLOTS];
+static volatile uint8_t rx_head = 0, rx_tail = 0;  /* Free running, head - tail = used slots */
+
+/**
+ * @brief Move one waiting packet from a CDC or vendor fifo into the ring
+ *
+ * The 64 byte fifo holds one packet at most. With the ring full the packet
+ * stays in the fifo, the OUT endpoint stays unarmed and the host gets NAK.
+ *
+ * @param char kind cdc or wusb
+ * @param uint8_t itf interface index
+ * @return bool true if a packet was queued
+ */
+static bool rx_ring_pull(char kind, uint8_t itf)
+{
+  if ((uint8_t)(rx_head - rx_tail) >= RX_RING_SLOTS) return false;  /* Ring full */
+  rx_slot_t *s = &rx_ring[rx_head & (RX_RING_SLOTS - 1)];
+  uint32_t n = (kind == cdc)
+    ? tud_cdc_n_read(itf, s->data, MAX_BUFFER_SIZE)
+    : tud_vendor_n_read(itf, s->data, MAX_BUFFER_SIZE);  /* Read re-arms the endpoint */
+  if (n == 0) return false;
+  s->kind = kind, s->itf = itf, s->len = (uint8_t)n;
+  rx_head++;
+  return true;
+}
+
+/**
+ * @brief Drop queued packets of one kind, used where TinyUSB flushes its fifo
+ *
+ * @param char kind cdc or wusb
+ */
+static void rx_ring_drop(char kind)
+{
+  for (uint8_t i = rx_tail; i != rx_head; i++) {
+    rx_slot_t *s = &rx_ring[i & (RX_RING_SLOTS - 1)];
+    if (s->kind == kind) s->kind = 0;
+  }
+}
+
+/**
+ * @brief Play the oldest queued packet, then refill from the fifos
+ *
+ * Runs from core0_loop after tud_task. Sets the same state the rx callbacks
+ * set before and calls process_buffer the same way.
+ */
+static void rx_ring_task(void)
+{
+  if (rx_head != rx_tail) {
+    rx_slot_t *s = &rx_ring[rx_tail & (RX_RING_SLOTS - 1)];
+    char kind = s->kind;
+    uint8_t itf = s->itf;
+    uint32_t len = s->len;
+    memcpy(sid_buffer, s->data, len);
+    rx_tail++;  /* Slot free, sid_buffer holds the packet */
+    rx_nested = true;  /* buffer_task may run tud_task */
+    if (kind == cdc) {
+      cdc_itf_num = itf;
+      set_receivedata(true), dtype = cdc, rtype = cdc;
+      cdcread = len;
+      process_buffer(cdc_itf, &cdcread);
+    } else if (kind == wusb) {
+      wusb_itf_num = itf;
+      set_receivedata(true), dtype = wusb, rtype = wusb;
+      webread = len;
+      process_buffer(wusb_itf, &webread);
+    }
+    rx_nested = false;
+  }
+  /* MIDI held back during the packet */
+  if (midi_rx_pending) {
+    uint8_t m = midi_rx_pending;
+    midi_rx_pending = 0;
+    for (uint8_t i = 0; i < CFG_TUD_MIDI; i++) {
+      if (m & (1u << i)) tud_midi_rx_cb(i);
+    }
+  }
+  /* Packets left in a fifo while the ring was full */
+  if (tud_cdc_n_available(CDC1_ITF)) rx_ring_pull(cdc, CDC1_ITF);
+  if (tud_cdc_n_available(CDC2_ITF)) rx_ring_pull(cdc, CDC2_ITF);
+  if (web_serial_connected && tud_vendor_n_available(WUSB_ITF)) rx_ring_pull(wusb, WUSB_ITF);
+}
+
+
 /* USB CALLBACKS */
 
 /**
@@ -563,6 +675,10 @@ void tud_resume_cb(void)
  */
 void tud_midi_rx_cb(uint8_t itf)
 {
+  if (rx_nested) {  /* Mid packet: data waits in the fifo, rx_ring_task plays it */
+    midi_rx_pending |= (uint8_t)(1u << itf);
+    return;
+  }
   if (tud_midi_n_mounted(itf)) {
     uint8_t packet[4];
     while (tud_midi_n_packet_read(itf, packet)) {  /* Loop as long as there are full packets available */
@@ -608,14 +724,21 @@ void __us_deprecated cdc_task(void)
 /**
  * @brief TinyUSB callback fired when CDC data is available from the host
  *
- * Read from host to device. No need to check available bytes for reading.
- * Reads up to MAX_BUFFER_SIZE bytes into read_buffer, copies them into
- * sid_buffer, and hands off to process_buffer.
+ * Read from host to device. With rx_ring_on queues the packet in the rx
+ * ring, rx_ring_task plays it, with the ring full the packet waits in the
+ * fifo. Without the ring reads up to MAX_BUFFER_SIZE bytes into
+ * read_buffer, copies them into sid_buffer, and hands off to process_buffer.
  *
  * @param uint8_t itf
  */
 void tud_cdc_rx_cb(uint8_t itf)
 { /* No need to check available bytes for reading */
+  if (rx_ring_on) {
+    if __us_likely((itf == CDC1_ITF) || (itf == CDC2_ITF)) {
+      rx_ring_pull(cdc, itf);
+    }
+    return;
+  }
   if __us_likely((itf == CDC1_ITF) || (itf == CDC2_ITF)) {
     if (tud_cdc_n_available(itf)) {
       cdc_itf_num = itf;
@@ -745,11 +868,14 @@ void __us_deprecated vendor_task(void)
 /**
  * @brief TinyUSB callback fired when WebUSB vendor data is available
  *
- * Read from host to device. With the fifo buffer disabled the buffer
- * contains the newest incoming data. With the fifo buffer enabled the
- * buffer contains data from the previous read. The vendor class has no
- * connect check built in: web_serial_connected is used as a makeshift
- * check.
+ * Read from host to device. With rx_ring_on queues the packet from the
+ * fifo in the rx ring, rx_ring_task plays it, with the ring full the packet
+ * waits in the fifo. The ring path does not use the endpoint buffer
+ * argument, the ISR can overwrite it once the endpoint is re-armed.
+ * Without the ring: with the fifo buffer disabled the buffer contains the
+ * newest incoming data, with the fifo buffer enabled the buffer contains
+ * data from the previous read. The vendor class has no connect check
+ * built in: web_serial_connected is used as a makeshift check.
  *
  * @param uint8_t itf
  * @param uint8_t const* buffer
@@ -757,6 +883,13 @@ void __us_deprecated vendor_task(void)
  */
 void tud_vendor_rx_cb(uint8_t itf, uint8_t const* buffer, uint16_t bufsize)
 {
+  if (rx_ring_on) {
+    /* vendor class has no connect check, use a makeshift check */
+    if __us_likely(itf == WUSB_ITF && web_serial_connected) {
+      rx_ring_pull(wusb, itf);
+    }
+    return;
+  }
   /* With the fifo buffer disabled the buffer contains the newest incoming data */
   /* If the fifo buffer is enabled the buffer contains data from the previous read */
 
@@ -811,6 +944,7 @@ static void vendor_endpoints_reset(uint8_t rhport, uint8_t itf, uint8_t ep_out, 
   usbd_edpt_clear_stall(rhport, ep_in);
   usbd_edpt_release(rhport, ep_in);
   tud_vendor_n_read_flush(itf);
+  rx_ring_drop(wusb);  /* Queued packets go with the fifo */
   usVDR("SET_INTERFACE itf %u, endpoints $%02X/$%02X reset to DATA0\n", itf, ep_out, ep_in);
 }
 
@@ -882,6 +1016,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
         /* Flush any data still in the fifo */
         if (web_serial_connected) {
           tud_vendor_n_read_flush(WUSB_ITF);
+          rx_ring_drop(wusb);  /* Queued packets go with the fifo */
           tud_vendor_n_write_flush(WUSB_ITF);
         }
         /* Respond with status OK */
@@ -945,6 +1080,7 @@ void __us_noreturn core0_loop(void)
 {
   while (1) {
     tud_task_ext(0, false);  /* equals tud_task(). The timout_ms is already at 0 and is _always_ discarded in osal_none.h */
+    if (rx_ring_on) rx_ring_task();  /* Play one queued USB RX packet */
 #if defined(USE_SID_STREAM)
     stream_task();  /* SID memory stream, own vendor interface */
 #endif
@@ -1490,6 +1626,9 @@ int main()
   core_sync_state = SYNC_CORE0_STAGE2;
   __dsb();  /* Data Synchronisation Barrier - ensures store completes before SEV */
   __sev();  /* Signal event to wake Core 1 from WFE */
+
+  /* Latch the USB RX ringbuffer setting, fixed until the next boot */
+  rx_ring_on = usbsid_config.rx_ring;
 
   /* All hardware ready - allow host to enumerate */
   if (!tud_connect()) usERR("!! USB CONNECTION ERROR !!");

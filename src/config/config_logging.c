@@ -205,6 +205,8 @@ void print_config_overview(void)
     switch_str((int)usbsid_config.Midi.enabled));
   usCFG("  ASID feature = %s\n",
     switch_str((int)usbsid_config.Asid.enabled));
+  usCFG("  USB RX ringbuffer = %s\n",
+    switch_str((int)usbsid_config.rx_ring));
 #if PCB_VERSION_INT >= 14
   usCFG("\n");
   usCFG("Verification of socket change detection on boot = %s\n",

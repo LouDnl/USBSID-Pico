@@ -262,7 +262,7 @@ void read_config(Config* config)
   config_array[57] = config->stereo_en;
   config_array[58] = config->lock_audio_sw;
 
-  config_array[59] = 0x00; /* Unused */
+  config_array[59] = (int)config->rx_ring;  /* USB RX ringbuffer */
 
   config_array[60] = ((int)config->mirrored | ((int)config->flipped << 1) | ((int)config->mixed << 2));
 
@@ -949,6 +949,11 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
             ? (bool)buffer[2]
             : true;  /* Default to 1 ~ enabled, always autodetect */
           break;
+        case BOARD_RXRING:    /* USB RX ringbuffer, applied after save and reboot */
+          if (buffer[2] <= 1) { /* 1 or 0 */
+            usbsid_config.rx_ring = (bool)buffer[2];
+          };
+          break;
         default:
           break;
       };
@@ -1480,6 +1485,15 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case LINK_CLOCK:
       usCFG("LINK_CLOCK %d\n", buffer[1]);
       usbsid_config.board_clock_link = (bool)buffer[1];
+      usCFG("Saving config\n");
+      save_config_ext();
+      usCFG("Rebooting\n");
+      mcu_reset(); /* Point of no return */
+      break;
+    case SET_RX_RING:
+      usCFG("SET_RX_RING %d\n", buffer[1]);
+      if (usbsid_config.rx_ring == (bool)buffer[1]) break;  /* Unchanged, no save and no reboot */
+      usbsid_config.rx_ring = (bool)buffer[1];
       usCFG("Saving config\n");
       save_config_ext();
       usCFG("Rebooting\n");
