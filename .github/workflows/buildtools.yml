@@ -49,9 +49,9 @@ jobs:
           - { os: windows-2022, shell: 'msys2 {0}',
               directory: send_sid, buildname: send_sid }
           - { os: macos-15, shell: 'bash',
-              directory: config-tool, buildname: cfg_usbsid_macos14 }
+              directory: config-tool, buildname: cfg_usbsid_macos15 }
           - { os: macos-15, shell: 'bash',
-              directory: send_sid, buildname: send_sid_macos14 }
+              directory: send_sid, buildname: send_sid_macos15 }
           # - { os: macos-14-large, shell: 'bash',
           #     directory: config-tool, buildname: cfg_usbsid_macos14large }
           # - { os: macos-14-large, shell: 'bash',
