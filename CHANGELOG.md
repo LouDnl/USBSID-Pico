@@ -60,6 +60,7 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 * Add USB RX ringbuffer for incoming USB CDC and Vendor (WebUSB) packets
 * Skip save and reboot when LINK_CLOCK value is unchanged
 * Add USB RX ringbuffer setting to the web config
+* Fix cfg_usbsid preset detect and clock list, add clock link option
 
 #### Version: 0.8.0
 * Add full MIDI implementation overhaul

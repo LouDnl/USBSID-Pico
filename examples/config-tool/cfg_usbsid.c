@@ -235,7 +235,7 @@ void write_config_ini(Config * config, char * filename)
     fprintf(f, "[General]\n");
     fprintf(f, "; Version is for reference only\n");
     fprintf(f, "version = v%s\n", (project_version[0] == 0 ? "0.0.0-DEFAULT.19000101" : project_version + 1));
-    fprintf(f, "; Possible clockrates: %d, %d, %d, %d\n", DEFAULT, PAL, NTSC, DREAN);
+    fprintf(f, "; Possible clockrates: %d, %d, %d, %d, %d\n", DEFAULT, PAL, NTSC, DREAN, NTSC2);
     fprintf(f, "clock_rate = %d\n", config->clock_rate);
     fprintf(f, "; Possible options: %s, %s\n", truefalse[0], truefalse[1]);
     fprintf(f, "lock_clockrate = %s\n", truefalse[config->lock_clockrate]);
@@ -711,6 +711,7 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
         break;
       case 6:
         usbsid_config.external_clock = (buff[i] & 0b1);
+        usbsid_config.board_clock_link = ((buff[i] >> 1) & 0b1);
         break;
       case 59:
         usbsid_config.rx_ring = (buff[i] & 0b1);
@@ -1170,6 +1171,8 @@ void print_config(void)
   printf("  Clock settings:\n");
   printf("    %s C64 clockrate = %d\n",
     intext[(int)usbsid_config.external_clock], (int)usbsid_config.clock_rate);
+  printf("    Clock link = %s\n",
+    enabled[(int)usbsid_config.board_clock_link]);
   printf("    Clock rate = %s\n",
     locked[(int)usbsid_config.lock_clockrate]);
   printf("\n");
@@ -2002,8 +2005,11 @@ void print_help_features(void)
   printf("  --reset-sid-registers         : Reset all SID registers\n");
   printf("  -flip,    --hotflip-sockets   : (Hot)Flip sockets SocketOne becomes SocketTwo, SocketTwo becomes SocketOne\n");
   printf("  -sc N,    --set-clock N       : Set and apply USBSID-Pico SID clock speed\n");
-  printf("                                  0: %d, 1: %d, 2: %d, 4: %d\n",
-    CLOCK_DEFAULT, CLOCK_PAL, CLOCK_NTSC, CLOCK_DREAN);
+  printf("                                  0: %d (Default), 1: %d (PAL), 2: %d (NTSC),\n",
+    CLOCK_DEFAULT, CLOCK_PAL, CLOCK_NTSC);
+  printf("                                  3: %d (DREAN), 4: %d (NTSC2)\n",
+    CLOCK_DREAN, CLOCK_NTSC2);
+  printf("  -lclk N,  --link-clock N      : Link the clock to the external clock input, the board reboots on change: 1/0\n");
   printf("  -lc N,    --lock-clockrate N  : Lock and save the clock rate from changing: True (1) False (0)\n");
   printf("  -tau,     --toggle-audio      : Toggle the mono/stereo audio switch (PCB v1.3+ only!)\n");
   printf("  -sau,     --set-audio N       : Set and save the mono/stereo audio switch (PCB v1.3+ only!)\n");
@@ -2090,8 +2096,10 @@ void print_help_manual(void)
   printf("  Please do not forget to use '-a' or '-s' after writing config settings manually\n");
   printf("  this is required for the settings to have any effect after a change\n");
   printf("  -c N,     --sid-clock N       : Change SID clock to\n");
-  printf("                                  0: %d, 1: %d, 2: %d, 4: %d\n",
-    CLOCK_DEFAULT, CLOCK_PAL, CLOCK_NTSC, CLOCK_DREAN);
+  printf("                                  0: %d (Default), 1: %d (PAL), 2: %d (NTSC),\n",
+    CLOCK_DEFAULT, CLOCK_PAL, CLOCK_NTSC);
+  printf("                                  3: %d (DREAN), 4: %d (NTSC2)\n",
+    CLOCK_DREAN, CLOCK_NTSC2);
   printf("  -l N,     --lockclockrate N   : Lock the clock rate from changing: True (1) False (0)\n");
   printf("  -led N,   --led-enabled N     : LED is Enabled (1) or Disabled (0)\n");
   printf("  -lbr N,   --led-breathe N     : LED idle breathing is Enabled (1) or Disabled (0)\n");
@@ -2604,7 +2612,24 @@ void config_usbsidpico(int argc, char **argv)
         goto exit;
       }
       printf("Disable silent automatic detection on preset select set to '%s'\n", enabled[det]);
-      write_config_command(SOCKET_DETECT, det, 0x0, 0x0, 0x0);
+      write_config_command(PRESET_DETECT, det, det, 0x0, 0x0);  /* Send value in both bytes, firmware reads buffer[2] */
+      break;
+    }
+    if (!strcmp(argv[param_count], "-lclk") || !strcmp(argv[param_count], "--link-clock")) {
+      param_count++;
+      if (param_count >= argc) {
+        printf("-lclk requires a value: 0 or 1\n");
+        cfg_exit_code = 1;
+        goto exit;
+      }
+      int lnk = atoi(argv[param_count]);
+      if (lnk > 1 || lnk < 0) {
+        printf("%d is not a correct clock link option, use 0 or 1\n", lnk);
+        cfg_exit_code = 1;
+        goto exit;
+      }
+      printf("Clock link set to '%s', the board saves and reboots when the value changes\n", enabled[lnk]);
+      write_config_command(LINK_CLOCK, lnk, 0x0, 0x0, 0x0);
       break;
     }
     if (!strcmp(argv[param_count], "-rxring") || !strcmp(argv[param_count], "--rx-ring")) {

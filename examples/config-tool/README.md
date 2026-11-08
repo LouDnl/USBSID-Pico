@@ -1,6 +1,6 @@
 # USBSID-Pico commandline configtool
 
-## Help menu (last update to this file was on 20260911)
+## Help menu
 ```shell
 ❯ cfg_usbsid -h
 ------------------------------------------------------------------------------------------------------------------------
@@ -57,7 +57,9 @@ $ cfg_usbsid [arguments]
   --reset-sid-registers         : Reset all SID registers
   -flip,    --hotflip-sockets   : (Hot)Flip sockets SocketOne becomes SocketTwo, SocketTwo becomes SocketOne
   -sc N,    --set-clock N       : Set and apply USBSID-Pico SID clock speed
-                                  0: 1000000, 1: 985248, 2: 1022727, 4: 1023440
+                                  0: 1000000 (Default), 1: 985248 (PAL), 2: 1022727 (NTSC),
+                                  3: 1023440 (DREAN), 4: 1022730 (NTSC2)
+  -lclk N,  --link-clock N      : Link the clock to the external clock input, the board reboots on change: 1/0
   -lc N,    --lock-clockrate N  : Lock and save the clock rate from changing: True (1) False (0)
   -tau,     --toggle-audio      : Toggle the mono/stereo audio switch (PCB v1.3+ only!)
   -sau,     --set-audio N       : Set and save the mono/stereo audio switch (PCB v1.3+ only!)
@@ -120,7 +122,8 @@ $ cfg_usbsid [arguments]
   Please do not forget to use '-a' or '-s' after writing config settings manually
   this is required for the settings to have any effect after a change
   -c N,     --sid-clock N       : Change SID clock to
-                                  0: 1000000, 1: 985248, 2: 1022727, 4: 1023440
+                                  0: 1000000 (Default), 1: 985248 (PAL), 2: 1022727 (NTSC),
+                                  3: 1023440 (DREAN), 4: 1022730 (NTSC2)
   -l N,     --lockclockrate N   : Lock the clock rate from changing: True (1) False (0)
   -led N,   --led-enabled N     : LED is Enabled (1) or Disabled (0)
   -lbr N,   --led-breathe N     : LED idle breathing is Enabled (1) or Disabled (0)

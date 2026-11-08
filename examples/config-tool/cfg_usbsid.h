@@ -150,6 +150,7 @@ enum
   US_PCB_VERSION   = 0x81,  /* Read PCB version */
   US_FEATURES      = 0x82,  /* Read USBSID compiled features, bit 4 = net, bit 5 = nsd */
   SET_RX_RING      = 0x83,  /* buffer[1] = 0/1, USB RX ringbuffer, board saves and reboots on change */
+  LINK_CLOCK       = 0x84,  /* buffer[1] = 0/1, link with external clock, board saves and reboots on change */
 
   RESTART_BUS      = 0x85,  /* Restart DMA & PIO */
   RESTART_BUS_CLK  = 0x86,  /* Restart PIO clocks */
@@ -167,6 +168,7 @@ enum
 
   CONFIG_ACK       = 0xFA,  /* Acknowledge the current configuration and switch on regulators (v1.5+ boards only) */
   SOCKET_DETECT    = 0xFD,  /* Disable/enable automatic socket change detection on boot (v1.5+ boards only) */
+  PRESET_DETECT    = 0xFE,  /* Enable/disable and save silent automatic detection on preset change */
 };
 
 /* SET_CONFIG item ids (buffer[1]) not covered by a named command */
@@ -299,6 +301,7 @@ typedef struct Config {
     bool enabled : 1;            /* Requires a clone SID! */
   } FMOpl;                       /* 9 */
   bool external_clock : 1;       /* enable / disable external oscillator */
+  bool board_clock_link : 1;     /* link PHI1 generation to the external clock input (READ_CONFIG byte 6 bit 1) */
   bool lock_clockrate : 1;       /* lock the set clockspeed from being changed */
   bool stereo_en : 1;            /* audio switch is off (mono) or on (stereo) ~ (PCB v1.3+ only) */
   bool lock_audio_sw : 1;        /* lock the audio switch into it's current stateand prevent it from being changed ~ (PCB v1.3+ only) */
@@ -371,6 +374,7 @@ typedef struct Config {
     .enabled = false, \
   }, \
   .external_clock = false, \
+  .board_clock_link = false, \
   .lock_clockrate = false, \
   .stereo_en = false, \
   .lock_audio_sw = false, \
