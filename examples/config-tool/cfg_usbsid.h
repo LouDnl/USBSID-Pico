@@ -140,15 +140,16 @@ enum
   WIFI_FORGET      = 0x78,  /* Erase stored credentials */
   BT_NSD_ENABLE    = 0x79,  /* buffer[1] = 0/1 */
   READ_NETCFG      = 0x7A,  /* Read net config as bytes */
-  WIFI_READ_IP     = 0x7B,  /* Returns {state, ip0..ip3}, needs US_FEATURES bit 1 */
-  DISCOVERY_ENABLE = 0x7C,  /* buffer[1] = 0/1, needs US_FEATURES bit 1 */
+  WIFI_READ_IP     = 0x7B,  /* Returns {state, ip0..ip3} */
+  DISCOVERY_ENABLE = 0x7C,  /* buffer[1] = 0/1 */
   USBNET_IP_MODE   = 0x7D,  /* buffer[1] = 0 DHCP client / 1 static / 2 DHCP server (default), USB network build only, persisted by WIFI_APPLY */
   USBNET_SET_STATIC= 0x7E,  /* buffer[1..4] ip, [5..8] netmask, [9..12] gateway, USB network build only, persisted by WIFI_APPLY */
   USBNET_READ_IPCFG= 0x7F,  /* Returns {mode, ip[4], netmask[4], gateway[4]} */
 
   USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
   US_PCB_VERSION   = 0x81,  /* Read PCB version */
-  US_FEATURES      = 0x82,  /* Read USBSID compiled features, bit 1 = wifi ip + discovery toggle, bit 4 = net, bit 5 = nsd */
+  US_FEATURES      = 0x82,  /* Read USBSID compiled features, bit 4 = net, bit 5 = nsd */
+  SET_RX_RING      = 0x83,  /* buffer[1] = 0/1, USB RX ringbuffer, board saves and reboots on change */
 
   RESTART_BUS      = 0x85,  /* Restart DMA & PIO */
   RESTART_BUS_CLK  = 0x86,  /* Restart PIO clocks */
@@ -166,6 +167,11 @@ enum
 
   CONFIG_ACK       = 0xFA,  /* Acknowledge the current configuration and switch on regulators (v1.5+ boards only) */
   SOCKET_DETECT    = 0xFD,  /* Disable/enable automatic socket change detection on boot (v1.5+ boards only) */
+};
+
+/* SET_CONFIG item ids (buffer[1]) not covered by a named command */
+enum {
+  BOARD_RXRING = 17,  /* USB RX ringbuffer 0/1, set only, applies after SAVE_CONFIG and reboot */
 };
 
 /* Config constants */
@@ -302,6 +308,7 @@ typedef struct Config {
   bool need_confirmation : 1;    /* (PCB v1.5+) current configuration needs confirmation, SID's are disabled until confirmed! */
   bool socket_change_detect : 1; /* (PCB v1.5+) disables socket change detection on boot */
   bool preset_auto_detect : 1;   /* disables silent auto detection before present change */
+  bool rx_ring : 1;              /* USB RX ringbuffer, applied after save and reboot */
 } Config;
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
@@ -373,6 +380,7 @@ typedef struct Config {
   .need_confirmation = false, \
   .socket_change_detect = true, /* WARNING: This setting _can_ and _will_ fry your 9v SID if config is set to 6581 (12v) */ \
   .preset_auto_detect = true, \
+  .rx_ring = true, \
 } \
 
 /* init local usbsid-pico variables */

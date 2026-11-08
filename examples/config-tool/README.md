@@ -63,9 +63,11 @@ $ cfg_usbsid [arguments]
   -sau,     --set-audio N       : Set and save the mono/stereo audio switch (PCB v1.3+ only!)
                                   0: Mono, 1:Stereo
   -lau N,   --lock-audio N      : Lock and the audio switch in it's current state until reboot: True (1) False (0)
-  -sad N,   --sock-autodetect N : Disable/enable and save the automatic socket change detection on boot (PCB v1.5+ only!)
+  -sad N,   --sock-autodetect N : Disable/enable and save the automatic socket change detection on boot (PCBv1.5+ only!)
                                   0: Disabled, 1:Enabled
   -pad N,   --preset-detect N   : Disable/enable and save the silent automatic socket detection on preset selection
+                                  0: Disabled, 1:Enabled
+  -rxring N, --rx-ring N        : Disable/enable and save the USB RX ringbuffer, the board reboots on change
                                   0: Disabled, 1:Enabled
 --[NETWORK]-(ONLY AVAILABLE ON _W PICO'S!)------------------------------------------------------------------------------
   -wifis,   --wifi-status       : Read and print WiFi link / NSD session status (and WiFi state / IP if supported)
@@ -77,6 +79,16 @@ $ cfg_usbsid [arguments]
   -nsden N, --nsd-enable N      : Enable (1) or Disable (0) Network SID Device (NSD)
   -discen N,--disc-enable N     : Enable (1) or Disable (0) UDP discovery, applied live, persisted by -wapply
   -nsdp N,  --nsd-port N        : Set the Network SID Device port to N
+  -unipm <server|dhcp|static>,
+    --usbnet-ip-mode M          : Set the USB network (NCM) IP mode (or 2/0/1), persisted and applied by -wapply
+                                  server (default): board 192.168.65.1/24, serves the USB link only
+                                  dhcp: needs a host bridge from the USB net interface to the LAN
+                                  static: needs host routing/proxy ARP or a bridge (set addresses with -unst)
+                                  Do not bridge the USB net interface into a LAN while in server mode
+  -unst I,N,G,
+    --usbnet-static I,N,G       : Set the USB network (NCM) static IP, netmask and gateway (dotted, gateway optional),
+                                  persisted and applied by -wapply
+  -unipc,   --usbnet-ipcfg      : Read and print the USB network (NCM) IP mode and stored static IP config
   -wapply,  --wifi-apply        : Persist WiFi/NSD config to flash and apply live
   -wforget, --wifi-forget       : Erase stored WiFi credentials and reset network config to defaults
   -bten N,  --bt-nsd-enable N   : Enable (1) or Disable (0) Bluetooth Network SID Device (SPP transport)

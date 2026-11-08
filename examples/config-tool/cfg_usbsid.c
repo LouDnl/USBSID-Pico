@@ -99,6 +99,8 @@ int value_position(const char * value, const char ** array)
   return 666;
 }
 
+static int cfg_exit_code = 0;  /* nonzero when an option failed */
+
 static int import_ini(void* user, const char* section, const char* name, const char* value)
 {
   int p = 0;
@@ -170,6 +172,10 @@ static int import_ini(void* user, const char* section, const char* name, const c
   if (MATCH("Features", "mixed")) {
     p = value_position(value, truefalse);
     if (p != 666) ini_config->mixed = p;
+  }
+  if (MATCH("Features", "rx_ring")) {
+    p = value_position(value, truefalse);
+    if (p != 666) ini_config->rx_ring = p;
   }
 
   /* LED */
@@ -274,6 +280,8 @@ void write_config_ini(Config * config, char * filename)
     fprintf(f, "mirrored = %s\n", truefalse[config->mirrored]);
     fprintf(f, "flipped  = %s\n", truefalse[config->flipped]);
     fprintf(f, "mixed    = %s\n", truefalse[config->mixed]);
+    fprintf(f, "; USB RX ringbuffer\n");
+    fprintf(f, "rx_ring  = %s\n", truefalse[config->rx_ring]);
     fprintf(f, "\n");
 
     fprintf(f, "[LED]\n");
@@ -528,6 +536,21 @@ void save_config(int reboot)
   return;
 }
 
+void read_version(uint8_t cmd, int print_version);
+
+/* True when the firmware version is newer than v0.8.1 (USB RX ringbuffer setting exists) */
+bool fw_has_rxring(void)
+{
+  if (project_version[0] == 0) read_version(USBSID_VERSION, 0);
+  const char * v = project_version;
+  while (*v != 0 && !isdigit((unsigned char)*v)) v++;
+  int ma = 0, mi = 0, pa = 0;
+  if (sscanf(v, "%d.%d.%d", &ma, &mi, &pa) != 3) return false;
+  if (ma != 0) return ma > 0;
+  if (mi != 8) return mi > 8;
+  return pa > 1;
+}
+
 void write_config(Config * config)
 {
   /* General */
@@ -572,6 +595,7 @@ void write_config(Config * config)
   write_config_command(SET_CONFIG,0xC,(int)config->mirrored,0,0);
   write_config_command(SET_CONFIG,0xD,(int)config->flipped,0,0);
   write_config_command(SET_CONFIG,0xE,(int)config->mixed,0,0);
+  if (fw_has_rxring()) write_config_command(SET_CONFIG,BOARD_RXRING,(int)config->rx_ring,0,0);  /* USB RX ringbuffer, applies after save and reboot */
 
   printf("Sending save config command\n");
   save_config(0);
@@ -686,7 +710,10 @@ void set_cfg_from_buffer(const uint8_t * buff, size_t len)
         usbsid_config.lock_clockrate = buff[i];
         break;
       case 6:
-        usbsid_config.external_clock = buff[i];
+        usbsid_config.external_clock = (buff[i] & 0b1);
+        break;
+      case 59:
+        usbsid_config.rx_ring = (buff[i] & 0b1);
         break;
       case 7:
         clockrate |= (buff[i] << 16);
@@ -1216,6 +1243,8 @@ void print_config(void)
     enabled[(int)usbsid_config.Midi.enabled]);
   printf("  ASID feature = %s\n",
     enabled[(int)usbsid_config.Asid.enabled]);
+  if (fw_has_rxring()) printf("  USB RX ringbuffer = %s\n", enabled[(int)usbsid_config.rx_ring]);
+  else printf("  USB RX ringbuffer = not supported by firmware\n");
   printf("\n");
   printf("Verification of socket change detection on boot = %s\n",
     enabled[(int)usbsid_config.socket_change_detect]);
@@ -1984,6 +2013,8 @@ void print_help_features(void)
   printf("                                  0: %s, 1:%s\n", enabled[0], enabled[1]);
   printf("  -pad N,   --preset-detect N   : Disable/enable and save the silent automatic socket detection on preset selection\n");
   printf("                                  0: %s, 1:%s\n", enabled[0], enabled[1]);
+  printf("  -rxring N, --rx-ring N        : Disable/enable and save the USB RX ringbuffer, the board reboots on change\n");
+  printf("                                  0: Disabled, 1:Enabled\n");
 
   return;
 }
@@ -2576,6 +2607,28 @@ void config_usbsidpico(int argc, char **argv)
       write_config_command(SOCKET_DETECT, det, 0x0, 0x0, 0x0);
       break;
     }
+    if (!strcmp(argv[param_count], "-rxring") || !strcmp(argv[param_count], "--rx-ring")) {
+      if (!fw_has_rxring()) {
+        printf("USB RX ringbuffer needs firmware newer than v0.8.1\n");
+        cfg_exit_code = 1;
+        goto exit;
+      }
+      param_count++;
+      if (param_count >= argc) {
+        printf("-rxring requires a value: 0 or 1\n");
+        cfg_exit_code = 1;
+        goto exit;
+      }
+      int rx = atoi(argv[param_count]);
+      if (rx > 1 || rx < 0) {
+        printf("%d is not a correct USB RX ringbuffer option, use 0 or 1\n", rx);
+        cfg_exit_code = 1;
+        goto exit;
+      }
+      printf("USB RX ringbuffer set to '%s', the board saves and reboots when the value changes\n", (rx ? "On" : "Off"));
+      write_config_command(SET_RX_RING, rx, 0x0, 0x0, 0x0);
+      break;
+    }
     int size = 0;
     if (!strcmp(argv[param_count], "-configr")) {
       param_count++;  /* skip usbsid executable and -config self */
@@ -2799,6 +2852,24 @@ void config_usbsidpico(int argc, char **argv)
           int sw = atoi(argv[pc]);
           printf("Set lock mono/stereo audio switch from '%s' to '%s'\n", truefalse[usbsid_config.lock_audio_sw], truefalse[sw]);
           write_config_command(SET_CONFIG, 0xB, sw, 0x0, 0x0);
+          continue;
+        }
+        if (!strcmp(argv[pc], "-rxring") || !strcmp(argv[pc], "--rx-ring")) {
+          if (!fw_has_rxring()) {
+            printf("USB RX ringbuffer needs firmware newer than v0.8.1\n");
+            cfg_exit_code = 1;
+            goto exit;
+          }
+          pc++;
+          int rx = (pc < argc) ? atoi(argv[pc]) : -1;
+          if (rx < 0 || rx > 1) {
+            printf("USB RX ringbuffer option must be 0 or 1\n");
+            cfg_exit_code = 1;
+            goto exit;
+          }
+          printf("Set USB RX ringbuffer from %s to: %s (applies after save and reboot)\n", enabled[usbsid_config.rx_ring], enabled[rx]);
+          usbsid_config.rx_ring = rx;
+          write_config_command(SET_CONFIG, BOARD_RXRING, rx, 0x0, 0x0);
           continue;
         }
         if (!strcmp(argv[pc], "-fm") || !strcmp(argv[pc], "--fmopl-enabled")) {
@@ -3201,7 +3272,7 @@ exit:;
   if (usid_dev != -1 || usid_dev == 0) {
     usbsid_close();
   }
-  return 0;
+  return cfg_exit_code;
 };
 
 #pragma diagnostic pop
