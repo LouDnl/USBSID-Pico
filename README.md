@@ -275,6 +275,7 @@ The firmware is still in development so features might change, be added or remov
   - NSD enable and discovery settings apply live, WiFi state and IP address can be queried (`cfg_usbsid -wifis`)
 - Optional SID register stream on a second vendor USB interface (build with `-DENABLE_SID_STREAM=1`), plus batch reads of up to 63 registers per USB packet
 - USB RX ringbuffer (default on): up to 8 incoming USB packets are buffered and played from the main loop: a host USB scheduling delay no longer leaves the SID idle (no cracks on write-heavy tunes). Applies to CDC and WebUSB, rp2040 and rp2350, takes effect after a reboot
+- Clock link (default off): mirror the SID clock to PHI2 for linking boards, or drive PHI1 from an external clock on PHI2; set with `cfg_usbsid -lclk` or the Configtool, the board saves and reboots on change
 #### v1.3+ PCB
 - Audio switch Stereo/Mono control
 #### v1.5+ PCB

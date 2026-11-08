@@ -151,13 +151,15 @@ https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/libwinpth
 https://usbsid.loudai.nl/?player=webusb[USBSID web configuration tool] (requires a Chrome based browser). +
 If needed you can change your USBSID configuration after selecting WebUSB and clicking on `Open config`. +
 image:images/firmware/usbsidpico-configwebsite.png[Title=Config Commodore theme,500] +
-_The player is set up with borrowed code from Deepsid using Hermit's JsSID implementation._
+_The player is set up with borrowed code from Deepsid using Hermit's JsSID implementation._ +
+The SID Presets buttons are `SINGLE`, `DUAL`, `SINGLE (S2)` (single SID in socket two), `MIRRORED`, `DUAL MIRRORED` (both sockets get the same writes), `TRIPLE (S1)`, `TRIPLE (S2)`, `QUAD`, `DUAL-S1`, `DUAL-S2`, `DUAL-FLIP`, `QUAD-FLIP`, `QUAD-MIX` and `QUAD-FLIP+MIX`.
 
 === Default configuration (depends on the board version)
 The default configuration differs slightly between Pico1 (rp2040) and Pico2 (rp2350) boards. +
 An explanation for these settings can be found further on in this document. +
 Board clock rate: `1000000Hz (DEFAULT)` for rp2040, `985248Hz (PAL)` for rp2350 +
 Clock rate locked: `False` +
+Clock link: `False` +
 Audio mode: `Mono` +
 Preset silent auto detection: `False` (`True` for PCB revision v1.5+) +
 Socket One Enabled: `True` +
@@ -197,12 +199,25 @@ FMOpl SID no: `0`
 The Commodore64 has different clockrates depending on where you live, USBSID-Pico supports these different clock rates as configuration setting. +
 Supported SID players will automatically send a new clock rate request to the board to switch to. +
 Available options are: +
-`DEFAULT 1000000Hz`, `PAL 985248Hz`, `NTSC 1022727`, `DREAN 1023440`, `NTSC2 1022730`
+`0` `DEFAULT 1000000Hz`, `1` `PAL 985248Hz`, `2` `NTSC 1022727`, `3` `DREAN 1023440`, `4` `NTSC2 1022730` +
+The clock rate can also be set manually with `cfg_usbsid -sc N` (`--set-clock`), the web configuration page, the Configtool or `clock_rate` in an ini file. +
+When `Clock rate locked` is enabled, clock rate change requests from players are ignored.
 
 === Clock rate locked
 Some players start sending data directly after the clockrate is changed. While in most cases this is no issue, some SID clones need some time to start up. This causes issues when the clock rate is changed on the fly. +
 Also changing the clock rate multiple times after another can cause data corruption to the SID which causes garbled sound. +
 To overcome this it is possible to lock the clockrate to the current setting it is set to. This blocks the ability for on the fly change requests. +
+Available options are: +
+`False`, `True`
+
+=== Clock link
+Mirrors the generated SID clock to the second clock pin `PHI2` as well as `PHI1`, or when an external clock is detected on `PHI2`, derives the `PHI1` output from that input. +
+With the clock link disabled the clock is only output on `PHI1`, external clock detection on `PHI1` runs on PCB v1.0 only. +
+When an external clock is detected the clock rate falls back to `PAL`. +
+Changing the setting saves the configuration and reboots the board. Sending the current value does nothing. +
+The state is reported in `READ_CONFIG` byte 6, bit 1. The command to change it is `LINK_CLOCK` `0x84`. +
+Change it with `cfg_usbsid -lclk 0|1` (`--link-clock`) or with the `Clock link` toggle on the Clock screen of the Configtool. +
+Default is `False`. +
 Available options are: +
 `False`, `True`
 
@@ -293,7 +308,8 @@ Available options are: +
 When enabled, the board silently re-runs chip/SID auto detection before applying a preset. +
 Default is `False` on PCB revision v1.0~v1.3 and `True` on PCB revision v1.5+. +
 Available options are: +
-`False`, `True`
+`False`, `True` +
+Change it with `cfg_usbsid -pad 0|1` (`--preset-detect`, `PRESET_DETECT` `0xFE`, saved without a reboot), `SET_CONFIG` item 16 (`BOARD_PADETECT`), the `Preset Auto Detect` setting on the web configuration page or the `Preset auto detect` toggle under ADVANCED in the Configtool.
 
 === LED Enabled
 Disable or enable the use of the onboard LED. +
@@ -337,8 +353,10 @@ Available options are: +
 `False`, `True`
 
 === FMOpl SID number
-_This setting cannot be changed manually_
-This setting will automatically be set to the correct SID number when all requirements are met as described under `FMOpl Enabled`
+This setting is set automatically to the correct SID number when the requirements under `FMOpl Enabled` are met. +
+It can also be set manually with `SET_CONFIG` item 9 (`BOARD_FMOPL`) and the SID number, or with the `FMOpl SID No.` selector on the Sockets screen of the Configtool. +
+A SID without an assigned address is refused. +
+Auto detection and socket change detection (PCB v1.5+) always override a manual setting.
 
 === CDC Enabled
 _This config setting is intended for future use_
