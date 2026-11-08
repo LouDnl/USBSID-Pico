@@ -180,6 +180,7 @@ const SID_PLAYER_MUTED = 0xEA;
 const SID_PLAYER_TIME  = 0xEB;
 
 const CONFIG_ACK       = 0xFA;  /* Acknowledge the current configuration and switch on regulators (v1.5+ boards only) */
+const SET_RX_RING      = 0x83;  /* USB RX ringbuffer off/on (arg 0/1); firmware saves + reboots when the value changes */
 const SOCKET_DETECT    = 0xFD;  /* Disable/enable automatic socket change detection on boot (v1.5+ boards only) */
 
 /* Config write sub-types */
@@ -1013,6 +1014,12 @@ class USBSIDDevice {
   async hasSidPlayer() {
     const f = await this.readFeatures();
     return (f === null) ? null : (f & FEATURE_SIDPLAYER) !== 0;
+  }
+
+  /* USB RX ringbuffer off/on. val: 0 = off, 1 = on. The firmware saves the
+   * config and reboots when the value changes, same value is a no-op. */
+  async setRxRing(val) {
+    await this.configCmd(SET_RX_RING, val & 1);
   }
 
   /* Clone config commands */

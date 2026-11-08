@@ -27,6 +27,7 @@ const cfgmap = {
   CFG_PRESET_AUTO_DETECT:   4,   /* value & 0x80, byte 0-6 = last preset */
   CFG_CLOCKLOCK:            5,
   CFG_EXT_CLOCK:            6,   /* external_clock boolean */
+  CFG_RX_RING:              59,  /* byte [59] = rx_ring, 0 or 1 */
   CFG_CLKRATE_H:            7,
   CFG_CLKRATE_M:            8,
   CFG_CLKRATE_L:            9,
@@ -108,6 +109,16 @@ const selectConfigMap = {
 };
 
 /* Helper: build <select> options from array */
+/* USB RX ringbuffer exists only in firmware newer than v0.8.1.  Parses the
+ * leading major.minor.patch of e.g. "v0.9.0-20261108"; unparseable = no. */
+function fwHasRxRing(ver) {
+  const m = /^\s*v?(\d+)\.(\d+)\.(\d+)/.exec(ver || '');
+  if (!m) return false;
+  const a = [+m[1], +m[2], +m[3]], b = [0, 8, 1];
+  for (let i = 0; i < 3; i++) { if (a[i] !== b[i]) return a[i] > b[i]; }
+  return false;
+}
+
 function buildSelectOptions(sel, arr) {
   sel.innerHTML = '';
   arr.forEach((label, i) => {
@@ -173,6 +184,8 @@ function buildAllSelectOptions() {
   const slaw = get('sel-lock-audiosw'); if (slaw) buildSelectOptions(slaw, VA_ENABLED);
   const sflp = get('sel-flipped');      if (sflp) buildSelectOptions(sflp, VA_ENABLED);
   const smix = get('sel-mixed');        if (smix) buildSelectOptions(smix, VA_ENABLED);
+
+  const srr = get('sel-rx-ring');       if (srr)  buildSelectOptions(srr, VA_ENABLED);
 
   /* v1.5+: socket change detection (0=Enabled, 1=Disabled) */
   const ssd = get('sel-socket-detect'); if (ssd) buildSelectOptions(ssd, ['Enabled', 'Disabled']);
@@ -283,6 +296,12 @@ function presentConfig(cfgData) {
       confirmEl.style.color = 'var(--c64-green)';
     }
   }
+  setSelectIndex('sel-rx-ring', (cfgData[cfgmap.CFG_RX_RING] & 0x01) ? 1 : 0);
+  const rxOk = fwHasRxRing(typeof usbsid !== 'undefined' ? usbsid.version : '');
+  const rxSel = document.getElementById('sel-rx-ring');
+  if (rxSel) rxSel.disabled = !rxOk;
+  const rxNote = document.getElementById('rx-ring-note');
+  if (rxNote) rxNote.style.display = rxOk ? 'none' : '';
   setSelectIndex('sel-socket-detect', cfgData[cfgmap.CFG_DISABLE_CHANGEDETECT] ? 1 : 0);
 
   /* Enable v1.5 controls now that config is loaded */
@@ -546,6 +565,26 @@ function initConfigUI() {
   attachSelectListeners();
   attachButtonListeners();
   checkDebugMode();
+
+  /* USB RX ringbuffer: dedicated SET_RX_RING command; the firmware saves and
+   * reboots when the value changes, so reconnect like the save + reboot button */
+  const selRxRing = document.getElementById('sel-rx-ring');
+  if (selRxRing) {
+    selRxRing.addEventListener('change', async () => {
+      if (!fwHasRxRing(typeof usbsid !== 'undefined' ? usbsid.version : '')) return;
+      if (!usbsidDevice.isOpen) { usbsidSetStatus('Not connected', 'red'); return; }
+      const val  = parseInt(selRxRing.value, 10);
+      const prev = (window._lastCfgData && (window._lastCfgData[cfgmap.CFG_RX_RING] & 0x01)) ? 1 : 0;
+      await usbsidDevice.setRxRing(val);
+      if (val === prev) { usbsidSetStatus('USB RX ringbuffer: ' + (val ? 'Enabled' : 'Disabled') + ' (unchanged)'); return; }
+      if (usbsidDevice.isSerial) {   /* serial retry reconnects and reloads the config */
+        usbsidSetStatus('USB RX ringbuffer ' + (val ? 'enabled' : 'disabled') + ', saving and rebooting... (reconnects over Web Serial)');
+        return;
+      }
+      usbsidSetStatus('USB RX ringbuffer ' + (val ? 'enabled' : 'disabled') + ', saving and rebooting\u2026');
+      setTimeout(() => (typeof reloadToCurrentTab === 'function' ? reloadToCurrentTab() : window.location.reload()), 3000);
+    });
+  }
 
   /* v1.5+: socket detect change sends SOCKET_DETECT command immediately */
   const selSocketDetect = document.getElementById('sel-socket-detect');

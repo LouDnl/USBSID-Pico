@@ -721,6 +721,16 @@
           </div>
         </div>
 
+        <!-- USB -->
+        <div class="c64-box">
+          <div class="c64-box-title">USB</div>
+          <div class="config-row">
+            <label title="Buffers up to 8 incoming USB packets, prevents cracks on write-heavy tunes. Default on. Changing it saves the config and reboots the board.">USB RX ringbuffer</label>
+            <select id="sel-rx-ring" class="c64-select"></select>
+            <span id="rx-ring-note" class="config-hint" style="display:none">Needs firmware newer than v0.8.1.</span>
+          </div>
+        </div>
+
         <!-- FMOpl -->
         <div class="c64-box">
           <div class="c64-box-title">FMOpl</div>
