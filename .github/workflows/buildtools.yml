@@ -48,9 +48,9 @@ jobs:
               directory: config-tool, buildname: cfg_usbsid }
           - { os: windows-2022, shell: 'msys2 {0}',
               directory: send_sid, buildname: send_sid }
-          - { os: macos-14, shell: 'bash',
+          - { os: macos-15, shell: 'bash',
               directory: config-tool, buildname: cfg_usbsid_macos14 }
-          - { os: macos-14, shell: 'bash',
+          - { os: macos-15, shell: 'bash',
               directory: send_sid, buildname: send_sid_macos14 }
           # - { os: macos-14-large, shell: 'bash',
           #     directory: config-tool, buildname: cfg_usbsid_macos14large }
@@ -118,7 +118,7 @@ jobs:
           sudo apt-get install -y pkg-config cmake build-essential libusb-1.0-0 libusb-1.0-0-dev
 
       # - name: Install dependencies (MacOs)
-      #   if: matrix.os == 'macos-14' || matrix.os == 'macos-15-intel'
+      #   if: matrix.os == 'macos-15' || matrix.os == 'macos-15-intel'
       #   run: |
       #     brew update
       #     brew install pkg-config cmake ninja libusb
