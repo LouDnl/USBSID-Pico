@@ -1236,6 +1236,16 @@ export class USPlayerAdapter {
   }
 
   /**
+   * Every song length in ms from the v5 embedded table of the loaded tune
+   * Fallback for a tune the database lacks
+   * Return null without a table
+   */
+  embeddedSongLengths() {
+    if (!this._player || typeof this._player.embeddedSongLengths !== 'function') return null;
+    try { return this._player.embeddedSongLengths(); } catch (_) { return null; }
+  }
+
+  /**
    * Last value written to a SID register, from the write shadow
    * Pull side of setHost({ registers })
    * A shadow because USB reads are too slow, ASID has no read and software audio lives in

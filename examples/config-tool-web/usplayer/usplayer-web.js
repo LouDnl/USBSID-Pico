@@ -207,6 +207,9 @@ export class USBSIDPlayerWeb {
     this._irqSources  = M.cwrap('usp_irq_sources', 'number', []);
     this._startMode   = M.cwrap('usp_start_mode', 'number', []);
     this._driverAddr  = M.cwrap('usp_driver_address', 'number', []);
+    /* Older wasm may lack it, the page then treats the video standard as known */
+    this._videoKnown  = (typeof M._usp_video_known === 'function')
+                      ? M.cwrap('usp_video_known', 'number', []) : null;
     this._songMd5     = M.cwrap('usp_song_md5', null, ['number', 'number', 'number']);
     this._songlenMs   = M.cwrap('usp_songlength_ms', 'number',
                                 ['number', 'number', 'number', 'number']);
@@ -725,7 +728,7 @@ export class USBSIDPlayerWeb {
    *
    * Read from the chips as they stand, true for the playing subtune. The init
    * routine decides if a CIA timer, raster compare or TOD alarm calls play,
-   * and a later subtune can differ. Return {irq: string[], start, driver}.
+   * and a later subtune can differ. Return {irq: string[], start, driver, video, videoKnown}.
    */
   timing() {
     const bits = this._irqSources();
@@ -739,10 +742,18 @@ export class USBSIDPlayerWeb {
     if (bits & 0x20) irq.push('CIA2 TOD');
     if (bits & 0x40) irq.push('VIC raster');
     const START = ['PSIDdrv', 'BASIC', 'PRG'];
+    /* Nearest of PAL 985248, NTSC 1022727, DREAN 1023440 Hz */
+    let video = null;
+    const hz = this._clockHz ? this._clockHz() : 0;
+    if (hz > 0) {
+      video = hz < 1004000 ? 'PAL' : (hz < 1023084 ? 'NTSC' : 'DREAN');
+    }
     return {
       irq,
       start: START[this._startMode()] || '?',
       driver: this._driverAddr(),
+      video,
+      videoKnown: this._videoKnown ? !!this._videoKnown() : true,
     };
   }
 
