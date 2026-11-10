@@ -1490,7 +1490,6 @@ function setNowPlayingName(name) {
 }
 
 function updateMetaDisplay(info) {
-  const p = _player;
   const el = document.getElementById('np-meta');
   if (!el) return;
   try {
@@ -1501,40 +1500,82 @@ function updateMetaDisplay(info) {
     /* A hyphen and not an em dash: the project writes no em dashes. */
     el.textContent = parts.join(' - ') || '';
   } catch (_) {}
+  _npInfo = info || null;
+  if (!info) {
+    const badges = document.getElementById('np-badges');
+    if (badges) badges.innerHTML = '';
+    _npBadgeSig = '';
+    return;
+  }
+  updateNpBadges(info, true);
+}
 
+/* Last meta info handed to updateMetaDisplay() and the badge signature last drawn */
+var _npInfo = null;
+var _npBadgeSig = '';
+
+/**
+ * Draw the Now Playing badges (SID count, start mode and driver, IRQ sources,
+ * video standard)
+ *
+ * The driver address and IRQ sources only exist once the tune's init has run,
+ * which is after the load reply this gets its info from. So the playtime tick
+ * calls it again and it redraws only when what it shows changed, which also
+ * covers a subtune change. Keeps the emulated modes' mute grid in step with the
+ * SID count.
+ *
+ * @param {object} [info] the load info, the last one is used when omitted
+ * @param {boolean} [force] redraw even if nothing changed
+ */
+function updateNpBadges(info, force) {
+  const p = _player;
+  if (info) _npInfo = info; else info = _npInfo;
+  if (!info) return;
   const badges = document.getElementById('np-badges');
-  if (badges) {
-    badges.innerHTML = '';
-    const add = (text) => {
-      if (!text) return;
-      const b = document.createElement('span');
-      b.className = 'np-badge';
-      b.textContent = text;
-      badges.appendChild(b);
-    };
-    const n = info && info.numSids ? info.numSids : 0;
-    if (n > 1) add(n + 'SID');
-    /* The emulated modes' mute grid follows the tune, so a two SID tune gets two
-     * rows. Rebuilt only when the count actually changes. */
-    if (n >= 1 && n !== _playerSidCount) {
-      _playerSidCount = n;
-      const box = document.getElementById('sendsid-mute-btns');
-      if (box && box.dataset.built === 'player') initPlayerMuteGrid();
-    }
+  if (!badges) return;
 
-    /* What is driving the tune, and how it was started. Both are read out of
-     * the emulated chips rather than the file, so they describe the subtune
-     * that is playing: a tune's init routine chooses whether a CIA timer, a
-     * raster compare or a TOD alarm calls the play routine, and another subtune
-     * may choose differently. */
-    const t = (p && typeof p.timing === 'function') ? p.timing() : null;
-    if (t) {
-      if (t.start) add(t.start + (t.driver ? ' $' + hex16(t.driver) : ''));
-      for (const src of t.irq) add(src);
-      if (!t.irq.length) add('no IRQ');
-    } else if (info && info.isPrg) {
-      add('PRG');
+  const n = info.numSids ? info.numSids : 0;
+  /* What is driving the tune, and how it was started. Both are read out of
+   * the emulated chips rather than the file, so they describe the subtune
+   * that is playing: a tune's init routine chooses whether a CIA timer, a
+   * raster compare or a TOD alarm calls the play routine, and another subtune
+   * may choose differently. Null in the board modes. */
+  let t = null;
+  try { t = (p && typeof p.timing === 'function') ? p.timing() : null; } catch (_) {}
+
+  const sig = [n, t ? t.start : '', t ? t.driver : '', t ? t.irq.join(',') : '',
+               t ? t.video : '', t ? t.videoKnown : '', info.isPrg ? 1 : 0].join('|');
+  if (!force && sig === _npBadgeSig) return;
+  _npBadgeSig = sig;
+
+  badges.innerHTML = '';
+  const add = (text, title) => {
+    if (!text) return;
+    const b = document.createElement('span');
+    b.className = 'np-badge';
+    b.textContent = text;
+    if (title) b.title = title;
+    badges.appendChild(b);
+  };
+  if (n > 1) add(n + 'SID');
+  /* The emulated modes' mute grid follows the tune, so a two SID tune gets two
+   * rows. Rebuilt only when the count actually changes. */
+  if (n >= 1 && n !== _playerSidCount) {
+    _playerSidCount = n;
+    const box = document.getElementById('sendsid-mute-btns');
+    if (box && box.dataset.built === 'player') initPlayerMuteGrid();
+  }
+
+  if (t) {
+    if (t.video) {
+      if (t.videoKnown === false) add(t.video + '*', 'Tune states no video standard, played as ' + t.video);
+      else add(t.video);
     }
+    if (t.start) add(t.start + (t.driver ? ' $' + hex16(t.driver) : ''));
+    for (const src of t.irq) add(src);
+    if (!t.irq.length) add('no IRQ');
+  } else if (info.isPrg) {
+    add('PRG');
   }
 }
 
@@ -1995,6 +2036,7 @@ var _playtimeTimer = null;
 
 function updatePlaytimeDisplay() {
   updateVolumeRow();   /* FM shows once a tune writes to it */
+  if (!_loading) updateNpBadges();   /* driver and IRQ badges exist only after init */
   const el = document.getElementById('np-time');
   if (!el) return;
   const total = currentSongLengthMs();
