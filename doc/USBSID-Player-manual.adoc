@@ -58,6 +58,18 @@ At start with keys on the player prints the list of keys. The arrow keys work th
 | ctrl-c | Quit, same effect as s (SIGTERM does the same)
 |===
 
+=== Subtunes and WAV recording with the usplayer CLI
+A tune with more than one subtune plays from the start song through the last one. Each song ends on its length from the HVSC Songlengths database or the file's own v5 song length table, 5 minutes when neither knows the song, and the player moves on to the following subtune. +
+`-s N` picks the start song. `-1` or `--single` plays only that song and stops when it ends. `-t N` stops after N seconds and also keeps the player on one song. +
+The same rules apply to `-w FILE`: without `-1` the WAV holds every song from the start song through the last. With `-nsl` and no `-t` the song never ends and the WAV keeps growing until ctrl-c.
+
+[source,shell]
+----
+usplayer -w all.wav tune.sid              # every subtune, from the default song on
+usplayer -s 2 -1 -w song2.wav tune.sid    # subtune 2 only
+usplayer -s 2 -t 90 -w song2.wav tune.sid # subtune 2, first 90 seconds
+----
+
 
 == Drivers
 include::drivers.adoc[]
