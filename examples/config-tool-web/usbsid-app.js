@@ -1543,7 +1543,7 @@ function updateNpBadges(info, force) {
   let t = null;
   try { t = (p && typeof p.timing === 'function') ? p.timing() : null; } catch (_) {}
 
-  const sig = [n, t ? t.start : '', t ? t.driver : '', t ? t.irq.join(',') : '',
+  const sig = [n, t ? t.start : '', t ? t.driver : '', t ? t.irq.join(',') : '', t ? t.irqKnown : '',
                t ? t.video : '', t ? t.videoKnown : '', info.isPrg ? 1 : 0].join('|');
   if (!force && sig === _npBadgeSig) return;
   _npBadgeSig = sig;
@@ -1572,8 +1572,11 @@ function updateNpBadges(info, force) {
       else add(t.video);
     }
     if (t.start) add(t.start + (t.driver ? ' $' + hex16(t.driver) : ''));
-    for (const src of t.irq) add(src);
-    if (!t.irq.length) add('no IRQ');
+    /* Sources are collected after the first second of play, show none before */
+    if (t.irqKnown !== false) {
+      for (const src of t.irq) add(src);
+      if (!t.irq.length) add('no IRQ');
+    }
   } else if (info.isPrg) {
     add('PRG');
   }

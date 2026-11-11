@@ -205,6 +205,9 @@ export class USBSIDPlayerWeb {
     this._frames      = M.cwrap('usp_frames', 'number', []);
     this._playtimeMs  = M.cwrap('usp_playtime_ms', 'number', []);
     this._irqSources  = M.cwrap('usp_irq_sources', 'number', []);
+    /* Older wasm may lack it, the sources are then treated as known */
+    this._irqKnown    = (typeof M._usp_irq_known === 'function')
+                      ? M.cwrap('usp_irq_known', 'number', []) : null;
     this._startMode   = M.cwrap('usp_start_mode', 'number', []);
     this._driverAddr  = M.cwrap('usp_driver_address', 'number', []);
     /* Older wasm may lack it, the page then treats the video standard as known */
@@ -726,9 +729,12 @@ export class USBSIDPlayerWeb {
   /**
    * Get what drives the tune and how it was started
    *
-   * Read from the chips as they stand, true for the playing subtune. The init
-   * routine decides if a CIA timer, raster compare or TOD alarm calls play,
-   * and a later subtune can differ. Return {irq: string[], start, driver, video, videoKnown}.
+   * Read from the chips, true for the playing subtune. The init routine decides
+   * if a CIA timer, raster compare or TOD alarm calls play, and a later subtune
+   * can differ. irq lists the sources used since the subtune started, collected
+   * after 1 s of play and never cleared until the song restarts, so a tune that
+   * toggles timers does not blink. irqKnown is false during that first second.
+   * Return {irq: string[], irqKnown, start, driver, video, videoKnown}.
    */
   timing() {
     const bits = this._irqSources();
@@ -750,6 +756,7 @@ export class USBSIDPlayerWeb {
     }
     return {
       irq,
+      irqKnown: this._irqKnown ? !!this._irqKnown() : true,
       start: START[this._startMode()] || '?',
       driver: this._driverAddr(),
       video,
