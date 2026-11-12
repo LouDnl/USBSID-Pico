@@ -134,13 +134,16 @@ body::before {
 /* Tabs */
 #c64-tabs {
   display: flex;
+  flex-wrap: wrap;           /* phone width: overflow to a second row */
   gap: 4px;
   margin-bottom: 8px;
   border-bottom: 2px solid var(--c64-border);
   padding-bottom: 4px;
 }
 .c64-tab {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--font-main);
   font-size: 1rem;
   text-transform: uppercase;
@@ -154,6 +157,7 @@ body::before {
   border-radius: 2px 2px 0 0;
   transition: background 0.15s, color 0.15s;
   user-select: none;
+  white-space: nowrap;
 }
 .c64-tab:hover { background: var(--c64-btn-hover); color: var(--c64-white); }
 .c64-tab.active {
@@ -163,7 +167,9 @@ body::before {
 }
 /* External link buttons in the tab bar - same shape, cyan accent, pushed to right */
 .c64-tab-link {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--font-main);
   font-size: 1rem;
   text-transform: uppercase;
@@ -177,12 +183,18 @@ body::before {
   border-radius: 2px 2px 0 0;
   transition: background 0.15s, color 0.15s;
   user-select: none;
+  white-space: nowrap;
+}
+/* GitHub + Firmware wrap as one unit, pushed right on whichever row they land */
+.c64-tab-links {
+  display: flex;
+  gap: 4px;
   margin-left: auto;
 }
-.c64-tab-link + .c64-tab-link { margin-left: 4px; }
 .c64-tab-link:hover { background: var(--c64-cyan); color: var(--c64-bg); }
 @media (max-width: 400px) {
-  .c64-tab {
+  .c64-tab,
+  .c64-tab-link {
     font-size: 0.75rem;
     padding: 3px 6px;
     letter-spacing: 0;
@@ -985,7 +997,8 @@ input[type=range].c64-range::-moz-range-thumb {
     padding: 6px 12px;
     font-size: 0.95rem;
   }
-  .c64-tab { min-height: 40px; padding: 6px 12px; }
+  .c64-tab,
+  .c64-tab-link { min-height: 40px; padding: 6px 12px; }
   .c64-select { min-height: 40px; }
   .c64-input { min-height: 40px; }
   /* Named again: the rules that size these are ID scoped or set their own
