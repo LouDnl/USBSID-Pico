@@ -2,9 +2,6 @@
 # [<img src="images/usbsid-logo.png" width="250em">](images/usbsid-logo.png)![LouD](images/loud.png)
 USBSID-Pico is a RaspberryPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board for interfacing one or two MOS SID chips and/or hardware SID emulators over (WEB)USB with your computer, phone, ASID supporting player or USB midi controller.  
 
-> [!IMPORTANT]
-> **Pre-order Pre-order run #1: 10 of 10, funded! Still open until October 31st: [USBSID-Pico v1.5c Blue PCB](https://smallrun.net/shop/loud/usbsid-pico-v1-5c-blue-pcb)**
-> Pre-soldered board, optional Pico2 and case. You are only charged if 10 boards are committed. Ships tracked and insured from NL (EU EUR 15).
 
 # This is USBSID-Pico! :)
 | **“Raster Bar” (8-bit)** | **Van Halen's Jump<br>dual SID in Stereo!** | **Next Level** | **Outerversal<br>dual SID in Stereo!** |
@@ -294,7 +291,7 @@ After download run `cd pico-sdk/lib/tinyusb` and then `python3 tools/get_deps.py
 ## Where to buy
 #### My SmallRun store
 You can purchase/pre-order (semi) assembled boards with or without Pico via my [SmallRun store](https://smallrun.net/shop/loud)!
-**Run #1 is open:** [USBSID-Pico v1.5c Blue PCB](https://smallrun.net/shop/loud/usbsid-pico-v1-5c-blue-pcb), you are only charged if 10 boards are committed.
+**Run #1 is complete successfully:** [USBSID-Pico v1.5c Blue PCB](https://smallrun.net/shop/loud/usbsid-pico-v1-5c-blue-pcb).
 [<img src="images/smallrun-35.png" width="150em">](https://smallrun.net/shop/loud)  
 <!-- Sponsored by [<img src="images/pcbway.png" width="150em">](images/pcbway.png) -->
 #### PCBWay
