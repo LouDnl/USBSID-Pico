@@ -47,6 +47,11 @@ include_directories(".")
 ### Create and enable PkgConfig
 find_package(PkgConfig REQUIRED)
 
+### Prefer static libraries on Windows, fall back to import libraries
+if (WIN32)
+set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
+endif (WIN32)
+
 ### Create `PkgConfig::<MODULE>` variables
 pkg_check_modules(libusb REQUIRED IMPORTED_TARGET libusb-1.0)
 
@@ -65,6 +70,7 @@ set(TARGET_LL
   PkgConfig::libusb
   Threads::Threads
   -lwinmm
+  -static
 )
 endif (WIN32)
 

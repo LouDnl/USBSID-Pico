@@ -1,6 +1,9 @@
 # Changelog
 Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on version changes
 
+#### Version: Unreleased
+* Build tools in full static without dependencies
+
 #### Version: 0.9.0
 * Add batch READ of up to 63 registers
 * Add Network SID Device (NSD) server over WiFi for pico_w/pico2_w
