@@ -29,7 +29,15 @@ var _browser        = null;
 var _player         = null;
 var _pcbver         = '';        /* PCB version string from device descriptor */
 var _emulator       = 'usplayer';  /* matches the default selected option in index.html */
-var _hasSIDPlayer   = false;     /* true when connected device productName contains 'Pico2' */
+/* Tri-state: does the connected WebUSB device's firmware carry the onboard SID
+ * player (SendSID mode)? true/false straight from hasSidPlayer(), or null on
+ * an older firmware that predates the US_FEATURES command and will not say.
+ * Never gate SendSID on this being false-y from silence: only a definite
+ * `false` blocks it, the way a definite `true` or an unknown `null` (older
+ * firmware that predates the US_FEATURES query) both allow it and let the
+ * board itself refuse an upload it cannot use. The Web Serial route asks the
+ * same question over the shared serial transport and refuses a definite `false`. */
+var _sidplayerCap   = null;
 var _loadedBytes    = null;      /* Uint8Array of the currently loaded SID file */
 var _sendsidPlaying = false;     /* playback state for SendSID onboard player mode */
 var _currentFile    = null;      /* { url, name } - url is blob: or http: */
@@ -38,11 +46,10 @@ var _currentSubtune = 0;
 var _maxSubtunes    = 1;
 var _webusbSidOffset   = 0;     /* SID address offset for WebUSB play-on-SID selector (0x00/0x20/0x40/0x60) */
 
-/* Path to SID library - same directory as this page, then SID/ */
-const SID_PATH = (function() {
-  const base = window.location.pathname.replace(/\/[^/]*$/, '/');
-  return base + 'SID/';
-}());
+/* Path to SID library - SID/ next to this script. Resolved from the script's
+ * own URL, not location.pathname: every route (/blog/<slug>, /blog/) serves
+ * this same page, and a page relative base there would point at /blog/SID/. */
+const SID_PATH = new URL('SID/', document.currentScript.src).pathname;
 
 /* Utility: log to debug panel + console */
 function usbsidLog(...args) {
@@ -66,6 +73,16 @@ function usbsidSetStatus(msg, color) {
   }
 }
 
+/* Utility: status text for a failed connect, from the driver's lastError.
+ * Returns '' when the failure left no error (picker cancelled, no device). */
+function usbsidConnectErrorText(err) {
+  if (!err) return '';
+  if (err.name === 'NetworkError')
+    return 'USBSID-Pico is in use by another tab or application. Close it there and try again.';
+  if (err.name === 'NotFoundError') return '';   /* picker cancelled */
+  return 'Connection failed: ' + (err.name || 'Error') + (err.message ? ': ' + err.message : '');
+}
+
 /* Utility: set LED state */
 function setLED(connected) {
   const led = document.getElementById('status-led');
@@ -74,30 +91,121 @@ function setLED(connected) {
   else led.classList.remove('connected');
 }
 
-/* Tab switching */
+/* Tab switching - real path slugs (/player, /config, ...), not #hash.
+ * Hash fragments are invisible to Google's indexer as separate URLs; real
+ * paths are. Nav tabs are <a href="/x" data-tab="x"> so a crawler that does
+ * not run JS still sees real links, and the click handler below intercepts
+ * same-tab-bar clicks to route client-side without a full page load.
+ * Requires the web server to serve this same index.html for every route
+ * below (nginx: a regex location per route with try_files /index.html) -
+ * otherwise a direct hit or refresh on e.g. /blog 404s. Only real routes get
+ * the fallback; any other path must stay a real 404, or every typo becomes
+ * a 200 duplicate of the home page (a "soft 404" to Google). The server also
+ * rewrites the static canonical/og:url per route, so crawlers see the same
+ * canonical before and after this script runs. */
+const TAB_NAMES = ['player', 'regs', 'visuals', 'config', 'about', 'blog'];
+/* One entry per blog post. Add a slug + title here and a matching
+ * #blog-post-<slug> .blog-view block in index.html to publish a new post -
+ * /blog itself just lists whatever is in this map. */
+const BLOG_POSTS = {
+  'usbsid-pico-sids-on-usb': {
+    title: 'USBSID-Pico: Bridging Real Commodore 64 Sound to Modern USB | USBSID-Pico Blog'
+  }
+};
+/* Distinct <title> per route - a real, differing title per page is an SEO
+ * signal a single static title across every tab could never give. */
+const TAB_TITLES = {
+  player: 'USBSID-Pico Web SID Player',
+  regs:   'USBSID-Pico SID Registers (Live)',
+  visuals: 'USBSID-Pico SID Visuals: Oscilloscope, Filter and Stereo',
+  config: 'USBSID-Pico Web Config',
+  about:  'About USBSID-Pico',
+  blog:   'USBSID-Pico Blog'
+};
+function tabPath(name, sub) {
+  if (name === 'player') return '/';
+  if (name === 'blog' && sub) return '/blog/' + sub;
+  return '/' + name;
+}
+/* Reload via the site root plus #tab: initTabs maps the hash back to /tab, which works
+ * on servers without the per-route fallback (python http.server) as well as nginx. */
+function reloadToCurrentTab() {
+  const route = parseRoute(location.pathname);
+  const tab = route ? route.tab : 'player';
+  location.replace('/' + location.search + (tab === 'player' ? '' : '#' + tab));
+}
+/* Parses a pathname into { tab, sub } or null if it matches no known route.
+ * sub is only ever set for a recognised /blog/<slug>. */
+function parseRoute(path) {
+  const slug = path.replace(/\/+$/, '') || '/';
+  if (slug === '/') return { tab: 'player', sub: null };
+  const parts = slug.slice(1).split('/');
+  const name = parts[0];
+  if (!TAB_NAMES.includes(name)) return null;
+  if (parts.length === 1) return { tab: name, sub: null };
+  if (name === 'blog' && parts.length === 2 && BLOG_POSTS[parts[1]]) {
+    return { tab: 'blog', sub: parts[1] };
+  }
+  return null;
+}
 function initTabs() {
   const tabs   = document.querySelectorAll('.c64-tab');
   const panels = document.querySelectorAll('.c64-panel');
-  function activateTab(target, updateHash) {
-    const tab = document.querySelector('.c64-tab[data-tab="' + target + '"]');
+  function activateRoute(route, updatePath) {
+    const tab = document.querySelector('.c64-tab[data-tab="' + route.tab + '"]');
     if (!tab) return false;
     tabs.forEach(t => t.classList.remove('active'));
     panels.forEach(p => p.classList.remove('active'));
     tab.classList.add('active');
-    const panel = document.getElementById('panel-' + target);
+    const panel = document.getElementById('panel-' + route.tab);
     if (panel) panel.classList.add('active');
-    if (updateHash) history.replaceState(null, '', '#' + target);
+    placeVisualsBoxes(route.tab === 'visuals');
+    if (window.usbsidVisuals) window.usbsidVisuals.setActive(route.tab === 'visuals');
+
+    if (route.tab === 'blog') {
+      document.querySelectorAll('#panel-blog .blog-view').forEach(v => v.classList.remove('active'));
+      const viewId = route.sub ? 'blog-post-' + route.sub : 'blog-index';
+      const view = document.getElementById(viewId);
+      if (view) view.classList.add('active');
+    }
+
+    if (updatePath) history.pushState(null, '', tabPath(route.tab, route.sub));
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) canonical.href = 'https://usbsid.loudai.nl' + tabPath(route.tab, route.sub);
+    document.title = route.sub ? BLOG_POSTS[route.sub].title : TAB_TITLES[route.tab];
     return true;
   }
   tabs.forEach(tab => {
-    tab.addEventListener('click', () => activateTab(tab.dataset.tab, true));
+    tab.addEventListener('click', (e) => {
+      e.preventDefault();
+      activateRoute({ tab: tab.dataset.tab, sub: null }, true);
+    });
   });
-  window.addEventListener('hashchange', () => {
-    activateTab(location.hash.slice(1), false);
+  /* Blog index -> post links live inside panel-blog, not the tab bar. */
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('[data-blog-link]');
+    if (!link) return;
+    e.preventDefault();
+    const route = parseRoute(new URL(link.href).pathname);
+    if (route) activateRoute(route, true);
   });
-  /* Activate tab from URL hash, else first tab */
-  const initial = location.hash.slice(1);
-  if (!initial || !activateTab(initial, false)) {
+  window.addEventListener('popstate', () => {
+    activateRoute(parseRoute(location.pathname) || { tab: 'player', sub: null }, false);
+  });
+  /* Old shared links used #blog etc (previous hash router). Redirect those to
+   * the real path so old posts/bookmarks land on the new canonical URL. */
+  const hashName = location.hash.slice(1);
+  const hashRoute = TAB_NAMES.includes(hashName) ? { tab: hashName, sub: null } : null;
+  if (hashRoute) {
+    history.replaceState(null, '', tabPath(hashRoute.tab, null) + location.search);
+  }
+
+  /* Activate route from URL path, else first tab. An unrecognised path (a
+   * stale link, a typo) falls back to the player tab but keeps the URL - the
+   * server decides whether that path is a real 404, this is just what
+   * renders. */
+  const initial = hashRoute || parseRoute(location.pathname);
+  if (!initial || !activateRoute(initial, false)) {
     if (tabs.length) tabs[0].click();
   }
 }
@@ -106,12 +214,19 @@ function initTabs() {
 var _connecting = false;   /* guards manual connect vs the load-time autoconnect */
 async function connectDevice() {
   if (_connecting || usbsidDevice.isOpen) return;   /* autoconnect may be in flight / already done */
+  cancelSerialRetry();
+  _serialNoRetry = false;
+  setUserDisconnected(false);
   _connecting = true;
   try {
     await _connectDeviceInner();
   } finally { _connecting = false; }
 }
 async function _connectDeviceInner() {
+  if (useSerialRoute()) {
+    await _connectDeviceSerial();
+    return;
+  }
   if (!navigator.usb) {
     usbsidSetStatus('WebUSB not available - use HTTPS or localhost', 'red');
     usbsidLog('ERROR: navigator.usb is undefined. WebUSB requires a secure context (HTTPS or localhost).');
@@ -126,11 +241,17 @@ async function _connectDeviceInner() {
       /* autoconnect won the race - reflect the real (connected) state */
       await onDeviceConnected();
     } else {
-      usbsidSetStatus('Connection failed or cancelled', 'red');
+      const msg = usbsidConnectErrorText(usbsidDevice.lastError);
+      if (!armSendsidSerialFallback(usbsidDevice.lastError)) {
+        usbsidSetStatus(msg || 'Connection failed or cancelled', 'red');
+        if (msg) usbsidLog('ERROR: ' + msg);
+      }
       setLED(false);
     }
   } catch (e) {
-    usbsidSetStatus('Connect error: ' + e.message, 'red');
+    if (!armSendsidSerialFallback(e)) {
+      usbsidSetStatus('Connect error: ' + e.message, 'red');
+    }
     usbsidLog('connectDevice error:', e);
     setLED(false);
   }
@@ -141,13 +262,29 @@ async function reconnectDevice() {
   _connecting = true;
   try {
     const ok = await usbsidDevice.reconnect();
-    if (ok) await onDeviceConnected();
+    if (ok) {
+      await onDeviceConnected();
+    } else if (!usbsidDevice.isOpen) {
+      const msg = usbsidConnectErrorText(usbsidDevice.lastError);
+      if (msg) {
+        usbsidSetStatus(msg, 'red');
+        usbsidLog('ERROR: ' + msg);
+        setLED(false);
+      }
+    }
   } finally { _connecting = false; }
 }
 
 async function disconnectDevice() {
   if (!usbsidDevice.isOpen) return;
+  cancelSerialRetry();
+  _serialNoRetry = true;   /* user chose to leave, no timed re-open */
+  setUserDisconnected(true);
   stopPlay();
+  if (usbsidDevice.isSerial) {
+    await releaseConfigSerial();
+    return;
+  }
   await usbsidDevice.close();
   onDeviceDisconnected();
 }
@@ -182,6 +319,7 @@ async function onDeviceConnected() {
   webusb_enabled  = (_emulator === 'webusb');
   webusbplaying   = false;
   webusbconnected = true;   /* kept in sync with our connection state */
+  if (!usbsidDevice.isSerial) _sendsidPreferSerial = false;   /* WebUSB works on this machine after all */
   savedport       = 'usbsidpico'; /* non-null -> prevents "Autoconnect not actived yet" alert */
 
   /* Update connect button IMMEDIATELY - before any async reads so the UI
@@ -199,10 +337,18 @@ async function onDeviceConnected() {
    *   productName:      "USBSID-Pico2 v1.3"           -> PCB ver = last token
    *   manufacturerName: "LouD (v0.7.0-20260308)"       -> FW ver  = text in () */
   const pname  = usbsidDevice.productName;
-  const mname  = usbsidDevice.manufacturerName;
-  const pcbver = pname.split(' ').pop();                          /* "v1.3" */
-  const fwMatch = mname.match(/\(([^)]+)\)/);
-  const ver    = fwMatch ? fwMatch[1] : '';                       /* "v0.7.0-20260308" */
+  let pcbver, ver;
+  if (usbsidDevice.isSerial) {
+    /* No descriptor strings over serial: ask the firmware, blank on failure. */
+    ver = ''; pcbver = '';
+    try { ver = (await usbsidDevice.readVersion()) || ''; } catch (_) {}
+    try { pcbver = ((await usbsidDevice.readPCBVersion()) || '').split(' ').pop(); } catch (_) {}
+  } else {
+    const mname  = usbsidDevice.manufacturerName;
+    pcbver = pname.split(' ').pop();                              /* "v1.3" */
+    const fwMatch = mname.match(/\(([^)]+)\)/);
+    ver    = fwMatch ? fwMatch[1] : '';                           /* "v0.7.0-20260308" */
+  }
   usbsid.version = ver;
   const verEl = document.getElementById('version-display');
   if (verEl) verEl.textContent = 'FW: ' + (ver || '-') + '  PCB: ' + (pcbver || '-');
@@ -217,12 +363,19 @@ async function onDeviceConnected() {
     await checkConfigAck(pcbver);
   }
 
-  /* Detect onboard SID player capability - Pico2 firmware builds only.
-   * readFMOplSID() is intentionally deferred to after config load so we only
-   * issue it when the config confirms FMOpl is enabled on a SID socket. */
-  _hasSIDPlayer = pname.includes('Pico2');
+  /* Onboard SID player capability (SendSID mode). ONBOARD_EMULATOR now builds
+   * for Pico 1 boards as well as Pico 2, so productName can no longer say
+   * whether this device's firmware carries it, the way it once could from
+   * 'Pico2' alone. Ask the firmware directly instead, over the same
+   * US_FEATURES byte Web Serial's SendSID route already reads; see
+   * _sidplayerCap. readFMOplSID() is intentionally deferred to after config
+   * load so we only issue it when the config confirms FMOpl is enabled on a
+   * SID socket. */
+  _sidplayerCap = await usbsidDevice.hasSidPlayer();
   usbsidLog('USB productName:', JSON.stringify(pname));
-  usbsidLog('Onboard SID player:', _hasSIDPlayer ? 'available' : 'not available');
+  usbsidLog('Onboard SID player:', _sidplayerCap === null
+    ? 'unknown (firmware predates the feature query)'
+    : (_sidplayerCap ? 'available' : 'not available'));
 
   /* Enable config panel */
   configavailable = true;
@@ -235,16 +388,17 @@ async function onDeviceConnected() {
   updateConfTabVisibility();
   updatePlayerSideButtons();
 
-  /* In SendSID mode, enable transport buttons immediately on connect */
+  /* In SendSID mode, enable transport buttons immediately on connect, unless
+   * the firmware has just told us definitively it has no onboard player. */
   if (_emulator === 'sendsid') {
-    if (_hasSIDPlayer) {
+    if (_sidplayerCap === false) {
+      setPlayerButtons(false);
+      setLoadButtons(false);
+      usbsidSetStatus('Incompatible: this firmware has no onboard SID player', 'red');
+    } else {
       setPlayerButtons(true);
       setLoadButtons(true);
       updateSendSIDPlayButton();
-    } else {
-      setPlayerButtons(false);
-      setLoadButtons(false);
-      usbsidSetStatus('Incompatible: SendSID requires Pico 2 firmware', 'red');
     }
   }
 
@@ -287,6 +441,11 @@ async function checkConfigAck(pcbver) {
 }
 
 function onDeviceDisconnected() {
+  /* Drop the driver's handle and latches too (device may already be gone), or
+   * CONNECT and reconnectDevice() bail out on a stale open state after a replug. */
+  if (usbsidDevice.isSerial) usbsidDevice.detachSerial();
+  _cfgSerial = null;
+  usbsidDevice._syncClose();
   webusb_enabled  = false;
   webusbplaying   = false;
   webusbconnected = false;
@@ -306,7 +465,7 @@ function onDeviceDisconnected() {
   const cfgHint = document.getElementById('config-status');
   if (cfgHint) cfgHint.textContent = 'Click \u201cRETRIEVE CONFIG\u201d to load the current device configuration.';
 
-  _hasSIDPlayer = false;
+  _sidplayerCap = null;
   _sendsidPlaying = false;
   _webusbSidOffset = 0;
   /* Clear v1.5 state */
@@ -347,11 +506,225 @@ function onDeviceDisconnected() {
  * connection exists anyway for the config panels and costs no second dialog.
  * Web Serial is what makes SendSID work in Firefox at all.
  */
-var _sendsidSerial = null;    /* built on demand, only for this mode */
+var _sendsidSerial = null;    /* legacy own port, no longer opened by the app */
+/* Transport the config driver is attached to (usbsidDevice.attachSerial).
+ * Shared page-wide: SendSID mode and the config panels use this same port, the
+ * usplayer-serial adapter may own the same object. Rule: the port closes only
+ * when no holder is left (serialHeldElsewhere). */
+var _cfgSerial = null;
+/* Set when WebUSB exists but could not open the board in any board mode
+ * (no WinUSB driver on Windows, claimInterface refused, SecurityError, ...).
+ * The next CONNECT press then goes to Web Serial. Kept for the page session
+ * on purpose: the cause is the machine and a retry over WebUSB would fail the
+ * same way. Cleared when a WebUSB connect succeeds, a reload resets it. */
+var _sendsidPreferSerial = false;
+
+/** Modes that play over WebUSB only, no serial fallback. */
+function webusbOnlyMode() {
+  return _emulator === 'webusb' || _emulator === 'usplayer';
+}
+
+/** Does the CONNECT button mean a serial port (config and SendSID)? */
+function useSerialRoute() {
+  if (!navigator.serial) return false;
+  if (!navigator.usb) return true;
+  if (webusbOnlyMode()) return false;
+  return _sendsidPreferSerial &&
+         !(typeof usbsidDevice !== 'undefined' && usbsidDevice.isOpen && !usbsidDevice.isSerial);
+}
+function useSendsidSerial() { return useSerialRoute(); }
+
+/** Open transport of the usplayer-serial adapter, or null. */
+function playerSerialTransport() {
+  const t = (_emulator === 'usplayer-serial' && _player) ? _player._transport : null;
+  return (t && t.isOpen && typeof t.configRequest === 'function') ? t : null;
+}
+
+/** Does any holder other than the config attachment still use transport t? */
+function serialHeldElsewhere(t) {
+  if (!t) return false;
+  if (_sendsidSerial === t) return true;
+  return playerSerialTransport() === t;
+}
+
+/**
+ * Get an open serial transport: reuse the config port, the legacy SendSID port
+ * or the open usplayer-serial port, else open a new one. granted=true skips the
+ * picker (previously granted ports only); false needs a user gesture.
+ * Returns the transport or null (status line already set).
+ */
+async function openSharedSerial(granted) {
+  if (!navigator.serial) {
+    usbsidSetStatus('This browser has no Web Serial', 'red');
+    return null;
+  }
+  const reuse = (_cfgSerial && _cfgSerial.isOpen) ? _cfgSerial
+              : (_sendsidSerial && _sendsidSerial.isOpen) ? _sendsidSerial
+              : playerSerialTransport();
+  if (reuse) return reuse;
+  const { USBSIDWebSerialTransport } =
+    await import('./usplayer/usbsid-webserial.js');
+  const t = new USBSIDWebSerialTransport();
+  let ok = false;
+  try {
+    ok = granted ? await t.connectGranted() : await t.connect();
+  } catch (e) {
+    usbsidSetStatus('No port chosen', 'yellow');
+    usbsidLog('Web Serial: no port chosen (' + (e && e.name ? e.name : e) + ')');
+    return null;
+  }
+  if (!ok) {
+    const why = t.lastError || 'that port did not answer';
+    usbsidSetStatus(why, 'red');
+    usbsidLog('Web Serial: ' + why);
+    return null;
+  }
+  return t;
+}
+
+/** Attach transport t to the config driver and run the post-connect steps. */
+async function attachConfigSerial(t) {
+  usbsidDevice.attachSerial(t);
+  _cfgSerial = t;
+  await onDeviceConnected();
+}
+
+/** CONNECT over Web Serial: picker, probe, attach, same steps as WebUSB. */
+async function _connectDeviceSerial() {
+  usbsidSetStatus('Pick a USBSID-Pico port: either works, not the one the command line player uses');
+  try {
+    const t = await openSharedSerial(false);
+    if (!t) { setLED(false); return; }
+    await attachConfigSerial(t);
+  } catch (e) {
+    usbsidSetStatus('Connect error: ' + e.message, 'red');
+    usbsidLog('connectDevice (serial) error:', e);
+    usbsidDevice.detachSerial();
+    _cfgSerial = null;
+    setLED(false);
+  }
+}
+
+/* Timed re-open after the serial port vanished (reboot, USB drop). Off after DISCONNECT or a
+ * bootloader command (BOOTSEL has no CDC port). Cleared by a manual CONNECT. */
+var _serialNoRetry = false;
+/* DISCONNECT pressed in this tab: no autoconnect (plug-in, reboot, page reload) until
+ * CONNECT. sessionStorage: survives a reload, a closed tab forgets it. */
+const USER_DISCONNECTED_KEY = 'usbsid_user_disconnected';
+function setUserDisconnected(on) {
+  try {
+    if (on) sessionStorage.setItem(USER_DISCONNECTED_KEY, '1');
+    else sessionStorage.removeItem(USER_DISCONNECTED_KEY);
+  } catch (e) { /* storage blocked */ }
+}
+function userDisconnected() {
+  try { return sessionStorage.getItem(USER_DISCONNECTED_KEY) === '1'; } catch (e) { return false; }
+}
+var _serialRetryTimer = null;
+var _serialRetryText = '';
+
+function cancelSerialRetry() {
+  if (_serialRetryTimer) { clearTimeout(_serialRetryTimer); _serialRetryTimer = null; }
+}
+
+/** Called by usbsid-config.js after a bootloader command: the board will not return as CDC. */
+function noteBootloaderSent() {
+  _serialNoRetry = true;
+  cancelSerialRetry();
+}
+
+/**
+ * Unprompted re-open over a previously granted serial port, no picker. Only on the serial
+ * route. Always a fresh transport: a torn-down one holds a dead SerialPort. Quiet on failure.
+ * Returns true when connected.
+ */
+async function reconnectSerial() {
+  if (!navigator.serial || !(useSerialRoute() || !navigator.usb)) return false;
+  if (_connecting || usbsidDevice.isOpen) return false;
+  _connecting = true;
+  let t = null;
+  try {
+    t = (_sendsidSerial && _sendsidSerial.isOpen) ? _sendsidSerial : playerSerialTransport();
+    if (!t) {
+      const { USBSIDWebSerialTransport } = await import('./usplayer/usbsid-webserial.js');
+      t = new USBSIDWebSerialTransport();
+      if (!(await t.connectGrantedAny())) {
+        usbsidLog('Web Serial: auto reconnect found no answering port');
+        return false;
+      }
+    }
+    await attachConfigSerial(t);
+    cancelSerialRetry();
+    return true;
+  } catch (e) {
+    usbsidLog('Web Serial: auto reconnect error:', e);
+    usbsidDevice.detachSerial();
+    _cfgSerial = null;
+    if (t && !serialHeldElsewhere(t)) { try { await t.disconnect(); } catch (_) {} }
+    return false;
+  } finally { _connecting = false; }
+}
+
+/** Retry reconnectSerial every 1 s for up to 15 s, a rebooting board is back in 1 to 3 s. */
+function startSerialRetry(giveUpText) {
+  cancelSerialRetry();
+  if (_serialNoRetry || !navigator.serial) return false;
+  _serialRetryText = giveUpText;
+  const until = Date.now() + 15000;
+  const tick = async () => {
+    _serialRetryTimer = null;
+    if (usbsidDevice.isOpen || _serialNoRetry) return;
+    /* Hidden tab: skip the attempt, a hidden tab must not grab the port */
+    if (document.visibilityState === 'visible' && await reconnectSerial()) return;
+    if (usbsidDevice.isOpen || _serialNoRetry) return;
+    if (Date.now() < until) {
+      _serialRetryTimer = setTimeout(tick, 1000);
+    } else {
+      usbsidLog('Web Serial: auto reconnect gave up');
+      usbsidSetStatus(_serialRetryText, 'yellow');
+    }
+  };
+  _serialRetryTimer = setTimeout(tick, 1000);
+  return true;
+}
+
+/** Detach the config driver, clean the UI, close the port when unshared. */
+async function releaseConfigSerial() {
+  const t = _cfgSerial;
+  usbsidDevice.detachSerial();
+  _cfgSerial = null;
+  onDeviceDisconnected();
+  if (t && !serialHeldElsewhere(t)) {
+    try { await t.disconnect(); } catch (_) {}
+  }
+}
+
+/**
+ * After a failed WebUSB connect in any serial capable mode, route the following CONNECT press
+ * to Web Serial when the browser has it. requestPort() needs a fresh user
+ * gesture. This only sets the flag and tells the user, it never opens the
+ * picker itself. A cancelled picker (NotFoundError) is not a failure.
+ * Returns true when the fallback was armed.
+ */
+function armSendsidSerialFallback(err) {
+  if (!navigator.serial || webusbOnlyMode()) return false;
+  if (!err || err.name === 'NotFoundError') return false;
+  _sendsidPreferSerial = true;
+  const msg = 'WebUSB failed (' + (err.name || 'Error') +
+              (err.message ? ': ' + err.message : '') +
+              '); press CONNECT again to use Web Serial';
+  usbsidSetStatus(msg, 'yellow');
+  usbsidLog('Config: ' + msg);
+  return true;
+}
 
 /** Whichever object can drive the onboard player right now, or null. */
 function sendsidDev() {
-  if (typeof usbsidDevice !== 'undefined' && usbsidDevice.isOpen) return usbsidDevice;
+  if (typeof usbsidDevice !== 'undefined' && usbsidDevice.isOpen) {
+    /* Over serial the transport carries the playtime aware upload. */
+    if (usbsidDevice.isSerial) return (_cfgSerial && _cfgSerial.isOpen) ? _cfgSerial : null;
+    return usbsidDevice;
+  }
   if (_sendsidSerial && _sendsidSerial.isOpen) return _sendsidSerial;
   return null;
 }
@@ -359,55 +732,9 @@ function sendsidDev() {
 /** Is a SendSID connection up, by either route? */
 function sendsidReady() {
   if (typeof usbsidDevice !== 'undefined' && usbsidDevice.isOpen) {
-    return _hasSIDPlayer;   /* the descriptor says whether it is a Pico 2 */
+    return _sidplayerCap !== false;   /* only a definite 'no' blocks it */
   }
   return !!(_sendsidSerial && _sendsidSerial.isOpen);
-}
-
-/**
- * Open a serial port for SendSID.
- *
- * Must run inside the click, for requestPort()'s user gesture. Unlike the
- * WebUSB route there is no product string to check, so whether this board has
- * the onboard player firmware cannot be known in advance: probe() confirms it is
- * a USBSID-Pico and the board ignores the player commands if it has no player.
- * Said out loud rather than guessed at.
- */
-async function connectSendsidSerial() {
-  usbsidLog('SendSID: opening a serial port');
-  if (!navigator.serial) {
-    usbsidSetStatus('This browser has no Web Serial', 'red');
-    return false;
-  }
-  const { USBSIDWebSerialTransport } =
-    await import('./usplayer/usbsid-webserial.js');
-  _sendsidSerial = new USBSIDWebSerialTransport();
-  let ok = false;
-  try {
-    ok = await _sendsidSerial.connect();
-  } catch (e) {
-    usbsidSetStatus('No port chosen', 'yellow');
-    usbsidLog('SendSID: no port chosen (' + (e && e.name ? e.name : e) + ')');
-    _sendsidSerial = null;
-    return false;
-  }
-  if (!ok) {
-    const why = _sendsidSerial.lastError || 'that port did not answer';
-    usbsidSetStatus(why, 'red');
-    usbsidLog('SendSID: ' + why);
-    _sendsidSerial = null;
-    return false;
-  }
-  setLED(true);
-  setSerialButton(true);
-  usbsidSetStatus('SendSID over Web Serial. Load a tune to upload it.', 'green');
-  usbsidLog('SendSID: port open. Whether this board carries the onboard ' +
-            'player firmware cannot be read over serial; if nothing plays, ' +
-            'that is what to check.');
-  setLoadButtons(true);
-  setPlayerButtons(true);
-  updateSendSIDPlayButton();
-  return true;
 }
 
 /* Player integration */
@@ -417,13 +744,20 @@ function createPlayer(emulator) {
   if (emulator === 'usplayer' || emulator === 'usplayer-asid' ||
       emulator === 'usplayer-serial' || emulator === 'usplayer-audio') {
     if (typeof window.USPlayerAdapter !== 'undefined') {
-      /* Web Serial opens its own port on the board's CDC interface. This app's
-       * driver owns a WebUSB device on the vendor interface and knows nothing
-       * about CDC, so there is no device to hand over: pass null and let the
-       * adapter ask for a port. Software audio has no device at all. */
+      /* Web Serial uses the board's CDC interface. This app's driver owns a
+       * WebUSB device on the vendor interface and knows nothing about CDC,
+       * there is no device to hand over: pass null. An open config port is
+       * adopted instead, the adapter never opens a second transport on the
+       * same port. Without one the adapter asks for a port itself. Software
+       * audio has no device at all. */
       const dev = (emulator === 'usplayer-serial' ||
                    emulator === 'usplayer-audio') ? null : usbsidDevice;
-      return new window.USPlayerAdapter(emulator, dev);
+      const pl = new window.USPlayerAdapter(emulator, dev);
+      if (emulator === 'usplayer-serial' && _cfgSerial && _cfgSerial.isOpen &&
+          typeof pl.adoptSerial === 'function') {
+        pl.adoptSerial(_cfgSerial);
+      }
+      return pl;
     }
     usbsidLog('USPlayerAdapter not loaded yet (usplayer/usplayer-adapter.js)');
     return null;
@@ -438,26 +772,66 @@ function createPlayer(emulator) {
 function getPlayer() {
   if (!_player || _player.emulator !== _emulator) {
     _player = createPlayer(_emulator);
+    applyStoredVolumes(_player);
+    /* The Visuals tab's settings go to the ResidFp player only. */
+    if (window.usbsidVisuals) {
+      window.usbsidVisuals.attach(_emulator === 'usplayer-audio' ? _player : null);
+    }
   }
   return _player;
 }
 
+/* For usbsid-visuals.js, a module that may load after the player is built. */
+window.currentPlayer = () => (_emulator === 'usplayer-audio' ? _player : null);
+window.visualsTabActive = () => {
+  const panel = document.getElementById('panel-visuals');
+  return !!panel && panel.classList.contains('active');
+};
+
+/* The Transport and SID Library boxes live in the player panel and move into
+ * the Visuals tab while that tab shows: one set of controls and handlers,
+ * never a copy. Each entry: box, its slot in Visuals, its marker at home. */
+const VISUALS_BOXES = [
+  ['transport-box', 'visuals-transport-slot', 'transport-home'],
+  ['sid-list-box', 'visuals-library-slot', 'sid-list-home'],
+];
+
+function placeVisualsBoxes(inVisuals) {
+  for (const [boxId, slotId, homeId] of VISUALS_BOXES) {
+    const box = document.getElementById(boxId);
+    const slot = document.getElementById(slotId);
+    const home = document.getElementById(homeId);
+    if (!box || !slot || !home) continue;
+    if (inVisuals) {
+      if (box.parentNode !== slot) slot.appendChild(box);
+    } else if (box.previousElementSibling !== home) {
+      home.after(box);
+    }
+  }
+}
+
 /* Workaround to always subtract 1 from subtune as the player expects this */
-function _loadTune(subtune, timeout, file, callback) {
+function _loadTune(subtune, timeout, file, callback, song) {
   const p = _player;  /* use existing player only - do NOT call getPlayer() here, as that
                         would create a new player for the current (possibly wrong) emulator */
   if (!p) return;
   subtune = (subtune != 0 ? (subtune - 1) : subtune);
   /* usbsidLog(subtune, timeout, file, callback); */
-  p.load(subtune, timeout, file, callback);
+  /* song counts from one and is only for the usplayer adapter: song 1 has no
+   * spelling in subtune, where 0 is the default song of the tune */
+  const done = p.load(subtune, timeout, file, callback, song);
   /* A load in usplayer-serial mode may have opened the port itself, in which
    * case nothing else has told the UI. See syncSerialUi(). */
   syncSerialUi();
+  return done;
 }
 
 /* Core load - url must be a full URL (blob: or http:) */
 async function doLoadSID(url, displayName, subtune, lengths) {
   if (loadRefused()) return;
+  /* Same URL again: the bytes are held, restart without a fetch. Read before
+   * _currentFile is overwritten. */
+  const sameUrl = !!(_currentFile && _currentFile.url === url && _loadedBytes);
   _currentFile    = { url, name: displayName };
   _currentSubtune = subtune != null ? subtune : 1;
   /* Song lengths, if the caller has them. A tune out of the served library
@@ -482,9 +856,11 @@ async function doLoadSID(url, displayName, subtune, lengths) {
     setNowPlayingName(displayName);
     usbsidSetStatus('Fetching: ' + displayName + '\u2026');
     try {
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      _loadedBytes = new Uint8Array(await resp.arrayBuffer());
+      if (!sameUrl) {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        _loadedBytes = new Uint8Array(await resp.arrayBuffer());
+      }
     } catch (e) {
       usbsidSetStatus('Fetch failed: ' + e.message, 'red');
       usbsidLog('sendsid fetch error:', e);
@@ -516,15 +892,13 @@ async function doLoadSID(url, displayName, subtune, lengths) {
   setNowPlayingName(displayName);
 
   usbsidSetStatus('Loading: ' + displayName);
-  if (usbsidDevice.isOpen) await usbsidDevice.resetSID();
 
-  p.setVolume(1);
-  /* p.load(_currentSubtune, 1000, url, null); */
-  _loadTune(_currentSubtune, 1000, url, null);
+  p.setVolume(userVolume());
   webusbplaying = true;
-
-  /* Give the player time to parse the file headers */
-  setTimeout(() => {
+  /* Runs when the load finished: the tune's own info, driver address and play
+   * state exist only then. A failed or superseded load never calls it. */
+  const afterLoad = () => {
+    if (gen !== _loadGen) return;
     try {
       const info = p.getSongInfo();
       _maxSubtunes = Math.max(1, (info.maxSubsong || 0) + 1);
@@ -538,9 +912,8 @@ async function doLoadSID(url, displayName, subtune, lengths) {
       usbsidSetStatus('Playing: ' + displayName, 'green');
     } catch (_) {}
     setPlayerButtons(true);
-    /* Only the newest load may declare itself playing. A slower earlier fetch
-     * landing after a later one must not take the counter back. */
-    if (gen === _loadGen) _loading = false;
+    updatePlayButton(p);
+    _loading = false;
     updatePlaytimeDisplay();
     /* Not awaited: see resolveSongLengths(). A tune out of the library arrived
      * with its lengths already and needs nothing here. */
@@ -548,7 +921,12 @@ async function doLoadSID(url, displayName, subtune, lengths) {
     /* Unconditional, unlike the lengths: nothing arrives with its STIL notes
      * already, and the lookup needs only the MD5 the player just computed. */
     resolveStil();
-  }, 100);
+  };
+  const done = _loadTune(_currentSubtune, 1000, url, afterLoad);
+  /* A failed load never calls afterLoad, release the loading flag anyway */
+  Promise.resolve(done).then(() => {
+    if (gen === _loadGen && _loading) { _loading = false; updatePlaytimeDisplay(); }
+  });
 }
 
 /* Load from local <input type=file> - wraps binary in a Blob URL */
@@ -605,12 +983,13 @@ async function playPause() {
       /* nothing loaded yet */
     } else if (!webusbplaying) {
       /* not playing - resume from pause or start fresh */
-      p.setVolume(1);
+      p.setVolume(userVolume());
       if (p.paused) {
         p.play();
       } else {
         // p.load(_currentSubtune, 1000, _currentFile.url, null);
-        _loadTune(_currentSubtune, 1000, _currentFile.url, null);
+        _loadTune(_currentSubtune, 1000, _currentFile.url,
+                  () => updatePlayButton(p));
       }
       webusbplaying = true;
       syncSerialUi();   /* the resume path too, see syncSerialUi() */
@@ -632,6 +1011,7 @@ async function stopPlay() {
       try { await sendsidDev().playerStop(); } catch (e) { usbsidLog('sendsid stop error:', e); }
     }
     _sendsidPlaying = false;
+    resetFfwdUi();  /* the board ends its own fast forward on stop */
     /* Polling stops, the last position stays on screen. The firmware freezes its
      * own figure the same way, so the two agree. */
     stopSendsidTimeTimer();
@@ -646,7 +1026,6 @@ async function stopPlay() {
     p.setVolume(0);
     p.stop();
     webusbplaying = false;
-    if (usbsidDevice.isOpen) await usbsidDevice.resetSID();
     updatePlayButton(p);
     usbsidSetStatus('Stopped');
   } catch (e) {
@@ -669,8 +1048,9 @@ async function prevSubtune() {
     if (!p) return;
     if (p && _currentFile) {
       // p.load(_currentSubtune, 1000, _currentFile.url, null);
-      _loadTune(_currentSubtune, 1000, _currentFile.url, null);
-      p.setVolume(1);
+      _loadTune(_currentSubtune, 1000, _currentFile.url, () => updatePlayButton(p),
+                _currentSubtune === 1 ? 1 : undefined);
+      p.setVolume(userVolume());
     }
     updateSubtuneDisplay();
     /* A different song, so a different length and a fresh end of song guard.
@@ -697,8 +1077,8 @@ async function nextSubtune() {
     if (!p) return;
     if (p && _currentFile) {
       // p.load(_currentSubtune, 1000, _currentFile.url, null);
-      _loadTune(_currentSubtune, 1000, _currentFile.url, null);
-      p.setVolume(1);
+      _loadTune(_currentSubtune, 1000, _currentFile.url, () => updatePlayButton(p));
+      p.setVolume(userVolume());
     }
     updateSubtuneDisplay();
     /* A different song, so a different length and a fresh end of song guard.
@@ -1070,7 +1450,10 @@ async function sendsidSubtuneChanged(delta) {
   const dev = sendsidDev();
   const lenMs = _songLengths ? currentSongLengthMs() : 0;
   if (dev && lenMs && typeof dev.playerSetPlaytime === 'function') {
-    try { await dev.playerSetPlaytime(lenMs); } catch (e) {
+    try {
+      await dev.playerSetPlaytime(lenMs);
+      _sendsidStopMs = lenMs;
+    } catch (e) {
       usbsidLog('Could not set onboard playtime:', e && e.message ? e.message : e);
     }
   }
@@ -1107,7 +1490,6 @@ function setNowPlayingName(name) {
 }
 
 function updateMetaDisplay(info) {
-  const p = _player;
   const el = document.getElementById('np-meta');
   if (!el) return;
   try {
@@ -1118,40 +1500,85 @@ function updateMetaDisplay(info) {
     /* A hyphen and not an em dash: the project writes no em dashes. */
     el.textContent = parts.join(' - ') || '';
   } catch (_) {}
+  _npInfo = info || null;
+  if (!info) {
+    const badges = document.getElementById('np-badges');
+    if (badges) badges.innerHTML = '';
+    _npBadgeSig = '';
+    return;
+  }
+  updateNpBadges(info, true);
+}
 
+/* Last meta info handed to updateMetaDisplay() and the badge signature last drawn */
+var _npInfo = null;
+var _npBadgeSig = '';
+
+/**
+ * Draw the Now Playing badges (SID count, start mode and driver, IRQ sources,
+ * video standard)
+ *
+ * The driver address and IRQ sources only exist once the tune's init has run,
+ * which is after the load reply this gets its info from. So the playtime tick
+ * calls it again and it redraws only when what it shows changed, which also
+ * covers a subtune change. Keeps the emulated modes' mute grid in step with the
+ * SID count.
+ *
+ * @param {object} [info] the load info, the last one is used when omitted
+ * @param {boolean} [force] redraw even if nothing changed
+ */
+function updateNpBadges(info, force) {
+  const p = _player;
+  if (info) _npInfo = info; else info = _npInfo;
+  if (!info) return;
   const badges = document.getElementById('np-badges');
-  if (badges) {
-    badges.innerHTML = '';
-    const add = (text) => {
-      if (!text) return;
-      const b = document.createElement('span');
-      b.className = 'np-badge';
-      b.textContent = text;
-      badges.appendChild(b);
-    };
-    const n = info && info.numSids ? info.numSids : 0;
-    if (n > 1) add(n + 'SID');
-    /* The emulated modes' mute grid follows the tune, so a two SID tune gets two
-     * rows. Rebuilt only when the count actually changes. */
-    if (n >= 1 && n !== _playerSidCount) {
-      _playerSidCount = n;
-      const box = document.getElementById('sendsid-mute-btns');
-      if (box && box.dataset.built === 'player') initPlayerMuteGrid();
-    }
+  if (!badges) return;
 
-    /* What is driving the tune, and how it was started. Both are read out of
-     * the emulated chips rather than the file, so they describe the subtune
-     * that is playing: a tune's init routine chooses whether a CIA timer, a
-     * raster compare or a TOD alarm calls the play routine, and another subtune
-     * may choose differently. */
-    const t = (p && typeof p.timing === 'function') ? p.timing() : null;
-    if (t) {
-      if (t.start) add(t.start + (t.driver ? ' $' + hex16(t.driver) : ''));
+  const n = info.numSids ? info.numSids : 0;
+  /* What is driving the tune, and how it was started. Both are read out of
+   * the emulated chips rather than the file, so they describe the subtune
+   * that is playing: a tune's init routine chooses whether a CIA timer, a
+   * raster compare or a TOD alarm calls the play routine, and another subtune
+   * may choose differently. Null in the board modes. */
+  let t = null;
+  try { t = (p && typeof p.timing === 'function') ? p.timing() : null; } catch (_) {}
+
+  const sig = [n, t ? t.start : '', t ? t.driver : '', t ? t.irq.join(',') : '', t ? t.irqKnown : '',
+               t ? t.video : '', t ? t.videoKnown : '', info.isPrg ? 1 : 0].join('|');
+  if (!force && sig === _npBadgeSig) return;
+  _npBadgeSig = sig;
+
+  badges.innerHTML = '';
+  const add = (text, title) => {
+    if (!text) return;
+    const b = document.createElement('span');
+    b.className = 'np-badge';
+    b.textContent = text;
+    if (title) b.title = title;
+    badges.appendChild(b);
+  };
+  if (n > 1) add(n + 'SID');
+  /* The emulated modes' mute grid follows the tune, so a two SID tune gets two
+   * rows. Rebuilt only when the count actually changes. */
+  if (n >= 1 && n !== _playerSidCount) {
+    _playerSidCount = n;
+    const box = document.getElementById('sendsid-mute-btns');
+    if (box && box.dataset.built === 'player') initPlayerMuteGrid();
+  }
+
+  if (t) {
+    if (t.video) {
+      if (t.videoKnown === false) add(t.video + '*', 'Tune states no video standard, played as ' + t.video);
+      else add(t.video);
+    }
+    if (t.start) add(t.start + (t.driver ? ' $' + hex16(t.driver) : ''));
+    /* Sources are collected after the first second of play, show none before */
+    if (t.irqKnown !== false) {
       for (const src of t.irq) add(src);
       if (!t.irq.length) add('no IRQ');
-    } else if (info && info.isPrg) {
-      add('PRG');
     }
+  } else if (info.isPrg) {
+    add('PRG');
   }
 }
 
@@ -1522,15 +1949,30 @@ function resolveSongLengths() {
   ensureSonglengthDb(p).then((ok) => {
     /* Another tune was chosen while the database was on its way. Its own
      * lookup is in flight; this answer is for a tune nobody is playing. */
-    if (!ok || seq !== _lengthSeq) return;
-    const key = p.md5();
-    if (!key) return;
-    const lens = p.songLengths(key);
     if (seq !== _lengthSeq) return;
+    const key = ok ? p.md5() : null;
+    let lens = key ? p.songLengths(key) : null;
     if (lens) {
       usbsidLog('Song lengths:', lens.map(ms => formatTime(ms)).join(', '));
       setSongLengths(lens);
-    } else {
+      return;
+    }
+    /* Not in the external database, or no database at all. A v5 tune can
+     * carry its own song length table right in the file (see sidfile.h),
+     * which is authoritative for this file, so it is used in place of the
+     * database rather than falling back to the five minute default -
+     * currentSongLengthMs()'s DEFAULT_SONG_MS is for when nothing at all
+     * knows how long the tune runs. Same fallback order
+     * usplayer-adapter.js's own _sendBoardPlaytime() already uses for the
+     * onboard player. */
+    if (typeof p.embeddedSongLengths === 'function') {
+      lens = p.embeddedSongLengths();
+    }
+    if (lens && lens.length) {
+      usbsidLog('Song lengths (from the file\'s own v5 table):',
+                lens.map(ms => formatTime(ms)).join(', '));
+      setSongLengths(lens);
+    } else if (key) {
       usbsidLog('Not in songlengths.md5:', key);
     }
   });
@@ -1596,6 +2038,8 @@ function formatTime(ms) {
 var _playtimeTimer = null;
 
 function updatePlaytimeDisplay() {
+  updateVolumeRow();   /* FM shows once a tune writes to it */
+  if (!_loading) updateNpBadges();   /* driver and IRQ badges exist only after init */
   const el = document.getElementById('np-time');
   if (!el) return;
   const total = currentSongLengthMs();
@@ -1611,9 +2055,9 @@ function updatePlaytimeDisplay() {
     if (!SENDSID_SONGLENGTHS) return;
 
     /* Same two step guard as the emulated path: a subtune only counts as ended
-     * once it has been seen running before its end. */
+     * once it has been seen running (position above zero) before its end. */
     const endAt = songEndAtMs();
-    if (endAt && ms != null && ms < endAt) _endArmed = true;
+    if (endAt && ms != null && ms > 0 && ms < endAt) _endArmed = true;
     if (_endArmed && endAt && ms != null && ms >= endAt && _sendsidPlaying) {
       songEnded();
     }
@@ -1695,6 +2139,21 @@ var _sendsidPollFails = 0;
 var _sendsidLastMs = -1;
 var _sendsidSame = 0;
 
+/* The length the board will stop itself at, in ms.
+ *
+ * Firmware default: `maxplaytime = 300000` (5 minutes) in src/sid/sid_player.c,
+ * restored on every upload and on play stop in src/config.c. Set at upload time
+ * to the playtime sent with the tune, or this default when none was sent.
+ *
+ * A reading that does not move only counts as the board having finished when it
+ * sits near this length. A tune can also freeze the reading far below it: the
+ * firmware samples the player only between its own steps, and a long silent init
+ * (no SID access for seconds) leaves the figure standing still while the emulator
+ * busy-waits, which is a stall and not an end. */
+const SENDSID_DEFAULT_STOP_MS = 300000;
+const SENDSID_STOP_SLACK_MS = 1000;
+var _sendsidStopMs = SENDSID_DEFAULT_STOP_MS;
+
 /* Give up after this many unanswered reads.
  *
  * Not just noise control. A timed out read leaves a transferIn pending that a
@@ -1726,14 +2185,18 @@ async function pollSendsidTime() {
         usbsidLog('Onboard player position:', formatTime(ms), '(' + ms + ' ms)');
       }
       _sendsidTimeMs = ms;
+      /* Armed by the first reading above zero, which is the board running. */
+      if (ms > 0) _endArmed = true;
 
       if (ms === _sendsidLastMs) {
         _sendsidSame++;
         /* Twice, not once: one repeat could be a poll that landed inside the same
          * millisecond, though at half a second apart it should not. Only once the
          * tune has been seen running, so a tune that has not started yet cannot
-         * look finished. */
-        if (_sendsidSame >= 2 && ms > 0 && _endArmed && _sendsidPlaying) {
+         * look finished, and only near the length the board stops at. A freeze
+         * anywhere else is a stall (a silent init, a busy wait): keep polling. */
+        if (_sendsidSame >= 2 && ms > 0 && _endArmed && _sendsidPlaying &&
+            ms >= _sendsidStopMs - SENDSID_STOP_SLACK_MS) {
           usbsidLog('Onboard player finished at', formatTime(ms));
           _sendsidSame = 0;
           songEnded();
@@ -1836,7 +2299,8 @@ function modeLinkReady() {
       return sendsidReady();
     case 'webusb':
     case 'usplayer':
-      return usbOpen;
+      /* WebUSB play only: a serial attachment (config) does not count. */
+      return usbOpen && !usbsidDevice.isSerial;
     case 'asid':
     case 'usplayer-asid':
       return midiOutputSelected();
@@ -1974,7 +2438,21 @@ function updateConfTabVisibility() {
   }
 }
 
+function updateVisualsTabVisibility() {
+  /* Scope, filter and stereo act on reSIDfp in the page: ResidFp mode only. */
+  const tab = document.querySelector('.c64-tab[data-tab="visuals"]');
+  const panel = document.getElementById('panel-visuals');
+  const show = (_emulator === 'usplayer-audio');
+  if (tab) tab.style.display = show ? '' : 'none';
+  if (panel && !show && panel.classList.contains('active')) {
+    const playerTab = document.querySelector('.c64-tab[data-tab="player"]');
+    if (playerTab) playerTab.click();
+  }
+}
+
 function updateRegsTabVisibility() {
+  updateVisualsTabVisibility();
+  updateVolumeRow();
   /* Registers tab is shown whenever WebUSB mode is selected - no need to wait
    * for device open, which avoids auto-connect timing races. */
   const tab = document.querySelector('.c64-tab[data-tab="regs"]');
@@ -1998,11 +2476,10 @@ function updatePlayerSideButtons() {
   const sendsidBtns = document.getElementById('sendsid-player-btns');
   if (webusbBtns)  webusbBtns.style.display  = (_emulator === 'webusb')  ? 'flex' : 'none';
   if (asidBtns)    asidBtns.style.display    = (_emulator === 'asid')   ? 'flex' : 'none';
-  const shown = (_emulator === 'sendsid' && usbsidDevice.isOpen && _hasSIDPlayer);
+  const shown = (_emulator === 'sendsid' && sendsidReady());
   if (shown) ensureSendsidTimeTimer();
   if (sendsidBtns) sendsidBtns.style.display = shown ? 'flex' : 'none';
-  /* The mute grid rides with them, but only when the transport in use can carry
-   * the command: the serial route to the onboard player has no playerMute(). */
+  /* The mute grid rides with them: both SendSID transports implement playerMute(). */
   /* The mute grid is not SendSID's alone any more, despite the id: the WebUSB and
    * Web Serial modes get the same three controls, acting on the emulation rather
    * than on the board. See muteTarget(). */
@@ -2029,16 +2506,23 @@ function switchEmulator(em) {
   if (_emulator === 'usplayer-serial' && em !== 'usplayer-serial' &&
       _player && typeof _player.isConnected === 'function' &&
       _player.isConnected() && _player._transport) {
-    try { _player._transport.disconnect(); } catch (_) {}
-    setLED(false);
+    /* Keep the port when the config panels hold it (shared transport). */
+    if (_cfgSerial !== _player._transport) {
+      try { _player._transport.disconnect(); } catch (_) {}
+      setLED(false);
+    }
   }
-  /* Same for SendSID's own port. */
+  /* Same for the legacy SendSID port, unless the config side holds it. */
   if (_emulator === 'sendsid' && em !== 'sendsid' &&
       _sendsidSerial && _sendsidSerial.isOpen) {
-    try { _sendsidSerial.disconnect(); } catch (_) {}
+    if (_sendsidSerial !== _cfgSerial) {
+      try { _sendsidSerial.disconnect(); } catch (_) {}
+      setLED(false);
+    }
     _sendsidSerial = null;
-    setLED(false);
   }
+  /* A config held port stays open: the usplayer-serial adapter adopts _cfgSerial
+   * (createPlayer), _cfgSerial remains the single owner and closer. */
   stopPlay();   /* uses _player directly now - safe to call before changing _emulator */
   /* Hide the audio switch straight away rather than waiting for the transport
    * state to settle: refreshTransportButtons() re-shows it if the new mode can
@@ -2065,6 +2549,8 @@ function switchEmulator(em) {
   /* Mode-specific prompts and button state */
   if ((em === 'webusb' || em === 'usplayer' || em === 'sendsid') && !usbsidDevice.isOpen) {
     usbsidSetStatus('Connect device for ' + (em === 'sendsid' ? 'SendSID' : 'WebUSB') + ' playback', 'yellow');
+  } else if ((em === 'webusb' || em === 'usplayer') && usbsidDevice.isSerial) {
+    usbsidSetStatus('This mode plays over WebUSB: press DISCONNECT, then CONNECT again', 'yellow');
   }
   if ((em === 'asid' || em === 'usplayer-asid') && !midiOutputSelected()) {
     usbsidSetStatus('Select a MIDI output for ASID playback', 'yellow');
@@ -2075,13 +2561,22 @@ function switchEmulator(em) {
     const open = !!(_player && typeof _player.isConnected === 'function' &&
                     _player.isConnected());
     setSerialButton(open);
-    if (!open) {
+    if (!open && _cfgSerial && _cfgSerial.isOpen) {
+      /* Config port is open: adopt it, no picker. Async, the adapter loads its wasm first. */
+      const pl = getPlayer();
+      if (pl && typeof pl.connect === 'function') {
+        usbsidSetStatus('Connected over Web Serial', 'green');
+        pl.connect().then(() => {
+          if (_player === pl) { syncSerialUi(); refreshTransportButtons(); }
+        }).catch((e) => usbsidLog('Web Serial: adopt failed:', e));
+      }
+    } else if (!open) {
       usbsidSetStatus('Press connect and choose the board\u2019s serial port', 'yellow');
     }
   }
-  if (em === 'sendsid' && !navigator.usb) {
-    /* No WebUSB, so the button means a serial port here too. */
-    const open = !!(_sendsidSerial && _sendsidSerial.isOpen);
+  if (em === 'sendsid' && useSendsidSerial()) {
+    /* No usable WebUSB: the button means a serial port here too. */
+    const open = !!(usbsidDevice.isOpen || (_sendsidSerial && _sendsidSerial.isOpen));
     setSerialButton(open);
     if (!open) {
       usbsidSetStatus('Press connect and choose the board\u2019s serial port ' +
@@ -2090,14 +2585,14 @@ function switchEmulator(em) {
   }
   /* Enable all transport buttons immediately in sendsid mode when already connected */
   if (em === 'sendsid' && typeof usbsidDevice !== 'undefined' && usbsidDevice.isOpen) {
-    if (_hasSIDPlayer) {
+    if (_sidplayerCap === false) {
+      setPlayerButtons(false);
+      setLoadButtons(false);
+      usbsidSetStatus('Incompatible: this firmware has no onboard SID player', 'red');
+    } else {
       setPlayerButtons(true);
       setLoadButtons(true);
       updateSendSIDPlayButton();
-    } else {
-      setPlayerButtons(false);
-      setLoadButtons(false);
-      usbsidSetStatus('Incompatible: SendSID requires a Pico2 with onboard sidplayer firmware', 'red');
     }
   }
   updateConnectButtonVisibility();
@@ -2514,7 +3009,8 @@ function initFileLoading() {
  * MutationObserver below was the fix for that and is kept as a guard: the ASID
  * transport in usplayer/asid-midi.js reads the selected option by name and does
  * not touch the list, so it should never fire now. */
-var _savedAsidMidiIdx = parseInt(localStorage.getItem('usbsid_asid_midi_idx') || '0', 10);
+/* -1 means nothing saved (or an invalid value); 0 is a valid saved choice. */
+var _savedAsidMidiIdx = /^\d+$/.test(localStorage.getItem('usbsid_asid_midi_idx') || '') ? parseInt(localStorage.getItem('usbsid_asid_midi_idx'), 10) : -1;
 
 function initMIDI() {
   const sel = document.getElementById('asid-midi-outputs');
@@ -2541,11 +3037,17 @@ function initMIDI() {
     });
     /* Restore saved MIDI output index (persisted across page reloads).
      * This ensures select.value is correct before jsSID's init() reads it. */
-    if (_savedAsidMidiIdx > 0 && outputs[_savedAsidMidiIdx]) {
+    if (_savedAsidMidiIdx >= 0 && outputs[_savedAsidMidiIdx]) {
       sel.value = String(_savedAsidMidiIdx);
       selectedMidiOutput = outputs[_savedAsidMidiIdx];
     } else {
-      selectedMidiOutput = outputs[0];
+      /* No saved choice: prefer a USBSID port, as the ASID transport does. The
+       * list follows the browser order, where the first entry is often a system
+       * port (Midi Through) that plays to nothing. */
+      const hinted = outputs.findIndex(o => (o.name || '').toLowerCase().includes('usbsid'));
+      const idx = hinted > 0 ? hinted : 0;
+      sel.value = String(idx);
+      selectedMidiOutput = outputs[idx];
     }
     sel.addEventListener('change', () => {
       const idx = parseInt(sel.value, 10);
@@ -2745,14 +3247,87 @@ function initEmulatorSelect() {
   }
 }
 
-/* The volume slider is gone.
+/* Volume, reSIDfp and FM sliders, ResidFp mode only: the board modes have no
+ * gain stage, the board's output is their volume. Volume is the output gain:
+ * pause and stop silence through setVolume(0), play and resume restore
+ * userVolume(). reSIDfp and FM are the two sides of the mix, before the sum. */
+const VOLUME_KEY = 'usplayer_volume';
+
+/* Mix sliders: element id, storage key, default percent, adapter setter. */
+const MIX_SLIDERS = [
+  ['volume-sid', 'usplayer_sid_volume', 100, 'setSidVolume'],
+  ['volume-fm', 'volume_fm', 50, 'setFmVolume'],
+];
+
+/** Read a stored 0-100 percent, or fallback when absent or out of range. */
+function storedPercent(key, fallback) {
+  try {
+    const v = parseInt(localStorage.getItem(key), 10);
+    if (v >= 0 && v <= 100) return v;
+  } catch (e) { /* storage blocked */ }
+  return fallback;
+}
+
+/** Return the Volume slider's gain, 0 to 1, for play and resume. */
+function userVolume() {
+  return storedPercent(VOLUME_KEY, 100) / 100;
+}
+
+/** Give a new player the stored mix volumes, applied on its first start. */
+function applyStoredVolumes(p) {
+  if (!p) return;
+  for (const [, key, def, setter] of MIX_SLIDERS) {
+    if (typeof p[setter] === 'function') p[setter](storedPercent(key, def));
+  }
+}
+
+/** Show the volume row in ResidFp mode, the FM slider once the tune has FM. */
+function updateVolumeRow() {
+  const row = document.getElementById('audio-volume-row');
+  const fmRow = document.getElementById('row-volume-fm');
+  if (!row || !fmRow) return;
+  const audio = (_emulator === 'usplayer-audio');
+  const fm = audio && !!_player && typeof _player.hasFm === 'function' &&
+             _player.hasFm();
+  const rowDisplay = audio ? '' : 'none';
+  const fmDisplay = fm ? '' : 'none';
+  if (row.style.display !== rowDisplay) row.style.display = rowDisplay;
+  if (fmRow.style.display !== fmDisplay) fmRow.style.display = fmDisplay;
+}
+
+/**
+ * Bind a 0-100 slider to its readout and storage key.
  *
- * It called setVolume() on the player, and USPlayerAdapter.setVolume is an
- * explicit no-op: pausing and stopping do the silencing, and there is no gain
- * stage between the emulation and either a board or the AudioWorklet. Since
- * jsSID was removed there is no backend left that implements it, so the control
- * moved a slider and did nothing at all. The browser's own tab volume and the
- * board's output are the real controls. */
+ * @param {string} id        slider element id, readout is id + '-val'
+ * @param {string} key       localStorage key
+ * @param {number} def       default percent
+ * @param {function} apply   called with the percent on input
+ */
+function bindPercentSlider(id, key, def, apply) {
+  const el = document.getElementById(id);
+  const val = document.getElementById(id + '-val');
+  if (!el || !val) return;
+  el.value = String(storedPercent(key, def));
+  val.textContent = el.value;
+  el.addEventListener('input', () => {
+    val.textContent = el.value;
+    try { localStorage.setItem(key, el.value); } catch (e) { /* storage blocked */ }
+    apply(parseInt(el.value, 10));
+  });
+}
+
+function initVolumeSliders() {
+  bindPercentSlider('volume-main', VOLUME_KEY, 100, () => {
+    /* Paused or stopped stays silent: play and resume pick it up. */
+    if (_player && webusbplaying) _player.setVolume(userVolume());
+  });
+  for (const [id, key, def, setter] of MIX_SLIDERS) {
+    bindPercentSlider(id, key, def, (percent) => {
+      if (_player && typeof _player[setter] === 'function') _player[setter](percent);
+    });
+  }
+  updateVolumeRow();
+}
 
 /* Connect button */
 function initConnectButton() {
@@ -2765,27 +3340,13 @@ function initConnectButton() {
      * Ask for the port instead, from this click, which is the gesture
      * requestPort() needs.
      *
-     * The config panels are a separate matter: they are WebUSB and there is no
-     * Web Serial path to them, so in this mode they stay unavailable and the
-     * status line says so rather than a second dialog appearing unbidden. */
+     * The config panels attach to the same port once it is open. */
     if (_emulator === 'usplayer-serial') {
       await connectSerialPlayer();
       return;
     }
-    /* SendSID prefers the WebUSB device, since the config panels need it anyway
-     * and it costs no extra dialog. With no WebUSB at all, the onboard player is
-     * still reachable over serial, and that is the only route in Firefox. */
-    if (_emulator === 'sendsid' && !navigator.usb) {
-      if (_sendsidSerial && _sendsidSerial.isOpen) {
-        try { await _sendsidSerial.disconnect(); } catch (_) {}
-        _sendsidSerial = null;
-        setLED(false); setSerialButton(false); setPlayerButtons(false);
-        usbsidSetStatus('Serial port closed');
-      } else {
-        await connectSendsidSerial();
-      }
-      return;
-    }
+    /* Every other mode goes through connectDevice(), which picks WebUSB or Web
+     * Serial (useSerialRoute) and serves the config panels and SendSID alike. */
     try {
       if (typeof usbsidDevice === 'undefined') {
         usbsidSetStatus('Driver not loaded', 'red');
@@ -2813,7 +3374,6 @@ function initConnectButton() {
  * it from the button and put the answer on screen.
  */
 async function connectSerialPlayer() {
-  usbsidLog('Web Serial: connect requested');
   if (!navigator.serial) {
     usbsidSetStatus('This browser has no Web Serial', 'red');
     usbsidLog('ERROR: navigator.serial is undefined. Web Serial needs Firefox ' +
@@ -2828,15 +3388,33 @@ async function connectSerialPlayer() {
     return;
   }
   if (p.isConnected()) {          /* already open: this click means disconnect */
+    usbsidLog('Web Serial: disconnect requested');
+    setUserDisconnected(true);
     if (typeof p.stop === 'function') p.stop();
-    if (p._transport && p._transport.disconnect) await p._transport.disconnect();
+    const pt = p._transport;
+    const adopted = !!p._serialAdopted;
+    if (_cfgSerial && _cfgSerial === pt) {
+      usbsidDevice.detachSerial();
+      _cfgSerial = null;
+      onDeviceDisconnected();
+    }
+    /* Single close: the app owns an adopted transport, the adapter only drops it */
+    if (pt && pt.disconnect) await pt.disconnect();
+    if (adopted && typeof p.disconnect === 'function') await p.disconnect();
     setLED(false);
     setSerialButton(false);
     setPlayerButtons(false);
     usbsidSetStatus('Serial port closed');
     return;
   }
-  usbsidSetStatus('Choose the board\u2019s serial port\u2026', 'yellow');
+  usbsidLog('Web Serial: connect requested');
+  setUserDisconnected(false);
+  /* Config port already open: adopt it, skip the picker */
+  if (_cfgSerial && _cfgSerial.isOpen && typeof p.adoptSerial === 'function') {
+    p.adoptSerial(_cfgSerial);
+  } else {
+    usbsidSetStatus('Pick a USBSID-Pico port: either works, not the one the command line player uses', 'yellow');
+  }
   try {
     const ok = await p.connect();
     if (!ok) {
@@ -2855,10 +3433,14 @@ async function connectSerialPlayer() {
   usbsidLog('Web Serial: port open');
   setLED(true);
   setSerialButton(true);
-  usbsidSetStatus('Connected over Web Serial. The config panels need WebUSB ' +
-                  'and stay unavailable in this mode.', 'green');
+  usbsidSetStatus('Connected over Web Serial', 'green');
   setLoadButtons(true);
   refreshTransportButtons();
+  /* Config panels share this port. */
+  if (p._transport && !usbsidDevice.isOpen) {
+    try { await attachConfigSerial(p._transport); }
+    catch (e) { usbsidLog('Config over Web Serial failed:', e); usbsidDevice.detachSerial(); _cfgSerial = null; }
+  }
 }
 
 /** The connect button, for the serial mode's own idea of connected. */
@@ -2888,6 +3470,14 @@ function syncSerialUi() {
   }
 }
 
+/** Clear the FFWD hold state and highlight, for events the board answers by ending its own fast forward. */
+function resetFfwdUi() {
+  const ff = document.getElementById('btn-ffwd');
+  if (!ff) return;
+  ff._held = false;
+  ff.classList.remove('c64-btn-warn');
+}
+
 /**
  * Wire the two controls the transport row was missing.
  *
@@ -2901,19 +3491,34 @@ function wireExtraTransport() {
   const ff = document.getElementById('btn-ffwd');
   if (ff && !ff._wired) {
     ff._wired = true;
-    let held = false;
+    ff._held = false;
     const set = (on) => {
       /* Idempotent. The first version logged on every event, which is what showed
        * up the bug: `off` lines arrived with no `on` before them, because
        * pointerleave fires on plain hover-out and not only during a press. */
-      if (on === held) return;
+      if (on === ff._held) return;
+      /* SendSID: the board plays and the board fast forwards. It applies the
+       * command at a frame boundary, ends it on stop, init and new upload, and
+       * keeps it across next and previous subtune. */
+      if (_emulator === 'sendsid') {
+        const dev = sendsidDev();
+        if (!dev || typeof dev.playerFfwd !== 'function') {
+          usbsidLog('FFWD: no SendSID device with playerFfwd (connect first)');
+          return;
+        }
+        ff._held = on;
+        ff.classList.toggle('c64-btn-warn', on);
+        Promise.resolve(dev.playerFfwd(on)).catch(e => usbsidLog('sendsid ffwd error:', e));
+        usbsidLog('FFWD (board): ' + (on ? 'on' : 'off'));
+        return;
+      }
       if (!_player) { usbsidLog('FFWD: no player'); return; }
       if (typeof _player.fastForward !== 'function' &&
           typeof _player.setSpeed !== 'function') {
         usbsidLog('FFWD: this player has neither fastForward nor setSpeed');
         return;
       }
-      held = on;
+      ff._held = on;
       if (typeof _player.fastForward === 'function') _player.fastForward(on);
       else _player.setSpeed(on ? 4 : 1);
       ff.classList.toggle('c64-btn-warn', on);
@@ -2980,9 +3585,8 @@ function setSerialButton(on) {
 async function uploadCurrentSID() {
   const dev = sendsidDev();
   if (!dev) { usbsidSetStatus('Not connected', 'red'); return; }
-  /* Only the WebUSB route can tell a Pico from a Pico 2 before trying. */
-  if (dev === usbsidDevice && !_hasSIDPlayer) {
-    usbsidSetStatus('Incompatible: SendSID requires Pico 2 firmware', 'red'); return;
+  if ((dev === usbsidDevice || usbsidDevice.isSerial) && _sidplayerCap === false) {
+    usbsidSetStatus('Incompatible: this firmware has no onboard SID player', 'red'); return;
   }
   if (!_loadedBytes) { usbsidSetStatus('No SID file loaded', 'yellow'); return; }
   /* The board path never hands the file to a player, so the header is the only
@@ -3008,10 +3612,19 @@ async function uploadCurrentSID() {
      * tune is already running against the board's five minute default, and the
      * UART showed exactly that: SID_PLAYER_START, then UPLOAD_SID_PLAYTIME. */
     const lenMs = _songLengths ? currentSongLengthMs() : 0;
-    await sendsidDev().uploadSIDFile(_loadedBytes, _currentSubtune, 0x01, (sent, total) => {
+    resetFfwdUi();  /* the board ends its own fast forward on a new upload */
+    const upOk = await sendsidDev().uploadSIDFile(_loadedBytes, _currentSubtune, 0x01, (sent, total) => {
       if (statusEl) statusEl.textContent = Math.round(sent / total * 100) + '%';
     }, lenMs);
+    /* WebUSB throws on a failed transfer, Web Serial returns false. Only a
+     * definite false counts, the WebUSB method returns nothing on success. */
+    if (upOk === false) {
+      const why = sendsidDev() ? '' : ' (port closed)';
+      throw new Error('the board did not accept the upload' + why);
+    }
     if (lenMs) usbsidLog('Onboard player: max playtime', formatTime(lenMs));
+    /* No length sent: the upload reset the board to its default. */
+    _sendsidStopMs = lenMs > 0 ? lenMs : SENDSID_DEFAULT_STOP_MS;
     if (statusEl) statusEl.textContent = 'Done';
     usbsidSetStatus('SID uploaded and playing on device', 'green');
     _sendsidTimeMs = 0;
@@ -3118,21 +3731,121 @@ function initTransportButtons() {
   setPlayerButtons(false);
 }
 
+/* Auto-claim only in a visible tab: a hidden tab grabbing the board locks out
+ * the tab the user is looking at. Hidden: wait once for visible, then try if
+ * still not connected and the board is still present. Explicit CONNECT clicks
+ * do not pass through here. */
+var _autoReconnectPending = false;
+function autoReconnectWhenVisible() {
+  if (userDisconnected()) return;   /* DISCONNECT pressed: wait for CONNECT */
+  if (document.visibilityState === 'visible') {
+    reconnectDevice();
+    return;
+  }
+  if (_autoReconnectPending) return;
+  _autoReconnectPending = true;
+  const onVisible = () => {
+    if (document.visibilityState !== 'visible') return;
+    document.removeEventListener('visibilitychange', onVisible);
+    _autoReconnectPending = false;
+    if (!usbsidDevice.isOpen && !userDisconnected()) reconnectDevice();   /* reconnect() finds no device if unplugged again */
+  };
+  document.addEventListener('visibilitychange', onVisible);
+}
+
+/* Serial twin of autoReconnectWhenVisible */
+var _autoReconnectSerialPending = false;
+function autoReconnectSerialWhenVisible() {
+  if (userDisconnected()) return;   /* DISCONNECT pressed: wait for CONNECT */
+  if (document.visibilityState === 'visible') {
+    reconnectSerial();
+    return;
+  }
+  if (_autoReconnectSerialPending) return;
+  _autoReconnectSerialPending = true;
+  const onVisible = () => {
+    if (document.visibilityState !== 'visible') return;
+    document.removeEventListener('visibilitychange', onVisible);
+    _autoReconnectSerialPending = false;
+    if (!usbsidDevice.isOpen && !userDisconnected()) reconnectSerial();
+  };
+  document.addEventListener('visibilitychange', onVisible);
+}
+
 /* WebUSB device events */
 function initDeviceEvents() {
   if (navigator.usb) {
     navigator.usb.addEventListener('connect', async (e) => {
       if (e.device.vendorId === USBSID_VID && e.device.productId === USBSID_PID) {
         usbsidLog('USB device appeared');
-        await reconnectDevice();
+        autoReconnectWhenVisible();
       }
     });
     navigator.usb.addEventListener('disconnect', (e) => {
-      if (e.device.vendorId === USBSID_VID && e.device.productId === USBSID_PID) {
+      if (e.device.vendorId === USBSID_VID && e.device.productId === USBSID_PID &&
+          !usbsidDevice.isSerial) {
         usbsidLog('USB device disconnected');
         onDeviceDisconnected();
       }
     });
+  }
+  if (navigator.serial) {
+    navigator.serial.addEventListener('connect', () => {
+      usbsidLog('Serial port appeared');
+      autoReconnectSerialWhenVisible();
+    });
+    navigator.serial.addEventListener('disconnect', (e) => {
+      /* e.target is the SerialPort that went away (e.port in newer builds) */
+      const gone = e && (e.port || e.target);
+      const same = (t) => t && (!gone || !t._port || gone === t._port);
+      if (same(_cfgSerial)) {
+        onConfigSerialDisconnected();
+      } else if (same(_sendsidSerial)) {
+        onSendsidSerialDisconnected();
+      }
+    });
+  }
+}
+
+/** The config serial port was unplugged: detach, close, clean the UI. No WebUSB reconnect. */
+function onConfigSerialDisconnected() {
+  usbsidLog('Config: serial port disconnected');
+  const t = _cfgSerial;
+  stopSendsidTimeTimer();
+  _sendsidPlaying = false;
+  onDeviceDisconnected();   /* detaches the driver, clears _cfgSerial */
+  if (t) { try { t.disconnect(); } catch (_) {} }
+  if (_sendsidSerial === t) _sendsidSerial = null;
+  setSerialButton(false);
+  setPlayerButtons(false);
+  updateSendSIDPlayButton();
+  updatePlayerSideButtons();
+  const finalText = 'Serial port disconnected. Press CONNECT to reconnect.';
+  if (startSerialRetry(finalText)) {
+    usbsidSetStatus('Serial port lost, reconnecting...', 'yellow');
+  } else {
+    usbsidSetStatus(finalText, 'yellow');
+  }
+}
+
+/**
+ * The legacy SendSID serial port was unplugged: the same cleanup the WebUSB unplug
+ * does for SendSID mode, minus the config panel state that only WebUSB owns.
+ */
+function onSendsidSerialDisconnected() {
+  usbsidLog('SendSID: serial port disconnected');
+  const dev = _sendsidSerial;
+  _sendsidSerial = null;
+  if (dev) { try { dev.disconnect(); } catch (_) {} }
+  stopSendsidTimeTimer();
+  _sendsidPlaying = false;
+  setLED(false);
+  setSerialButton(false);
+  setPlayerButtons(false);
+  updateSendSIDPlayButton();
+  updatePlayerSideButtons();
+  if (_emulator === 'sendsid') {
+    usbsidSetStatus('Serial port disconnected. Press CONNECT to reconnect.', 'yellow');
   }
 }
 
@@ -3181,6 +3894,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     initConnectButton();
     initTransportButtons();
+    initVolumeSliders();
     wireExtraTransport();   /* fast forward and the board's audio switch */
     initFileLoading();
     initSIDList();
@@ -3218,9 +3932,8 @@ document.addEventListener('DOMContentLoaded', () => {
         usbsidSetStatus('WebUSB unavailable - WebUSB requires an Edge or Chromium based browser', 'yellow');
         usbsidLog('WARNING: navigator.usb is not defined. WebUSB requires an Edge or Chromium based browser. The connect button will not work.');
         if (navigator.serial) {
-          usbsidLog('This browser does have Web Serial: choose the Web Serial ' +
-                    '(USBSID-Player) mode to play. The config panels are WebUSB ' +
-                    'only and stay unavailable.');
+          usbsidLog('This browser does have Web Serial: press CONNECT in a ' +
+                    'serial capable mode to use the config panels over it.');
         }
       } else {
         usbsidSetStatus('WebUSB unavailable - WebUSB requires permissions and a secure context (HTTPS or localhost)', 'yellow');
@@ -3229,13 +3942,13 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (!navigator.usb && _emulator === 'usplayer-audio') {
       /* Synthesised in the page. There is nothing to connect and nothing
        * missing, so this is a note and not a warning. */
-      usbsidLog('Software audio needs no board. The config panels are WebUSB ' +
-                'only and stay unavailable in this browser.');
+      usbsidLog('Software audio needs no board. Config panels work over Web ' +
+                'Serial: pick a board mode and press CONNECT.');
       usbsidSetStatus('Ready - load a SID file and press play');
     } else if (!navigator.usb) {
       /* A Web Serial capable mode in a browser with no WebUSB: nothing wrong. */
-      usbsidLog('No WebUSB here, which this mode does not need. The config ' +
-                'panels are WebUSB only and stay unavailable.');
+      usbsidLog('No WebUSB in this browser, which this mode does not need. Config ' +
+                'panels work over Web Serial.');
       usbsidSetStatus('Press connect and choose the board\u2019s serial port', 'yellow');
     } else if (_emulator === 'usplayer-audio') {
       /* WebUSB is here but this mode does not use it. "Click CONNECT" would be
@@ -3249,8 +3962,13 @@ document.addEventListener('DOMContentLoaded', () => {
        * put a WebUSB picker in front of the serial one. */
       if ((_emulator !== 'usplayer-audio') &&
           (_emulator !== 'usplayer-serial')) {
-        setTimeout(() => reconnectDevice(), 200);
+        setTimeout(() => autoReconnectWhenVisible(), 200);
       }
+    }
+
+    /* Re-open a granted serial port at startup, no picker */
+    if (navigator.serial && (!navigator.usb || useSerialRoute())) {
+      setTimeout(() => autoReconnectSerialWhenVisible(), 200);
     }
 
     if (webusbconnected) {

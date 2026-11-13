@@ -41,7 +41,7 @@ jobs:
           echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
 
       - name: 📇 Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           # path: master
@@ -61,7 +61,7 @@ jobs:
           IS_TAG: ${{ steps.branch_name.outputs.IS_TAG }}
           SOURCE_TAG: ${{ steps.branch_name.outputs.SOURCE_TAG }}
         if: "${{ env.IS_TAG == 'true' }}"
-        uses: actions/download-artifact@v4 # https://github.com/actions/download-artifact
+        uses: actions/download-artifact@v7 # https://github.com/actions/download-artifact
         with:
           path: release
           pattern: releasebuild-usbsid*
@@ -74,6 +74,21 @@ jobs:
         if: "${{ env.IS_TAG == 'true' }}"
         run: ls -R
 
+      - name: Zip firmware by PCB revision
+        env:
+          IS_TAG: ${{ steps.branch_name.outputs.IS_TAG }}
+        if: "${{ env.IS_TAG == 'true' }}"
+        working-directory: release
+        run: |
+          for ver in v1.0 v1.3 v1.5; do
+            files=$(ls -- *${ver}*.uf2 2>/dev/null || true)
+            if [ -n "$files" ]; then
+              zip "USBSID-Pico_${ver}.zip" $files
+              rm -- $files
+            fi
+          done
+          ls -la
+
       - name: Create tagged release
         id: create_release
         env:
@@ -85,7 +100,7 @@ jobs:
           tag: ${{ env.SOURCE_TAG }}
           name: ${{ env.SOURCE_TAG }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: "release/*.uf2,release/*.zip"
+          artifacts: "release/*.zip"
           prerelease: false
           removeArtifacts: true
           generateReleaseNotes: true
@@ -103,96 +118,72 @@ jobs:
               directory: pico,
               pico_board: pico,
               pico_platform: rp2040,
-              withsidplayer: 0,
-              withcynthcart: 0,
+              withemulator: 0,
+              extra_cmake_args: "",
             }
           - {
-              buildname: Pico_SIDplayer,
-              directory: pico_sp,
+              buildname: Pico_Emulator,
+              directory: pico_em,
               pico_board: pico,
               pico_platform: rp2040,
-              withsidplayer: 1,
-              withcynthcart: 0,
-            }
-          - {
-              buildname: Pico_SIDplayer_Cynthcart,
-              directory: pico_sp_cc,
-              pico_board: pico,
-              pico_platform: rp2040,
-              withsidplayer: 1,
-              withcynthcart: 1,
+              withemulator: 1,
+              extra_cmake_args: "",
             }
           - {
               buildname: Pico_W,
               directory: picow,
               pico_board: pico_w,
               pico_platform: rp2040,
-              withsidplayer: 0,
-              withcynthcart: 0,
+              withemulator: 0,
+              extra_cmake_args: "",
             }
           - {
-              buildname: Pico_W_SIDplayer,
-              directory: picow_sp,
+              buildname: Pico_W_Emulator,
+              directory: picow_em,
               pico_board: pico_w,
               pico_platform: rp2040,
-              withsidplayer: 1,
-              withcynthcart: 0,
+              withemulator: 1,
+              extra_cmake_args: "",
             }
           - {
-              buildname: Pico_W_SIDplayer_Cynthcart,
-              directory: picow_sp_cc,
+              buildname: Pico_W_Net_NSD,
+              directory: picow_net,
               pico_board: pico_w,
               pico_platform: rp2040,
-              withsidplayer: 1,
-              withcynthcart: 1,
+              withemulator: 0,
+              extra_cmake_args: "-DENABLE_NET=1",
             }
           - {
               buildname: Pico2,
               directory: pico2,
               pico_board: pico2,
               pico_platform: rp2350-arm-s,
-              withsidplayer: 0,
-              withcynthcart: 0,
+              withemulator: 0,
+              extra_cmake_args: "",
             }
           - {
-              buildname: Pico2_SIDplayer,
-              directory: pico2_sp,
+              buildname: Pico2_Emulator,
+              directory: pico2_em,
               pico_board: pico2,
               pico_platform: rp2350-arm-s,
-              withsidplayer: 1,
-              withcynthcart: 0,
-            }
-          - {
-              buildname: Pico2_SIDplayer_Cynthcart,
-              directory: pico2_sp_cc,
-              pico_board: pico2,
-              pico_platform: rp2350-arm-s,
-              withsidplayer: 1,
-              withcynthcart: 1,
+              withemulator: 1,
+              extra_cmake_args: "",
             }
           - {
               buildname: Pico2_W,
               directory: pico2w,
               pico_board: pico2_w,
               pico_platform: rp2350-arm-s,
-              withsidplayer: 0,
-              withcynthcart: 0,
+              withemulator: 0,
+              extra_cmake_args: "",
             }
           - {
-              buildname: Pico2_W_SIDplayer,
-              directory: pico2w_sp,
+              buildname: Pico2_W_Emulator_Net_NSD,
+              directory: pico2w_emnet,
               pico_board: pico2_w,
               pico_platform: rp2350-arm-s,
-              withsidplayer: 1,
-              withcynthcart: 0,
-            }
-          - {
-              buildname: Pico2_W_SIDplayer_Cynthcart,
-              directory: pico2w_sp_cc,
-              pico_board: pico2_w,
-              pico_platform: rp2350-arm-s,
-              withsidplayer: 1,
-              withcynthcart: 1,
+              withemulator: 1,
+              extra_cmake_args: "-DENABLE_NET=1",
             }
 
       fail-fast: false
@@ -205,27 +196,27 @@ jobs:
       - name: Install Act dependencies
         if: ${{ env.ACT }}
         run: |
-          apt-get update && apt-get install sudo -y
+          apt-get -o Acquire::Retries=5 update && apt-get -o Acquire::Retries=5 install sudo -y
 
       - name: Install dependencies
         if: ${{ env.ACT }}
         run: |
-          sudo apt-get update && sudo apt-get install curl build-essential cmake -y
+          sudo apt-get -o Acquire::Retries=5 update && sudo apt-get -o Acquire::Retries=5 install curl build-essential cmake -y
 
       - name: Install USBSID-Player xa dependency
-        if: ${{matrix.withsidplayer == 1 }}
+        if: ${{matrix.withemulator == 1 }}
         run: |
-          sudo apt-get update && sudo apt-get install -y xa65
+          sudo apt-get -o Acquire::Retries=5 update && sudo apt-get -o Acquire::Retries=5 install -y xa65
 
       - name: Checkout bin2h source
-        if: ${{matrix.withsidplayer == 1 }}
-        uses: actions/checkout@v4
+        if: ${{matrix.withemulator == 1 }}
+        uses: actions/checkout@v5
         with:
           repository: elnormous/bin2h
           path: bin2h-src
 
       - name: Build and add to PATH
-        if: ${{matrix.withsidplayer == 1 }}
+        if: ${{matrix.withemulator == 1 }}
         run: |
           cd bin2h-src
           make
@@ -233,7 +224,7 @@ jobs:
           echo "$(pwd)" >> $GITHUB_PATH
 
       - name: Verify installation
-        if: ${{matrix.withsidplayer == 1 }}
+        if: ${{matrix.withemulator == 1 }}
         run: bin2h --help
 
       - name: 🗒️ Check GCC Version
@@ -245,14 +236,14 @@ jobs:
 
       - name: 💽 Cache Pico-SDK
         id: cache-pico-sdk
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: pico-sdk
           key: ${{runner.os}}-pico-sdk-${{env.PICO_SDK_REF}}
 
       - name: 📇 Checkout Pico-SDK
         if: ${{steps.cache-pico-sdk.outputs.cache-hit != 'true' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: raspberrypi/pico-sdk
           ref: ${{env.PICO_SDK_REF}}
@@ -267,14 +258,14 @@ jobs:
 
       - name: 💽 Cache Pico-Extras
         id: cache-pico-extras
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: pico-extras
           key: ${{runner.os}}-pico-extras-${{env.PICO_EXTRAS_REF}}
 
       - name: 📇 Checkout Pico-Extras
         if: ${{steps.cache-pico-extras.outputs.cache-hit != 'true' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: raspberrypi/pico-extras
           ref: ${{env.PICO_EXTRAS_REF}}
@@ -288,14 +279,14 @@ jobs:
 
       - name: 💽 Cache picotool
         id: cache-picotool
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: picotool
           key: ${{runner.os}}-picotool-${{env.PICOTOOL_REF}}
 
       - name: 📇 Checkout picotool
         if: ${{steps.cache-picotool.outputs.cache-hit != 'true' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: raspberrypi/picotool
           ref: ${{env.PICOTOOL_REF}}
@@ -310,19 +301,19 @@ jobs:
           make -j ${{env.BUILD_THREADS}} install
 
       - name: 📇 Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: master
 
       - name: 📇 Checkout USBSID-Player
-        if: ${{matrix.withsidplayer == 1 }}
-        uses: actions/checkout@v4
+        if: ${{matrix.withemulator == 1 }}
+        uses: actions/checkout@v5
         with:
           repository: loudnl/usbsid-player
           path: master/lib/usbsid-player
 
       - name: 📇 Set USBSID-Player EMUDIR
-        if: ${{matrix.withsidplayer == 1 }}
+        if: ${{matrix.withemulator == 1 }}
         run: |
           echo "EMUDIR=${{github.workspace}}/master/lib/usbsid-player" >> $GITHUB_ENV
 
@@ -340,10 +331,9 @@ jobs:
             -DPICO_PLATFORM=${{matrix.pico_platform}} \
             -DPICO_BOARD=${{matrix.pico_board}} \
             -Dpicotool_DIR=${{github.workspace}}/picotool/picotool \
-            -DONBOARD_SIDPLAYER=${{matrix.withsidplayer}} \
-            -DONBOARD_CYNTHCART=${{matrix.withcynthcart}} \
+            -DONBOARD_EMULATOR=${{matrix.withemulator}} \
             -DEMUDIR=${{env.EMUDIR}} \
-            $extra_arg
+            ${{matrix.extra_cmake_args}}
 
       - name: 🏭 Build ${{matrix.buildname}}
         run: |
@@ -368,7 +358,7 @@ jobs:
           echo "DATETIME=$(date +'%Y%m%dT%H%M%S')" >> $GITHUB_ENV
 
       - name: 💾 Upload Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: releasebuild-usbsid${{matrix.directory}}
           path: ${{github.workspace}}/master/dist
@@ -389,7 +379,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Download Tools Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: 'tools-*'
           path: tools-output
@@ -400,7 +390,7 @@ jobs:
         run: zip -r -j tools.zip ./tools-output
 
       - name: Upload tools zip
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: releasebuild-usbsidtools
           path: tools.zip

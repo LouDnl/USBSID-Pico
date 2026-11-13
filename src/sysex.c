@@ -54,8 +54,8 @@ enum {
   SYSEX_TOGGLE_AUDIO = 0x01,
   /* Trigger-only, no payload - the MIDI blob save/load/reset
    * itself (magic/version/crc32/sequence, slot scan, sanitising transient
-   * state) lives entirely in midi_config.c; this just calls it. Reachable
-   * with a plain `amidi -S "f0 50 10 f7"` etc, so testing flash
+   * state) lives entirely in midi_config.c. This calls it. Reachable
+   * with a plain `amidi -S "f0 50 10 f7"` etc: testing flash
    * persistence needs nothing beyond what midi_test.sh already uses -
    * unlike LOAD_MIDI_STATE/SAVE_MIDI_STATE/RESET_MIDI_STATE (config.c),
    * which are the raw USB config protocol, a different transport. */
@@ -67,15 +67,15 @@ enum {
    * SYSEX_MIDI_SAVE persists it, same as any other live edit). DUMP asks
    * the device to send one patch's current data back out over MIDI OUT
    * (endpoint 0x83, declared in usb_descriptors.c and otherwise still
-   * unused) as a DATA message, so the same tool that authors a patch can
+   * unused) as a DATA message: the same tool that authors a patch can
    * also read one back to inspect or copy it. Neither touches the bus -
    * a stored patch only reaches the chip via Program Change. */
   SYSEX_MIDI_PATCH_LOAD = 0x20,
   SYSEX_MIDI_PATCH_DUMP = 0x21,  /* request: device -> host */
   SYSEX_MIDI_PATCH_DATA = 0x22,  /* response: device -> host, and what LOAD expects as input */
-  /* The same LOAD/DUMP/DATA shape as the SID patch commands just
+  /* The same LOAD/DUMP/DATA shape as the SID patch commands
    * above, aimed at fmopl_patches[]/opl_instrument_t (midi_fmopl.h) instead
-   * of midi_patches[]/midi_patch_t - a different, much smaller struct, so
+   * of midi_patches[]/midi_patch_t - a different, much smaller struct, with
    * its own commands and its own nibble count rather than trying to
    * shoehorn it into 0x20-0x22's fixed 36-nibble frame. */
   SYSEX_FMOPL_PATCH_LOAD = 0x23,
@@ -86,12 +86,12 @@ enum {
    * exists at all: the compiled-in OPL2 clock constant is verified correct
    * against both the spec and SIDKick-pico's own source, but still measured
    * wrong on at least one real board. Payload: 3 bytes (24 bits, enough for
-   * any real OPL clock) packed as 6 nibbles, big-endian; all-zero resets to
+   * any real OPL clock) packed as 6 nibbles, big-endian. All-zero resets to
    * the compiled-in default. */
   SYSEX_FMOPL_SET_CLOCK = 0x26,
   /* GoatTracker/SidWizard-style arp/chord table authoring, same
    * LOAD/DUMP/DATA shape as the SID (0x20-0x22) and FMOpl (0x23-0x25) patch
-   * commands - by now a proven, repeatable pattern. Own frame size (36
+   * commands - a proven, repeatable pattern. Own frame size (36
    * nibbles: 16 signed-byte offsets + loop_start + step_count), aimed at
    * arp_tables[]/midi_arp_table_t (midi_arp_table.h) instead of a patch
    * struct - entirely new commands, no shared frame with anything above to
@@ -103,7 +103,7 @@ enum {
    * patch slot instead of writing data the host already has. No payload -
    * buffer[3] = channel, buffer[4] = patch index, everything else is read
    * straight off live device state (midi_handler_capture_patch()/
-   * midi_fmopl_capture_patch()). RAM only, same as LOAD; SYSEX_MIDI_SAVE
+   * midi_fmopl_capture_patch()). RAM only, same as LOAD. SYSEX_MIDI_SAVE
    * persists it. */
   SYSEX_MIDI_PATCH_SAVE  = 0x2A,
   SYSEX_FMOPL_PATCH_SAVE = 0x2B,
@@ -121,7 +121,7 @@ enum {
  *
  * 6 more 1-byte fields appended at the tail (lfo2_wave/rate/
  * depth/dest, unison_enabled, unison_detune) -> +12 nibbles = 48. Appended,
- * not interleaved, so PATCH_SYSEX_MIN_SIZE (derived from this constant)
+ * not interleaved: PATCH_SYSEX_MIN_SIZE (derived from this constant)
  * naturally refuses an old 36-nibble dump instead of misreading its
  * trailing bytes as these new fields - see midi_patch.h's own comment on
  * midi_patch_t for the full non-breaking rule this follows.*/
@@ -239,13 +239,13 @@ static void unpack_patch(const uint8_t *in, midi_patch_t *p)
 
 /* buffer[3] = patch index, buffer[4..4+35] = 36 nibble bytes, matching
  * SYSEX_MIDI_PATCH_LOAD's and SYSEX_MIDI_PATCH_DATA's own layout */
-#define PATCH_SYSEX_MIN_SIZE (4 + PATCH_SYSEX_NIBBLES + 1)  /* + F0,50,cmd already counted by buffer[0..2]; +1 for F7 */
+#define PATCH_SYSEX_MIN_SIZE (4 + PATCH_SYSEX_NIBBLES + 1)  /* + F0,50,cmd already counted by buffer[0..2]. +1 for F7 */
 
 /**
  * @brief Handle SYSEX_MIDI_PATCH_LOAD: write one SID patch into RAM
  *
  * Validates the message length and patch index, then unpacks the nibble
- * payload at buffer[4..] into midi_patches[patch_index]. RAM only; does
+ * payload at buffer[4..] into midi_patches[patch_index]. RAM only. Does
  * not persist to flash (SYSEX_MIDI_SAVE does that).
  *
  * @param uint8_t * buffer
@@ -302,10 +302,10 @@ static void handle_patch_dump(uint8_t *buffer, int size)
 /**
  * @brief Handle SYSEX_MIDI_PATCH_SAVE: capture a channel's live state into a patch slot
  *
- * Inverse of LOAD - no payload, just addressing. buffer[3] = channel,
+ * Inverse of LOAD - no payload, only addressing. buffer[3] = channel,
  * buffer[4] = patch index. Delegates the actual field-by-field capture to
  * midi_handler_capture_patch() (midi_handler.c), which mirrors
- * apply_patch_to_channel() in reverse. RAM only; SYSEX_MIDI_SAVE persists it.
+ * apply_patch_to_channel() in reverse. RAM only. SYSEX_MIDI_SAVE persists it.
  *
  * @param uint8_t * buffer
  * @param int size
@@ -448,11 +448,11 @@ static void handle_fmopl_patch_dump(uint8_t *buffer, int size)
  * @brief Handle SYSEX_FMOPL_PATCH_SAVE: capture a channel's currently-selected
  *        instrument into another patch slot
  *
- * No payload, just addressing. buffer[3] = channel, buffer[4] = patch index.
+ * No payload, only addressing. buffer[3] = channel, buffer[4] = patch index.
  * Delegates to midi_fmopl_capture_patch() (midi_fmopl.c) - see that
  * function's own doc comment for why this is a plain instrument duplicate
  * today, not yet a true live-tweaks capture (no per-operator live editing
- * exists to capture). RAM only; SYSEX_MIDI_SAVE persists it.
+ * exists to capture). RAM only. SYSEX_MIDI_SAVE persists it.
  *
  * @param uint8_t * buffer
  * @param int size
@@ -540,7 +540,7 @@ static void pack_arp_table(const midi_arp_table_t *t, uint8_t *out)
  * @brief The inverse of pack_arp_table()
  *
  * Also clamps step_count to MIDI_ARP_TABLE_STEPS and resets loop_start to
- * 0 when it falls outside the table's decoded step_count, so a malformed
+ * 0 when it falls outside the table's decoded step_count. A malformed
  * or hand-crafted frame cannot make arp_advance_table() (midi_handler.c)
  * index out of bounds.
  *
@@ -569,7 +569,7 @@ static void unpack_arp_table(const uint8_t *in, midi_arp_table_t *t)
  * @brief Handle SYSEX_MIDI_ARPTABLE_LOAD: write one arp/chord table into RAM
  *
  * Validates the message length and table index, then unpacks the nibble
- * payload at buffer[4..] into arp_tables[table_index]. RAM only; does not
+ * payload at buffer[4..] into arp_tables[table_index]. RAM only. Does not
  * persist to flash (SYSEX_MIDI_SAVE does that).
  *
  * @param uint8_t * buffer
@@ -698,8 +698,8 @@ void decode_sysex_command(uint8_t * buffer, int size)
  * @brief Route an incoming SysEx message by its manufacturer id (buffer[1])
  *
  * 0x2D dispatches to the ASID decoder (decode_asid_message), 0x50 to this
- * file's own decode_sysex_command; any other id is ignored. Also sets
- * dtype so downstream logging reports the correct data source.
+ * file's own decode_sysex_command. Any other id is ignored. Also sets
+ * dtype to make downstream logging report the correct data source.
  *
  * @param uint8_t * buffer
  * @param int size

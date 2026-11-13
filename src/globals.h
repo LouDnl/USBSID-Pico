@@ -105,18 +105,24 @@
 #define MIN_CYCLES 6  /* 10 cycles for non cycled writes when in sequence */
 #endif
 
-#ifndef USE_CDC_CALLBACK
-#define USE_CDC_CALLBACK 1  /* Force CDC callback use over cdc_task */
-#endif
-
-#ifndef USE_VENDOR_CALLBACK
-#define USE_VENDOR_CALLBACK 1  /* Force Vendor callback use over vendor_task */
-#endif
-
 /* Global USB definitions */
-#define CDC_ITF 0
-#define MIDI_ITF 0
-#define WUSB_ITF 0
+#define CDC1_ITF 0 /* Data port CDC */
+#define CDC2_ITF 1 /* WebSerial CDC */
+#define WSRL_ITF 1 /* WebSerial CDC, the same as CDC2_ITF */
+#define CDC3_ITF 2 /* USB Uart CDC */
+#define MIDI_ITF 0 /* Midi/ASID */
+#define WUSB_ITF 0 /* WebUSB Vendor */
+
+/* Vendor USB interface numbers and endpoints, checked in usb_descriptors.c */
+#define WUSB_ITF_NUM 4    /* WebUSB Vendor (WUSB_ITF) */
+#define WUSB_EP_OUT  0x04
+#define WUSB_EP_IN   0x84
+#if defined(USE_SID_STREAM)
+#define STREAM_ITF_NUM 7  /* SID stream, own class driver in stream.c */
+#define STREAM_EP_OUT  0x07
+#define STREAM_EP_IN   0x87
+#endif /* USE_SID_STREAM */
+
 #define MIDI_CABLE 0
 
 /* USB data type */

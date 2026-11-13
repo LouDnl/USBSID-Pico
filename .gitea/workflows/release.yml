@@ -1,0 +1,413 @@
+# Gitea Actions copy of .github/workflows/release.yml (git.loudai.nl). Gitea runs
+# .gitea/workflows/ and ignores .github/workflows/ when this directory exists.
+# Differences: no macos-14 (no Apple Silicon runner), repositories under
+# LouDnl/ on GitHub live under usbsid/ here, releases go through Gitea's API.
+
+name: USBSID-Pico Release
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  BUILD_THREADS: 4
+  BUILD_TYPE: Release
+  # Pico-SDK version
+  PICO_SDK_REF: 2.2.0
+  PICO_EXTRAS_REF: sdk-2.2.0
+  PICOTOOL_REF: 2.2.0
+
+on:
+  push:
+    branches: [master]
+    tags:
+      - 'v(\d|\.|-|[A-Z])+' # Only if the tag contains 'v0.0.0' etc
+  # Allows you to run this workflow manually from the Actions tab when needed
+  workflow_dispatch:
+  # Enables calling from other workflows
+  workflow_call:
+
+jobs:
+  release:
+    name: Create release files
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    needs: [build, upload-tools]
+    # job will only start if there is a new tag
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Branch latest
+        id: branch_name
+        run: |
+          echo "IS_TAG=${{ startsWith(github.ref, 'refs/tags/') }}" >> $GITHUB_OUTPUT
+          echo "SOURCE_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+
+      - name: 📇 Checkout project
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # path: master
+
+      - name: Generate release notes
+        env:
+          IS_TAG: ${{ steps.branch_name.outputs.IS_TAG }}
+          SOURCE_TAG: ${{ steps.branch_name.outputs.SOURCE_TAG }}
+        if: "${{ env.IS_TAG == 'true' }}"
+        id: release-notes
+        run: |
+          echo "**Commits in this release:**" > release_notes.md
+          git log $(git tag --sort version:refname | tail -n 2 | head -n 1)..HEAD --oneline >> release_notes.md
+
+      - name: Download all archived artifacts
+        env:
+          IS_TAG: ${{ steps.branch_name.outputs.IS_TAG }}
+          SOURCE_TAG: ${{ steps.branch_name.outputs.SOURCE_TAG }}
+        if: "${{ env.IS_TAG == 'true' }}"
+        uses: actions/download-artifact@v4 # https://github.com/actions/download-artifact
+        with:
+          path: release
+          pattern: releasebuild-usbsid*
+          merge-multiple: true
+
+      - name: View directory content
+        env:
+          IS_TAG: ${{ steps.branch_name.outputs.IS_TAG }}
+          SOURCE_TAG: ${{ steps.branch_name.outputs.SOURCE_TAG }}
+        if: "${{ env.IS_TAG == 'true' }}"
+        run: ls -R
+
+      - name: Zip firmware by PCB revision
+        env:
+          IS_TAG: ${{ steps.branch_name.outputs.IS_TAG }}
+        if: "${{ env.IS_TAG == 'true' }}"
+        working-directory: release
+        run: |
+          for ver in v1.0 v1.3 v1.5; do
+            files=$(ls -- *${ver}*.uf2 2>/dev/null || true)
+            if [ -n "$files" ]; then
+              zip "USBSID-Pico_${ver}.zip" $files
+              rm -- $files
+            fi
+          done
+          ls -la
+
+      - name: Create tagged release
+        id: create_release
+        if: "${{ env.IS_TAG == 'true' }}"
+        env:
+          IS_TAG: ${{ steps.branch_name.outputs.IS_TAG }}
+          SOURCE_TAG: ${{ steps.branch_name.outputs.SOURCE_TAG }}
+          TOKEN: ${{ secrets.GITEA_TOKEN }}
+          API: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
+          TAG: ${{ steps.branch_name.outputs.SOURCE_TAG }}
+          TITLE: ${{ steps.branch_name.outputs.SOURCE_TAG }}
+          PRERELEASE: "false"
+        run: |
+          # Gitea's release API (the GitHub workflow uses a GitHub-only action).
+          # Re-runs reuse the release of this tag and replace assets of the same name.
+          set -euo pipefail
+          auth=(-H "Authorization: token $TOKEN")
+          id=$(curl -fsS "${auth[@]}" "$API/releases/tags/$TAG" 2>/dev/null \
+                 | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' || true)
+          if [ -z "$id" ]; then
+            payload=$(TAG="$TAG" TITLE="$TITLE" PRE="$PRERELEASE" python3 -c '
+          import json, os
+          body = open("release_notes.md").read() if os.path.exists("release_notes.md") else ""
+          print(json.dumps({"tag_name": os.environ["TAG"], "name": os.environ["TITLE"],
+                            "body": body, "prerelease": os.environ["PRE"] == "true"}))')
+            id=$(curl -fsS "${auth[@]}" -H 'Content-Type: application/json' -X POST \
+                   "$API/releases" -d "$payload" \
+                 | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+          fi
+          echo "release id $id for $TAG"
+          shopt -s nullglob
+          for f in release/*.zip; do
+            n=$(basename "$f")
+            for old in $(curl -fsS "${auth[@]}" "$API/releases/$id/assets" \
+                | python3 -c 'import json,sys; print(" ".join(str(a["id"]) for a in json.load(sys.stdin) if a["name"]==sys.argv[1]))' "$n"); do
+              curl -fsS "${auth[@]}" -X DELETE "$API/releases/$id/assets/$old"
+            done
+            curl -fsS "${auth[@]}" -X POST -F "attachment=@$f" "$API/releases/$id/assets?name=$n" >/dev/null
+            echo "uploaded $n"
+          done
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - {
+              buildname: Pico,
+              directory: pico,
+              pico_board: pico,
+              pico_platform: rp2040,
+              withemulator: 0,
+              extra_cmake_args: "",
+            }
+          - {
+              buildname: Pico_Emulator,
+              directory: pico_em,
+              pico_board: pico,
+              pico_platform: rp2040,
+              withemulator: 1,
+              extra_cmake_args: "",
+            }
+          - {
+              buildname: Pico_W,
+              directory: picow,
+              pico_board: pico_w,
+              pico_platform: rp2040,
+              withemulator: 0,
+              extra_cmake_args: "",
+            }
+          - {
+              buildname: Pico_W_Emulator,
+              directory: picow_em,
+              pico_board: pico_w,
+              pico_platform: rp2040,
+              withemulator: 1,
+              extra_cmake_args: "",
+            }
+          - {
+              buildname: Pico_W_Net_NSD,
+              directory: picow_net,
+              pico_board: pico_w,
+              pico_platform: rp2040,
+              withemulator: 0,
+              extra_cmake_args: "-DENABLE_NET=1",
+            }
+          - {
+              buildname: Pico2,
+              directory: pico2,
+              pico_board: pico2,
+              pico_platform: rp2350-arm-s,
+              withemulator: 0,
+              extra_cmake_args: "",
+            }
+          - {
+              buildname: Pico2_Emulator,
+              directory: pico2_em,
+              pico_board: pico2,
+              pico_platform: rp2350-arm-s,
+              withemulator: 1,
+              extra_cmake_args: "",
+            }
+          - {
+              buildname: Pico2_W,
+              directory: pico2w,
+              pico_board: pico2_w,
+              pico_platform: rp2350-arm-s,
+              withemulator: 0,
+              extra_cmake_args: "",
+            }
+          - {
+              buildname: Pico2_W_Emulator_Net_NSD,
+              directory: pico2w_emnet,
+              pico_board: pico2_w,
+              pico_platform: rp2350-arm-s,
+              withemulator: 1,
+              extra_cmake_args: "-DENABLE_NET=1",
+            }
+
+      fail-fast: false
+
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: 🛠️ Arm GNU Toolchain (arm-none-eabi-gcc)
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
+
+      - name: Install Act dependencies
+        if: ${{ env.ACT }}
+        run: |
+          apt-get -o Acquire::Retries=5 update && apt-get -o Acquire::Retries=5 install sudo -y
+
+      - name: Install dependencies
+        if: ${{ env.ACT }}
+        run: |
+          sudo apt-get -o Acquire::Retries=5 update && sudo apt-get -o Acquire::Retries=5 install curl build-essential cmake -y
+
+      - name: Install USBSID-Player xa dependency
+        if: ${{matrix.withemulator == 1 }}
+        run: |
+          sudo apt-get -o Acquire::Retries=5 update && sudo apt-get -o Acquire::Retries=5 install -y xa65
+
+      - name: Checkout bin2h source
+        if: ${{matrix.withemulator == 1 }}
+        # Anonymous clone from github.com: actions/checkout would send Gitea's token there.
+        run: |
+          git clone --filter=blob:none https://github.com/elnormous/bin2h.git bin2h-src
+
+      - name: Build and add to PATH
+        if: ${{matrix.withemulator == 1 }}
+        run: |
+          cd bin2h-src
+          make
+          # Add the current directory containing the built 'bin2h' to the runner's PATH
+          echo "$(pwd)" >> $GITHUB_PATH
+
+      - name: Verify installation
+        if: ${{matrix.withemulator == 1 }}
+        run: bin2h --help
+
+      - name: 🗒️ Check GCC Version
+        id: compiler-version
+        run: |
+          arm-none-eabi-gcc --version
+          ver=$(arm-none-eabi-gcc --version | head -1)
+          echo "CC_VERSION=$ver" >> $GITHUB_OUTPUT
+
+      - name: 💽 Cache Pico-SDK
+        id: cache-pico-sdk
+        uses: actions/cache@v4
+        with:
+          path: pico-sdk
+          key: ${{runner.os}}-pico-sdk-${{env.PICO_SDK_REF}}
+
+      - name: 📇 Checkout Pico-SDK
+        if: ${{steps.cache-pico-sdk.outputs.cache-hit != 'true' }}
+        # Anonymous clone from github.com: actions/checkout would send Gitea's token there.
+        run: |
+          git clone --filter=blob:none --branch "${{env.PICO_SDK_REF}}" --recurse-submodules https://github.com/raspberrypi/pico-sdk.git pico-sdk
+
+      - name: 🔖 Add PICO_SDK_PATH to Environment
+        run: |
+          echo "PICO_SDK_PATH=${{github.workspace}}/pico-sdk" >> $GITHUB_ENV
+          cd pico-sdk/lib/tinyusb
+          python3 tools/get_deps.py ${{matrix.pico_platform}}
+
+      - name: 💽 Cache Pico-Extras
+        id: cache-pico-extras
+        uses: actions/cache@v4
+        with:
+          path: pico-extras
+          key: ${{runner.os}}-pico-extras-${{env.PICO_EXTRAS_REF}}
+
+      - name: 📇 Checkout Pico-Extras
+        if: ${{steps.cache-pico-extras.outputs.cache-hit != 'true' }}
+        # Anonymous clone from github.com: actions/checkout would send Gitea's token there.
+        run: |
+          git clone --filter=blob:none --branch "${{env.PICO_EXTRAS_REF}}" --recurse-submodules https://github.com/raspberrypi/pico-extras.git pico-extras
+
+      - name: 🔖 Add PICO_EXTRAS_PATH to Environment
+        run: |
+          echo "PICO_EXTRAS_PATH=${{github.workspace}}/pico-extras" >> $GITHUB_ENV
+          ls pico-extras/external -la
+
+      - name: 💽 Cache picotool
+        id: cache-picotool
+        uses: actions/cache@v4
+        with:
+          path: picotool
+          key: ${{runner.os}}-picotool-${{env.PICOTOOL_REF}}
+
+      - name: 📇 Checkout picotool
+        if: ${{steps.cache-picotool.outputs.cache-hit != 'true' }}
+        # Anonymous clone from github.com: actions/checkout would send Gitea's token there.
+        run: |
+          git clone --filter=blob:none --branch "${{env.PICOTOOL_REF}}" --recurse-submodules https://github.com/raspberrypi/picotool.git picotool-src
+
+      - name: 🏭 Build picotool
+        if: ${{steps.cache-picotool.outputs.cache-hit != 'true' }}
+        run: |
+          cmake -S picotool-src -B picotool-src/build -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/picotool -DPICOTOOL_FLAT_INSTALL=1
+          cd picotool-src/build
+          make -j ${{env.BUILD_THREADS}} install
+
+      - name: 📇 Checkout project
+        uses: actions/checkout@v4
+        with:
+          path: master
+
+      - name: 📇 Checkout USBSID-Player
+        if: ${{matrix.withemulator == 1 }}
+        uses: actions/checkout@v4
+        with:
+          repository: usbsid/usbsid-player
+          path: master/lib/usbsid-player
+
+      - name: 📇 Set USBSID-Player EMUDIR
+        if: ${{matrix.withemulator == 1 }}
+        run: |
+          echo "EMUDIR=${{github.workspace}}/master/lib/usbsid-player" >> $GITHUB_ENV
+
+      - name: 🏭 Create build directory
+        run: |
+          mkdir -p ${{github.workspace}}/master/build_${{matrix.directory}}
+
+      - name: 🏭 Setup CMAKE
+        run: |
+          unset PICO_PLATFORM
+          unset PICO_BOARD
+          cmake -S master \
+            -B ${{github.workspace}}/master/build_${{matrix.directory}} \
+            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -DPICO_PLATFORM=${{matrix.pico_platform}} \
+            -DPICO_BOARD=${{matrix.pico_board}} \
+            -Dpicotool_DIR=${{github.workspace}}/picotool/picotool \
+            -DONBOARD_EMULATOR=${{matrix.withemulator}} \
+            -DEMUDIR=${{env.EMUDIR}} \
+            ${{matrix.extra_cmake_args}}
+
+      - name: 🏭 Build ${{matrix.buildname}}
+        run: |
+          cmake --build ${{github.workspace}}/master/build_${{matrix.directory}} --config ${{env.BUILD_TYPE}} -j ${{env.BUILD_THREADS}}
+
+      - name: List build files
+        run: |
+          ls ${{github.workspace}}/master/build_${{matrix.directory}}/*.uf2 -la
+
+      - name: 💾 Gather Artifact Files
+        working-directory: ${{github.workspace}}/master
+        run: |
+          mkdir dist
+          cp -av build_${{matrix.directory}}/*.uf2 dist/
+
+      - name: Get current branch
+        run: |
+          echo "BRANCHNAME=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_ENV
+
+      - name: Get current datetime
+        run: |
+          echo "DATETIME=$(date +'%Y%m%dT%H%M%S')" >> $GITHUB_ENV
+
+      - name: 💾 Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: releasebuild-usbsid${{matrix.directory}}
+          path: ${{github.workspace}}/master/dist
+
+  build-tools:
+    name: Build Tools
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.gitea/workflows/buildtools.yml
+    with:
+      force_run: true  # This overrides the 'if' logic in the child
+
+  # Final job to collect everything and upload to the release
+  upload-tools:
+    name: Upload tools
+    needs: build-tools
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download Tools Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: 'tools-*'
+          path: tools-output
+          merge-multiple: true
+
+      - name: Zip tools
+        # -r for recursive, -j to junk paths so files are at the zip root
+        run: zip -r -j tools.zip ./tools-output
+
+      - name: Upload tools zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: releasebuild-usbsidtools
+          path: tools.zip

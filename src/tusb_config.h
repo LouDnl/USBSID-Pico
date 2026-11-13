@@ -52,7 +52,7 @@
 // RHPort max operational speed can defined by board.mk
 #ifndef BOARD_TUD_MAX_SPEED
 #define BOARD_TUD_MAX_SPEED   OPT_MODE_FULL_SPEED  /* Boo! Can't use HIGH speed 😢 */
-#define CFG_TUSB_RHPORT0_MODE (OPT_MODE_DEVICE | BOARD_TUD_MAX_SPEED)  /* High speed with TinyUSB is not available for rp2040*/
+#define CFG_TUSB_RHPORT0_MODE (OPT_MODE_DEVICE | BOARD_TUD_MAX_SPEED)  /* High speed with TinyUSB is not available for rp2040 */
 #endif
 
 //--------------------------------------------------------------------
@@ -104,15 +104,17 @@
 #define CFG_TUD_TASK_QUEUE_SZ   100  /* WHAT DOES THIS BUTTON DO!? */
 
 //------------- CLASS -------------//
-#ifdef USB_PRINTF
-#define CFG_TUD_CDC              2
+/* WARNING: Adding more CDC ports can cause delays and
+ * desync on high speed demanding SID tunes */
+#if defined(USB_PRINTF)
+#define CFG_TUD_CDC              3
 #else
-#define CFG_TUD_CDC              1
+#define CFG_TUD_CDC              2
 #endif
 #define CFG_TUD_MSC              0
 #define CFG_TUD_HID              0
 #define CFG_TUD_MIDI             1
-#define CFG_TUD_VENDOR           1
+#define CFG_TUD_VENDOR           1  /* WebUSB only, SID stream has its own class driver */
 
 // CDC Endpoint transfer buffer size, more is faster
 #define CFG_TUD_CDC_EP_BUFSIZE    64  // Even at 512KB only 64KB will be used because of TUD_OPT_FULL_SPEED, Pico is only USB2.0
@@ -127,9 +129,20 @@
 
 // Vendor FIFO size of TX and RX
 // If not configured vendor endpoints will not be buffered
-// For buffering it's better to to define USE_VENDOR_CALLBACK 1 in globals.h
+// For buffering define tud_vendor_rx_cb in usbsid.c
+// For non buffering use vendor_task in the Core0 main loop
+// Current javascript driver _requires_ buffering + MacOs desktop uses this endpoint as CDC
 #define CFG_TUD_VENDOR_RX_BUFSIZE 64  /* Set to 0 to disable buffering (the fifo is not used) */
 #define CFG_TUD_VENDOR_TX_BUFSIZE 64  /* Set to 0 to disable buffering (the fifo is not used) */
+
+#if defined(USE_USB_NET)
+// CDC-NCM network interface (NSD over USB), callbacks in net/net_usb.c
+#define CFG_TUD_NCM                   1
+#define CFG_TUD_NCM_IN_NTB_MAX_SIZE   3200  /* Device to host NTB size, must be > MTU */
+#define CFG_TUD_NCM_OUT_NTB_MAX_SIZE  3200  /* Host to device NTB size, Linux minimum 2048 */
+#define CFG_TUD_NCM_IN_NTB_N          3     /* TX NTBs, 3 keeps tud_network_can_xmit() from blocking */
+#define CFG_TUD_NCM_OUT_NTB_N         2     /* RX NTBs, 2 adds throughput at full speed */
+#endif
 
 
 #ifdef __cplusplus

@@ -90,15 +90,11 @@ extern uint32_t ADDR_PERSISTENT[];
 /* Default config offset in flash memory */
 #define FLASH_CONFIG_OFFSET (FLASH_PERSISTENT_OFFSET + ((FLASH_PERSISTENT_SIZE / 4) * 3))
 
-/* MIDI expansion: its own partition, directly after Config's, added by the
- * linker script rather than derived a second independent way in C. Both
- * ADDR_CONFIG (linker) and FLASH_CONFIG_OFFSET (the macro above, computed
- * from PICO_FLASH_SIZE_BYTES at compile time) describe the same address by
- * construction; verify_midiconfig_offset() in config.c checks that at boot
- * so the two never quietly drift apart. */
+/* MIDI expansion has its own linker script defined
+ * persistent section after the config one */
 extern uint32_t ADDR_CONFIG[];
 extern uint32_t ADDR_MIDICONFIG[];
-/* Set by verify_midiconfig_offset() at boot; midi_config_save()/load() must
+/* Set by verify_midiconfig_offset() at boot. The midi_config_save()/load() must
  * refuse to touch flash while this is false. */
 extern bool midiconfig_offset_ok;
 #define FLASH_MIDICONFIG_OFFSET ((uint32_t)ADDR_MIDICONFIG - XIP_BASE)
@@ -111,6 +107,80 @@ extern bool midiconfig_offset_ok;
 /* Max config size = 256 Bytes == FLASH_PAGE_SIZE (FLASH_SECTOR_SIZE / 16 config saves) */
 #define CONFIG_SIZE (FLASH_SECTOR_SIZE / 16)
 
+/* WiFi credentials and Bluetooth NSD settings live in their own page, well
+ * away from Config: Config's full contents are serialised back to the
+ * host by read_config() (any WebUSB page could read it), and a PSK must
+ * never travel that path.
+ *
+ * Persistent region layout (usbsidpico-rp2040/-rp2350/-rp2350b.ld):
+ *   quarter 0-2 - free
+ *   quarter 3   - ADDR_CONFIG (16 x 256B slots), then ADDR_MIDICONFIG (16 x 4K slots, 64KB)
+ * FLASH_NET_OFFSET below sits at quarter index 2, inside the unclaimed
+ * first three quarters. */
+#define FLASH_NET_OFFSET (FLASH_PERSISTENT_OFFSET + ((FLASH_PERSISTENT_SIZE / 4) * 2))
+/* Same 16-slot wear-levelling shape as Config (CONFIG_SIZE/MIDICONFIG_SAVE_SLOTS) */
+#define NETCONFIG_SAVE_SLOTS 16
+#define NETCONFIG_SIZE       (FLASH_SECTOR_SIZE / 16) /* 256B page, same as Config */
+
+typedef struct NetConfig {
+  uint32_t magic;             /* MAGIC_SMOKE, same wipe-on-rebuild semantics as Config */
+  uint8_t  version;           /* Internal version control */
+  uint8_t  save_id;           /* 16-slot wear levelling, mirrors load_config()/save_config() */
+  char     ssid[33];          /* None until user sets one */
+  char     psk[64];           /* NEVER serialised back to the host, see read_config() */
+  char     hostname[24];      /* discovery + LWIP_NETIF_HOSTNAME, default "USBSID-Pico" */
+  uint16_t nsd_port;          /* default 6581 */
+  struct {
+    bool wifi_enabled      : 1;
+    bool nsd_enabled       : 1;
+    bool bt_nsd_enabled    : 1;
+    bool discovery_enabled : 1;
+    uint8_t usbnet_ip_mode : 2;  /* USB net only: USBNET_IP_MODE_* */
+  } flags;
+#if defined(USE_USB_NET)
+  /* USB net static mode addresses, dotted order, 0.0.0.0 = unset */
+  uint8_t usbnet_ip[4];
+  uint8_t usbnet_netmask[4];
+  uint8_t usbnet_gateway[4];  /* 0.0.0.0 = no gateway */
+#endif /* USE_USB_NET */
+} NetConfig;
+
+/* NetConfig.flags.usbnet_ip_mode values.
+ * DHCP server (factory default): board 192.168.65.1/24, serves USB link only
+ * DHCP broadcasts never cross host routing or proxy ARP.
+ * DHCP client: needs a host bridge from USB link to LAN.
+ * Static: needs host routing, proxy ARP or a bridge.
+ * Do not bridge the USB network interface into a LAN that has its own DHCP
+ * server while in DHCP server mode. */
+enum {
+  USBNET_IP_MODE_DHCP_CLIENT = 0,  /* Lease from a LAN DHCP server via host bridge */
+  USBNET_IP_MODE_STATIC      = 1,  /* usbnet_ip / usbnet_netmask / usbnet_gateway */
+  USBNET_IP_MODE_DHCP_SERVER = 2,  /* Factory default, serves the USB link only */
+};
+
+/* Factory default IP mode, 0 on builds without USB net (flags byte unchanged) */
+#if defined(USE_USB_NET)
+#define USBNET_IP_MODE_DEFAULT USBNET_IP_MODE_DHCP_SERVER
+#else
+#define USBNET_IP_MODE_DEFAULT USBNET_IP_MODE_DHCP_CLIENT
+#endif
+
+#define NETCONFIG_DEFAULT_INIT { \
+  .magic = MAGIC_SMOKE, \
+  .version = 1, \
+  .save_id = 0, \
+  .ssid = {0}, \
+  .psk = {0}, \
+  .hostname = "USBSID-Pico", \
+  .nsd_port = 6581, \
+  .flags = { \
+    .wifi_enabled = false, \
+    .nsd_enabled = true, \
+    .bt_nsd_enabled = false, \
+    .discovery_enabled = true, \
+    .usbnet_ip_mode = USBNET_IP_MODE_DEFAULT, \
+  }, \
+}
 
 /* USBSID-Pico config struct */
 typedef struct SIDChip {
@@ -127,7 +197,8 @@ typedef struct Socket {
   bool    dualsid : 1;  /* enable / disable dual SID support for this socket (requires clone) */
 } Socket;
 
-typedef struct Config { // TODO: Add overrides for detect_default_config and add 5v/9v/12 overrides so they cannot be changed
+/* NOTE: WiFi/Bluetooth/NSD are explicitely not set in this config */
+typedef struct Config { // TODO: Add overrides for detect_default_config and add 5v/9v/12 overrides to make them unchangeable
   /* First three items must stay in the same order! */
   uint32_t magic;                /* Contains firmware build magic */
   int      default_config;       /* Defines if config is default config or not */
@@ -176,6 +247,8 @@ typedef struct Config { // TODO: Add overrides for detect_default_config and add
   bool need_confirmation : 1;    /* (PCB v1.5+) current configuration needs confirmation, SID's are disabled until confirmed! */
   bool socket_change_detect : 1; /* (PCB v1.5+) disables socket change detection on boot */
   bool preset_auto_detect : 1;   /* disables silent auto detection before present change, default disabled on v1.0~v1.3, default enabled on v1.5+ */
+  bool board_clock_link : 1;     /* uses GPIO17 as external clock detection, PHI1 wil generate based on the inpu */
+  bool rx_ring : 1;              /* USB RX ringbuffer, latched at boot (save and reboot to apply) */
 } Config;
 
 /* Fixed defaults that differ between Pico1 and Pico2 */
@@ -271,6 +344,8 @@ typedef struct Config { // TODO: Add overrides for detect_default_config and add
   .need_confirmation = false, \
   .socket_change_detect = true, /* WARNING: This setting _can_ and _will_ fry your 9v SID if config is set to 6581 (12v) */ \
   .preset_auto_detect = PRESET_AUTO_DETECT_DEFAULT, /* Default disabled on v1.0~v1.3, default enabled on v1.5+ */ \
+  .board_clock_link = false, /* Disabled by default */ \
+  .rx_ring = true, /* Enabled by default */ \
 } \
 
 typedef struct RuntimeCFG {
@@ -370,10 +445,33 @@ enum
   SAVE_MIDI_STATE  = 0x61,
   RESET_MIDI_STATE = 0x63,
 
+  /* Network SID Device (WiFi/Bluetooth) provisioning. Only meaningfully
+   * handled when USE_NET is compiled in. USE_USB_NET handles NSD,
+   * discovery, apply, forget and USBNET_* subset.
+   * pico/pico2 build replies ERROR (see handle_config_request()). */
+  WIFI_STATUS      = 0x70,  /* Returns {link_up, session_active} */
+  WIFI_SET_SSID    = 0x71,  /* buffer[1] = length, buffer[2..] = SSID bytes */
+  WIFI_SET_PSK     = 0x72,  /* buffer[1] = length, buffer[2..] = PSK bytes, write-only */
+  WIFI_SET_HOSTNAME= 0x73,  /* buffer[1] = length, buffer[2..] = hostname bytes */
+  WIFI_ENABLE      = 0x74,  /* buffer[1] = 0/1 */
+  NSD_ENABLE       = 0x75,  /* buffer[1] = 0/1 */
+  NSD_SET_PORT     = 0x76,  /* buffer[1..2] = port, big-endian */
+  WIFI_APPLY       = 0x77,  /* Persist net_cfg to flash and apply live */
+  WIFI_FORGET      = 0x78,  /* Erase stored credentials */
+  BT_NSD_ENABLE    = 0x79,  /* buffer[1] = 0/1 */
+  READ_NETCFG      = 0x7A,  /* Read net config as bytes */
+  WIFI_READ_IP     = 0x7B,  /* Returns {state, ip0, ip1, ip2, ip3}, every build */
+  DISCOVERY_ENABLE = 0x7C,  /* buffer[1] = 0/1, applied live, persisted by WIFI_APPLY */
+  USBNET_IP_MODE   = 0x7D,  /* buffer[1] = USBNET_IP_MODE_*, USB net only, persisted by WIFI_APPLY */
+  USBNET_SET_STATIC= 0x7E,  /* buffer[1..4] ip, [5..8] netmask, [9..12] gateway, USB net only, persisted by WIFI_APPLY */
+  USBNET_READ_IPCFG= 0x7F,  /* Returns {mode, ip[4], netmask[4], gateway[4]}, USB net only */
+
   USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
   US_PCB_VERSION   = 0x81,  /* Read PCB version */
   US_FEATURES      = 0x82,  /* Read USBSID compiled features */
+  SET_RX_RING      = 0x83,  /* Enable/Disable the USB RX ringbuffer (auto save and reboot) */
 
+  LINK_CLOCK       = 0x84,  /* Enable/Disable link with external clock feature (auto save and reboot) */
   RESTART_BUS      = 0x85,  /* Restart DMA & PIO */
   RESTART_BUS_CLK  = 0x86,  /* Restart PIO clocks */
   SYNC_PIOS        = 0x87,  /* Sync PIO clocks */
@@ -390,7 +488,7 @@ enum
   /* legacy commands */
   PDSID            = 0xA3,  /* Holds the reset line for 5 seconds to change SID type on a PDSID */
 
-#if defined(ONBOARD_SIDPLAYER)
+#if defined(ONBOARD_EMULATOR)
   /* Internal SID player */
   UPLOAD_SID_START    = 0xD0,  /* Start command for USBSID to go into receiving mode */
   UPLOAD_SID_DATA     = 0xD1,  /* Init byte for each packet containing data */
@@ -403,12 +501,12 @@ enum
   SID_PLAYER_START    = 0xE1,  /* Start SID file play */
   SID_PLAYER_STOP     = 0xE2,  /* Stop SID file play */
   SID_PLAYER_PAUSE    = 0xE3,  /* Pause/Unpause SID file play */
-  SID_PLAYER_NEXT     = 0xE4,  /* Next SID subtune play */
+  SID_PLAYER_NEXT     = 0xE4,  /* Following SID subtune play */
   SID_PLAYER_PREV     = 0xE5,  /* Previous SID subtune play */
   SID_PLAYER_TWO      = 0xE6,  /* Force play to play on socket two or sid two */
   SID_PLAYER_FFWD     = 0xE7,  /* Tune fast forward */
   SID_PLAYER_RWND     = 0xE8,  /* Tune rewind // NOTE: Not implemented */
-  SID_PLAYER_MUTE     = 0xE9,  /* Full mute, mute a voice or just one chip/SID */
+  SID_PLAYER_MUTE     = 0xE9,  /* Full mute, mute a voice or only one chip/SID */
   SID_PLAYER_MUTED    = 0xEA,  /* Read a the muted state */
   SID_PLAYER_TIME     = 0xEB,  /* Read play time of current track */
   TEST_FN2            = 0xEF,  /* TODO: Remove before v1 release */
@@ -427,11 +525,12 @@ enum
 enum {
   FULL_CONFIG       = READ_CONFIG,    /* 0x30 */
   SOCKET_CONFIG     = READ_SOCKETCFG, /* 0x37 */
-  MIDI_CONFIG       = 0x60,
-  MIDI_CCVALUES     = 0x70,
-  VERIFICATION_BYTE = 0x7F,
-  END_BYTE          = 0x8F,
-  TERMINATION_BYTE  = 0xFF,
+  MIDI_CONFIG       = 0x60, /* Not implemented */
+  MIDI_CCVALUES     = 0x6A, /* Not implemented */
+  NETWORK_CONFIG    = READ_NETCFG,    /* 0x7A */
+  VERIFICATION_BYTE = 0x7F, /* After init byte */
+  END_BYTE          = 0x8F, /* Before termination byte, but only if buffer can be more then 64 bytes */
+  TERMINATION_BYTE  = 0xFF, /* Last byte in buffer */
 };
 
 /* Clone chip config read/write initiator bytes */
@@ -484,61 +583,77 @@ enum {
   BOARD_MIXED     = 14,
   BOARD_SDETECT   = 15, /* (PCB v1.5+) Automatic socket change detection */
   BOARD_PADETECT  = 16, /* (PCB v1.5+) Preset automatic detection */
+  BOARD_RXRING    = 17, /* USB RX ringbuffer, applied after save and reboot */
 };
-
-/**
- * @brief USBSID-Pico PCB and Firmware features packed in a single byte
- * 1 Byte == 8 bits == 8 features to define
- *   76543210
- * 0b00000000
- * 0 = Pico type: 0 Pico1, 1 Pico2
- * 1 = Wifi / Bluetooth onboard: 0 No, 1 Yes
- * 2 = RGB LED onboard: 0 No, 1 Yes
- * 3 = PIO Uart
- * 4 = Unused
- * 5 = Unused
- * 6 = Embedded Cynthcart: 0 No, 1 Yes
- * 7 = Embedded SID player: 0 No, 1 Yes
- */
-static const uint8_t us_features = (
-  0
-#if defined(PICO_RP2350)
-  | (1 << 0)
-#endif
-#if defined(USE_BLUETOOTH) || defined(USE_WIFI)
-  | (1 << 1)
-#endif
-#if defined(USE_RGB)
-  | (1 << 2)
-#endif
-#if defined(USE_PIO_UART)
-  | (1 << 3)
-#endif
-  /* 4 Unused */
-  /* 5 Unused */
-#if defined(ONBOARD_CYNTHCART)
-  | (1 << 6)
-#endif
-#if defined(ONBOARD_SIDPLAYER)
-  | (1 << 7)
-#endif
-);
 
 /* Global variables from config.c */
 extern Config        usbsid_config;
 extern RuntimeCFG    cfg;
 extern ConfigError   err;
 extern volatile bool first_boot;
+/* Global versioning variables */
 extern const char    *us_product;
 extern const char    *project_version;
 extern const char    *pcb_version;
 
+/**
+ * @brief USBSID-Pico PCB and Firmware features packed in a single byte
+ * 1 Byte == 8 bits == 8 features to define
+ *   76543210
+ * 0b00000000 = default at source, compilation defines what is and is not enabled
+ * 0 = Pico type: 0 Pico1, 1 Pico2
+ * 1 = Unused
+ * 2 = RGB LED onboard: 0 No, 1 Yes
+ * 3 = PIO Uart: 0 No, 1 Yes
+ * 4 = Wifi & Bluetooth onboard: 0 No, 1 Yes
+ * 5 = Network SID Device: 0 No, 1 Yes
+ * 6 = SID Stream: 0 No, 1 Yes
+ *     An extra Vendor interface is available for reading a SID register stream
+ * 7 = Embedded SID player & Cynthcart: 0 No, 1 Yes
+ */
+static const uint8_t us_features = (
+  0b00000000 /* 0 */
+#if defined(PICO_RP2350)
+  | (1 << 0)
+#endif
+  /* 1 Unused */
+#if defined(USE_RGB)
+  | (1 << 2)
+#endif
+#if defined(USE_PIO_UART)
+  | (1 << 3)
+#endif
+#if defined(USE_NET) /* Also enables WIFI_READ_IP command */
+  | (1 << 4)
+#endif
+#if defined(USE_NSD) /* Also enables DISCOVERY_ENABLE command */
+  | (1 << 5)
+#endif
+#if defined(USE_SID_STREAM)  /* SID register stream */
+  | (1 << 6)
+#endif
+#if defined(ONBOARD_EMULATOR)
+  | (1 << 7)
+#endif
+);
+
+/* Const feature variables */
+static const bool is_rp2350     = (us_features & 0b00000001); /* 0 */
+static const bool has_rgb_vu    = (us_features & 0b00000100); /* 2 */
+static const bool has_pio_uart  = (us_features & 0b00001000); /* 3 */
+static const bool has_net       = (us_features & 0b00010000); /* 4 */
+static const bool has_nsd       = (us_features & 0b00100000); /* 5 */
+static const bool has_sidstream = (us_features & 0b01000000); /* 6 */
+static const bool has_emulator  = (us_features & 0b10000000); /* 7 */
+
 /* Functions from config.c */
+void        write_back_data(size_t buffersize);
 bool        config_unacknowledged(void);
 void        load_config(Config *config);
 void        verify_midiconfig_offset(void);
 void        save_config_ext(void);
 void        handle_config_request(uint8_t *buffer, uint32_t size);
+bool        config_is_query(uint8_t cmd);
 void        print_config(void);
 ConfigError apply_new_presetconfig(void);
 ConfigError apply_config(bool at_boot);
@@ -549,6 +664,9 @@ void        save_load_config(void);
 void        save_load_apply_config(bool at_boot);
 void        verify_clockrate(void);
 
+/* Defined in net_config.c, declared in this header since callers throughout this
+ * file need it and net_config.h doesn't include config.h */
+extern NetConfig net_cfg;
 
 #ifdef __cplusplus
   }

@@ -1,24 +1,22 @@
 /*
- * USBSID-Player: a cycle exact C64 SID player for USBSID-Pico, for command
- * line playback, for embedding on RP2350 (Pico2), and in a browser.
+ * USBSID-Player: a cycle exact C64 SID player for USBSID-Pico,
+ * command line playback, websites and for embedding on RP2040/RP2350.
  *
- * web/usplayer-web.js
+ * usplayer-web.js
  * The glue: the WASM module on one side, a transport on the other.
  *
- * Once per tick it steps the emulation by however many C64 frames of wall
- * clock time have passed, drains the SID write ring out of the WASM heap, and
- * hands the (register, value, cycles) triples to a transport. The gaps are the
- * same cycle exact gaps the command line player sends over libusb, so the
- * WebUSB path is cycle exact too; ASID is not, by nature, and ignores them.
+ * Once per tick it steps the emulation by the C64 frames that wall clock time
+ * has passed, drains the SID write ring from the WASM heap and hands the
+ * (register, value, cycles) triples to a transport. The gaps are the same
+ * cycle exact gaps the command line player sends over libusb, WebUSB is cycle
+ * exact too. ASID is not and ignores them.
  *
- * Pacing is against `performance.now()` rather than against the tick source,
- * so playback runs at the right speed on a 144 Hz monitor as well as on a 60,
- * and keeps its speed when the tick source is the audio thread instead of the
- * display. That distinction is not academic: pacing per animation frame plays
- * a PAL tune at 2.9x on a 144 Hz display.
+ * Pacing is against performance.now(), speed is right on a 144 Hz monitor as
+ * well as on a 60 and when the audio thread is the tick source. Pacing per
+ * animation frame plays a PAL tune at 2.9x on 144 Hz.
  *
- * DOM free, so it runs on the main thread, in a worker, or under node with a
- * capture transport, which is what the smoke test uses.
+ * DOM free: runs on the main thread, in a worker or under node with a
+ * capture transport.
  *
  * A transport implements:
  *   writeCycled(reg, val, cycles)  one cycle exact register write
@@ -29,14 +27,15 @@
  *   setClock(id)                   0 default, 1 PAL, 2 NTSC, 3 DREAN
  *   playbackStart()                enter the transport's play mode (ASID)
  *
- * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Player)
+ * This file is part of USBSID-Player (https://github.com/LouDnl/USBSID-Player)
  * File author: LouD
  *
  * Copyright (c) 2026 LouD
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, version 2.
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -48,10 +47,16 @@
  */
 
 /**
- * Is this a .sid file rather than a program?
+ * Max SID chips the wasm emulation core wires up (SidConfig::base in
+ * mos6581_8580.h), matches kMaxSids there and in sidfile.h. Real board
+ * backends stay at 4 chips, the reSIDfp software audio backend synthesises all.
+ */
+export const MAX_SIDS = 15;
+
+/**
+ * Check if bytes are a .sid file (PSID or RSID)
  *
  * @param {Uint8Array} bytes
- * @returns {boolean}
  */
 export function isSidHeader(bytes) {
   if (!bytes || bytes.length < 4) return false;
@@ -60,22 +65,27 @@ export function isSidHeader(bytes) {
 }
 
 /**
- * How many SID chips a .sid header asks for, 1 to 3.
+ * Count the SID chips a .sid header asks for, 1 to MAX_SIDS
  *
- * The second and third chips live at $7a and $7b and only exist from header
- * version 3 and 4, so the version has to be checked before the bytes are
- * believed: a v2 file has something else there.
+ * Chips two and three live at $7a and $7b, only from header version 3 and 4
+ * (a v2 file has something else there). Version 5 redefines both: the low
+ * nibble of $7a is the total chip count (multiSidConfig), up to 15 = MAX_SIDS.
+ * Which addresses are valid is sidfile.cpp's job after loading, this is a
+ * quick pre-parse for UI and transport setup.
  *
- * Lives here rather than in a frontend because more than one of them needs it
- * and they must agree. ASID in particular only emits the chips it is told
- * about, so a transport left at one chip plays a three SID tune as one.
+ * Lives in this file because more than one frontend needs it. ASID only emits
+ * the chips it is told about, a transport left at one chip plays a three SID
+ * tune as one.
  *
  * @param {Uint8Array} bytes
- * @returns {number} 1, 2 or 3
  */
 export function countSids(bytes) {
   if (!bytes || bytes.length < 0x7c) return 1;
   const version = (bytes[0x04] << 8) | bytes[0x05];
+  if (version >= 5) {
+    const total = bytes[0x7a] & 0x0f;
+    return Math.min(MAX_SIDS, Math.max(1, total || 1));
+  }
   let n = 1;
   if (version >= 3 && bytes[0x7a] !== 0) n++;
   if (version >= 4 && bytes[0x7b] !== 0) n++;
@@ -83,18 +93,15 @@ export function countSids(bytes) {
 }
 
 /**
- * Which chip a tune was written for, from the header's flags word.
+ * Get the chip a tune was written for (0 for a 6581, 1 for an 8580), from the header flags word
  *
  * Bits 4 and 5 of the big endian word at $76: 0 unknown, 1 is a 6581, 2 is an
- * 8580, 3 is either. Unknown and either both fall to 6581, which is what a
- * player with no opinion should do and what the command line player does.
+ * 8580, 3 is either. Unknown and either give 6581, same as the command line
+ * player.
  *
- * Only meaningful for software audio, where the model decides which filter is
- * emulated and is plainly audible. A board plays whatever chip is fitted and
- * does not care what the file says.
+ * Only meaningful for software audio, a board plays whatever chip is fitted.
  *
  * @param {Uint8Array} bytes
- * @returns {number} 0 for a 6581, 1 for an 8580
  */
 export function sidModel(bytes) {
   if (!bytes || bytes.length < 0x78) return 0;
@@ -104,14 +111,31 @@ export function sidModel(bytes) {
   return (((flags >> 4) & 0x03) === 2) ? 1 : 0;
 }
 
-/** Discards everything. The default, so a player without a device is inert. */
+/**
+ * Whether the tune header asks for a 6581, for the ASID SID type message (0x32)
+ *
+ * Bits 4 and 5 of the big endian word at $76 equal to 1. Unknown, either and a
+ * header older than v2 (no flags word) are not a 6581, as the command line player
+ * (info.sid_model == SidModel::Mos6581). Differs from sidModel(), which falls back to a 6581.
+ *
+ * @param {Uint8Array} bytes
+ */
+export function headerIs6581(bytes) {
+  if (!bytes || bytes.length < 0x78) return false;
+  const version = (bytes[0x04] << 8) | bytes[0x05];
+  if (version < 2) return false;
+  const flags = (bytes[0x76] << 8) | bytes[0x77];
+  return ((flags >> 4) & 0x03) === 1;
+}
+
+/** Discards everything, the default for a player without a device */
 export class NullTransport {
   writeCycled(_reg, _val, _cycles) {}
   flush() {}
   reset() {}
 }
 
-/** Records what it is given. What the smoke test measures. */
+/** Records what it is given */
 export class CaptureTransport {
   constructor() { this.writes = []; this.flushes = 0; this.resets = 0; }
   writeCycled(reg, val, cycles) { this.writes.push([reg, val, cycles]); }
@@ -132,6 +156,7 @@ export class USBSIDPlayerWeb {
     this._rafId = 0;
     this._audio = null;      // { ctx, node } while the AudioWorklet clock runs
     this._tunePtr = 0;
+    this._asidTune = null;   // { is6581 } of the loaded SID tune, null for a program
     this._lastFlush = 0;
     this._lastReset = 0;
     this._hz = 50.125;       // frames a second, replaced on load
@@ -142,8 +167,8 @@ export class USBSIDPlayerWeb {
     this._paused = false;
     this.resetStats();
     this._boardConfig = null;
-    /* The Songlengths database, once a page hands it over. See
-     * loadSonglengths(): it stays in the heap because every lookup walks it. */
+    /* The Songlengths database, see loadSonglengths(). Stays in the heap,
+     * every lookup walks it */
     this._slPtr = 0;
     this._slLen = 0;
 
@@ -152,6 +177,9 @@ export class USBSIDPlayerWeb {
     this._alloc          = M.cwrap('usp_alloc', 'number', ['number']);
     this._freeBuf        = M.cwrap('usp_free', null, ['number']);
     this._loadSidtune    = M.cwrap('usp_load_sidtune', 'number', ['number', 'number', 'number']);
+    /* Absent in a wasm older than the song 1 fix */
+    this._loadSidtuneSong = typeof M._usp_load_sidtune_song === 'function'
+      ? M.cwrap('usp_load_sidtune_song', 'number', ['number', 'number', 'number']) : null;
     this._loadPrg        = M.cwrap('usp_load_prg', 'number', ['number', 'number']);
     this._initSidplayer  = M.cwrap('usp_init_sidplayer', null, []);
     this._start          = M.cwrap('usp_start', null, []);
@@ -169,13 +197,22 @@ export class USBSIDPlayerWeb {
     this._isPrg       = M.cwrap('usp_is_prg', 'number', []);
     this._clockId     = M.cwrap('usp_clock_id', 'number', []);
     this._refreshHz   = M.cwrap('usp_refresh_hz', 'number', []);
+    /* Older wasm may lack it, the ASID environment message is then skipped */
+    this._clockHz     = (typeof M._usp_clock_hz === 'function')
+                      ? M.cwrap('usp_clock_hz', 'number', []) : null;
     this._song        = M.cwrap('usp_song', 'number', []);
     this._songs       = M.cwrap('usp_songs', 'number', []);
     this._frames      = M.cwrap('usp_frames', 'number', []);
     this._playtimeMs  = M.cwrap('usp_playtime_ms', 'number', []);
     this._irqSources  = M.cwrap('usp_irq_sources', 'number', []);
+    /* Older wasm may lack it, the sources are then treated as known */
+    this._irqKnown    = (typeof M._usp_irq_known === 'function')
+                      ? M.cwrap('usp_irq_known', 'number', []) : null;
     this._startMode   = M.cwrap('usp_start_mode', 'number', []);
     this._driverAddr  = M.cwrap('usp_driver_address', 'number', []);
+    /* Older wasm may lack it, the page then treats the video standard as known */
+    this._videoKnown  = (typeof M._usp_video_known === 'function')
+                      ? M.cwrap('usp_video_known', 'number', []) : null;
     this._songMd5     = M.cwrap('usp_song_md5', null, ['number', 'number', 'number']);
     this._songlenMs   = M.cwrap('usp_songlength_ms', 'number',
                                 ['number', 'number', 'number', 'number']);
@@ -185,6 +222,16 @@ export class USBSIDPlayerWeb {
     this._tuneName    = M.cwrap('usp_tune_name', 'number', []);
     this._tuneAuthor  = M.cwrap('usp_tune_author', 'number', []);
     this._tuneReleased = M.cwrap('usp_tune_released', 'number', []);
+    /* v5: multi-SID, panning, FM/OPL, embedded song lengths. Informational
+     * only, see web_api.cpp */
+    this._sidCount    = M.cwrap('usp_sid_count', 'number', []);
+    this._sidAddr     = M.cwrap('usp_sid_addr', 'number', ['number']);
+    this._sidPan      = M.cwrap('usp_sid_pan', 'number', ['number']);
+    this._panLayout   = M.cwrap('usp_pan_layout', 'number', []);
+    this._panMode     = M.cwrap('usp_pan_mode', 'number', []);
+    this._hasFmOpl    = M.cwrap('usp_has_fm_opl', 'number', []);
+    this._hasEmbeddedSonglengths = M.cwrap('usp_has_embedded_songlengths', 'number', []);
+    this._embeddedSonglenMs = M.cwrap('usp_embedded_songlength_ms', 'number', ['number']);
     this._readMemory  = M.cwrap('usp_read_memory', 'number', ['number']);
     this._ciaLatch    = M.cwrap('usp_cia_latch', 'number', ['number', 'number']);
     this._sidRegister = M.cwrap('usp_sid_register', 'number', ['number', 'number']);
@@ -203,14 +250,13 @@ export class USBSIDPlayerWeb {
     this._dropCount   = M.cwrap('usbsid_web_drop_count', 'number', []);
     this._resetCount  = M.cwrap('usbsid_web_reset_count', 'number', []);
 
-    /* Fixed for the module's lifetime: the ring is a static array. Its address
-     * survives memory growth because growth moves the heap's end, not its
-     * start, but HEAPU8 itself is re-created, so read the view every drain. */
+    /* Fixed for the module's lifetime, the ring is a static array. HEAPU8 is
+     * re-created on memory growth, read the view every drain */
     this._ringBase = this._ringPtr();
     this._ringCap  = this._ringEntries();
   }
 
-  /** Copy a file into the WASM heap, freeing whatever was there before. */
+  /** Copy a file into the WASM heap, freeing whatever was there before */
   _stage(bytes) {
     if (this._tunePtr) { this._freeBuf(this._tunePtr); this._tunePtr = 0; }
     const ptr = this._alloc(bytes.length);
@@ -220,14 +266,19 @@ export class USBSIDPlayerWeb {
   }
 
   /**
-   * Load a PSID or RSID (Uint8Array). subtune 0 is the file's own default.
-   * Returns falsy if the bytes are not a SID file, which is the page's cue to
-   * try loadPRG instead.
+   * Load a PSID or RSID (Uint8Array), subtune 0 is the file's default
+   * Return falsy if the bytes are not a SID file, try loadPRG then
+   *
+   * song counts from one and picks that song, 0 keeps subtune. Song 1 has no
+   * spelling in subtune, where 0 is the default (Action_Biker starts at song 2)
    */
-  loadSID(bytes, subtune = 0) {
+  loadSID(bytes, subtune = 0, song = 0) {
     if (this._running) this.stop();   // never leave a tune half playing
     const ptr = this._stage(bytes);
-    const ok = this._loadSidtune(ptr, bytes.length, subtune);
+    const ok = (song > 0 && this._loadSidtuneSong)
+      ? this._loadSidtuneSong(ptr, bytes.length, song)
+      : this._loadSidtune(ptr, bytes.length, subtune);
+    this._asidTune = ok ? { is6581: headerIs6581(bytes) } : null;
     if (ok) {
       this._initSidplayer();
       this._start();
@@ -237,17 +288,17 @@ export class USBSIDPlayerWeb {
   }
 
   /**
-   * Load a PRG or P00 (Uint8Array).
+   * Load a PRG or P00 (Uint8Array)
    *
-   * Slow, and unavoidably so: a program is started the way a person starts
-   * one, by booting a machine to the BASIC prompt and typing RUN, which is
-   * about two seconds of emulated time and runs on the calling thread. A tune
-   * skips all of it and starts in about fourteen milliseconds.
+   * Slow: boots a machine to the BASIC prompt and types RUN, about two
+   * seconds of emulated time on the calling thread. A tune starts in about
+   * fourteen milliseconds.
    */
   loadPRG(bytes) {
     if (this._running) this.stop();
     const ptr = this._stage(bytes);
     const ok = this._loadPrg(ptr, bytes.length);
+    this._asidTune = null;    // the command line sends no environment for a program
     if (ok) {
       this._start();
       this._afterStart();
@@ -260,13 +311,12 @@ export class USBSIDPlayerWeb {
     this._lastReset = this._resetCount();
     const hz = this._refreshHz();
     if (hz > 1) this._hz = hz;    // PAL 50.125, NTSC 59.83
-    /* Match the device's SID clock to the tune, or a PAL tune on a board left
-     * on NTSC plays sharp and fast. The id is the firmware's own index, which
-     * the player picked when it read the header. */
+    /* Match the device SID clock to the tune, else a PAL tune on a board left
+     * on NTSC plays sharp and fast. The id is the firmware index */
     if (this.transport.setClock) this.transport.setClock(this._clockId());
   }
 
-  /** One frame of emulation, then hand everything it produced to the transport. */
+  /** One frame of emulation, then hand what it produced to the transport */
   stepAndDrain() {
     this._step();
     this._drain();
@@ -276,25 +326,13 @@ export class USBSIDPlayerWeb {
     const head = this._ringHead();
     let tail = this._ringTail();
 
-    /* Seeking: step the emulation but send nothing.
-     *
-     * This is not an optimisation, it is the only way fast forward can work
-     * against hardware. The writes carry cycle deltas and the board honours
-     * them, so four frames of emulation per real frame means four frames of
-     * writes the board will take four frames to play. The queue grows without
-     * bound, the audio arrives seconds late and distorted, and anything queued
-     * behind it (a mono/stereo command, a stop) waits for the backlog. All three
-     * were reported and all three are this.
-     *
-     * The command line player has always done it this way: `f` swaps in a
-     * NullSidBackend for the duration (main_cli.cpp, `ff_null`). Same idea, one
-     * level up, because the page is where the ring is drained.
-     *
-     * The chip keeps whatever registers it had while this runs. Almost every
-     * tune rewrites its voices each frame, so it catches up immediately on
-     * release. The CLI can do better, pushing the register file back on arrival,
-     * because it can read the emulation's mirror; there is no export for that
-     * here yet. */
+    /* Seeking: step the emulation but send nothing. Needed for fast forward on
+     * hardware, the writes carry cycle deltas and the board plays them in real
+     * time: the queue grows, audio arrives seconds late and distorted and a
+     * stop or mono/stereo command waits behind the backlog.
+     * The CLI swaps in a NullSidBackend for this (main_cli.cpp, ff_null).
+     * The chip keeps its registers while seeking, most tunes rewrite their
+     * voices each frame. No export for the register mirror in this API yet */
     if (this._seeking) {
       if (tail !== head) this._ringSetTail(head >>> 0);
       return;
@@ -311,15 +349,14 @@ export class USBSIDPlayerWeb {
       }
       this._ringSetTail(head >>> 0);
     }
-    /* The player asking for silence (a stop, from anywhere) reaches the device
-     * through here, because only the page can talk to it. */
+    /* Player asked for silence (a stop), only the page can reach the device */
     const rc = this._resetCount();
     if (rc !== this._lastReset) {
       this._lastReset = rc;
       if (this.transport.resetSID) this.transport.resetSID();
       else if (this.transport.reset) this.transport.reset();
     }
-    /* One device flush per frame boundary crossed. */
+    /* One device flush per frame boundary crossed */
     const fc = this._flushCount();
     if (fc !== this._lastFlush) {
       this._lastFlush = fc;
@@ -328,43 +365,36 @@ export class USBSIDPlayerWeb {
   }
 
   /**
-   * One tick of whatever clock is driving us: advance as many emulated frames
-   * as real time has passed, scaled by the fast forward multiplier. Measuring
-   * against performance.now() rather than counting ticks is what keeps the
-   * tempo right whatever the tick rate turns out to be.
+   * One tick of the driving clock: advance as many emulated frames as real
+   * time has passed, scaled by the fast forward multiplier. Measured against
+   * performance.now() to keep the tempo right at any tick rate.
    */
   _tick() {
     if (!this._running) return;
     const now = () => ((typeof performance !== 'undefined') ? performance.now() : Date.now());
     if (this._paused) {
-      this._lastT = now();   // so resuming does not burst through a backlog
+      this._lastT = now();   // stops resuming from bursting through a backlog
       return;
     }
     const t = now();
     let dt = t - this._lastT;
     this._lastT = t;
     if (dt < 0) dt = 0;
-    if (dt > 250) dt = 250;              // a long stall is dropped, not chased
+    if (dt > 250) dt = 250;              // drop a long stall
     this._acc += dt;
     const period = (1000 / this._hz) / this._speed;
-    /* Two frames of catching up, not six. A frame of a write heavy tune is
-     * several hundred cycled writes, and the only place a burst of them can go
-     * is the transport's queue and then the board's own buffer. Neither can be
-     * taken back, so an overshoot here is heard long after the tick that caused
-     * it, and after a stop it is still playing. Two is enough to ride out a
-     * missed tick and small enough that the depth check below has something
-     * left to protect. */
+    /* Cap catching up at two frames. A write heavy frame is several hundred
+     * cycled writes, a burst sits in the transport queue and board buffer and
+     * cannot be taken back. The depth check below needs room to work */
     const cap = Math.max(2, Math.ceil(2 * this._speed));
-    /* Past this the board is already behind, so another frame is pure backlog.
-     * Transports that queue nothing (ASID, capture, null) say zero and never
-     * trip it. */
+    /* Past this the board is behind, another frame is backlog. Transports
+     * without a queue (ASID, capture, null) say zero */
     const limit = (this.transport.queueLimit || 256) >> 1;
     let steps = 0;
     let blocked = false;
     while (this._acc >= period && steps < cap) {
-      /* Not `_acc = 0`: throwing the accumulator away here loses the time
-       * outright and playback runs slow for as long as the queue is deep. Just
-       * stop stepping. The clamp below keeps at most one frame of it. */
+      /* Stop stepping, do not zero _acc. That loses time and playback runs
+       * slow while the queue is deep. The clamp below keeps one frame */
       if ((this.transport.queueDepth || 0) > limit) { blocked = true; break; }
       this.stepAndDrain();
       this._acc -= period;
@@ -376,13 +406,10 @@ export class USBSIDPlayerWeb {
   }
 
   /**
-   * What playback actually looked like, for comparing one arrangement against
-   * another. See web/bench.html.
+   * Record what playback looked like, for comparing arrangements (bench.html)
    *
-   * The number that matters is `maxDrainGap`, the longest a frame's writes ever
-   * went unsent, not the average anything: the board plays what it was given at
-   * the pre delays it was given, so it survives a late tick and starves on a
-   * long one. An average hides exactly the event that is audible.
+   * maxDrainGap matters most, the longest a frame's writes went unsent. The
+   * board survives a late tick and starves on a long one, an average hides it.
    */
   _record(t, dt, steps, blocked, period, done) {
     const s = this._stats;
@@ -401,7 +428,7 @@ export class USBSIDPlayerWeb {
       if (gap > s.maxDrainGap) s.maxDrainGap = gap;
       s.gapSum += gap;
       s.gaps++;
-      /* Late enough that the board has run out of what it was last given. */
+      /* Late enough that the board ran out of what it was given */
       if (gap > period * 2) s.starved++;
     }
     s.lastDrain = t;
@@ -438,21 +465,17 @@ export class USBSIDPlayerWeb {
   }
 
   /**
-   * Start the pump. Prefers an AudioWorklet, whose callback runs on the audio
-   * thread and keeps firing while the tab is in the background, where
-   * requestAnimationFrame is frozen and playback would otherwise stop dead.
-   * Async because resuming an AudioContext needs the user gesture that got us
-   * here.
+   * Start the pump on an AudioWorklet clock, it runs while the tab is in the
+   * background (requestAnimationFrame is frozen there). Async because
+   * resuming an AudioContext needs the user gesture.
    */
-  /** One tick of the clock, whatever is providing it. */
+  /** One tick of the clock, whatever is providing it */
   tick() { this._tick(); }
 
   /**
    * @param {object} opts
-   *   opts.externalClock  true when something else is calling tick(), which is
-   *                       what the worker does: the audio thread posts straight
-   *                       to it and neither AudioContext nor
-   *                       requestAnimationFrame exists there anyway.
+   *   opts.externalClock  true when something else calls tick(), as the worker
+   *                       does (no AudioContext or requestAnimationFrame there)
    */
   async start(opts = {}) {
     if (this._running) return;
@@ -461,6 +484,7 @@ export class USBSIDPlayerWeb {
     this._acc = 0;
     this._lastT = (typeof performance !== 'undefined') ? performance.now() : Date.now();
     if (this.transport.playbackStart) this.transport.playbackStart();
+    this._sendAsidTune();
 
     if (opts.externalClock) return;
 
@@ -469,6 +493,20 @@ export class USBSIDPlayerWeb {
       catch (e) { /* no Web Audio, or no gesture: fall through */ }
     }
     this._startRafClock();
+  }
+
+  /**
+   * ASID environment (0x31) and SID type (0x32) of the loaded tune, after the play start
+   *
+   * Same order and bytes as main_cli.cpp: PAL is a SID clock under 1 MHz, speed 1x.
+   * Only a SID tune, only a transport with the methods (ASID) and a wasm with the clock.
+   */
+  _sendAsidTune() {
+    const t = this.transport;
+    if (!this._asidTune || !this._clockHz) return;
+    if (typeof t.sendEnvironment !== 'function' || typeof t.sendSidType !== 'function') return;
+    t.sendEnvironment(this._clockHz() < 1000000, 1);
+    t.sendSidType(this._asidTune.is6581);
   }
 
   _startRafClock() {
@@ -483,8 +521,7 @@ export class USBSIDPlayerWeb {
   async _startAudioClock() {
     const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
     const ctx = new AC();
-    /* An inline processor that produces no audio and posts a message every
-     * render quantum, about 344 times a second at 48 kHz. */
+    /* Inline processor, posts a message every render quantum (about 344 a second at 48 kHz) */
     const src = `
       class UspClock extends AudioWorkletProcessor {
         process() { this.port.postMessage(0); return true; }
@@ -496,9 +533,8 @@ export class USBSIDPlayerWeb {
     const node = new AudioWorkletNode(ctx, 'usp-clock');
     node.port.onmessage = () => this._tick();
     node.connect(ctx.destination);   // something has to pull it or it never runs
-    /* Not a bare await: resume() on a context the browser will not let start
-     * stays pending rather than rejecting, which shows up as playback that
-     * silently never begins. */
+    /* resume() stays pending on a context the browser will not start, race a
+     * timeout */
     await Promise.race([ctx.resume(), new Promise((r) => setTimeout(r, 2000))]);
     if (ctx.state !== 'running') {
       console.warn('[usplayer] the AudioContext is', ctx.state +
@@ -515,21 +551,20 @@ export class USBSIDPlayerWeb {
     this._audio = null;
   }
 
-  /** Stop the pump, silence the device, tear the tune down. */
+  /** Stop the pump, silence the device, tear the tune down */
   stop() {
     this._running = false;
     this._paused = false;
     if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = 0; }
     this._stopAudioClock();
-    /* Silence first. The device holds the last register state it was given,
-     * so a stop that only tears down the emulation leaves the voices ringing. */
+    /* Silence first, the device holds its last register state */
     if (this.transport.resetSID) this.transport.resetSID();
     else if (this.transport.reset) this.transport.reset();
     this._stop();
     this._lastReset = this._resetCount();
   }
 
-  /** Pause, and mute the device so a sustained note actually goes quiet. */
+  /** Pause, and mute the device to silence a sustained note */
   pause(on) {
     this._paused = !!on;
     this._pause(on ? 1 : 0);
@@ -538,18 +573,16 @@ export class USBSIDPlayerWeb {
   }
   get paused() { return this._paused; }
 
-  /** The fast forward multiplier in force. Read by whatever is clocking us. */
+  /** The fast forward multiplier in force, read by whatever clocks the player */
   get speed() { return this._speed; }
 
-  /** Playback speed. 1 is normal, 4 is four times as fast. */
+  /** Playback speed, 1 is normal, 4 is four times as fast */
   setSpeed(mult) { this._speed = Math.max(0.1, Math.min(8, mult || 1)); }
 
   /**
-   * Seek: run the emulation fast with nothing reaching the device.
-   *
-   * Silent by design, see _drain(). On release the accumulator is dropped so the
-   * frames that went by while seeking are not then chased at 1x, which would
-   * play the seek a second time into the queue this exists to protect.
+   * Seek: run the emulation fast with nothing reaching the device, see _drain()
+   * On release the accumulator is dropped, else the frames seeked past are
+   * chased at 1x and played into the queue a second time.
    */
   fastForward(on, mult = 4) {
     this.setSpeed(on ? mult : 1);
@@ -563,28 +596,22 @@ export class USBSIDPlayerWeb {
   setClock(rateId) { if (this.transport.setClock) this.transport.setClock(rateId); }
 
   /**
-   * Tell the emulation what the board is carrying.
+   * Tell the emulation what the board carries
    *
-   * `fmopl` is which chip answers $df40/$df50, one based, -1 for none. Without
-   * it those writes reach nothing and an FM/OPL tune plays its SID voices and
-   * none of its OPL. `numsids` is accepted and ignored, as everywhere else:
-   * how many chips the emulation decodes is the tune's business.
+   * fmopl is the chip answering $df40/$df50, one based, -1 for none. Without it
+   * an FM/OPL tune plays its SID voices and none of its OPL. numsids is
+   * accepted and ignored, the tune decides how many chips are decoded.
    */
   setSidConfig(numsids, socketOne, socketTwo, fmopl) {
     let fm = (fmopl === undefined || fmopl === null) ? -1 : (fmopl | 0);
-    /* A transport that carries FM in a message of its own needs $df40/$df50 to
-     * stay unclaimed, so they arrive as $80/$90 instead of being folded into a
-     * chip's registers. ASID is the case: it decodes FM from its 0x60 command,
-     * and FM sent as SID data inside a 0x4E snapshot is not FM to any receiver.
-     * Forced here rather than trusted to the caller, because the value comes
-     * from a board read and the board is right about its own hardware and wrong
-     * about this transport. */
+    /* A transport that carries FM in its own message needs $df40/$df50
+     * unclaimed (they arrive as $80/$90). ASID decodes FM from its 0x60 command,
+     * FM sent as SID data in a 0x4E snapshot is not FM to any receiver. Forced
+     * in this method, the board value describes its hardware only */
     if (this.transport && this.transport.fmAsOwnMessage) fm = -1;
     this._setSidConfig(numsids | 0, socketOne | 0, socketTwo | 0, fm);
-    /* `fmoplSid` is what the board says it has; `fmoplApplied` is what the
-     * emulation was actually given, which differs over ASID. Reporting only the
-     * first would have a page saying "FM/OPL on SID 2" while the player has it
-     * unclaimed, which is true of the hardware and false of the playback. */
+    /* fmoplSid = board report, fmoplApplied = given to the emulation (differs
+     * over ASID) */
     this._boardConfig = { sidsSocketOne: socketOne | 0,
                           sidsSocketTwo: socketTwo | 0,
                           fmoplSid: (fmopl === undefined) ? -1 : (fmopl | 0),
@@ -592,15 +619,14 @@ export class USBSIDPlayerWeb {
   }
 
   /**
-   * Read the board's own configuration and apply it.
+   * Read the board configuration and apply it, like the command line player
+   * does at connect
    *
-   * This is what the command line player does at connect, and the browser had
-   * no equivalent, which is why FM/OPL tunes did not work in it. Call it once
-   * after the transport is open and before loading anything: the tune's init
-   * writes go out under whatever is set at that moment.
+   * Call once after the transport is open and before loading a tune, its init
+   * writes go out under the config set at that moment.
    *
-   * Returns what was applied, or null when the transport cannot say, in which
-   * case the emulation keeps its defaults and the caller can set them by hand.
+   * Return what was applied, or null when the transport cannot say (defaults
+   * stay, set them by hand).
    */
   async applyBoardConfig() {
     if (!this.transport.readBoardConfig) return null;
@@ -610,11 +636,11 @@ export class USBSIDPlayerWeb {
     return cfg;
   }
 
-  /** The last configuration applied, for a page that wants to show it. */
+  /** The last configuration applied, for a page that wants to show it */
   boardConfig() { return this._boardConfig || null; }
   nextSubtune() { this._nextSubtune(); }
   prevSubtune() { this._prevSubtune(); }
-  /** RUN/STOP on the keyboard matrix, which is how a program is interrupted. */
+  /** RUN/STOP on the keyboard matrix, how a program is interrupted */
   runStop() { return !!this._runStop(); }
   forceSocketTwo() { this._forceSocketTwo(); }
 
@@ -626,34 +652,29 @@ export class USBSIDPlayerWeb {
   refreshHz() { return this._hz; }
 
   /**
-   * How far into the tune the emulation is, in milliseconds.
+   * Time into the tune in milliseconds, in emulated time
    *
-   * Emulated time and not wall clock time, which is the point: it does not
-   * advance while paused, it jumps when a seek does, and it is the same figure
-   * whatever the transport is doing. A page showing wall clock time would drift
-   * away from the tune the first time the board made the player wait.
+   * Does not advance while paused, jumps on a seek and is the same whatever
+   * the transport does.
    */
   playtimeMs() { return this._playtimeMs(); }
 
   /**
-   * One byte of the emulated machine's RAM.
+   * Read one byte of the emulated machine RAM
    *
-   * The RAM itself, with no banking and no side effects, so an address under
-   * I/O answers with what is beneath the chip rather than asking the chip. That
-   * is deliberate: reading a CIA's interrupt register acknowledges its pending
-   * interrupts, so a page redrawing a memory view every frame would break the
-   * tune it is showing. See usp_read_memory() in src/host/web_api.cpp.
+   * Plain RAM, no banking and no side effects. An address under I/O gives what
+   * is beneath the chip, reading a CIA interrupt register would acknowledge its
+   * interrupts. See usp_read_memory() in src/host/web_api.cpp.
    *
    * @param {number} address 0 to 65535
    */
   readMemory(address) { return this._readMemory(address & 0xffff); }
 
   /**
-   * The last value written to a SID register, from the emulation's own mirror.
+   * Get the last value written to a SID register, from the emulation mirror
    *
-   * Works in every mode, which watching the writes go past does not: in software
-   * audio the reSIDfp backend takes them inside the emulation and none of them
-   * reach the page. See usp_sid_register() in src/host/web_api.cpp.
+   * Works in every mode, in software audio the writes never reach the page.
+   * See usp_sid_register() in src/host/web_api.cpp.
    *
    * @param {number} chip 1 to 4
    * @param {number} reg  0 to 31
@@ -661,11 +682,10 @@ export class USBSIDPlayerWeb {
   sidRegister(chip, reg) { return this._sidRegister(chip, reg); }
 
   /**
-   * A CIA timer's latch, which is how often a CIA driven tune is called.
+   * Get a CIA timer latch, how often a CIA driven tune is called
    *
-   * A frame's cycles divided by this is the number of calls a frame, so about
-   * 19654 is once and half of it is twice. `timing()` says which timer, if any,
-   * is the one driving.
+   * A frame's cycles divided by this is the calls a frame: about 19654 is once,
+   * half of it twice. timing() says which timer drives.
    *
    * @param {number} cia   1 or 2
    * @param {number} timer 0 for A, 1 for B
@@ -673,11 +693,10 @@ export class USBSIDPlayerWeb {
   ciaLatch(cia = 1, timer = 0) { return this._ciaLatch(cia, timer); }
 
   /**
-   * Hold one voice silent while the tune plays on.
+   * Hold one voice silent while the tune plays on
    *
-   * Masked inside the emulation, upstream of everything: it works the same in
-   * software audio and over every board transport, and it costs the tune
-   * nothing, because the writes still happen and only the gate is held down.
+   * Masked inside the emulation, same in software audio and on every transport.
+   * The writes still happen, only the gate is held down.
    *
    * @param {number} chip  1 to 4
    * @param {number} voice 1 to 3
@@ -687,17 +706,15 @@ export class USBSIDPlayerWeb {
     this._setVoiceMute(chip, voice, muted ? 1 : 0);
   }
 
-  /** The mute bits of one chip, bit 0 being voice 1. Chip counts from 1. */
+  /** Mute bits of one chip, bit 0 is voice 1, chip counts from 1 */
   voiceMute(chip = 1) { return this._voiceMuteBits(chip); }
 
   /**
-   * Hold a whole chip silent, dropping its writes.
+   * Hold a whole chip silent, dropping its writes
    *
-   * Not the same as muting its three voices, and not a shorthand for it. A voice
-   * mute masks the gate and the sustain and lets every other write through; a chip
-   * mute drops the writes, which is the only one of the two that reaches $18. A
-   * tune playing samples through the volume register keeps sounding however many
-   * voices are muted, and stops when its chip is.
+   * A voice mute masks gate and sustain, other writes pass. A chip mute drops
+   * the writes and is the only one reaching $18: a tune playing samples through
+   * the volume register keeps sounding with voices muted and stops with its chip.
    *
    * @param {number} chip 1 to 4
    * @param {boolean} muted
@@ -706,23 +723,23 @@ export class USBSIDPlayerWeb {
     this._setChipMute(chip, muted ? 1 : 0);
   }
 
-  /** The muted chips as a bitmask, bit 0 being chip one. */
+  /** The muted chips as a bitmask, bit 0 is chip one */
   chipMute() { return this._chipMuteBits(); }
 
   /**
-   * What is driving the tune, and how it was started.
+   * Get what drives the tune and how it was started
    *
-   * Read from the chips as they stand, so it is the truth for the subtune
-   * playing now rather than a guess from the file: a tune's init routine is
-   * what decides whether a CIA timer, a raster compare or a TOD alarm calls the
-   * play routine, and a later subtune can choose differently.
-   *
-   * @returns {{irq: string[], start: string, driver: number}}
+   * Read from the chips, true for the playing subtune. The init routine decides
+   * if a CIA timer, raster compare or TOD alarm calls play, and a later subtune
+   * can differ. irq lists the sources used since the subtune started, collected
+   * after 1 s of play and never cleared until the song restarts, so a tune that
+   * toggles timers does not blink. irqKnown is false during that first second.
+   * Return {irq: string[], irqKnown, start, driver, video, videoKnown}.
    */
   timing() {
     const bits = this._irqSources();
     const irq = [];
-    /* Kept in step with the USP_IRQ_* defines in src/api/usplayer.h. */
+    /* Same as the USP_IRQ_* defines in src/api/usplayer.h */
     if (bits & 0x01) irq.push('CIA1 TA');
     if (bits & 0x02) irq.push('CIA1 TB');
     if (bits & 0x04) irq.push('CIA1 TOD');
@@ -731,27 +748,33 @@ export class USBSIDPlayerWeb {
     if (bits & 0x20) irq.push('CIA2 TOD');
     if (bits & 0x40) irq.push('VIC raster');
     const START = ['PSIDdrv', 'BASIC', 'PRG'];
+    /* Nearest of PAL 985248, NTSC 1022727, DREAN 1023440 Hz */
+    let video = null;
+    const hz = this._clockHz ? this._clockHz() : 0;
+    if (hz > 0) {
+      video = hz < 1004000 ? 'PAL' : (hz < 1023084 ? 'NTSC' : 'DREAN');
+    }
     return {
       irq,
+      irqKnown: this._irqKnown ? !!this._irqKnown() : true,
       start: START[this._startMode()] || '?',
       driver: this._driverAddr(),
+      video,
+      videoKnown: this._videoKnown ? !!this._videoKnown() : true,
     };
   }
 
   /**
-   * The Songlengths key for a tune: the MD5 of the whole file, as 32 hex
-   * characters.
+   * Get the Songlengths key for a tune: MD5 of the whole file, 32 hex characters
    *
-   * **The plain MD5 of every byte of the .sid**, not the PSID MD5 that older
-   * players use and that libsidplayfp carries two variants of. Getting it wrong
-   * misses every entry in the database silently.
+   * The plain MD5 of every byte of the .sid (the PSID MD5 of older players
+   * misses every entry in the database).
    *
-   * Done in the wasm because there is no MD5 in a browser: WebCrypto leaves it
-   * out deliberately, and this is the one place a page can get one without
-   * shipping an implementation of its own.
+   * Done in the wasm, a browser has no MD5 (WebCrypto leaves it out).
+   *
+   * Return empty string when it cannot be computed
    *
    * @param {Uint8Array} bytes the file, as loaded
-   * @returns {string} 32 hex characters, or '' when it could not be computed
    */
   md5(bytes) {
     if (!bytes || !bytes.length) return '';
@@ -773,22 +796,21 @@ export class USBSIDPlayerWeb {
   }
 
   /**
-   * Hand over the Songlengths database, once, and keep it in the heap.
+   * Hand over the Songlengths database once, kept in the heap
    *
-   * It is four to five megabytes of text and every lookup walks it, so it is
-   * copied in once and the pointer kept: a page that re-uploaded it per tune
-   * would spend more time on memcpy than on emulation. `releaseSonglengths()`
-   * gives it back if a page ever wants the memory.
+   * Four to five megabytes of text walked by every lookup, re-uploading per
+   * tune would cost more than emulation. releaseSonglengths() frees it.
+   *
+   * Return false when it cannot be allocated
    *
    * @param {string} text the file as fetched
-   * @returns {boolean} false when it could not be allocated
    */
   loadSonglengths(text) {
     this.releaseSonglengths();
     if (!text) return false;
-    /* Latin-1 rather than UTF-8: the file is ASCII apart from the comment lines
-     * naming each tune, and the parser only ever looks at hex, '=' and digits.
-     * One byte per character also means the length is known before encoding. */
+    /* Latin-1, the file is ASCII apart from the tune name comments and the
+     * parser only looks at hex, '=' and digits. One byte per character gives
+     * the length up front */
     const n = text.length;
     const p = this._alloc(n + 1);
     if (!p) return false;
@@ -807,10 +829,11 @@ export class USBSIDPlayerWeb {
   get hasSonglengths() { return !!this._slPtr; }
 
   /**
-   * Every song's length for one key, in milliseconds.
+   * Get every song length for one key, in milliseconds
    *
-   * @param {string} key 32 hex characters from `md5()`
-   * @returns {number[]|null} one entry per song, or null when the key is absent
+   * Return one entry per song, or null when the key is absent
+   *
+   * @param {string} key 32 hex characters from md5()
    */
   songLengths(key) {
     if (!this._slPtr || !key || key.length !== 32) return null;
@@ -822,8 +845,7 @@ export class USBSIDPlayerWeb {
       const count = this._songlenCount(this._slPtr, this._slLen, kp);
       if (count <= 0) return null;
       const out = [];
-      /* The database counts songs from one, as the file's own subtune numbers
-       * do. The array is zero based, so out[0] is song 1. */
+      /* Database counts songs from one, the array is zero based: out[0] is song 1 */
       for (let s = 1; s <= count; s++) {
         out.push(this._songlenMs(this._slPtr, this._slLen, kp, s));
       }
@@ -833,12 +855,33 @@ export class USBSIDPlayerWeb {
     }
   }
 
-  /** Title, author and release, as the file's own header spells them. */
+  /**
+   * Get every song length from the v5 embedded table, or null without one
+   * Same shape as songLengths(), a fallback when the database has nothing
+   */
+  embeddedSongLengths() {
+    if (!this._hasEmbeddedSonglengths()) return null;
+    const count = this._songs();
+    if (count <= 0) return null;
+    const out = [];
+    for (let s = 1; s <= count; s++) out.push(this._embeddedSonglenMs(s));
+    return out;
+  }
+
+  /** Title, author and release from the header, plus the v5 multi-SID/panning/FM-OPL
+   * summary. Chip fields cover what this player wires up (MAX_SIDS at most).
+   * numSidsRequested is the raw count the header asked for */
   info() {
     const str = (fn) => {
       const p = fn();
       return p ? this.M.UTF8ToString(p) : '';
     };
+    const requested = this._sidCount();
+    const wired = Math.min(MAX_SIDS, Math.max(1, requested));
+    const sids = [];
+    for (let i = 0; i < wired; i++) {
+      sids.push({ addr: this._sidAddr(i), pan: ['L', 'C', 'R'][this._sidPan(i)] || 'C' });
+    }
     return {
       name: str(this._tuneName),
       author: str(this._tuneAuthor),
@@ -846,6 +889,12 @@ export class USBSIDPlayerWeb {
       song: this._song(),
       songs: this._songs(),
       isPrg: this.isPrg(),
+      numSidsRequested: requested,
+      sids,
+      panLayout: ['standard', 'lcr', 'centerFirst', 'fullyCentered'][this._panLayout()] || 'standard',
+      panMode: ['direct', 'reverse', 'group', 'spread'][this._panMode()] || 'direct',
+      hasFmOpl: !!this._hasFmOpl(),
+      hasEmbeddedSongLengths: !!this._hasEmbeddedSonglengths(),
     };
   }
 }

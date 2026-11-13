@@ -212,7 +212,7 @@ static void init_async(void)
  *
  * Sets up the byte queue, async context/worker, claims a free PIO state
  * machine for the RX program on PIOUART_RX, starts it, and wires up its
- * IRQ (falling back to the next IRQ number if the first is already in use).
+ * IRQ (falling back to the following IRQ number if the first is already in use).
  *
  * @note panics if no PIO state machine or IRQ is available
  */

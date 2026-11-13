@@ -32,6 +32,7 @@
 #include <dma.h>
 #include <logging.h>
 #include <sid.h>
+#include <sid_player.h>
 #include <vu.h>
 
 #include "vu.pio.h"      /* Vu LED handler */
@@ -225,11 +226,16 @@ void __no_inline_not_in_flash_func(led_breathe_task)(void)
 
 /**
  * @brief Blinky blinky on SID change :D
- * Auto loops Core2 when SID has changed
+ * Auto loops Core1 when SID has changed
+ * Runs on Core0 when pico_w or pico2_w
  *
  */
 void __no_inline_not_in_flash_func(led_fast_blink)(void)
 {
+#if defined(CYW43_WL_GPIO_LED_PIN)
+  /* Return if Core0 is not the caller when pico_w or pico2_w */
+  if (get_core_num() != 0) return;
+#endif
   if (to_us_since_boot(get_absolute_time()) - us_now < BLINK_INTV) {
     /* do nothing */
     return;
@@ -275,7 +281,7 @@ void __no_inline_not_in_flash_func(led_runner)(void)
         n_checks = 0, set_receivedata(false), dtype = ntype;  /* NOTE: This sets dtype to 0 which causes buffertask write to go to default and error out with many consecutive reads from the bus */
         offload_ledrunner = false;
         /**
-         * @brief Let's make sure we always reset the write order
+         * @brief Always reset the write order
          * when the interface is no longer mounted
          */
         extern bool tud_midi_n_mounted (uint8_t itf);

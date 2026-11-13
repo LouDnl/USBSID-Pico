@@ -34,6 +34,14 @@
 #define SKPICO_DAC_START   30
 #define SKPICO_DAC_LEN      1
 
+/* init local skpico variables */
+static uint8_t skpico_config[MAX_BUFFER_SIZE] = {0xFF}; /* MAX_BUFFER_SIZE is defined in cfg_usbsid.h */
+static uint8_t skpico_version[SKPICO_VER_SIZE] = {0xFF};
+static uint8_t base_address = 0x0;
+static int sid_socket = 1;
+static int skpico_v = 0;
+static bool is_u64fw = false;
+
 const uint8_t init_configmode[3]      = { 0x00, 0x1f, 0xff };  /* Inits and extends config mode */
 const uint8_t config_extend[3]        = { 0x00, 0x1d, 0xfa };  /* Clear address lines and extend config mode */
 const uint8_t config_exit[3]          = { 0x00, 0x1d, 0xfb };  /* Exit config mode without reset */

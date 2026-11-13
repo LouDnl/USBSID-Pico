@@ -39,7 +39,7 @@ image:images/vol/seated-v1.3.png[link="https://github.com/LouDnl/USBSID-Pico/blo
 
 == Usage v1.0
 Same as with v1.3, please take great care when using the board. +
-The v1.0 pcb only has 2 pins where the outer pin on each side is Ground. This requires you to make another mod to the board to provide ground to the board. Do this at your own risk, the board is _not_ tested with v1.0 pcb's. +
+The v1.0 pcb only has 2 pins where the outer pin on each side is Ground. This needs another mod to the board to provide ground. Do this at your own risk, the board is _not_ tested with v1.0 pcb's. +
 
 == Solder jumpers
 The board has 4 solder jumpers on the bottom that set the pin functions of 2 two outer most pins for each pinsocket. +

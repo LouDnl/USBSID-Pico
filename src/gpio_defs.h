@@ -34,7 +34,7 @@
 
 /* Uart 0 */
 #define TX 16  /* uart 0 tx */
-#define RX 17  /* uart 0 rx */
+#define RX -1  /* uart 0 rx (unused, was 17) */
 
 /* Unable to use PIO Uart on PCB v1.5+ */
 #if PCB_VERSION_INT >= 15
@@ -72,6 +72,7 @@
 #define CS1  20  /* Chip Select for 1 or 1 & 2 with Clone SID */
 #define CS2  21  /* Chip Select for 2 or 3 & 4 with Clone SID */
 #define PHI1 22  /* Pico 1Mhz PWM out ~ External Clock In (v1.0 only) */
+#define PHI2 17  /* External Clock In for board linking/syncing */
 
 /* v0.1, v0.2, v1.0 & v1.2 additional pin configuration */
 #if PCB_VERSION_INT < 13

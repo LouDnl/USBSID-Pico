@@ -23,23 +23,56 @@ Yes you read that right, USBSID-Player is embedded on USBSID-Pico and allows you
 
 
 == Firmwares with embedded USBSID-Player
-Starting with firmware version v0.6.0-BETA firmwares ending with `_sp` have an embedded emulator that can play PSID and RSID tunes and PSID64 PRG/P00 files. +
-For example `usbsidpico2-v1.0_sp.uf2`, `usbsidpico2-v1.3-rgb_sp.uf2` or `usbsidpico2-v1.5_sp.uf2` +
-This USBSID-Player is still in active development and some tunes might not work or play at all. +
-The embedded USBSID-Player requires more then 256KB RAM, which is why it is primarily built and tested for rp2350 Pico2 boards, but `_sp` firmwares are also built for rp2040 Pico1 boards. +
-**NOTE!** Due to the hardware limitations of the RP2040, highly demanding, cycle-exact SID tunes (dense per-cycle register writes, e.g. some digi/sample tunes) may not play at full speed on Pico1 or Pico1_w boards. Use a Pico2 or Pico2_w (rp2350) board for these tunes. +
-**WARNING!** Whenever the USBSID-Player is used the Pico MCU is overclocked to 250MHz, regardless of Pico type. Passive cooling _might/could_ be needed. +
-Cynthcart runs through the embedded USBSID-Player - see the `USBSID-Pico-Cynthcart-manual` file for more information. +
+Starting with firmware version v0.6.0-BETA firmwares have an embedded emulator that can play PSID and RSID tunes and PSID64 PRG/P00 files. +
+From v0.8.1 and later these files are for example `usbsidpico-v1.0_em.uf2`, `usbsidpico2-v1.3-rgb_em.uf2` or `usbsidpico2-v1.5_em.uf2` +
+This USBSID-Player is in active development and some tunes might not work or play at all, let me know if you come across any! +
+**NOTE!** Highly demanding cycle-exact SID tunes (e.g. some digi/sample tunes) may not play at full speed on Pico1 or Pico1_w boards (RP2040). Use a Pico2 or Pico2_w (rp2350) board for these tunes. +
+**WARNING!** Whenever the USBSID-Player is compiled into the firmware the Pico MCU is overclocked to 250MHz. Passive cooling _might/could_ be needed. +
+Cynthcart also runs through the embedded USBSID-Player ~ see the `USBSID-Pico-Cynthcart-manual` file for more information. +
 
 
 == Usage
-To play SID tunes and run PRG/P00 PSID64 files _on_ USBSID-Pico you will need the `send_sid` tool that is available in the `tools.zip` starting with firmware release v0.6.0-BETA and up. +
-The help menu is self explanatory. +
-Multi-subtune PSID/RSID files are supported - you can switch to the next or previous subtune while a tune is playing.
+To play SID tunes and run PRG/P00 PSID64 files _on_ USBSID-Pico you will need the `send_sid` tool that is available in the `tools.zip` starting with firmware release v0.6.0-BETA and up, the help menu is self explanatory. +
+Firmware release v0.7.0 and up supports the send sid mode on the USBSID-Pico config website and on Deepsid! +
+Multi-subtune PSID/RSID files are supported, you can switch to the following or previous subtune while a tune is playing.
 
 
-== Future plans
-When all bugs are squashed and more tunes are supported a website will be made available where you can 'send' files from to the onboard SID player
+=== Keyboard controls of the usplayer CLI
+While a tune plays, the `usplayer` command line player reads single key presses without Enter. Keys are lowercase, up and down arrows are ignored. +
+On Linux and macOS the keys are active when stdin is a terminal. With stdin on a pipe or script the keys are off, the player prints `press ctrl-c to stop` and ctrl-c stops it. On Windows the keys are on and read from the console. +
+At start with keys on the player prints the list of keys. The arrow keys work the same as `n` and `p`. A bare Esc quits.
+
+[cols="1,4",options="header"]
+|===
+| Key | Action
+
+| space | Pause or resume. The chip is silenced while paused and restored from the register file on resume, the time display freezes
+| n or right arrow | Go to the following subtune. Wraps from the last subtune to the first. Does nothing on a tune with one song.
+| p or left arrow | Previous subtune. Wraps from the first subtune to the last. Does nothing on a tune with one song.
+| r | Restart the current song from its start. Unlike n and p it also works on a tune with a single song.
+| f | Toggle fast forward. This is a seek without pacing, writes are discarded and the chip is silent while it runs. Press again to stop seeking, the chip is caught up from the register file and pacing resumes from that point. The status line shows `>> seeking`. USBSID cannot play faster than the tune timing.
+| 1, 2, 3 | Toggle mute of voice 1, 2 or 3 on the selected SID chip. The selected chip is SID 1 at start.
+| c | Cycle the selected SID chip for the 1, 2 and 3 keys, wraps from the last chip to SID 1. Needs more than one SID
+| s | Stop playback and exit.
+| q or Esc | Quit, same effect as s.
+| ctrl-c | Quit, same effect as s (SIGTERM does the same)
+|===
+
+=== Subtunes and WAV recording with the usplayer CLI
+A tune with more than one subtune plays from the start song through the last one. Each song ends on its length from the HVSC Songlengths database or the file's own v5 song length table, 5 minutes when neither knows the song, and the player moves on to the following subtune. +
+`-s N` picks the start song. `-1` or `--single` plays only that song and stops when it ends. `-t N` stops after N seconds and also keeps the player on one song. +
+The same rules apply to `-w FILE`: without `-1` the WAV holds every song from the start song through the last. With `-nsl` and no `-t` the song never ends and the WAV keeps growing until ctrl-c.
+
+[source,shell]
+----
+usplayer -w all.wav tune.sid              # every subtune, from the default song on
+usplayer -s 2 -1 -w song2.wav tune.sid    # subtune 2 only
+usplayer -s 2 -t 90 -w song2.wav tune.sid # subtune 2, first 90 seconds
+----
+
+
+== Drivers
+include::drivers.adoc[]
 
 
 == Development

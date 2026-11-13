@@ -101,12 +101,16 @@ void setup_vu(void)
 #endif /* USE_RGB */
   setup_vu_dma();
 #elif defined(CYW43_WL_GPIO_LED_PIN)
-#ifndef USE_BLUETOOTH
-  /* For Pico W devices we need to initialise the driver etc */
-  cyw43_arch_init();
+#if !defined(USE_NET)
+  /* For Pico W devices the driver etc needs initialising, unless
+   * USE_NET is defined, this owns the cyw43_arch_init() call.
+   - see the guard in net_wifi.c / net_bluetooth.c's setup_bluetooth() */
+  if (cyw43_arch_init()) {
+    usERR("cyw43_arch_init() failed, onboard LED will not work\n");
+  }
   /* Ask the wifi "driver" to set the GPIO on or off */
   cyw43_arch_gpio_put(BUILTIN_LED, usbsid_config.LED.enabled);
-#endif /* USE_BLUETOOTH */
+#endif /* !USE_NET */
 #endif /* CYW43_WL_GPIO_LED_PIN */
   return;
 }
@@ -121,14 +125,14 @@ void setup_piobus(void)
   busclock_frequency = (float)pico_hz / (usbsid_config.clock_rate * 32) / 2;  /* Clock frequency is 8 times the SID clock */
 
   usNFO("\n");
-  usDBG("BUS Clock initialisation\n");
-  usDBG("  Pico Clock @ %luMHz\n",
+  usPIO("BUS Clock initialisation\n");
+  usPIO("  Pico Clock @ %luMHz\n",
     (pico_hz / 1000 / 1000));
-  usDBG("  BUS clock divisor = %.2f\n",
+  usPIO("  BUS clock divisor = %.2f\n",
     busclock_frequency);
-  usDBG("  BUS Clock @ %.2f\n",
+  usPIO("  BUS Clock @ %.2f\n",
     (float)pico_hz / busclock_frequency / 2);
-  usDBG("  C64 SID Clock = %d\n",
+  usPIO("  C64 SID Clock = %d\n",
     (int)usbsid_config.clock_rate);
   stdio_flush();
 
@@ -196,7 +200,7 @@ void clear_bus_fifos(void)
   pio_sm_clear_fifos(bus_pio, sm_control);
   pio_sm_clear_fifos(bus_pio, sm_data);
   pio_sm_clear_fifos(bus_pio, sm_delay);
-  /* NOTE: sm_clkcnt lives on clkcnt_pio (pio1), passing bus_pio here
+  /* NOTE: sm_clkcnt lives on clkcnt_pio (pio1), passing bus_pio in that call
      cleared bus_pio SM3 (sm_delay) a second time and never touched the
      cycle counter fifo at all */
   pio_sm_clear_fifos(clkcnt_pio, sm_clkcnt);
@@ -218,16 +222,16 @@ void sync_pios(bool at_boot)
 { /* Sync PIO's */
   usNFO("\n");
 #if PICO_PIO_VERSION == 0
-  usDBG("Restarting PIO's (Pico & Pico_w)\n");
+  usPIO("Restarting PIO's (Pico & Pico_w)\n");
   /* NOTE: `pio_sm_restart` takes a statemachine number and not a mask,
      the previous `pio_sm_restart(bus_pio, 0b1111)` wrote CTRL bit 19,
-     which is reserved, so nothing was ever restarted here.
+     which is reserved: nothing was ever restarted.
      The PHI1 clock statemachine (SM0) is left out on purpose, restarting
      it glitches the SID clock */
   pio_restart_sm_mask(bus_pio, 0b1110);
 #elif PICO_PIO_VERSION > 0  /* NOTE: rp2350 only */
-  usDBG("Synchronise PIO's (Pico2 & Pico2_w)\n");
-  /* stdio_flush is required here because pio_clkdiv_restart_sm_multi_mask
+  usPIO("Synchronise PIO's (Pico2 & Pico2_w)\n");
+  /* stdio_flush is required at this point because pio_clkdiv_restart_sm_multi_mask
      (RP2350-only) briefly disrupts UART interrupt handling mid-transmission.
      Flush ensures buffer empty before PIO operations.*/
   stdio_flush();
@@ -235,15 +239,15 @@ void sync_pios(bool at_boot)
   // pio_clkdiv_restart_sm_multi_mask(clkcnt_pio, 0, 0b0011, 0); /* TODO: SYNC COUNTER PIO WITH BUS PIO */
   pio_clkdiv_restart_sm_multi_mask(clkcnt_pio, 0, 0b1000, 0);
   /* A clock divider restart does not clear the waiting-on-irq or stall
-     state of a statemachine, so do that seperately (bus SM's only) */
+     state of a statemachine: do that seperately (bus SM's only) */
   pio_restart_sm_mask(bus_pio, 0b1110);
 #endif
   /* A statemachine restart leaves the irq flags untouched, clear both
-     bus handshake flags so no stale token survives the sync */
+     bus handshake flags to leave no stale token after the sync */
   bus_pio->irq = ((1u << PIO_IRQ0) | (1u << PIO_IRQ1));
   if __us_likely(!at_boot) {
     clear_bus_fifos();
-    /* A restart does not reset the program counters either, so put the
+    /* A restart does not reset the program counters either: put the
        bus statemachines back at the start of their programs */
     bus_resync();
   };
@@ -260,7 +264,7 @@ void sync_pios(bool at_boot)
 void restart_bus_clocks(void)
 {
   usNFO("\n");
-  usDBG("Re-initialise clocks\n");
+  usPIO("Re-initialise clocks\n");
   uint32_t pico_hz = clock_get_hz(clk_sys);
   busclock_frequency = (float)pico_hz / (usbsid_config.clock_rate * 32) / 2;  /* Clock frequency is 8 times the SID clock */
   sidclock_frequency = (float)pico_hz / usbsid_config.clock_rate / 2;
@@ -270,17 +274,17 @@ void restart_bus_clocks(void)
   pio_sm_set_clkdiv(bus_pio, sm_delay, busclock_frequency);
   pio_sm_set_clkdiv(clkcnt_pio, sm_clkcnt, busclock_frequency);
 
-  usDBG("  Pico Clock @ %luMHz\n",
+  usPIO("  Pico Clock @ %luMHz\n",
     (pico_hz / 1000 / 1000));
-  usDBG("  BUS clock divisor = %.2f\n",
+  usPIO("  BUS clock divisor = %.2f\n",
     busclock_frequency);
-  usDBG("  BUS Clock @ %.2f\n",
+  usPIO("  BUS Clock @ %.2f\n",
     ((float)pico_hz / busclock_frequency / 2));
-  usDBG("  SID clock divisor = %.2f\n",
+  usPIO("  SID clock divisor = %.2f\n",
     sidclock_frequency);
-  usDBG("  SID Clock @ %.2f\n",
+  usPIO("  SID Clock @ %.2f\n",
     ((float)pico_hz / sidclock_frequency / 2));
-  usDBG("  C64 SID Clock = %d\n",
+  usPIO("  C64 SID Clock = %d\n",
     (int)usbsid_config.clock_rate);
   return;
 }
@@ -324,19 +328,53 @@ static void init_sidclock(void)
   sidclock_frequency = (float)pico_hz / usbsid_config.clock_rate / 2;
 
   usNFO("\n");
-  usDBG("SID Clock initialisation\n");
-  usDBG("  Pico Clock @ %luMHz\n",
+  usPIO("SID Clock initialisation\n");
+  usPIO("  Pico Clock @ %luMHz\n",
     (pico_hz / 1000 / 1000));
-  usDBG("  SID clock divisor = %.2f\n",
+  usPIO("  SID clock divisor = %.2f\n",
     sidclock_frequency);
-  usDBG("  SID Clock @ %.2f\n",
+  usPIO("  SID Clock @ %.2f\n",
     ((float)pico_hz / sidclock_frequency / 2));
-  usDBG("  C64 SID Clock = %d\n",
+  usPIO("  C64 SID Clock = %d\n",
     (int)usbsid_config.clock_rate);
   offset_clock = pio_add_program(bus_pio, &clock_program);
   sm_clock = 0;  /* PIO0 SM0 */
   pio_sm_claim(bus_pio, sm_clock);
-  clock_program_init(bus_pio, sm_clock, offset_clock, PHI1, sidclock_frequency);
+  if (usbsid_config.board_clock_link) { /* Mirror the clock output to PHI2 */
+    clock_program_init(bus_pio, sm_clock, offset_clock, PHI1, PHI2, sidclock_frequency);
+  } else { /* No clock link: only 1 output */
+    clock_program_init(bus_pio, sm_clock, offset_clock, PHI1, -1, sidclock_frequency);
+  }
+
+  return;
+}
+
+/**
+ * @brief Init nMHz square wave output derived from square wave input
+ *        at PHI2, GPIO PIN 17
+ *
+ * @note local function, sm_clock gets claimed and never released
+ *
+ */
+static void init_sidclock_link(void)
+{
+  uint32_t pico_hz = clock_get_hz(clk_sys);
+  sidclock_frequency = (float)pico_hz / usbsid_config.clock_rate / 2;
+
+  usNFO("\n");
+  usPIO("SID Linked clock initialisation\n");
+  usPIO("  Pico Clock @ %luMHz\n",
+    (pico_hz / 1000 / 1000));
+  usPIO("  SID clock divisor = %.2f\n",
+    sidclock_frequency);
+  usPIO("  SID Clock @ %.2f\n",
+    ((float)pico_hz / sidclock_frequency / 2));
+  usPIO("  C64 SID Clock = %d\n",
+    (int)usbsid_config.clock_rate);
+  offset_clock = pio_add_program(bus_pio, &clock_link_program);
+  sm_clock = 0;  /* PIO0 SM0 */
+  pio_sm_claim(bus_pio, sm_clock);
+  clock_link_program_init(bus_pio, sm_clock, offset_clock, PHI1, sidclock_frequency);
 
   return;
 }
@@ -347,7 +385,7 @@ static void init_sidclock(void)
  * Verifies the configured clock rate is in bounds, then on PCB version
  * 1.0 detects whether an external crystal is driving PHI1: if not, PHI1
  * is disabled as a GPIO and the internal SID clock is initialised via
- * init_sidclock(); if an external clock is detected, external_clock is
+ * init_sidclock(). If an external clock is detected, external_clock is
  * set and clock_rate falls back to CLOCK_DEFAULT (1MHz). On any other
  * PCB version, PHI1 is disabled as a GPIO and the internal clock is
  * always initialised.
@@ -357,24 +395,30 @@ void setup_sidclock(void)
   /* Verify the clockrare in the config is not out of bounds */
   verify_clockrate();
 
-  /* Run only if PCB version 1.0 */
-  if (PCB_VERSION_INT == 10) {
+  /* Run only if external clock link is enabled or when PCB version 1.0 */
+  if (usbsid_config.board_clock_link || (PCB_VERSION_INT == 10)) {
     /* Detect optional external crystal */
     if __us_likely(detect_clocksignal() == 0) {
       usbsid_config.external_clock = false;
-      gpio_deinit(PHI1); /* Disable PHI1 as gpio */
+      gpio_deinit(PHI1); /* Disable PHI1 as regular gpio */
+      if (usbsid_config.board_clock_link) {
+        gpio_deinit(PHI2); /* Disable PHI2 as regular gpio */
+      }
       init_sidclock();
     } else {  /* Do nothing gpio acts as input detection */
       usbsid_config.external_clock = true;
-      usbsid_config.clock_rate = CLOCK_DEFAULT;  /* Always fallback to 1MHz */
+      usbsid_config.clock_rate = CLOCK_PAL;  /* Always fall back to PAL */
+      /* Clock link relies on the player to set the correct SID clock */
+      if (usbsid_config.board_clock_link) {
+        init_sidclock_link(); /* PHI2 in -> PHI1 out */
+      }
     }
   } else {
     usbsid_config.external_clock = false;
-    gpio_deinit(PHI1); /* Disable PHI1 as gpio */
-#if 0 && PICO_RP2350 && !USE_PIO_UART /* Only on rp2350 for testing and when not using PIO Uart */
-    // gpio_deinit(PHI1); /* Disable PHI1 as gpio */
-    gpio_deinit(PHI2); /* Disable PHI2 as gpio */
-#endif
+    gpio_deinit(PHI1); /* Disable PHI1 as regular gpio */
+    if (usbsid_config.board_clock_link) {
+      gpio_deinit(PHI2); /* Disable PHI2 as regular gpio */
+    }
     init_sidclock();
   }
 
@@ -383,12 +427,23 @@ void setup_sidclock(void)
 /**
  * @brief De-init nMHz square wave output
  *
- * NOTE: The sidclock should actually never be disabled
  */
-static void __us_deprecated deinit_sidclock(void)
+static void deinit_sidclock(void)
 {
-  usDBG("SID Clock deinitialise\n");
+  usPIO("SID Clock deinitialise\n");
   clock_program_deinit(bus_pio, sm_clock, offset_clock, clock_program);
+
+  return;
+}
+
+/**
+ * @brief De-init nMHz linked square wave output
+ *
+ */
+static void deinit_sidclock_link(void)
+{
+  usPIO("SID Clock link deinitialise\n");
+  clock_link_program_deinit(bus_pio, sm_clock, offset_clock, clock_program);
 
   return;
 }

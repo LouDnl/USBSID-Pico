@@ -39,6 +39,8 @@ const USBSID_PID = 0x4011;
 /* Buffer / packet constants */
 const BUFFER_SIZE       = 64;
 const MAX_PACKET_SIZE   = 64;
+/* Reads per reply before giving up on zero length packets, see _transferInReply() */
+const ZLP_READ_ATTEMPTS = 4;
 
 /**
  * How long to wait for the board-information reads at connect.
@@ -141,6 +143,10 @@ const RESET_MIDI_STATE = 0x63;
 
 const USBSID_VERSION  = 0x80;
 const US_PCB_VERSION  = 0x81;
+/* What the firmware was compiled with, one byte of flags
+ * bit 7 is the embedded SID player, which is the one SendSID needs. */
+const US_FEATURES     = 0x82;
+const FEATURE_SIDPLAYER = 1 << 7;
 const RESTART_BUS     = 0x85;
 const RESTART_BUS_CLK = 0x86;
 const SYNC_PIOS       = 0x87;
@@ -168,12 +174,14 @@ const SID_PLAYER_PAUSE = 0xE3;
 const SID_PLAYER_NEXT  = 0xE4;
 const SID_PLAYER_PREV  = 0xE5;
 const SID_PLAYER_TWO   = 0xE6;
-const SID_PLAYER_FFWD  = 0xE7;   /* non functional, see playerFfwd() */
+const SID_PLAYER_FFWD  = 0xE7;
 const SID_PLAYER_MUTE  = 0xE9;
 const SID_PLAYER_MUTED = 0xEA;
 const SID_PLAYER_TIME  = 0xEB;
 
 const CONFIG_ACK       = 0xFA;  /* Acknowledge the current configuration and switch on regulators (v1.5+ boards only) */
+const SET_RX_RING      = 0x83;  /* USB RX ringbuffer off/on (arg 0/1); firmware saves + reboots when the value changes */
+const PRESET_DETECT    = 0xFE;  /* Silent socket detection when a preset is applied (arg 0/1, saved) */
 const SOCKET_DETECT    = 0xFD;  /* Disable/enable automatic socket change detection on boot (v1.5+ boards only) */
 
 /* Config write sub-types */
@@ -190,6 +198,53 @@ const clock_rates = {
   DREAN:   3,  /* 1023440 Hz */
 };
 
+/**
+ * Web Serial reply lengths, keyed by config sub (byte 1 of a 0xD2 frame).
+ * Entry: {len, timeout} or fn(b2) returning one. len 0 = no reply, timeout in ms
+ * (default SERIAL_REPLY_MS). Web Serial has no packet framing, the exact
+ * reply length must be known to read it. Subs not listed are unknown.
+ */
+const SERIAL_REPLY_MS = 250;
+const SERIAL_REPLY = {
+  0x30: { len: 64 },
+  0x37: { len: 12 },
+  0x39: { len: 1 },
+  0x3A: { len: 1 },
+  0x3F: { len: 1 },
+  0x51: (a) => (a === 0 ? { len: 64, timeout: 1500 } : { len: 0 }),
+  0x57: { len: 1 },
+  0x5A: { len: 64, timeout: 500 },
+  0x5B: (a) => (a !== 1 ? { len: 64, timeout: 4500 } : { len: 0 }),
+  0x70: { len: 2 },
+  0x7A: { len: 64 },
+  0x7B: { len: 5 },
+  0x7F: { len: 13 },
+  0x80: (a) => ({ len: a === 0 ? 64 : 1 }),
+  0x81: (a) => ({ len: a === 0 ? 64 : 1 }),
+  0x82: { len: 1 },
+  0x91: { len: 1 },
+  0xA0: { len: 64 },
+  0xEA: { len: 5 },
+  0xEB: { len: 4 },
+};
+
+/** Reply spec {len, timeout} for a command frame, null when the command is not in the table. */
+function serialReplySpec(frame) {
+  const c = frame[0];
+  if (c === 0xD2) {
+    const e = SERIAL_REPLY[frame[1]];
+    if (!e) return null;
+    const r = (typeof e === 'function') ? e(frame[2] | 0) : e;
+    return { len: r.len, timeout: r.timeout || SERIAL_REPLY_MS };
+  }
+  if ((c & 0xC0) === 0x40) {            /* READ, 0x40 | n */
+    const n = c & 0x3F;
+    return { len: n === 0 ? 1 : n, timeout: SERIAL_REPLY_MS };
+  }
+  if (c === 0xC4) return { len: 1, timeout: SERIAL_REPLY_MS };   /* CYCLED_READ */
+  return null;
+}
+
 /* Delay helper */
 const us_delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -205,6 +260,10 @@ class USBSIDDevice {
     this._ifaceNum   = null;
     this._isOpen     = false;
     this._debug      = false;
+    this._deviceOpened = false;
+    this._openingDevice = false;
+    this._serial = null;     /* injected Web Serial transport, null = WebUSB */
+    this.lastError = null;   /* last connect/open failure, read by the app for the status line */
     /* Best-effort close on page hide/refresh.
      * Chrome does not cancel HCI-queued bulk OUT transfers on same-origin
      * page reload - old SID write packets from unawaited write() calls
@@ -225,6 +284,8 @@ class USBSIDDevice {
       this._device.close().catch(() => {});
     } catch (_) {}
     this._isOpen   = false;
+    this._deviceOpened   = false;
+    this._openingDevice   = false;
     this._device   = null;
     this._epOut    = null;
     this._epIn     = null;
@@ -236,6 +297,7 @@ class USBSIDDevice {
   /** Request device via browser USB picker */
   async connect() {
     if (this._isOpen) return true;
+    this.lastError = null;
     try {
       this._device = await navigator.usb.requestDevice({
         filters: [{ vendorId: USBSID_VID, productId: USBSID_PID }]
@@ -243,6 +305,7 @@ class USBSIDDevice {
       return await this._open();
     } catch (e) {
       this._log('connect failed:', e);
+      this.lastError = e;
       return false;
     }
   }
@@ -266,15 +329,24 @@ class USBSIDDevice {
    *  before the real _open() so Chrome discards the stale handle. */
   async reconnect() {
     if (this._isOpen) return true;
+    this.lastError = null;
     try {
       const devices = await navigator.usb.getDevices();
       const dev = devices.find(d => d.vendorId === USBSID_VID && d.productId === USBSID_PID);
       if (!dev) return false;
       this._device = dev;
-      try { await dev.open(); await dev.close(); } catch (_) {}
+      /* Throwaway warm-up cycle, not a real open - must not touch
+       * _deviceOpened/_openingDevice, those guard _open() below and setting
+       * them here would make _open() bail out before it actually opens
+       * anything. */
+      try {
+        await dev.open();
+        await dev.close();
+      } catch (_) {}
       return await this._open();
     } catch (e) {
       this._log('reconnect failed:', e);
+      this.lastError = e;
       return false;
     }
   }
@@ -282,17 +354,26 @@ class USBSIDDevice {
   /** Internal: open, claim interface, enable */
   async _open() {
     try {
-      await this._device.open();
+      // await this._device.open();
+      if (this._deviceOpened || this._openingDevice)
+        return;
+      this._openingDevice = true;
+      try {
+        await this._device.open();
+        this._deviceOpened = true;
+      } finally {
+        this._openingDevice = false;
+      }
       if (this._device.configuration === null) {
         await this._device.selectConfiguration(1);
       }
-      /* Find DEVICE_CLASS (0xFF) interface */
+      /* The first vendor (0xFF) interface is the WebUSB command interface. */
       this._ifaceNum = null;
       this._epOut    = null;
       this._epIn     = null;
       for (const iface of this._device.configuration.interfaces) {
         for (const alt of iface.alternates) {
-          if (alt.interfaceClass === DEVICE_CLASS) {
+          if (alt.interfaceClass === DEVICE_CLASS && this._ifaceNum === null) {
             this._ifaceNum = iface.interfaceNumber;
             for (const ep of alt.endpoints) {
               if (ep.direction === 'out') this._epOut = ep.endpointNumber;
@@ -303,11 +384,13 @@ class USBSIDDevice {
       }
       if (this._ifaceNum === null) {
         this._log('DEVICE_CLASS interface not found');
-        await this._device.close();
+        await this._abortOpen();
         return false;
       }
       await this._device.claimInterface(this._ifaceNum);
-      await this._device.selectAlternateInterface(this._ifaceNum, 0);
+      /* No selectAlternateInterface(): the interface has only alt 0, and
+       * SET_INTERFACE resets the host's data toggles but not the firmware's.
+       * The first packet after it is then ACKed and dropped as a duplicate. */
       // The following two lines are commented out, they cause reading issues!
       // try { await this._device.clearHalt('out', this._epOut); } catch (_) {}
       // try { await this._device.clearHalt('in',  this._epIn);  } catch (_) {}
@@ -318,23 +401,66 @@ class USBSIDDevice {
         value:       CTRL_ENABLE,
         index:       this._ifaceNum,
       });
-      /* Short settle delay: selectAlternateInterface sends SET_INTERFACE which
-       * causes TinyUSB to reset the bulk endpoints. On fast reconnects (page
-       * refresh, emulator switch) the first OUT packet can arrive while the
-       * device is still processing SET_INTERFACE and gets silently dropped.
-       * 100ms is imperceptible to the user but sufficient for the device to
-       * finish endpoint reset before the first bulk transfer. */
+      /* Short settle delay after the connect request: the firmware flushes
+       * both vendor FIFOs on it, a bulk transfer racing that flush is lost. */
       await us_delay(100);
       this._isOpen = true;
       this._log('opened, ifaceNum', this._ifaceNum, 'epOut', this._epOut, 'epIn', this._epIn);
       return true;
     } catch (e) {
       this._log('_open failed:', e);
+      this.lastError = e;
+      await this._abortOpen();
       return false;
     }
   }
 
+  /** Internal: undo a partial open so the next attempt starts clean. Without
+   *  this a refused claimInterface leaves _deviceOpened latched and every
+   *  later _open() returns early on a device nobody can use. */
+  async _abortOpen() {
+    if (this._device) {
+      try { await this._device.close(); } catch (_) {}
+    }
+    this._isOpen        = false;
+    this._deviceOpened  = false;
+    this._openingDevice = false;
+    this._ifaceNum      = null;
+    this._epOut         = null;
+    this._epIn          = null;
+  }
+
+  /* Web Serial seam: route the primitives through an injected transport.
+   * The transport is owned by the app, the driver never opens or closes the port. */
+  attachSerial(transport) { this._serial = transport || null; }
+  detachSerial()          { this._serial = null; }
+  get isSerial()          { return this._serial !== null; }
+  _serialOpen()           { return !!(this._serial && this._serial.isOpen); }
+
+  /** Send bytes as 64 byte slots via the transport, no wait for completion. Throws on a transport error. */
+  _serialSend(data) {
+    const buf = data instanceof Uint8Array ? data : new Uint8Array(data);
+    for (let o = 0; o < buf.length; o += MAX_PACKET_SIZE) {
+      this._serial._queueCommand(buf.subarray(o, o + MAX_PACKET_SIZE));
+    }
+    this._serial._flushBatch();
+  }
+
+  /** Config exchange over the transport. Returns Uint8Array or null. Length from SERIAL_REPLY,
+   *  the caller length only when the command is unknown and the caller gave a non-default one,
+   *  otherwise unknown length (quiet gap). */
+  async _serialExchange(frame, callerLen) {
+    const spec = serialReplySpec(frame);
+    let len;
+    if (spec) len = spec.len;
+    else len = (callerLen > 0 && callerLen !== MAX_PACKET_SIZE) ? callerLen : -1;
+    const r = await this._serial.configRequest(frame, len, spec ? spec.timeout : SERIAL_REPLY_MS);
+    if (!r) return null;
+    return r instanceof Uint8Array ? r : new Uint8Array(r);
+  }
+
   async close() {
+    if (this._serial) { this.detachSerial(); return; }   /* app owns the port */
     /* Always attempt full teardown even if _isOpen is false (e.g. partial open) */
     if (this._device) {
       try {
@@ -342,7 +468,9 @@ class USBSIDDevice {
         await this._device.close();
       } catch (_) {}
     }
-    this._isOpen   = false;
+    this._isOpen        = false;
+    this._deviceOpened  = false;
+    this._openingDevice = false;
     this._device   = null;
     this._epOut    = null;
     this._epIn     = null;
@@ -350,32 +478,66 @@ class USBSIDDevice {
     this._log('closed');
   }
 
-  get isOpen()          { return this._isOpen; }
-  get productName()     { return this._device ? (this._device.productName     || '') : ''; }
-  get manufacturerName(){ return this._device ? (this._device.manufacturerName || '') : ''; }
+  get isOpen()          { return this._serial ? this._serialOpen() : this._isOpen; }
+  get productName()     {
+    if (this._serial) return this._serial.productName || 'USBSID-Pico (Web Serial)';
+    return this._device ? (this._device.productName     || '') : '';
+  }
+  get manufacturerName(){ return this._serial ? '' : (this._device ? (this._device.manufacturerName || '') : ''); }
 
   /* Raw I/O */
 
   /** Write a Uint8Array or plain Array to the OUT endpoint */
   async write(data) {
+    if (this._serial) {
+      if (!this._serialOpen()) return;
+      try { this._serialSend(data); } catch (e) { this._log('write error:', e); }
+      return;
+    }
     if (!this._isOpen) return;
     const buf = data instanceof Uint8Array ? data : new Uint8Array(data);
     try {
-      /* await */ this._device.transferOut(this._epOut, buf);
+      await this._device.transferOut(this._epOut, buf);
     } catch (e) {
       this._log('write error:', e);
     }
   }
 
+  /**
+   * Read one reply from the IN endpoint, skipping zero length packets.
+   *
+   * A reply of exactly 64 bytes ends with a zero length packet, which arrives
+   * as an empty result on the following read. A retry follows an empty result only:
+   * the reply it waits for is already on its way.
+   *
+   * @returns {Promise<Uint8Array|null>} the reply, null when every attempt was empty
+   */
+  async _transferInReply() {
+    for (let i = 0; i < ZLP_READ_ATTEMPTS; i++) {
+      const r = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE); /* Vendor is fixed at 64 bytes */
+      if (r && r.data && r.data.byteLength > 0) {
+        return new Uint8Array(r.data.buffer, r.data.byteOffset, r.data.byteLength);
+      }
+    }
+    return null;
+  }
+
   /** Write then read one packet from the IN endpoint */
   async writeAndRead(data, readLen = MAX_PACKET_SIZE) {
+    if (this._serial) {
+      if (!this._serialOpen()) return null;
+      try {
+        return await this._serialExchange(data instanceof Uint8Array ? data : Uint8Array.from(data), readLen);
+      } catch (e) {
+        this._log('writeAndRead error:', e);
+        return null;
+      }
+    }
     if (!this._isOpen) return null;
     const buf = data instanceof Uint8Array ? data : new Uint8Array(data);
     try {
       await this._device.transferOut(this._epOut, buf);
-      const result = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE); /* Vendor is fixed at 64 bytes */
-      this._device.transferIn(this._epIn, 0); /* Account for the second 0 length packet */
-      return new Uint8Array(result.data.buffer);
+      return await this._transferInReply();
     } catch (e) {
       this._log('writeAndRead error:', e);
       return null;
@@ -384,11 +546,20 @@ class USBSIDDevice {
 
   /** Read one packet from the IN endpoint (after write was already done) */
   async read(readLen = MAX_PACKET_SIZE) {
+    if (this._serial) {
+      /* Reply to an earlier write(): no request to attach to, take what arrives (quiet gap) */
+      if (!this._serialOpen() || typeof this._serial._collectQuiet !== 'function') return null;
+      try {
+        const r = await this._serial._collectQuiet(SERIAL_REPLY_MS, 30);
+        return r ? (r instanceof Uint8Array ? r : new Uint8Array(r)) : null;
+      } catch (e) {
+        this._log('read error:', e);
+        return null;
+      }
+    }
     if (!this._isOpen) return null;
     try {
-      const result = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE); /* Vendor is fixed at 64 bytes */
-      this._device.transferIn(this._epIn, 0); /* Account for the second 0 length packet */
-      return new Uint8Array(result.data.buffer);
+      return await this._transferInReply();
     } catch (e) {
       this._log('read error:', e);
       return null;
@@ -397,6 +568,7 @@ class USBSIDDevice {
 
   /** Clear endpoint halt/toggle state (e.g. after switching away and back) **/
   async clearHaltEndpoints() {
+    if (this._serial) return;   /* no endpoints */
     if (!this._isOpen) return;
     try { await this._device.clearHalt('out', this._epOut); } catch (_) {}
     try { await this._device.clearHalt('in',  this._epIn);  } catch (_) {}
@@ -404,6 +576,7 @@ class USBSIDDevice {
 
   /** Send a ZLP to the OUT endpoint to flush any buffered data */
   async clearEndpoints() {
+    if (this._serial) return;   /* no endpoints */
     if (!this._isOpen) return;
     try { await this._device.transferOut(this._epOut, new Uint8Array(0)); } catch (_) {}
   }
@@ -417,6 +590,13 @@ class USBSIDDevice {
 
   /** Send a raw 6-byte config command */
   async configCmd(sub, b2 = 0, b3 = 0, b4 = 0, b5 = 0) {
+    if (this._serial) {
+      if (!this._serialOpen()) return;
+      try {
+        await this._serial.configRequest([this.cmd(COMMAND, CONFIG), sub, b2, b3, b4, b5], 0);
+      } catch (e) { this._log('write error:', e); }
+      return;
+    }
     await this.write([this.cmd(COMMAND, CONFIG), sub, b2, b3, b4, b5]);
   }
 
@@ -447,6 +627,17 @@ class USBSIDDevice {
   }
 
   async _configCmdReadOnce(sub, b2, b3, b4, b5, numBytes, timeoutMs) {
+    if (this._serial) {
+      if (!this._serialOpen()) return [];
+      try {
+        const r = await this._serialExchange(
+          Uint8Array.of(this.cmd(COMMAND, CONFIG), sub, b2, b3, b4, b5), numBytes);
+        return r ? [r] : [];
+      } catch (e) {
+        usbsidLog('configCmdRead error:', e.message || e);
+        return [];
+      }
+    }
     if (!this._isOpen) return [];
     const cmdBuf = new Uint8Array([this.cmd(COMMAND, CONFIG), sub, b2, b3, b4, b5]);
     const packets = [];
@@ -491,15 +682,14 @@ class USBSIDDevice {
       return packets;
     }
     try {
-      const r = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE); /* Vendor is fixed at 64 bytes */
+      const r = await this._transferInReply();
       // const r = await Promise.race([
       //   this._device.transferIn(this._epIn, MAX_PACKET_SIZE), /* Vendor is fixed at 64 bytes */
       //   new Promise((_, reject) =>
       //     setTimeout(() => reject(new Error('configCmdRead timeout')), timeoutMs)
       //   ),
       // ]);
-      this._device.transferIn(this._epIn, 0); /* Account for the second 0 length packet */
-      packets.push(new Uint8Array(r.data.buffer));
+      if (r) packets.push(r);
     } catch (e) {
       /* Remember it: the next read clears up after this one. The abandoned
        * transferIn cannot be cancelled, so its reply is still coming. */
@@ -542,6 +732,16 @@ class USBSIDDevice {
   }
 
   async _configReadNoRaceOnce(sub, len, b2, b3, b4, b5) {
+    if (this._serial) {
+      if (!this._serialOpen()) return null;
+      try {
+        return await this._serialExchange(
+          Uint8Array.of(this.cmd(COMMAND, CONFIG), sub, b2, b3, b4, b5), len);
+      } catch (e) {
+        usbsidLog('configReadNoRace error:', e.message || e);
+        return null;
+      }
+    }
     if (!this._isOpen) return null;
     /* Says so if a read never comes back, without abandoning it.
      *
@@ -560,10 +760,9 @@ class USBSIDDevice {
     const cmdBuf = new Uint8Array([CC, sub, b2, b3, b4, b5]);
     try {
       await this._device.transferOut(this._epOut, cmdBuf);
-      const r = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE); /* Vendor is fixed at 64 bytes */
-      r.data.byteLength == 64 ? this._device.transferIn(this._epIn, 0) : null ; /* Account for the second 0 length packet */
+      const r = await this._transferInReply();
       await us_delay(100);
-      return new Uint8Array(r.data.buffer);
+      return r;
     } catch (e) {
       usbsidLog('configReadNoRace error:', e.message || e);
       return null;
@@ -593,6 +792,16 @@ class USBSIDDevice {
 
   async _readConfigOnce() {
     const CONFIG_SIZE = 64;
+    if (this._serial) {
+      if (!this._serialOpen()) return new Uint8Array(0);
+      try {
+        const r = await this._serialExchange(Uint8Array.of(this.cmd(COMMAND, CONFIG), READ_CONFIG, 0, 0, 0, 0));
+        return r ? r.slice(0, CONFIG_SIZE) : new Uint8Array(0);
+      } catch (e) {
+        usbsidLog('readConfig error:', e.message || e);
+        return new Uint8Array(0);
+      }
+    }
     const CC = this.cmd(COMMAND, CONFIG);
     const cmdBuf = new Uint8Array([CC, READ_CONFIG, 0, 0, 0, 0]);
     const all = [];
@@ -600,7 +809,7 @@ class USBSIDDevice {
       /* Send READ_CONFIG and collect response without Promise.race (which leaks
        * pending transferIn calls and causes the next read to consume the wrong packet).
        * Skip stale packets inline instead:
-       *   - zero-length packets -> skip (ZLP residue)
+       *   - zero-length packets -> skipped by _transferInReply() (ZLP residue)
        *   - all-zero packets   -> skip (stale empty response)
        *   - wrong magic bytes  -> skip (stale response from another command)
        * fw >= 0.7.0: full config fits in one 64-byte packet (terminator at [62..63]).
@@ -610,18 +819,15 @@ class USBSIDDevice {
        * WebUSB rejects all pending transferIn on disconnect, so no infinite hang. */
       await this._device.transferOut(this._epOut, cmdBuf);
       for (let i = 0; i < 4; i++) {
-        const r = await this._device.transferIn(this._epIn, MAX_PACKET_SIZE); /* Vendor is fixed at 64 bytes */
-        r.data.byteLength == 64 ? this._device.transferIn(this._epIn, 0) : null ; /* Account for the second 0 length packet */
-        const chunk = new Uint8Array(r.data.buffer);
+        const chunk = await this._transferInReply();
+        if (!chunk) break;
         if (all.length === 0) {
-          if (chunk.length === 0) { this._log('readConfig: skipping zero-length packet'); continue; }
           if (chunk.every(b => b === 0)) { this._log('readConfig: skipping stale zero packet'); continue; }
           if (chunk[0] !== 0x30 || chunk[1] !== 127) {
             this._log('readConfig: skipping stale packet (magic', chunk[0], chunk[1] + ')');
             continue;
           }
         }
-        if (chunk.length === 0) break;
         all.push(...chunk);
         if (all.length >= CONFIG_SIZE) break;
       }
@@ -629,6 +835,20 @@ class USBSIDDevice {
       usbsidLog('readConfig error:', e.message || e);
     }
     return new Uint8Array(all.slice(0, CONFIG_SIZE));
+  }
+
+  /* Parse a version reply {sub, len, text...}; fall back to NUL-terminated scan */
+  _versionText(bytes, sub) {
+    let s = '';
+    if (bytes[0] === sub && bytes[1] <= bytes.length - 2) {
+      for (let i = 2; i < 2 + bytes[1]; i++) s += String.fromCharCode(bytes[i]);
+    } else {
+      for (let i = 0; i < bytes.length; i++) {
+        if (bytes[i] === 0) break;
+        s += String.fromCharCode(bytes[i]);
+      }
+    }
+    return s.replace(/[\x00-\x1f\x7f-\x9f]/g, '').trim();
   }
 
   /* Read firmware version string */
@@ -641,12 +861,7 @@ class USBSIDDevice {
     /* configReadNoRace() answers with the bytes themselves, not the array of
      * packets configCmdRead() returns. */
     const bytes = r;
-    let s = '';
-    for (let i = 0; i < bytes.length; i++) {
-      if (bytes[i] === 0) break;
-      s += String.fromCharCode(bytes[i]);
-    }
-    return s.trim();
+    return this._versionText(bytes, USBSID_VERSION);
   }
 
   /* Read PCB version */
@@ -659,12 +874,7 @@ class USBSIDDevice {
     /* configReadNoRace() answers with the bytes themselves, not the array of
      * packets configCmdRead() returns. */
     const bytes = r;
-    let s = '';
-    for (let i = 0; i < bytes.length; i++) {
-      if (bytes[i] === 0) break;
-      s += String.fromCharCode(bytes[i]);
-    }
-    return s.trim();
+    return this._versionText(bytes, US_PCB_VERSION);
   }
 
   /* Set a single config item: group=nameval, item, value */
@@ -731,6 +941,8 @@ class USBSIDDevice {
   async setTripleSIDTwo()  { await this.configCmd(TRIPLE_SID_TWO); }
   async setQuadSID()       { await this.configCmd(QUAD_SID); }
   async setMirroredSID()   { await this.configCmd(MIRRORED_SID); }
+  async setSingleSIDTwo()  { await this.configCmd(SINGLE_SID, 1); }
+  async setDualMirrored()  { await this.configCmd(MIRRORED_SID, 1); }
   async setDualSocket1()   { await this.configCmd(DUAL_SOCKET1); }
   async setDualSocket2()   { await this.configCmd(DUAL_SOCKET2); }
   async setDualFlipped()   { await this.configCmd(DUAL_FLIPPED); }
@@ -793,6 +1005,26 @@ class USBSIDDevice {
     return (r && r.length) ? r[0] : 0;
   }
 
+  /* What the firmware was built with, or null when it will not say (older
+   * firmware that predates this command). */
+  async readFeatures() {
+    usbsidLog("Reading USBSID-Pico feature flags");
+    const r = await this.configReadNoRace(US_FEATURES, MAX_PACKET_SIZE);
+    return (r && r.length) ? r[0] : null;
+  }
+
+  /** Does this board carry the onboard SID player? null when it will not say. */
+  async hasSidPlayer() {
+    const f = await this.readFeatures();
+    return (f === null) ? null : (f & FEATURE_SIDPLAYER) !== 0;
+  }
+
+  /* USB RX ringbuffer off/on. val: 0 = off, 1 = on. The firmware saves the
+   * config and reboots when the value changes, same value is a no-op. */
+  async setRxRing(val) {
+    await this.configCmd(SET_RX_RING, val & 1);
+  }
+
   /* Clone config commands */
   async configFPGASID(b2, b3, b4) { await this.configCmd(FPGASID, b2, b3, b4); }
   async configSKPico(b2, b3, b4)  { await this.configCmd(SKPICO, b2, b3, b4); }
@@ -809,7 +1041,7 @@ class USBSIDDevice {
    * connect; reopen cancels the leaked transferIn and the retry succeeds once the
    * endpoint is fully initialised. */
   async readConfigAck() {
-    if (!this._isOpen) return 0;
+    if (!this.isOpen) return 0;
     /* Unraced, and this one matters more than the others.
      *
      * It is the first read after opening, and its own note says the first attempt
@@ -830,6 +1062,11 @@ class USBSIDDevice {
    * Uses direct awaited transferOut (not write()) so caller can await completion
    * before issuing subsequent commands like READ_CONFIG. */
   async confirmConfig() {
+    if (this._serial) {
+      if (!this._serialOpen()) return;
+      this._serialSend([this.cmd(COMMAND, CONFIG), CONFIG_ACK, 0, 0, 0, 0]);
+      return;
+    }
     if (!this._isOpen) return;
     const cmdBuf = new Uint8Array([this.cmd(COMMAND, CONFIG), CONFIG_ACK, 0, 0, 0, 0]);
     await this._device.transferOut(this._epOut, cmdBuf);
@@ -839,6 +1076,13 @@ class USBSIDDevice {
    * val: 0 = detection enabled (default), 1 = detection disabled */
   async setSocketDetect(val) {
     await this.configCmd(SOCKET_DETECT, val & 1);
+  }
+
+  /* Enable/disable silent socket detection when a preset is applied.
+   * val: 0 = off, 1 = on. Firmware reads buffer[2], so the value goes in b3
+   * (b2 mirrored for safety). Saved by the firmware, no reboot. */
+  async setPresetDetect(val) {
+    await this.configCmd(PRESET_DETECT, val & 1, val & 1);
   }
 
   /* SID register write (plain, 3 bytes: cmd, reg, val) */
@@ -862,6 +1106,11 @@ class USBSIDDevice {
    * backpressure. Used by the USBSID-Player transport to serialize cycled
    * packets so a whole-frame burst cannot overflow the device buffer. */
   async writeArrayAwait(arr) {
+    if (this._serial) {
+      if (!this._serialOpen()) return;
+      try { this._serialSend(arr); } catch (e) { this._log('writeArrayAwait error:', e); }
+      return;
+    }
     if (!this._isOpen) return;
     const buf = arr instanceof Uint8Array ? arr : new Uint8Array(arr);
     try {
@@ -889,7 +1138,7 @@ class USBSIDDevice {
   async pause()   { await this.write([this.cmd(COMMAND, PAUSE),   0, 0, 0, 0, 0]); }
   async unpause() { await this.write([this.cmd(COMMAND, UNPAUSE), 0, 0, 0, 0, 0]); }
 
-  /* Onboard player (requires ONBOARD_SIDPLAYER firmware build) */
+  /* Onboard player (requires ONBOARD_EMULATOR firmware build) */
   async playerUploadStart(fileType = 0x01) {
     await this.configCmd(UPLOAD_SID_START, fileType);
   }
@@ -1021,12 +1270,9 @@ class USBSIDDevice {
   /**
    * Fast forward on or off.
    *
-   * **Does nothing.** The firmware marks the case `/* Non functional *\/` and the
-   * `emu_ffwd()` call is commented out, because emu_ffwd() was itself an empty
-   * stub: on the device the SID writes are the pacing, so there is nothing to
-   * skip until the embedded build has a pacer. Kept so the wiring is ready, and
-   * deliberately absent from the UI: a control that cannot work invites being
-   * pressed repeatedly.
+   * The board applies it at a frame boundary. It ends the fast forward itself on
+   * stop, init and a new upload, and keeps it across a subtune change. Needs
+   * firmware with `emu_ffwd()` implemented.
    */
   async playerFfwd(on) {
     await this.configCmd(SID_PLAYER_FFWD, on ? 1 : 0);
@@ -1053,7 +1299,7 @@ class USBSIDDevice {
     /* 2. START packet: [CMD, UPLOAD_SID_START, fileType, 0...] */
     pkt.fill(0);
     pkt[0] = CMD;  pkt[1] = UPLOAD_SID_START;  pkt[2] = fileType;
-    await this._device.transferOut(this._epOut, pkt);
+    await this._rawOut(pkt);
 
     /* 3. DATA packets: [CMD, UPLOAD_SID_DATA, b0..b61] - 62 bytes per packet */
     let sent = 0;
@@ -1062,7 +1308,7 @@ class USBSIDDevice {
       pkt[0] = CMD;  pkt[1] = UPLOAD_SID_DATA;
       const end = Math.min(sent + CHUNK, total);
       pkt.set(bytes.subarray(sent, end), 2);
-      await this._device.transferOut(this._epOut, pkt);
+      await this._rawOut(pkt);
       sent = end;
       if (onProgress) onProgress(sent, total);
     }
@@ -1070,14 +1316,14 @@ class USBSIDDevice {
     /* 4. END packet */
     pkt.fill(0);
     pkt[0] = CMD;  pkt[1] = UPLOAD_SID_END;
-    await this._device.transferOut(this._epOut, pkt);
+    await this._rawOut(pkt);
 
     /* 5. SIZE packet: [CMD, UPLOAD_SID_SIZE, size_hi, size_lo, 0...] */
     pkt.fill(0);
     pkt[0] = CMD;  pkt[1] = UPLOAD_SID_SIZE;
     pkt[2] = (total >> 8) & 0xFF;
     pkt[3] =  total       & 0xFF;
-    await this._device.transferOut(this._epOut, pkt);
+    await this._rawOut(pkt);
 
     /* 6. PLAYTIME, before anything starts.
      *
@@ -1092,6 +1338,12 @@ class USBSIDDevice {
 
     /* 8. Start playback */
     await this.playerStart();
+  }
+
+  /** Awaited raw 64 byte out, transport aware (upload helpers). */
+  async _rawOut(pkt) {
+    if (this._serial) { this._serialSend(pkt); return; }
+    await this._device.transferOut(this._epOut, pkt);
   }
 
   _log(...args) {

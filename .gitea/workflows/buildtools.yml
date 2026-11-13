@@ -1,0 +1,149 @@
+# Gitea Actions copy of .github/workflows/buildtools.yml (git.loudai.nl). Gitea runs
+# .gitea/workflows/ and ignores .github/workflows/ when this directory exists.
+# Differences: no macos-14 (no Apple Silicon runner), repositories under
+# LouDnl/ on GitHub live under usbsid/ here, releases go through Gitea's API.
+
+name: USBSID-Pico Build Tools
+
+env:
+  BUILD_THREADS: 4
+  BUILD_TYPE: Release
+  EMUDIR:
+
+on:
+  push:
+    paths:
+      - "examples/config-tool/**"
+      - "examples/send_sid/**"
+      - "examples/usbsid-driver.cmake"
+      - ".gitea/workflows/buildtools.yml"
+    # Only run on dev branch
+    branches: [dev]
+  # Allows you to run this workflow manually from the Actions tab when needed
+  workflow_dispatch:
+  # Enables calling from other workflows
+  workflow_call:
+    inputs:
+      force_run:
+        type: boolean
+        default: false
+
+concurrency:
+  group: dev-tools-build
+  cancel-in-progress: true
+
+jobs:
+  build-tools:
+    name: Tools
+    # Allow if it's NOT a tag OR if it's being called by another workflow/manual dispatch
+    if: |
+      inputs.force_run == true ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, shell: bash,
+              directory: config-tool, buildname: cfg_usbsid }
+          - { os: ubuntu-latest, shell: bash,
+              directory: send_sid, buildname: send_sid }
+          - { os: windows-2022, shell: 'msys2 {0}',
+              directory: config-tool, buildname: cfg_usbsid }
+          - { os: windows-2022, shell: 'msys2 {0}',
+              directory: send_sid, buildname: send_sid }
+          # - { os: macos-14-large, shell: 'bash',
+          #     directory: config-tool, buildname: cfg_usbsid_macos14large }
+          # - { os: macos-14-large, shell: 'bash',
+          #     directory: send_sid, buildname: send_sid_macos14large }
+          - { os: macos-15-intel, shell: 'bash',
+              directory: config-tool, buildname: cfg_usbsid_macos15intel }
+          - { os: macos-15-intel, shell: 'bash',
+              directory: send_sid, buildname: send_sid_macos15intel }
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Forces checkout of the branch head instead of a specific commit SHA
+          ref: ${{ github.ref }}
+          submodules: true
+          path: repo
+
+      # Must run before any step using the job default shell, which is
+      # `msys2 {0}` on Windows and does not exist until this action has run.
+      - name: Set up MSYS2 (Windows)
+        if: matrix.os == 'windows-2022'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: false
+          release: false
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-libusb
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-pkg-config
+            mingw-w64-ucrt-x86_64-ninja
+
+      # Both tools link USBSID-Pico-driver, found by examples/usbsid-driver.cmake
+      # in repo/lib/usbsid-driver.
+      - name: 📇 Checkout USBSID-Pico-driver
+        uses: actions/checkout@v4
+        with:
+          repository: usbsid/USBSID-Pico-driver
+          path: repo/lib/usbsid-driver
+
+      - name: 📇 Checkout USBSID-Player
+        if: ${{ matrix.directory == 'send_sid' }}
+        uses: actions/checkout@v4
+        with:
+          repository: usbsid/usbsid-player
+          path: repo/lib/usbsid-player
+
+      # Relative to the cmake source dir (repo/examples/<directory>), which the
+      # build step below runs from. An absolute ${{github.workspace}} path would
+      # be backslash separated on Windows and mangled by the time cmake sees it.
+      - name: 📇 Set USBSID-Player EMUDIR
+        if: ${{ matrix.directory == 'send_sid' }}
+        run: |
+          echo "EMUDIR=../../lib/usbsid-player" >> $GITHUB_ENV
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get -o Acquire::Retries=5 update
+          sudo apt-get -o Acquire::Retries=5 install -y pkg-config cmake build-essential libusb-1.0-0 libusb-1.0-0-dev
+
+      # - name: Install dependencies (MacOs)
+      #   if: matrix.os == 'macos-15-intel'
+      #   run: |
+      #     brew update
+      #     brew install pkg-config cmake ninja libusb
+
+      - name: Remove pre-built binaries
+        run: |
+          pushd repo/examples/${{ matrix.directory }}
+          ls -lhai
+          rm ${{ matrix.buildname }} || true
+          popd
+
+      - name: Configure and build ${{ matrix.buildname }}
+        run: |
+          pushd repo/examples/${{ matrix.directory }}
+          cmake -S . -B build -DEXECUTABLE=${{ matrix.buildname }} -DEMUDIR=${{ env.EMUDIR }} && cmake --build build -j$(nproc)
+          ls -lhai
+          popd
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: tools-${{ matrix.buildname }}-${{ matrix.os }}
+          path: |
+            ${{ matrix.os == 'windows-2022' && format('repo/examples/{0}/{1}.exe', matrix.directory, matrix.buildname) || format('repo/examples/{0}/{1}', matrix.directory, matrix.buildname) }}
+            ${{ matrix.os == 'windows-2022' && format('repo/examples/{0}/*.dll', matrix.directory) || '' }}
+          if-no-files-found: ignore

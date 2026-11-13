@@ -38,17 +38,31 @@
 #include <sid_detection.h>
 #include <sid_cloneconfig.h>
 #include <sid_tests.h>
+#include <clone_skpico.h>
 #include <config_bus.h>
 #include <config_socket.h>
 #include <config_logging.h>
 #include <logging.h>
+#ifdef USE_NET
+#include <net_wifi.h>
+#include <net_config.h>
+#include <net_bluetooth.h>
+#endif /* USE_NET */
+#ifdef USE_USB_NET
+#include <net_config.h>
+#include <net_usb.h>
+#endif /* USE_USB_NET */
+#ifdef USE_NSD
+#include <nsd.h>
+#endif /* USE_NSD */
 
 /* SID player */
-#if defined(ONBOARD_SIDPLAYER)
+#if defined(ONBOARD_EMULATOR)
+#include <sid_player.h>
 #include <usplayer.h>
 static int sidbytes_received = 0;
 static bool receiving_sidfile = 0;
-#endif /* ONBOARD_SIDPLAYER */
+#endif /* ONBOARD_EMULATOR */
 
 /* Declare variables */
 static const Config usbsid_default_config = USBSID_DEFAULT_CONFIG_INIT;
@@ -63,21 +77,26 @@ const char __in_flash("us_vars") *us_product = USBSID_PRODUCT;
 /* Declare local variables */
 /* 0x15 (16) max before starting at 0 flash sector erase */
 static uint8_t config_saveid = 0;
-bool midiconfig_offset_ok = false;  /* set by verify_midiconfig_offset(), see config.h */
 /* 256 Bytes MAX == FLASH_PAGE_SIZE (Max storage size is 4096 bytes == FLASH_SECTOR_SIZE) */
 static uint8_t config_array[FLASH_PAGE_SIZE] = {0};
 /* 12 bytes and counting */
 static uint8_t socket_config_array[SOCKET_BUFFER_SIZE];
+/* 256 Bytes MAX == FLASH_PAGE_SIZE */
+static uint8_t net_config_array[FLASH_PAGE_SIZE];
 /* 64 byte array for copying the config version into */
 static uint8_t p_version_array[MAX_BUFFER_SIZE] = {0};
 /* Config magic verification storage */
 static uint32_t cm_verification = 0;
-/* Number of writes to host we need to do on a config read depending on the config_array size */
+/* Number of writes to host needed on a config read depending on the config_array size */
 static int cfg_read_writes = 0;
+/* Number of writes to host needed on a config read depending on the net_config_array size */
+static int net_cfg_read_writes = 0;
 /* Temporary buffer to store incoming data */
 uint8_t * data_buffer = NULL;
 /* Well, how big is it? */
 volatile int data_buffer_size = 0;
+/* Is it ok? */
+bool midiconfig_offset_ok = false;
 
 
 /**
@@ -96,152 +115,6 @@ void write_back_data(size_t buffersize)
       break;
   }
   return;
-}
-
-/**
- * @brief Set the onboard SID player maxplaytime
- *
- * Combines 4x uint8_t from the buffer into a single uint32_t and sets
- * maxplaytime: buffer[1..4] = { FF000000, 00FF0000, 0000FF00, 000000FF } -> 0xFFFFFFFF
- *
- * @param uint8_t * buffer buffer[5] = { CMD, FF000000, 00FF0000, 0000FF00, 000000FF }
- */
-void set_maxplaytime(uint8_t * buffer)
-{
-#if defined(ONBOARD_SIDPLAYER)
-  maxplaytime = ((buffer[1] << 24) | (buffer[2] << 16) | (buffer[3] << 8) | buffer[4]);
-  double maxtimeplayed = maxplaytime / 1000.0; /* Force floating-point division by using 1000.0 */
-  int minutes = (int)(maxtimeplayed / 60); /* Get total whole minutes */
-  double secs = maxtimeplayed - (minutes * 60); /* Get remaining seconds with decimals */
-  usCFG("Max playtime set to ms: %u, maxtimeplayed: %f. Max playtime: %02d:%05.2f\n",
-    maxplaytime, maxtimeplayed, minutes, secs
-  );
-#endif
-  return;
-}
-
-/**
- * @brief Get the onboard SID player current playtime
- *
- * Writes the uint32_t playtime cut into 4x uint8_t, i.e.
- * { FF000000, 00FF0000, 0000FF00, 000000FF }, to the requesting endpoint.
- *
- * @note Does not return anything, writes the buffer directly
- */
-void get_playtime(void)
-{
-#if defined(ONBOARD_SIDPLAYER)
-  if (sidplayer_playing) {
-    playtime = usplayer_playtime_ms();
-  }
-  memset(write_buffer_p, 0, 64);
-  write_buffer_p[0] = (uint8_t)((playtime >> 24) & 0xFF);
-  write_buffer_p[1] = (uint8_t)((playtime >> 16) & 0xFF);
-  write_buffer_p[2] = (uint8_t)((playtime >> 8) & 0xFF);
-  write_buffer_p[3] = (uint8_t)(playtime & 0xFF);
-  write_back_data(4);
-
-  double timeplayed = playtime / 1000.0; /* Force floating-point division by using 1000.0 */
-  int minutes = (int)(timeplayed / 60); /* Get total whole minutes */
-  double secs = timeplayed - (minutes * 60); /* Get remaining seconds with decimals */
-  usCFG("Playtime in ms: %u/%u, timeplayed: %f. Playtime: %02d:%05.2f\n",
-    playtime, maxplaytime, timeplayed, minutes, secs
-  );
-#endif
-  return;
-}
-
-/**
- * @brief Hold one onboard SID player voice of one SID silent while the
- *        tune keeps playing
- *
- * buffer[4] = { CMD, chip, voice, mute }: chip is 1 to 4, voice is 1 to 3,
- * mute is 0 or 1, any higher value in any field discards the command
- * completely.
- *
- * @note use chip = 0, voice = 0, mute 1 or 0 to mute or unmute all
- * @note chip = 0, voice = !0 or too high numbers are invalid combinations
- *
- * @param uint8_t * buffer
- */
-void set_mutestate(uint8_t * buffer)
-{
-#if defined(ONBOARD_SIDPLAYER)
-  if ((buffer[1] == 0 && buffer[2] > 1) /* all chips, no voices specified */
-      || (buffer[1] > 4) /* chip */
-      || (buffer[2] > 3) /* voice */
-      || (buffer[3] > 1) /* mute */) {
-    usWRN("Invalid chip (%u)/ voice (%u)/ mute (%u) combination!\n",
-      buffer[1], buffer[2], buffer[3]);
-    return;
-  }
-
-  uint8_t chip  = buffer[1];
-  uint8_t voice = buffer[2];
-  bool mute = buffer[3];
-
-  if (chip == 0 && voice == 0) {
-    usCFG("%s all chips & all voices\n",
-      (mute ? "Muting" : "Unmuting"));
-    for (int s = 1; s < 5; s++) {
-      usCFG("  Chip %d\n", s);
-      usplayer_set_chip_mute(s, mute);
-      for (int v = 1; v < 4; v++) {
-        usNFO(" Voice %d", v);
-        usplayer_set_voice_mute(s, v, mute);
-      }
-      usNFO("\n");
-    }
-  } else if (voice == 0) {
-    usCFG("%s chip %u\n",
-      (mute ? "Muting" : "Unmuting"), chip);
-      usplayer_set_chip_mute(chip, mute);
-  } else {
-    usCFG("%s voice %u on chip %u\n",
-      (mute ? "Muting" : "Unmuting"), chip, voice);
-    usplayer_set_voice_mute(chip, voice, mute);
-  }
-  return;
-#endif
-}
-
-/**
- * @brief Get the onboard SID player mute state of all chips and voices
- *
- * Writes { uint8_t chips, uint8_t chip1, uint8_t chip2, uint8_t chip3,
- * uint8_t chip4 } to the requesting endpoint, where the chips byte packs
- * per-chip mute bits and each chipN byte packs its 3 voice mute bits
- * (0b111 = voices 3, 2, 1).
- *
- * @note does not return anything, writes the buffer directly
- */
-void get_mutestate(void)
-{
-#if defined(ONBOARD_SIDPLAYER)
-  uint8_t chips = 0, chip1 = 0, chip2 = 0, chip3 = 0, chip4 = 0;
-  if (sidplayer_playing) {
-    chips = usplayer_chip_mute();
-    chip1 = usplayer_voice_mute(1);
-    chip2 = usplayer_voice_mute(2);
-    chip3 = usplayer_voice_mute(3);
-    chip4 = usplayer_voice_mute(4);
-  }
-  memset(write_buffer_p, 0, 64);
-  write_buffer_p[0] = chips;
-  write_buffer_p[1] = chip1;
-  write_buffer_p[2] = chip2;
-  write_buffer_p[3] = chip3;
-  write_buffer_p[4] = chip4;
-  write_back_data(5);
-
-  usCFG("SID player mute state\n");
-  usCFG("  CHIPS :%04b\n", chips);
-  usCFG("  CHIP 1:%03b\n", chip1);
-  usCFG("  CHIP 2:%03b\n", chip2);
-  usCFG("  CHIP 3:%03b\n", chip3);
-  usCFG("  CHIP 4:%03b\n", chip4);
-  return;
-#endif
 }
 
 /**
@@ -282,6 +155,7 @@ void handle_config_buffer(uint8_t * buffer, uint32_t size)
     case SOCKET_CONFIG: break;
     case MIDI_CONFIG: break;
     case MIDI_CCVALUES: break;
+    case NETWORK_CONFIG: break;
     default:
       break;
   }
@@ -306,8 +180,8 @@ void read_config(Config* config)
   usCFG("Reading configuration from 0x%x to 0x%x with size %u\n",
     (uint)config, &config_array, sizeof(Config));
 
-  config_array[0] = READ_CONFIG; /* Initiator byte */
-  config_array[1] = 0x7F;        /* Verification byte */
+  config_array[0] = READ_CONFIG;       /* Initiator byte */
+  config_array[1] = VERIFICATION_BYTE; /* Verification byte */
 
   config_array[2] = (int)config_unacknowledged();      /* (PCB v1.5+) Need configuration confirmation */
   config_array[3] = (int)config->socket_change_detect; /* (PCB v1.5+) Socket change detection */
@@ -317,7 +191,7 @@ void read_config(Config* config)
 
   /* Clockworx */
   config_array[5] = (int)config->lock_clockrate;
-  config_array[6] = (int)config->external_clock;
+  config_array[6] = (int)config->external_clock | ((int)config->board_clock_link << 1);
   config_array[7] = (config->clock_rate >> 16) & BYTE;
   config_array[8] = (config->clock_rate >> 8) & BYTE;
   config_array[9] = config->clock_rate & BYTE;
@@ -360,7 +234,7 @@ void read_config(Config* config)
   config_array[38] = 0x00; /* Unused */
   config_array[39] = 0x00; /* Unused */
 
-  /* I can see colors! */
+  /* Colors! */
   config_array[40] = (int)config->RGBLED.enabled;
   config_array[41] = (int)config->RGBLED.idle_breathe;
   config_array[42] = config->RGBLED.brightness;
@@ -388,19 +262,19 @@ void read_config(Config* config)
   config_array[57] = config->stereo_en;
   config_array[58] = config->lock_audio_sw;
 
-  config_array[59] = 0x00; /* Unused */
+  config_array[59] = (int)config->rx_ring;  /* USB RX ringbuffer */
 
   config_array[60] = ((int)config->mirrored | ((int)config->flipped << 1) | ((int)config->mixed << 2));
 
   config_array[61] = 0x00; /* Unused */
 
-  config_array[62] = 0x8F; /* Mark end of config */
-  config_array[63] = 0xFF; /* Terminator byte */
+  config_array[62] = END_BYTE; /* Mark end of config */
+  config_array[63] = TERMINATION_BYTE; /* Terminator byte */
 
-  /* Yes, I know, I can assign cfg_read_writes manually, but I do not want to keep wondering if I need to change it */
+  /* cfg_read_writes can be assigned manually, but this avoids having to remember to change it */
   for (int n = 0; n < count_of(config_array); n++) { /* Find number of writes by terminator byte */
     static int endbyte = 0;
-    if (config_array[n] == 0x8F) { endbyte = n;
+    if (config_array[n] == END_BYTE) { endbyte = n;
       if (config_array[n+1] == 0xFF) {
         /* n = 62, 62+2 = 64, 64/64 = 1 */
         /* n = 117, 117+2 = 119, 119/64 = 1 */
@@ -426,8 +300,8 @@ void read_socket_config(Config* config)
 {
   memset(socket_config_array, 0, sizeof socket_config_array);  /* Make sure we don't send garbled old data */
 
-  socket_config_array[0]  = READ_SOCKETCFG; /* Initiator byte */
-  socket_config_array[1]  = 0x7F; /* Verification byte */
+  socket_config_array[0]  = READ_SOCKETCFG;    /* Initiator byte */
+  socket_config_array[1]  = VERIFICATION_BYTE; /* Verification byte */
 
   socket_config_array[2]  = ((int)config->socketOne.enabled << 4) | (int)config->socketOne.dualsid;
   socket_config_array[3]  = (int)config->socketOne.chiptype;
@@ -442,7 +316,60 @@ void read_socket_config(Config* config)
 
   socket_config_array[10] = ((int)config->mirrored | ((int)config->flipped << 1) | ((int)config->mixed << 2));
 
-  socket_config_array[11] = 0xFF;  /* Terminator byte */
+  socket_config_array[11] = TERMINATION_BYTE; /* Terminator byte */
+
+  return;
+}
+
+/**
+ * @brief Encode a NetConfig struct into the 64 byte READ_NETCFG wire buffer
+ *
+ * Fills the static `net_config_array` with the fields the host expects for a
+ * READ_NETCFG response and scans the array for the 0x8F/0xFF end marker to
+ * compute `net_cfg_read_writes`,the number of 64 byte USB writes needed to
+ * send it back.
+ *
+ * @param NetConfig* config
+ */
+void read_net_config(NetConfig* config)
+{
+#if defined(USE_USB_NET)
+  static_assert(sizeof(NetConfig) == 144, "[NETCONFIG] LAYOUT ERROR: NetConfig size changed, USB net flash page layout must stay 144 bytes");
+#else
+  static_assert(sizeof(NetConfig) == 132, "[NETCONFIG] LAYOUT ERROR: NetConfig size changed, flash page layout must stay 132 bytes");
+#endif /* USE_USB_NET */
+  memset(net_config_array, 0, sizeof net_config_array);  /* Make sure no garbled old data is sent */
+
+  net_config_array[0]  = READ_NETCFG;       /* Initiator byte */
+  net_config_array[1]  = VERIFICATION_BYTE; /* Verification byte */
+
+  memcpy(&net_config_array[2], config->ssid, count_of(net_cfg.ssid)); /* 33 */
+  memcpy(&net_config_array[35], config->hostname, count_of(net_cfg.hostname)); /* 24 */
+
+  net_config_array[59] = (config->nsd_port & BYTE); /* Port Lo */
+  net_config_array[60] = ((config->nsd_port >> 8) & BYTE); /* Port Hi */
+  net_config_array[61]  = (
+    config->flags.wifi_enabled
+  | (config->flags.nsd_enabled << 1)
+  | (config->flags.bt_nsd_enabled << 2)
+  | (config->flags.discovery_enabled << 3)
+  | (config->flags.usbnet_ip_mode << 4));  /* Bits 4-5 */
+
+  net_config_array[62] = END_BYTE; /* Mark end of net_config */
+  net_config_array[63] = TERMINATION_BYTE; /* Terminator byte */
+
+  /* net_cfg_read_writes can be assigned manually, but this avoids having to remember to change it */
+  for (int n = 0; n < count_of(net_config_array); n++) { /* Find number of writes by terminator byte */
+    static int endbyte = 0;
+    if (net_config_array[n] == END_BYTE) { endbyte = n;
+      if (net_config_array[n+1] == 0xFF) {
+        /* n = 62, 62+2 = 64, 64/64 = 1 */
+        /* n = 117, 117+2 = 119, 119/64 = 1 */
+        net_cfg_read_writes = ROUND((n+2)/64);
+        break;
+      }
+    }
+  }
 
   return;
 }
@@ -478,7 +405,7 @@ void read_pcb_version(void)
 /**
  * @brief Reset a Config struct to the compiled-in default configuration
  *
- * Preserves the config's `config_saveid` across the reset so the flash
+ * Preserves the config's `config_saveid` across the reset. The flash
  * save slot bookkeeping stays intact.
  *
  * @param Config* config
@@ -498,17 +425,20 @@ void __no_inline_not_in_flash_func(default_config)(Config* config)
  * `ADDR_CONFIG` (linker symbol, in the .ld scripts) and `FLASH_CONFIG_OFFSET`
  * (the macro above, derived at compile time from `PICO_FLASH_SIZE_BYTES`)
  * compute the identical address two different ways. They have to agree by
- * construction; this just says so out loud at boot, before anything ever
+ * construction. This check reports it at boot, before anything ever
  * writes to the MIDI partition that sits directly after both of them. A
- * mismatch here would mean the two build-time views of the flash layout
+ * mismatch would mean the two build-time views of the flash layout
  * have drifted apart, which is exactly the kind of thing that must be
  * caught before a flash_range_erase() runs anywhere near it.
  */
 void verify_midiconfig_offset(void)
 {
   uint32_t linker_config_offset = (uint32_t)ADDR_CONFIG - XIP_BASE;
-  usCFG("MIDI storage: FLASH_CONFIG_OFFSET = 0x%X, linker ADDR_CONFIG offset = 0x%X, FLASH_MIDICONFIG_OFFSET = 0x%X\n",
-    FLASH_CONFIG_OFFSET, linker_config_offset, FLASH_MIDICONFIG_OFFSET);
+  usNFO("\n");
+  usCFG("MIDI storage:\n");
+  usCFG("  FLASH_CONFIG_OFFSET = 0x%X\n", FLASH_CONFIG_OFFSET);
+  usCFG("  linker ADDR_CONFIG offset = 0x%X\n", linker_config_offset);
+  usCFG("  FLASH_MIDICONFIG_OFFSET = 0x%X\n", FLASH_MIDICONFIG_OFFSET);
   if (linker_config_offset != FLASH_CONFIG_OFFSET) {
     usERR("MIDI storage: ADDR_CONFIG (linker) 0x%X != FLASH_CONFIG_OFFSET (macro) 0x%X - refusing to trust MIDI flash offsets!\n",
       linker_config_offset, FLASH_CONFIG_OFFSET);
@@ -524,7 +454,7 @@ void verify_midiconfig_offset(void)
  *
  * Walks the flash save slots (`FLASH_PAGE_SIZE` apart, up to 16 slots)
  * starting at slot 0, following the `config_saveid` chain until it finds a
- * slot whose stored id no longer matches its position; that means the
+ * slot whose stored id no longer matches its position. That means the
  * previous slot holds the latest saved config, which is then copied into
  * `*config`. Falls back to `default_config()` if the loaded config's magic
  * number does not match `MAGIC_SMOKE`.
@@ -553,13 +483,13 @@ AGAIN:
     savelocationid++;  /* Increase id and try again */
     goto AGAIN; /* Always tries again if config is found */
   } else { /* They are not equal, that means this config is an empty save location or corrupted, load the previous config */
-    savelocationid--; /* This will now be the previous config_saveid */
+    savelocationid--; /* This will be the previous config_saveid */
     usCFG("  Found %s configuration at position %u\n",
       ((savelocationid == 255) ? "empty" : "latest"), savelocationid);
     memcpy(config, (void *)(XIP_BASE + (FLASH_CONFIG_OFFSET + (FLASH_PAGE_SIZE * savelocationid))), sizeof(Config));
     stdio_flush();
   }
-  /* Do not assign savelocationid here but he actual saveid from the restored config */
+  /* Do not assign savelocationid at this point but he actual saveid from the restored config */
   config_saveid = usbsid_config.config_saveid;  /* copy saveid into global variable (for later saving use etc.) */
   usCFG("  %s loaded from position %u\n",
     (usbsid_config.config_saveid == 255 ? "Empty configuration" : "Configuration"),
@@ -579,7 +509,6 @@ AGAIN:
     (uint)config);
   usCFG("  &config = 0x%x\n",
     (uint)&config);
-
 
   cm_verification = usbsid_config.magic;   /* Store the current magic for later */
   if (usbsid_config.magic != MAGIC_SMOKE) {  /* Verify the magic */
@@ -621,7 +550,7 @@ void __no_inline_not_in_flash_func(write_config_lowlevel)(void* config_data)
  *
  * Copies the config into a `CONFIG_SIZE` local buffer (statically asserted
  * to fit the whole struct), then runs write_config_lowlevel() through
- * flash_safe_execute() so the flash operation is safely coordinated with
+ * flash_safe_execute() to coordinate the flash operation safely with
  * core1, and sleeps 100ms afterwards.
  *
  * @param const Config* config
@@ -643,7 +572,7 @@ void __no_inline_not_in_flash_func(write_config)(const Config* config)
  * @brief Advance the save slot id and persist a Config struct to flash
  *
  * Only proceeds if `usbsid_config.config_saveid` and the local
- * `config_saveid` counter still agree; increments and wraps the id at 0xF
+ * `config_saveid` counter still agree. Increments and wraps the id at 0xF
  * (16 slots), then calls write_config(). Logs an error and returns without
  * writing if the ids have gone out of sync.
  *
@@ -668,6 +597,42 @@ void __no_inline_not_in_flash_func(save_config)(Config* config)
   write_config(config);
   usCFG("Configuration saved!\n");
   return;
+}
+
+/**
+ * @brief: Check whether a config command only reads state, no bus access
+ *
+ * @param uint8_t cmd config command byte, buffer[0] of handle_config_request()
+ * @return bool true for a read-only query
+ */
+bool config_is_query(uint8_t cmd)
+{
+  switch (cmd) {
+    case READ_CONFIG:
+    case READ_SOCKETCFG:
+    case READ_NUMSIDS:
+    case READ_FMOPLSID:
+    case READ_CONFIGACK:
+    case GET_CLOCK:
+    case WIFI_STATUS:
+    case READ_NETCFG:
+    case WIFI_READ_IP:
+    case USBSID_VERSION:
+    case US_PCB_VERSION:
+    case US_FEATURES:
+    case GET_AUDIO:
+    case TOGGLE_AUDIO:
+#if defined(USE_USB_NET)
+    case USBNET_READ_IPCFG:
+#endif
+#if defined(ONBOARD_EMULATOR)
+    case SID_PLAYER_MUTED:
+    case SID_PLAYER_TIME:
+#endif
+      return true;
+    default:
+      return false;
+  }
 }
 
 /**
@@ -722,6 +687,25 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       memcpy(write_buffer_p, socket_config_array, SOCKET_BUFFER_SIZE);
       write_back_data(SOCKET_BUFFER_SIZE);
       break;
+    case READ_NETCFG:
+    {
+      usCFG("READ_NETCFG\n");
+#if defined(USE_NET) || defined(USE_USB_NET)
+      read_net_config(&net_cfg);
+#else /* Write back default config (unchangeable) */
+      static NetConfig ndc = NETCONFIG_DEFAULT_INIT;
+      read_net_config(&ndc);
+#endif /* USE_NET || USE_USB_NET */
+      print_cfg(net_config_array, count_of(net_config_array), false);
+      memset(write_buffer_p, 0, 64);
+      /* Account for the Config array size with a loop */
+      for (int i = 0; i < net_cfg_read_writes; i++) {
+        usCFG("Write back net config array part %d of %d\n", (i+1), net_cfg_read_writes); /* i+1 because humans count from 1 :) */
+        memcpy(write_buffer_p, net_config_array + (i * 64), 64);
+        write_back_data(64);
+      }
+      break;
+    }
     case READ_NUMSIDS:
       usCFG("READ_NUMSIDS: %u\n", get_numsids());
       memset(write_buffer_p, 0, 64);
@@ -965,6 +949,11 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
             ? (bool)buffer[2]
             : true;  /* Default to 1 ~ enabled, always autodetect */
           break;
+        case BOARD_RXRING:    /* USB RX ringbuffer, applied after save and reboot */
+          if (buffer[2] <= 1) { /* 1 or 0 */
+            usbsid_config.rx_ring = (bool)buffer[2];
+          };
+          break;
         default:
           break;
       };
@@ -1071,6 +1060,176 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       usCFG("RESET_MIDI_STATE\n");
       midi_config_reset();
       break;
+    case WIFI_STATUS: /* Not available on non _w, always returns 0xFF 0xFF */
+      usCFG("WIFI_STATUS\n");
+      memset(write_buffer_p, 0, 64);
+#if defined(USE_NET)
+      write_buffer_p[0] = (uint8_t)net_wifi_is_connected();
+#elif defined(USE_USB_NET)
+      write_buffer_p[0] = (uint8_t)(net_usb_link_state() == NET_USB_CODE_CONNECTED);
+#else
+      write_buffer_p[0] = 0xFF; /* Not built with WiFi/Bluetooth support */
+#endif /* USE_NET */
+#ifdef USE_NSD
+      write_buffer_p[1] = (uint8_t)nsd_session_is_active();
+#else
+      write_buffer_p[1] = 0xFF;
+#endif /* USE_NSD */
+      write_back_data(2);
+      break;
+    case WIFI_READ_IP: /* Replies on every build, 0xFF state on non _w */
+      usCFG("WIFI_READ_IP\n");
+      memset(write_buffer_p, 0, 64);
+#if defined(USE_NET)
+      write_buffer_p[0] = net_wifi_state_code();
+      net_wifi_get_ip4(&write_buffer_p[1]);
+#elif defined(USE_USB_NET)
+      {
+        write_buffer_p[0] = net_usb_link_state();
+        uint32_t ip = net_usb_ip_addr(); /* Network order, first octet in lowest byte */
+        if (write_buffer_p[0] == NET_USB_CODE_CONNECTED) memcpy(&write_buffer_p[1], &ip, 4);
+      }
+#else
+      write_buffer_p[0] = 0xFF; /* Not built with WiFi/Bluetooth support */
+#endif /* USE_NET */
+      write_back_data(5);
+      break;
+#ifdef USE_NET
+    case WIFI_SET_SSID:
+    {
+      usCFG("WIFI_SET_SSID\n");
+      uint8_t len = buffer[1];
+      if (len > sizeof(net_cfg.ssid) - 1) len = sizeof(net_cfg.ssid) - 1;
+      memset(net_cfg.ssid, 0, sizeof(net_cfg.ssid));
+      memcpy(net_cfg.ssid, &buffer[2], len);
+      break;
+    }
+    case WIFI_SET_PSK:
+    {
+      usCFG("WIFI_SET_PSK\n"); /* Never log or read the value itself */
+      uint8_t len = buffer[1];
+      if (len > sizeof(net_cfg.psk) - 1) len = sizeof(net_cfg.psk) - 1;
+      memset(net_cfg.psk, 0, sizeof(net_cfg.psk));
+      memcpy(net_cfg.psk, &buffer[2], len);
+      break;
+    }
+    case WIFI_SET_HOSTNAME:
+     {
+      usCFG("WIFI_SET_HOSTNAME\n");
+      uint8_t len = buffer[1];
+      if (len > sizeof(net_cfg.hostname) - 1) len = sizeof(net_cfg.hostname) - 1;
+      memset(net_cfg.hostname, 0, sizeof(net_cfg.hostname));
+      memcpy(net_cfg.hostname, &buffer[2], len);
+      break;
+    }
+    case WIFI_ENABLE:
+      usCFG("WIFI_ENABLE: %u\n", buffer[1]);
+      if (buffer[1] <= 1) net_cfg.flags.wifi_enabled = (bool)buffer[1];
+      /* Doesn't require WIFI_APPLY to have been sent first */
+      if (net_cfg.flags.wifi_enabled && net_cfg.ssid[0]) {
+        net_wifi_set_credentials(net_cfg.ssid, net_cfg.psk);
+        net_wifi_set_hostname(net_cfg.hostname);
+        net_wifi_start();
+      }
+      break;
+#ifdef USE_NSD
+    case NSD_ENABLE:
+      usCFG("NSD_ENABLE: %u\n", buffer[1]);
+      if (buffer[1] <= 1) net_cfg.flags.nsd_enabled = (bool)buffer[1];
+      /* Doesn't require WIFI_APPLY to have been sent first */
+      net_wifi_apply_nsd_config(&net_cfg);
+      break;
+    case DISCOVERY_ENABLE:
+      usCFG("DISCOVERY_ENABLE: %u\n", buffer[1]);
+      if (buffer[1] <= 1) net_cfg.flags.discovery_enabled = (bool)buffer[1];
+      /* Doesn't require WIFI_APPLY to have been sent first */
+      net_wifi_apply_nsd_config(&net_cfg);
+      break;
+      case NSD_SET_PORT:
+      usCFG("NSD_SET_PORT\n");
+      net_cfg.nsd_port = (uint16_t)((buffer[1] << 8) | buffer[2]);
+      break; /* Applied by WIFI_APPLY */
+#endif /* USE_NSD */
+    case WIFI_APPLY:
+      usCFG("WIFI_APPLY\n");
+      save_net_config(&net_cfg);
+      net_wifi_set_credentials(net_cfg.ssid, net_cfg.psk);
+      net_wifi_set_hostname(net_cfg.hostname);
+      net_wifi_apply_nsd_config(&net_cfg);
+      /* net_wifi_start() is one-way, one-shot power-on (no teardown yet) -
+       * toggling WIFI_ENABLE back off after this does not power it down. */
+      if (net_cfg.flags.wifi_enabled) {
+        net_wifi_start();
+      }
+      break;
+    case WIFI_FORGET:
+      usCFG("WIFI_FORGET\n");
+      default_net_config(&net_cfg);
+      save_net_config(&net_cfg);
+      net_wifi_set_credentials("", "");
+      break;
+    case BT_NSD_ENABLE:
+      usCFG("BT_NSD_ENABLE: %u\n", buffer[1]);
+      if (buffer[1] <= 1) net_cfg.flags.bt_nsd_enabled = (bool)buffer[1];
+      save_net_config(&net_cfg); /* Save the config first */
+      /* Doesn't require WIFI_APPLY to have been sent first */
+      net_bt_set_power(net_cfg.flags.bt_nsd_enabled);
+#endif /* USE_NET */
+      break;
+#if defined(USE_USB_NET)
+    case NSD_ENABLE:
+      usCFG("NSD_ENABLE: %u\n", buffer[1]);
+      if (buffer[1] <= 1) net_cfg.flags.nsd_enabled = (bool)buffer[1];
+      /* Doesn't require WIFI_APPLY to have been sent first */
+      net_usb_apply_nsd();
+      break;
+    case DISCOVERY_ENABLE:
+      usCFG("DISCOVERY_ENABLE: %u\n", buffer[1]);
+      if (buffer[1] <= 1) net_cfg.flags.discovery_enabled = (bool)buffer[1];
+      /* Doesn't require WIFI_APPLY to have been sent first */
+      net_usb_apply_nsd();
+      break;
+    case NSD_SET_PORT:
+      usCFG("NSD_SET_PORT\n");
+      net_cfg.nsd_port = (uint16_t)((buffer[1] << 8) | buffer[2]);
+      break; /* Applied by WIFI_APPLY */
+    case USBNET_IP_MODE:
+      usCFG("USBNET_IP_MODE: %u\n", buffer[1]);
+      if (buffer[1] <= USBNET_IP_MODE_DHCP_SERVER) {
+        net_cfg.flags.usbnet_ip_mode = buffer[1];
+      }
+      break; /* Applied by WIFI_APPLY */
+    case USBNET_SET_STATIC:
+      usCFG("USBNET_SET_STATIC\n");
+      if (size < 13) {
+        usUNET("USBNET_SET_STATIC needs 12 address bytes, got %u\n", (unsigned)(size > 0 ? size - 1 : 0));
+        break;
+      }
+      memcpy(net_cfg.usbnet_ip, &buffer[1], 4);
+      memcpy(net_cfg.usbnet_netmask, &buffer[5], 4);
+      memcpy(net_cfg.usbnet_gateway, &buffer[9], 4);
+      break; /* Applied by WIFI_APPLY */
+    case USBNET_READ_IPCFG:
+      usCFG("USBNET_READ_IPCFG\n");
+      memset(write_buffer_p, 0, 64);
+      write_buffer_p[0] = net_cfg.flags.usbnet_ip_mode;
+      memcpy(&write_buffer_p[1], net_cfg.usbnet_ip, 4);
+      memcpy(&write_buffer_p[5], net_cfg.usbnet_netmask, 4);
+      memcpy(&write_buffer_p[9], net_cfg.usbnet_gateway, 4);
+      write_back_data(13);
+      break;
+    case WIFI_APPLY:
+      usCFG("WIFI_APPLY\n");
+      save_net_config(&net_cfg);
+      net_usb_apply();
+      break;
+    case WIFI_FORGET:
+      usCFG("WIFI_FORGET\n");
+      default_net_config(&net_cfg);
+      save_net_config(&net_cfg);
+      net_usb_apply();
+      break;
+#endif /* USE_USB_NET */
     case SET_CLOCK:         /* Change SID clock frequency by array id */
       usCFG("SET_CLOCK\n");
       /* locked clockrate check is done in apply_clockrate */
@@ -1119,11 +1278,14 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         return;
       }
       break;
-    case GET_AUDIO: /* Returns the audio switch state */
+    case GET_AUDIO:         /* Returns the audio switch state */
 #if PCB_VERSION_INT >= 13
-      usCFG("GET_AUDIO: %d\n", (int)usbsid_config.stereo_en);
-      memset(write_buffer_p, 0, 64);
-      write_buffer_p[0] = (uint8_t)usbsid_config.stereo_en;
+      {
+        bool state = get_audio_switch();
+        usCFG("GET_AUDIO: s:%d c:%d\n", (int)state, (int)usbsid_config.stereo_en);
+        memset(write_buffer_p, 0, 64);
+        write_buffer_p[0] = (uint8_t)state;
+      }
 #else
       usCFG("GET_AUDIO Not supported\n");
       memset(write_buffer_p, 0, 64);
@@ -1320,6 +1482,24 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       write_buffer_p[0] = us_features;
       write_back_data(1);
       break;
+    case LINK_CLOCK:
+      usCFG("LINK_CLOCK %d\n", buffer[1]);
+      if (usbsid_config.board_clock_link == (bool)buffer[1]) break;  /* Unchanged, no save and no reboot */
+      usbsid_config.board_clock_link = (bool)buffer[1];
+      usCFG("Saving config\n");
+      save_config_ext();
+      usCFG("Rebooting\n");
+      mcu_reset(); /* Point of no return */
+      break;
+    case SET_RX_RING:
+      usCFG("SET_RX_RING %d\n", buffer[1]);
+      if (usbsid_config.rx_ring == (bool)buffer[1]) break;  /* Unchanged, no save and no reboot */
+      usbsid_config.rx_ring = (bool)buffer[1];
+      usCFG("Saving config\n");
+      save_config_ext();
+      usCFG("Rebooting\n");
+      mcu_reset(); /* Point of no return */
+      break;
     case RESTART_BUS:
       usCFG("RESTART_BUS\n");
       restart_bus();
@@ -1466,6 +1646,9 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         tud_vendor_n_write_flush(WUSB_ITF);
         tud_vendor_n_read_flush(WUSB_ITF);
       }
+      if(buffer[1] == 0x11) {
+        auto_update_skpico_clock(buffer[2], buffer[3]);
+      }
       break;
     case READ_CLONECHIP: /* Read configuration / data from clone Chips */
       usCFG("READ_CLONECHIP: $%02x @ $%02x\n", buffer[1], buffer[2]);
@@ -1500,15 +1683,15 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         break;
       }
       break;
-#if defined(ONBOARD_SIDPLAYER)
+#if defined(ONBOARD_EMULATOR)
     case UPLOAD_SID_START:
       /* REVERT NOTE: this used to stage the incoming file in its own
-       * calloc'd buffer (0x10000 on RP2350, 0x8000 on RP2040) here, then
+       * calloc'd buffer (0x10000 on RP2350, 0x8000 on RP2040), then
        * hand it to load_prg()/load_sidtune() on core1, which copied it a
        * second time into usplayer's own tune buffer before freeing this
-       * one - two copies of one file. usplayer_upload_start()/_feed() now
-       * write straight into usplayer's buffer as packets arrive, so there
-       * is nothing to allocate here any more. See usplayer.h's "Streaming
+       * one - two copies of one file. usplayer_upload_start()/_feed()
+       * write straight into usplayer's buffer as packets arrive. There
+       * is nothing to allocate any more. See usplayer.h's "Streaming
        * upload" block for the replacement API, and git history for this
        * file if the old staged-buffer approach ever needs to come back. */
       usCFG("UPLOAD_SID_START: %d\n",buffer[1]);
@@ -1523,7 +1706,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       if (sidbytes_received == 0) usCFG("UPLOAD_SID_DATA\n");
       if (receiving_sidfile) {
         /* Max buffer size minus command byte (config init byte is already
-         * gone); straight into usplayer's own tune buffer, no local copy. */
+         * gone). Straight into usplayer's own tune buffer, no local copy. */
         if (!usplayer_upload_feed(&buffer[1], 62)) {
           receiving_sidfile = false;
           usERR("More incoming data than usplayer has room for, aborting upload here!\n");
@@ -1540,12 +1723,12 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       break;
     case UPLOAD_SID_SIZE:
       /* REVERT NOTE: used to be stored in sidfile_size and passed to
-       * load_prg()/load_sidtune() as the byte count. Dropped: usplayer now
+       * load_prg()/load_sidtune() as the byte count. Dropped: usplayer
        * tracks the real count itself as bytes stream in, which is more
        * honest than this announced value ever was (see the removed "these
        * are never the same size" note this replaces). The command is still
-       * accepted so the upload sequence on the wire is unchanged; the value
-       * itself just goes nowhere now. */
+       * accepted to keep the upload sequence on the wire unchanged. The value
+       * itself goes nowhere. */
       usCFG("UPLOAD_SID_SIZE\n");
       usDBG("Received file size announcement: %u (no longer used)\n",
         (unsigned)(buffer[1]<<8|buffer[2]));
@@ -1560,13 +1743,13 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       usCFG("Subtune %d\n", tuneno);
       unmute_sid(); /* Must unmute before play start or some tunes will be silent */
       sidplayer_init = true;
+      break;
     case SID_PLAYER_START:
       usCFG("SID_PLAYER_START %d\n", sidplayer_init);
       if (sidplayer_init) {
         offload_ledrunner = true;
         sidplayer_start = true;
       }
-      sidplayer_init = false;
       break;
     case SID_PLAYER_STOP:
       usCFG("SID_PLAYER_STOP\n");
@@ -1595,10 +1778,10 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       usCFG("SID_PLAYER_TWO\n");
       force_socktwo();
       break;
-    case SID_PLAYER_FFWD: /* Non functional */
+    case SID_PLAYER_FFWD: /* Applied by the player on core 1 at a frame boundary */
       usCFG("SID_PLAYER_FFWD: %s\n",
         (buffer[1] ? "ON" : "OFF"));
-      /* emu_ffwd((bool)buffer[1]); */
+      emu_ffwd((bool)buffer[1]);
       break;
     case SID_PLAYER_RWND: /* Not implemented */
       break;
@@ -1838,7 +2021,7 @@ void save_config_ext(void)
  * @brief Run first-boot auto detection when the loaded config is the default
  *
  * If `usbsid_config.default_config` is set, clears the flag, sets
- * `first_boot` (so the link popup is sent once), runs sid_auto_detect() at
+ * `first_boot` (to send the link popup once), runs sid_auto_detect() at
  * boot (which turns on the socket regulators on v1.5+), forces
  * `need_confirmation`/`detected_sid_change` and turns the regulators back
  * off again on v1.5+, and saves the resulting config.
@@ -1888,18 +2071,17 @@ int return_clockrate(void)
 /**
  * @brief Change the SID clock rate to the given clockrates table entry
  *
- * No-op if an external clock is in use or the clockrate is locked, or if
- * the requested rate already matches the current one. Otherwise updates
- * `clock_rate`/`refresh_rate`/`raster_rate` and the derived `sid_hz`/
- * `sid_mhz`/`sid_us` cycled-write timing variables, then aborts in-flight
- * DMA bus transfers and restarts the bus clocks/PIOs.
+ * No-op if an external/locked clock, or already at the requested rate.
  *
  * @param int n_clock index into the `clockrates` table
- * @param bool suspend_sids when true, disables the SIDs (RES low) before
- *        the clock change and re-enables/unmutes them afterwards
+ * @param bool suspend_sids disable/unmute SIDs around the clock change
  */
 void apply_clockrate(int n_clock, bool suspend_sids)
 {
+  if (n_clock < 0 || n_clock >= (int)count_of(clockrates)) {
+    usCFG("apply_clockrate: index %d out of range, ignoring\n", n_clock);
+    return;
+  }
   if (!usbsid_config.external_clock) {
     if (!usbsid_config.lock_clockrate) {
       if (clockrates[n_clock] != usbsid_config.clock_rate) {
@@ -1920,7 +2102,8 @@ void apply_clockrate(int n_clock, bool suspend_sids)
           clock_get_hz(clk_sys), cpu_mhz, cpu_us);
         usCFG("  C64 SID Clock @ %.0f Hz, %.6f MHz, %.4f uS\n",
           sid_hz, sid_mhz, sid_us);
-        /* Start clock set */
+        /* bus_heavy_op_begin()/_end() bracket this DMA/PIO restart, see bus.h. */
+        bus_heavy_op_begin();
         abort_dma_bustransfers();
         restart_bus_clocks();
         sync_pios(false);
@@ -1928,6 +2111,24 @@ void apply_clockrate(int n_clock, bool suspend_sids)
           usCFG("Enable SID's and UnMute\n");
           enable_sid(true);
         }
+        bus_heavy_op_end();
+
+        /* SIDKICK-pico requires the clock to be updated if it changes,
+           otherwise it will still assume the clock has not changed at all.
+           Sends update command to physical slot address and profile 0. */
+        if (cfg.chip_one == CHIP_SKPICO) { /* Slot 0 has one physical ID (0) and one virtual (1) */
+          auto_update_skpico_clock(
+            cfg.sidaddr[cfg.ids[cfg.sidid[0]]], /* Physical SID ID 0 -> Runtime ID -> Configured address */
+            0 /* profile */
+          );
+        }
+        if (cfg.chip_two == CHIP_SKPICO) { /* Slot 1 has one physical ID (2) and one virtual (3) */
+          auto_update_skpico_clock(
+            cfg.sidaddr[cfg.ids[cfg.sidid[2]]], /* Physical SID ID 2 -> Runtime ID -> Configured address */
+            0 /* profile */
+          );
+        }
+
         // ISSUE: WHEN THE BUS IS RESTARTED THE CRACKLING ON CYCLE EXACT TUNES IS IMMENSE!
         // THIS IS AFTER PAL -> NTSC -> PAL
         // restart_bus();

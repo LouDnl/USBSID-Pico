@@ -134,15 +134,20 @@ body::before {
 /* Tabs */
 #c64-tabs {
   display: flex;
+  flex-wrap: wrap;           /* phone width: overflow to a second row */
   gap: 4px;
   margin-bottom: 8px;
   border-bottom: 2px solid var(--c64-border);
   padding-bottom: 4px;
 }
 .c64-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--font-main);
   font-size: 1rem;
   text-transform: uppercase;
+  text-decoration: none;
   background: var(--c64-darkgray);
   color: var(--c64-text);
   border: 2px solid var(--c64-gray);
@@ -152,6 +157,7 @@ body::before {
   border-radius: 2px 2px 0 0;
   transition: background 0.15s, color 0.15s;
   user-select: none;
+  white-space: nowrap;
 }
 .c64-tab:hover { background: var(--c64-btn-hover); color: var(--c64-white); }
 .c64-tab.active {
@@ -161,9 +167,13 @@ body::before {
 }
 /* External link buttons in the tab bar - same shape, cyan accent, pushed to right */
 .c64-tab-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--font-main);
   font-size: 1rem;
   text-transform: uppercase;
+  text-decoration: none;
   background: var(--c64-darkgray);
   color: var(--c64-cyan);
   border: 2px solid var(--c64-cyan);
@@ -173,12 +183,18 @@ body::before {
   border-radius: 2px 2px 0 0;
   transition: background 0.15s, color 0.15s;
   user-select: none;
+  white-space: nowrap;
+}
+/* GitHub + Firmware wrap as one unit, pushed right on whichever row they land */
+.c64-tab-links {
+  display: flex;
+  gap: 4px;
   margin-left: auto;
 }
-.c64-tab-link + .c64-tab-link { margin-left: 4px; }
 .c64-tab-link:hover { background: var(--c64-cyan); color: var(--c64-bg); }
 @media (max-width: 400px) {
-  .c64-tab {
+  .c64-tab,
+  .c64-tab-link {
     font-size: 0.75rem;
     padding: 3px 6px;
     letter-spacing: 0;
@@ -186,6 +202,8 @@ body::before {
 }
 .c64-panel { display: none; }
 .c64-panel.active { display: block; }
+.blog-view { display: none; }
+.blog-view.active { display: block; }
 
 /* Generic box */
 .c64-box {
@@ -461,6 +479,48 @@ input[type=range].c64-range::-moz-range-thumb {
 .sid-reg-cell .reg-val  { color: var(--c64-cyan); }
 .sid-reg-cell.reg-written { background: var(--c64-darkgray); }
 .sid-reg-cell.reg-written .reg-val { color: var(--c64-yellow); }
+
+/* Visuals tab (reSIDfp mode): sub-tabs, oscilloscope mosaic, filter, stereo */
+#visuals-subtabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--c64-border);
+  padding-bottom: 4px;
+}
+.visuals-subtab[aria-selected="true"] {
+  background: var(--c64-btn-active);
+  color: var(--c64-bg);
+}
+.visuals-sub { display: none; }
+.visuals-sub.active { display: block; }
+.visuals-check {
+  min-width: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.visuals-slider input[type=range] { flex: 1; min-width: 120px; max-width: 360px; }
+.visuals-slider.disabled label { color: var(--c64-gray); }
+.visuals-slider input[type=range]:disabled { opacity: 0.4; cursor: not-allowed; }
+.usp-scope-mosaic {
+  display: grid;
+  grid-template-columns: repeat(var(--usp-scope-cols, 1), 1fr);
+  gap: 3px;
+}
+.usp-scope {
+  width: 100%;
+  height: 70px;
+  background: var(--c64-screen);
+  border: 1px solid var(--c64-gray);
+  cursor: pointer;
+  display: block;
+}
+.usp-scope.usp-scope-muted { opacity: 0.3; }
+@media (max-width: 520px) {
+  .usp-scope { height: 56px; }
+}
 
 /* Config section */
 .config-section-title {
@@ -937,7 +997,8 @@ input[type=range].c64-range::-moz-range-thumb {
     padding: 6px 12px;
     font-size: 0.95rem;
   }
-  .c64-tab { min-height: 40px; padding: 6px 12px; }
+  .c64-tab,
+  .c64-tab-link { min-height: 40px; padding: 6px 12px; }
   .c64-select { min-height: 40px; }
   .c64-input { min-height: 40px; }
   /* Named again: the rules that size these are ID scoped or set their own
@@ -1023,7 +1084,7 @@ input[type=range].c64-range::-moz-range-thumb {
 }
 #panel-blog .c64-img-grid img { max-width: 100%; margin: 0; }
 #panel-blog sup { display: block; margin: 0px auto; text-align: center; color: var(--c64-bloggray); font-size: 0.8em; }
-#panel-blog .c64-date-author { font-size: 0.8rem; color: var(--c64-bloggray); }
+#panel-blog .c64-date-author { display: block; font-size: 0.8rem; color: var(--c64-bloggray); }
 #panel-blog code {
   background: var(--c64-screen);
   color: var(--c64-cyan);
@@ -1076,4 +1137,31 @@ input[type=range].c64-range::-moz-range-thumb {
   padding-bottom: 3px;
   /* display: block; */
   /* align-self: auto; */
+}
+
+/* Blog section/subsection labels are real h2-h5 elements now (SEO/semantic
+   structure), not divs. Reset the UA heading defaults (top margin, bold
+   weight) they'd otherwise add on top of the explicit values above, so the
+   retag is visually invisible. */
+#panel-blog h2.c64-blog-title,
+#panel-blog h3.c64-box-title,
+#panel-blog h4.c64-blog-h2,
+#panel-blog h5.c64-blog-h3 {
+  margin-top: 0;
+  font-weight: normal;
+  display: block;
+}
+
+/* Visually hidden but present in the DOM: for search engines and screen
+   readers only, never shown on screen. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

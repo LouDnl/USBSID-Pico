@@ -1,18 +1,121 @@
 # Changelog
 Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on version changes
 
+#### Version: 0.9.0
+* Add batch READ of up to 63 registers
+* Add Network SID Device (NSD) server over WiFi for pico_w/pico2_w
+  - Add Bluetooth Classic SPP transport for the same NSD protocol
+  - NSD server uses protocol version 5
+    Add remote enable/disable of FM OPL on a SID socket
+  - FM OPL over NSD follows the spec
+    - TRY_WRITE_EX/TRY_READ_EX $DF40 = FM OPL address port, $DF50 = data port
+    - any other $DFxx address writes nothing and keeps its delay
+    - replaces the private form ($DF00 plus OPL register as one entry)
+  - TRY_SET_FM_OPL resets FM OPL on enable, BUSY when MIDI or ASID holds the bus
+  - Needs USBSID-Player newer than v1.4.0 for FM OPL over NSD
+  - Builds with WiFi/Bluetooth NSD get the _net filename suffix
+  - Fix TRY_READ_EX accepting an FM OPL address ($DF00-$DFFF) as read target
+  - Apply NSD enable, port and discovery settings live, no reboot needed
+  - Fix NSD listener failing to bind after a board initiated close
+  - Fix NSD pending cycle count race between the two cores
+  - Reads and resets wait for queued writes to play out
+  - Fix NSD registers $80 and up (SID 5-16) aliasing onto SID 1-4
+  - TRY_SET_SID_COUNT accepts 1-16 SIDs (was 1-8)
+  - MUTE drops queued writes of the muted voice
+  - Increase NSD write ring to 4096 entries
+* Add IP-to-Bluetooth NSD bridge example for TCP-only NSD clients
+* Add WIFI_READ_IP config command (WiFi state and IPv4 address)
+* Add dedicated WebSerial CDC interface for Windows
+* Add bus ownership arbiter for USB, NSD, onboard player and MIDI
+* Add USB RX ringbuffer for incoming USB CDC and Vendor (WebUSB) packets
+* Add USB RX ringbuffer setting to cfg_usbsid (-rxring, ini import and export)
+* Add USB RX ringbuffer setting to the web config
+* Add experimental Multiboard clock link (wire RX/PHI2 pin to all boards)
+* Add experimental SID register stream on vendor interface 7
+  - only built with -DENABLE_SID_STREAM=1, sets US_FEATURES bit 6
+* Add command to get the state of the audio switch (v1.3+ only)
+* Add SFX/FM OPL detection fallback for ARM2SID with unknown SID type
+* Add SIDKICK-pico config mode, profile read/write and clock speed functions
+* Add build gated CDC-NCM firmware feature for testing NSD over USB on non WiFi capable Pico boards
+* Add ffwd for the onboard player
+* Add net config read as struct buffer
+* Add preset auto detect and two preset buttons to the web config
+* Add READ_PROBE_DEBUGGING as optional debug item
+* Add separate debug flags for CDC and vendor event logging
+* Add video standard badge to the web player
+* Add config panels over Web Serial to the web config tool
+* Add Volume, reSIDfp and FM sliders to the web player
+* Add WiFi/Bluetooth NSD commands to commandline configtool
+* Add help menu's from commandline tools to dedicated README's
+* Add missing drivers section to all docs that require it
+* Add Gitea Actions workflows
+* Add apt installation retries for linux in build scripts
+* Merge Cynthcart into the onboard USBSID-Player builds
+  - both get the _em filename suffix
+  - pico2_w boards have a single em_net filename suffix
+* On pico1_w boards the emulator and wireless are too large to run together
+  - these boards have separate builds for _em and _net filename suffixes
+* Change cfg_usbsid and send_sid to use USBSID-Pico-driver
+* Document clock link, preset detect, clock rates and FMOpl SID number
+* Document USB hub and cable effects on demanding tunes
+* Hold WiFi polling during SID reset, clock rate change and SID auto detect
+* Move SIDKICK-pico code into its own source file
+* Move the web player library to Visuals
+* Remove reset SID when already resetting SID registers before the call
+* Remove telemetry option from buildscript
+* Reorganise source file layout
+* Send ASID FM OPL register writes through the ASID ring
+* Skip save and reboot when LINK_CLOCK value is unchanged
+* Split cfg_usbsid help menu into parts, add extra help arguments
+* Update GitLab CI
+* Update manuals
+* Update SIDKICK-pico clock profile on clock rate change
+* Update web config tool with new USBSID-Player code
+* Validate ASID FM OPL message length
+* Validate ASID write order packet
+* Website SEO + improvement
+* Fix ASID write order (0x30) applied to the wrong registers
+* Fix ASID writing $00 to register 0 after boot, 255 cycle waits dropped
+* Fix SID register reads overwriting the register mirror on real SIDs
+  - only $19-$1C are readable, clone chips keep full readback
+* Fix buttons in mobile view of the web config tool
+* Fix case fallthrough in embedded player config commands and remove misplaced boolean
+* Fix cfg_usbsid preset detect and clock list, add clock link option
+* Fix cfg_usbsid READ_CONFIG byte 6 parse, external_clock reads bit 0 only
+* Fix dangling CDC and WebUSB interface pointers
+* Fix failing MacOS 14 workflow build
+* Fix IRQ badges of the web player blinking on tunes that toggle timers
+* Fix PSIDdrv value, play button state and refetch in the web player
+* Fix read-only config queries claiming the SID bus and never releasing it
+* Fix response on VENDOR_REQUEST_WEBUSB
+* Fix RSID driver placement and post-init interrupt in the web player
+* Fix send_sid -sid - losing the tail of the tune and play time 0
+* Fix send_sid not sending the last byte of the play time
+* Fix stale PSIDdrv address badge in the web player
+* Fix toggle mono/stereo causing a playing freeze
+* Fix USB control request logging printing over UART during play
+* Fix vendor endpoint toggles not reset on SET_INTERFACE
+* Fix WebUSB reconnect after a refused or failed open
+* Fix Windows builds failing due to mingw64 deprecation
+* Fix write_debug queue size per pico type
+
 #### Version: 0.8.0
-* Add full MIDI implementation overhaul: dedicated flash-backed MIDI config storage, MIDI engine/handler/queue/voice/patch/arp table modules, MIDI clock control, sid bus spinlock
+* Add full MIDI implementation overhaul
+  - add flash-backed MIDI config storage
+  - add engine, handler, queue, voice, patch and arp table modules
+  - add MIDI clock control and sid bus spinlock
 * Add FMOpl (OPL2/3) MIDI control, fixes and new config item support
-* Add MIDI patch and arpeggiator table examples, MIDI example tools (CC controller, patch editor), VMPK/Strudel/TidalCycles MIDI examples
-* Migrate embedded Cynthcart to run through the onboard USBSID-Player instead of the old emudore-based path, new `_cc` firmware variant
-* Add embedded USBSID-Player support for Pico and Pico W (rp2040) builds, previously Pico 2 / Pico 2 W only
+* Add MIDI patch and arpeggiator table examples
+* Add MIDI example tools (CC controller, patch editor)
+* Add VMPK/Strudel/TidalCycles MIDI examples
+* Migrate embedded Cynthcart to the onboard USBSID-Player, add cc variant
+* Add embedded USBSID-Player for Pico and Pico W (rp2040) builds
 * Deprecate and remove "Adorable" onboard C64 emulator (emudore) support
 * Fix SIDs getting disabled on USB dismount
-* Fix `last_preset` config setting for all PCB versions
+* Fix last_preset config setting for all PCB versions
 * Guard ASID writes during reset and while ASID is disabled
 * Fix stale DMA functions
-* Add overclock warning (250MHz) to README and manuals for firmwares using the embedded USBSID-Player or Cynthcart
+* Add overclock warning (250MHz) for embedded Player and Cynthcart
 * Fix compilation error caused by octal-looking version numbers
 * Update GitHub and GitLab CI build workflows
 * Update firmware, Cynthcart, PCB v1.0/v1.3/v1.5, Configtool and Player manuals
@@ -20,13 +123,13 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 
 #### Version: 0.7.7
 * Fix board -> host WebUSB writes to be 64 bytes
-* Add mute/clear so OPL audio won't linger
+* Add mute/clear to prevent lingering OPL audio
 * Fix WebUSB config read
 * Remove deprecated item
 
 #### Version: 0.7.6
 * Add and implement new onboard SID player features
-* Add default support for song lengths to `send_sid`
+* Add default support for song lengths to send_sid
 * Update web config tool
 * Update buildtools workflow
 
@@ -34,7 +137,7 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 * Optimize Vu handling, fix Vu on embedded play without USB
 * Fix ASID regression
 * FMOpl fixes and added support for new config items
-* Fix timing issue in `detect_all`, fix issue in `update_probe_config_from_detection`
+* Fix timing issue in detect_all, fix issue in update_probe_config_from_detection
 * Fix FPGASID detection leaving it in config state
 * Guard buffer overrun in buffer tick
 * Fix SKPico firmware type detection
@@ -52,13 +155,13 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 
 #### Version: 0.7.3
 * Fix voltage apply when saving config without reboot
-* Return `last_preset` in config buffer
+* Return last_preset in config buffer
 * Set current preset based on current config (v1.5+ boards)
 * Add web player URL loading
 
 #### Version: 0.7.2
 * Fix FPGASID config address display error
-* Fix disable-autodetect feature so the config-tool GUI works correctly
+* Fix disable-autodetect feature for the config-tool GUI to work correctly
 * Add additional SID player commands
 * Add USB command to read compiled USBSID features
 * Add v1.3 KiCad files, update v1.3 gerbers/schematic/BOM, add v1.3 OSHWA certification
@@ -76,26 +179,23 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 
 #### Version: 0.7.0
 * Add initial v1.5 PCB support
-  - Fix voltage set order so clone SIDs don't misbehave
+  - Fix voltage set order to stop clone SIDs misbehaving
   - Fix incorrect packet length on reads (must be 64 bytes for WebUSB)
-* [BREAKING CHANGE] Rewrite configuration logic, improve and clear up logging
-  and SID/chip detection
+* [BREAKING CHANGE] Rewrite configuration logic, improve and clear up logging and SID/chip detection
   - Add limited ARMSID, PDSID and BACKSID support
 * Add SIDEmu detection and support
 * Add FPGASID preset support
-* Change midi->SID control to a user defined channel, save settings per
-  channel (like an instrument)
+* Change midi->SID control to a user defined channel, save settings per channel (like an instrument)
 * Enable direct Midi access even when onboard emulator is present
-* Rename `midi_cc` to `midi_defs`
-* Deprecate `usbsid_doubletap`
+* Rename midi_cc to midi_defs
+* Deprecate usbsid_doubletap
 * Add Cynthcart VST (by Raros)
 * Add first iteration of new webconfig tool
 * Header cleanup: internalize externs
 * Add stdio_flush during PIO bus setup/sync, fixes memory corruption
 * Add workaround for lingering data in the vendor fifo
 * Fixes for new SKPico firmware versions
-* Stall Core1 until completely finished booting, add Firmware compilation
-  log type
+* Stall Core1 until completely finished booting, add Firmware compilation log type
 
 #### Version: 0.6.4-BETA
 * Fix onboard SID player playback issues
@@ -104,53 +204,46 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 * Log USBSID version at end of boot, reset SIDs at end of boot
 * Add PDSID detect and SID type config, rework auto detection
 * Start rebuilding native Midi
-* Fix assertion panic on invalid `raster_pio` value
+* Fix assertion panic on invalid raster_pio value
 * Add webconfig tool source
 * Add VirtualMidiPianoKeyboard instrument file for embedded Cynthcart
 
 #### Version: 0.6.2-BETA
 * Add socket flip command to config-tool
 * Reset SID registers after socket flip/change
-* Fix lockups when using register `r10` without verification
+* Fix lockups when using register r10 without verification
 * Add GitLab CI config
 * Add warning/error logging for ASID buffer rate and overflow
 
 #### Version: 0.6.1-BETA
 * Add config option to flip sockets at runtime (1 <--> 2)
 * Add single SID socket 2 config option
-* Re-introduce ASID (ring)buffer for `write_ordered` messages (e.g.
-  SIDFactoryII), add `set_asid_env`
+* Re-introduce ASID (ring)buffer for write_ordered messages (e.g. SIDFactoryII), add set_asid_env
 * ASID handling overhaul
 * Fix hardfault/lockup on RP2350 when toggling the mono/stereo pin
-* Fix regression in boot sequence where RP2350 could freeze forever waiting
-  on a semaphore; replaced with native ARM functions, boot sequence
-  rearranged
-* Fix `clockcycle_delay` for RP2040 by chaining two DMA channels together,
-  move functions into bus.c
+* Fix RP2350 boot freeze waiting on a semaphore
+* Fix clockcycle_delay for RP2040 with chained DMA channels, move to bus.c
 * Logging overhaul
 * Also reset the writeorder when midi/asid is no longer mounted
 * Add shortcuts to command line arguments
 * Add custom naming parameter to build scripts, add MacOS support
 
 #### Version: 0.6.0-BETA
-* Add first iteration of onboard SID player (PRG support, next/previous
-  tune, buffer)
+* Add first iteration of onboard SID player (PRG support, tune skip, buffer)
 * Add first iteration of onboard C64 emulator (emudore based Cynthcart)
   - Add shared memory support between core0/core1
   - Increase midi->cynthcart queue size
 * Overclock RP2350 for onboard SID player, optimize build to -O3
 * Add Pico2 RGB support
-* Fix muting so all volume ($18) registers are masked/muted correctly
-* Add PDSID type switch command, clone SID config commands, config error
-  check + fallback
+* Fix muting of all volume ($18) registers
+* Add PDSID type switch command, clone SID config commands, config error check + fallback
 * Add non-cycled direct PIO write operation
-* Add optional cycled_delayed_write_operation and
-  cycled_write_operation_nondma functions
+* Add optional cycled_delayed_write_operation and cycled_write_operation_nondma functions
 * Split gpio.c into separate files, add clock counter
 * Rework branch prediction, remove endless loop workaround
 * Fix SID register reset
-* Fix `sid_memory` not cleared by `clear_sid_registers`
-* Move bus bit related settings into `set_bus_bits`
+* Fix sid_memory not cleared by clear_sid_registers
+* Move bus bit related settings into set_bus_bits
 * Disable unsupported DMA type on RP2040
 * Start re-implementation of Midi handling
 * Add first iteration of UART SID writes
@@ -160,15 +253,13 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 * Add Dual USBSID-Pico C64 Case (by OlefinMakes)
 
 #### Version: 0.5.0-BETA
-* Add autodetection routine to first boot on new firmware and
-  default firmware settings
+* Add autodetection routine to first boot on new firmware and default firmware settings
 * Double tap the reset button to start autodetection routine
   - This only works on Pico1 (rp2040) boards!
 * Improve SID and Clone detection
 * Add custom Sysex command for Stereo/Mono switch (v1.3 PCB only)
 * Add PCB version to USB ProductId
-* Disable fifo buffer for USB Vendor class (WebUSB) for
-  faster writes
+* Disable fifo buffer for USB Vendor class (WebUSB) for faster writes
 * Add support for ordered ASID writes
 * Start rework ASID handling for sidfactory2 (thanks @thomasj)
 * Rework config handling at runtime
@@ -200,8 +291,7 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 * Add support for PCB v1.3 audio switch
 * Add reserverd flash partition for persistent storage
 * Add optional clockrate locking
-  - this locks the clockrate in config so it can no
-    longer be changed
+  - this locks the clockrate in config, it can no longer be changed
 * Add workaround fix for SID3 not always working
 * Add FMOpl support (Clone SID only)
 * Add Pico2W support
@@ -216,8 +306,7 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
   - Fix DMA panic on Pico_w
   - Add syncing of PIO's
   - Add stream buffer support
-  - Add check for Clone type sid to reset_set
-    SKPico does not handle resets very well
+  - Add check for Clone type sid to reset_set SKPico does not handle resets very well
   - Move SID clock functions to GPIO
 * PIO bus overhaul
   - Add support for clock cycle writes

@@ -360,6 +360,7 @@ const char * boolean_str(ZeroOne val)
 
 /**
  * @brief Helper function
+ * TODO: Decide on implementation
  *
  * @param ZeroOne val
  * @return const char* string

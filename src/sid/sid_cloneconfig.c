@@ -1,0 +1,551 @@
+/*
+ * USBSID-Pico is a RPi Pico/PicoW (RP2040) & Pico2/Pico2W (RP2350) based board
+ * for interfacing one or two MOS SID chips and/or hardware SID emulators over
+ * (WEB)USB with your computer, phone or ASID supporting player
+ *
+ * sid_detection.c
+ * This file is part of USBSID-Pico (https://github.com/LouDnl/USBSID-Pico)
+ * File author: LouD
+ *
+ * Copyright (c) 2024-2026 LouD
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 2.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#include <globals.h>
+#include <usbsid_constants.h>
+#include <config.h>
+#include <gpio_defs.h>
+#include <bus.h>
+#include <sid.h>
+#include <sid_detection.h>
+#include <config_logging.h>
+#include <logging.h>
+#include <clone_armsid.h>
+#include <clone_backsid.h>
+#include <clone_fpgasid.h>
+#include <clone_pdsid.h>
+#include <clone_sidemu.h>
+
+
+/* Init local variables */
+static volatile bool read_config = false;
+static uint8_t * chip_config = NULL;
+static volatile bool sid_logging = true, sid_debug = true;
+
+
+/**
+ * @brief Parses and prints supplied FPGASID configuration array
+ *
+ * @param int slot
+ * @param int sidno
+ * @param uint8_t *configarray
+ */
+static void print_fpgasid_sidconfig(int slot, int sidno, uint8_t * configarray)
+{
+  int extin = ((configarray[2] & 0b11000000) >> 6);
+  int readb = ((configarray[2] & 0b110000) >> 4);
+  int regd = ((configarray[2] & 0b1000) >> 3);
+  int mixw = ((configarray[2] & 0b100) >> 2);
+  int crunch = ((configarray[2] & 0b10) >> 1);
+  int fltr = (configarray[2] & 0b1);
+  int outp = ((configarray[1] & 0b1000) >> 3);
+  int addr1 = (((configarray[1] & 0b100) >> 2) == 1 ? 1 : 4);
+  int addr2 = (((configarray[1] & 0b10) >> 1) == 1 ? 2 : 4);
+  int addr3 = ((configarray[1] & 0b1) == 1 ? 3 : 4);
+  int addr = ((addr1 + addr2 + addr3) == 12 ? 0 : 4);
+
+  usSID("\n");
+  usSID("FPGASID configuration of slot %s and SID %d\n", slots[slot], sidno);
+  if (sidno == 1) {
+    usSID("  Output mode    = %s\n", outputmode[outp]);
+    usSID("  SID2 addresses = %s%s%s%s\n", sid2addr[addr], sid2addr[addr1], sid2addr[addr2], sid2addr[addr3]);
+  }
+  usSID("  ExtIn source   = %s\n", extinsource[extin]);
+  usSID("  Register read  = %s\n", readback[readb]);
+  usSID("  Register delay = %s\n", regdelay[regd]);
+  usSID("  Mixed wavform  = %s\n", mixedwave[mixw]);
+  usSID("  Crunchy DAC    = %s\n", crunchydac[crunch]);
+  usSID("  Analog filter  = %s\n", filtermode[fltr]);
+  usSID("  DigiFIX values = %02x\n", configarray[0]);
+
+  return;
+}
+
+/**
+ * @brief Read configuration from an FPGASID at supplied address
+ *
+ * @param uint8_t base_address
+ */
+void read_fpgasid_configuration(uint8_t base_address)
+{
+  if ((usbsid_config.socketOne.chiptype != CHIP_FPGASID) && (usbsid_config.socketTwo.chiptype != CHIP_FPGASID)) {
+    usERR("No FPGASID configured, socketOne: %s (%d) socketTwo: %s (%d)\n",
+      chip_type_name((int)usbsid_config.socketOne.chiptype), usbsid_config.socketOne.chiptype,
+      chip_type_name((int)usbsid_config.socketTwo.chiptype), usbsid_config.socketTwo.chiptype
+    );
+    return; /* Do nothing if no FPGASID configured */
+  }
+
+  static uint8_t idHi, idLo, cpld, fpga, pca, select_pins, idxa, idxb, flta, fltb;
+  static uint16_t frequency_r;
+  static float frequency = 0.0;
+  static uint8_t unique_id[8];
+  static uint8_t sid_one_a[3];
+  static uint8_t sid_two_a[3];
+  static uint8_t sid_one_b[3];
+  static uint8_t sid_two_b[3];
+
+  usNFO("\n");
+  usSID("Reading FPGASID configuration from address $%02x\n", base_address);
+  /* Enable diag mode */
+  cycled_write_operation((0x19 + base_address), 0xEE, 6);  /* Write magic cookie Hi */
+  cycled_write_operation((0x1A + base_address), 0xAB, 6);  /* Write magic cookie Lo */
+
+  /* Double check that we are actually data from an FPGASID */
+  idLo = cycled_read_operation((0x0 + base_address), 4);      /* Read identify Hi */
+  idHi = cycled_read_operation((0x1 + base_address), 4);      /* Read identify Lo */
+  uint16_t fpgasid_id = (idHi << 8 | idLo);
+  if (fpgasid_id != FPGASID_ID) {
+    usERR("Incorrect identifier 0x%04X != 0x%04X, no FPGASID found @ $%02x\n", fpgasid_id, FPGASID_ID, base_address);
+    return;
+  }
+
+  /* Start diag config read */
+  cpld = cycled_read_operation((0x02 + base_address), 4);  /* Read clpd revision */
+  fpga = cycled_read_operation((0x03 + base_address), 4);  /* Read fpga revision */
+  pca  = cycled_read_operation((0x0D + base_address), 4);  /* Read pca revision */
+  select_pins  = cycled_read_operation((0x0D + base_address), 4);  /* Read select pins */
+  for (int i = 0; i < 8; i++) {
+    unique_id[i] = cycled_read_operation(((0x04 + base_address) + i), 4);  /* Read unique identifier */
+  }
+  idxa = cycled_read_operation((0x1B + base_address), 4);  /* Read config index A revision */
+  idxb = cycled_read_operation((0x1C + base_address), 4);  /* Read config index B revision */
+  flta = cycled_read_operation((0x1D + base_address), 4);  /* Read filterbias A revision */
+  fltb = cycled_read_operation((0x1E + base_address), 4);  /* Read filterbias B revision */
+  /* 0 digifix, 1 stereo, 2 mode */
+  for (int i = 0; i < 3; i++) {
+    sid_one_a[i] = cycled_read_operation(((0x0F + base_address) + i), 4);  /* Read SID1 A config */
+  }
+  for (int i = 0; i < 3; i++) {
+    sid_two_a[i] = cycled_read_operation(((0x12 + base_address) + i), 4);  /* Read SID2 A config */
+  }
+  for (int i = 0; i < 3; i++) {
+    sid_one_b[i] = cycled_read_operation(((0x15 + base_address) + i), 4);  /* Read SID1 B config */
+  }
+  for (int i = 0; i < 3; i++) {
+    sid_two_b[i] = cycled_read_operation(((0x18 + base_address) + i), 4);  /* Read SID2 B config */
+  }
+  for (int i = 0; i < 10; i++) {
+    frequency += cycled_read_operation((0x0C + base_address), 4);  /* Read Ø2 frequency */
+  }
+  frequency_r = (uint16_t)frequency; // assign for readback
+  frequency /= 10;   // 10 reads
+  frequency *= 12.5; // kHz
+  frequency /= 1000; // to uS
+
+  /* Exit diag mode */
+  cycled_write_operation((0x19 + base_address), 0x0, 6);   /* Clear magic cookie Hi */
+  cycled_write_operation((0x1A + base_address), 0x0, 6);   /* Clear magic cookie Lo */
+
+  if (!read_config) {
+    usSID("FPGASID Diagnostic result:\n");
+    usSID("  Identifier:        %04X (FPGASID)\n", fpgasid_id);
+    usSID("  CPLD Revision:     %02X\n", cpld);
+    usSID("  FPGA Revision:     %02X\n", fpga);
+    usSID("  PCA Revision:      %02X\n", pca);
+    usSID("  Unique identifier: %02X%02X%02X%02X%02X%02X%02X%02X\n",
+      unique_id[0], unique_id[1], unique_id[2], unique_id[3],
+      unique_id[4], unique_id[5], unique_id[6], unique_id[7]);
+    usSID("  Clock frequency:   %.3fμs\n", frequency);
+    usSID("  Select pins:       %02X\n", select_pins);
+    usSID("  Index config A:    %02X\n", idxa);
+    usSID("    SID 1 A:         %02X%02X%02X\n",
+      sid_one_a[0], sid_one_a[1], sid_one_a[2]);
+    usSID("    SID 2 A:         %02X%02X%02X\n",
+      sid_two_a[0], sid_two_a[1], sid_two_a[2]);
+    usSID("    Filterbias A\n");
+    usSID("      SID1/SID2:     %02x\n", flta);
+    usSID("  Index config B:    %02X\n", idxb);
+    usSID("    SID 1 B:         %02X%02X%02X\n",
+      sid_one_b[0], sid_one_b[1], sid_one_b[2]);
+    usSID("    SID 2 B:         %02X%02X%02X\n",
+      sid_two_b[0], sid_two_b[1], sid_two_b[2]);
+    usSID("    Filterbias B\n");
+    usSID("      SID1/SID2:     %02x\n", fltb);
+
+    print_fpgasid_sidconfig(0, 1, sid_one_a);
+    print_fpgasid_sidconfig(0, 2, sid_two_a);
+    print_fpgasid_sidconfig(1, 1, sid_one_b);
+    print_fpgasid_sidconfig(1, 2, sid_two_b);
+  }
+
+  usNFO("read_config: %d\n",read_config);
+  if (read_config) {
+    chip_config[2] = idHi;
+    chip_config[3] = idLo;
+    chip_config[4] = cpld;
+    chip_config[5] = fpga;
+    chip_config[6] = pca;
+    chip_config[7] = select_pins;
+    chip_config[8] = idxa;
+    chip_config[9] = idxb;
+    chip_config[10] = flta;
+    chip_config[11] = fltb;
+    chip_config[12] = (uint8_t)((frequency_r&0xff00) >> 8);
+    chip_config[13] = (uint8_t)(frequency_r&0xff);
+    int idx = 14;
+    memcpy(chip_config+idx, unique_id, 8);
+    memcpy(chip_config+(idx+=3), sid_one_a, 3);
+    memcpy(chip_config+(idx+=3), sid_two_a, 3);
+    memcpy(chip_config+(idx+=3), sid_one_b, 3);
+    memcpy(chip_config+(idx+=3), sid_two_b, 3);
+  }
+
+  usNFO("\n");
+
+  return;
+}
+
+/**
+ * @brief Change Public Domain SID type
+ *
+ * This requires a 5 second reset hold to switch to and/or from 6581/8580.
+ */
+void reset_switch_pdsid_type(void)
+{
+  usSID("Switching PDSID SID type with reset pin\n");
+  set_reset_state(true); // reset_state = 1;
+  set_paused_state(false); // paused_state = 0;
+  clear_volume_state(); // memset(volume_state, 0, 4);
+  clear_sid_memory(); // memset(sid_memory, 0, count_of(sid_memory));
+  usSID("  RST pin low\n");
+  cPIN(RES); // gpio_put(RES, 0);
+  usSID("  Sleep 6 seconds\n");
+  sleep_ms(6000);
+  usSID("  RST pin high\n");
+  sPIN(RES); // gpio_put(RES, 1);
+  set_reset_state(false); // reset_state = 0;
+
+  return;
+}
+
+/**
+ * @brief Read PDSID configured type
+ *
+ * @note BUG: Inconsistent results when reading
+ *
+ * @param uint8_t base_address
+ * @return uint8_t pdsid type 0 = 6581, 1 = 8580
+ */
+uint8_t read_pdsid_sid_type(uint8_t base_address)
+{
+  set_detection_logging(false);
+  detect_pdsid(base_address);
+  cycled_write_operation((base_address + PDREG_P),PDSID_P,6);  /* 'P' */
+  sleep_ms(33); /* 2 jiffies of 16,8ms each */
+  cycled_write_operation((base_address + PDREG_D),PDSID_D,6);  /* 'D' */
+  sleep_ms(33); /* 2 jiffies of 16,8ms each */
+  uint8_t result = cycled_read_operation((base_address + PDREG_S),6); /* 0 = 6581, 1 = 8580 */
+  sleep_ms(33); /* 2 jiffies of 16,8ms each */
+  // cycled_write_operation((base_address + PDREG_P),0x00,6);  /* end config mode */
+  set_detection_logging(true);
+  return result;
+}
+
+/**
+ * @brief Set the pdsid sid type object
+ *
+ * @param uint8_t base_address
+ * @param uint8_t type
+ * @return boolean true succes
+ * @return boolean false false
+ */
+bool set_pdsid_sid_type(uint8_t base_address, uint8_t type)
+{
+  if (type > 1) { return false; } /* Cannot do that here! */
+  set_detection_logging(false);
+  detect_pdsid(base_address);
+  cycled_write_operation((base_address + PDREG_P),PDSID_P,6); /* 'P' */
+  sleep_ms(33); /* 2 jiffies of 16,8ms each */
+  cycled_write_operation((base_address + PDREG_D),PDSID_D,6); /* 'D' */
+  sleep_ms(33); /* 2 jiffies of 16,8ms each */
+  cycled_write_operation((base_address + PDREG_S),type,6); /* 0 = 6581, 1 = 8580 */
+  sleep_ms(33); /* 2 jiffies of 16,8ms each */
+  // cycled_write_operation((base_address + PDREG_P),0x00,6);  /* end config mode */
+  set_detection_logging(true);
+  return true;
+}
+
+/**
+ * @brief Read and print BackSID version
+ * @note Reverse engineered from `backsid223.prg`
+ *
+ * @param uint8_t base_address
+ */
+void print_backsid_version(uint8_t base_address)
+{
+  cycled_write_operation((base_address + BACKSID_REG), BACKSID_MAJ, 6);   /* Set major register */
+  sleep_ms(33); /* 2 jiffies of 16,8ms each */
+  uint8_t major = cycled_read_operation((base_address + BACKSID_RD), 6); /* Read major */
+
+  cycled_write_operation((base_address + BACKSID_REG),BACKSID_MIN, 6);   /* Set minor register */
+  sleep_ms(33); /* 2 jiffies of 16,8ms each */
+  uint8_t minor = cycled_read_operation((base_address + BACKSID_RD), 6); /* Read minor */
+
+  cycled_write_operation((base_address + BACKSID_REG), BACKSID_PAT, 6);   /* Set minor register */
+  sleep_ms(33); /* 2 jiffies of 16,8ms each */
+  uint8_t patch = cycled_read_operation((base_address + BACKSID_RD), 6); /* Read minor */
+
+  cycled_write_operation((base_address + BACKSID_REG), BACKSID_REV, 6);   /* Set hardware revision register */
+  sleep_ms(33); /* 2 jiffies of 16,8ms each */
+  uint8_t hwrev = cycled_read_operation((base_address + BACKSID_RD), 6); /* Read hardware revision */
+
+  usNFO("\n");
+  usSID("Reading BackSID version @ $%02x]\n", base_address);
+  usSID("  BackSID version:   %d%d%d\n", major, minor, patch);
+  usSID("  Hardware revision: %d\n", hwrev);
+  return;
+}
+
+/**
+ * @brief Read and print BackSID filter type
+ * @note Reverse engineered from `backsid223.prg`
+ *
+ * @param uint8_t base_address
+ */
+void print_backsid_filter_type(uint8_t base_address)
+{
+  bool again = false;
+  usNFO("\n");
+  usSID("Reading BackSID filters @ $%02x]\n", base_address);
+again:;
+  cycled_write_operation((base_address + BACKSID_REG), BACKSID_FLT, 6);         /* Set filter register */
+  sleep_ms(33); /* 2 jiffies of 16,8ms each */
+  uint8_t filter_type = cycled_read_operation((base_address + BACKSID_RD), 6); /* Read filter type */
+  usSID("  Filters read RAW: %u\n", filter_type);
+  if (!again) {
+    again = true;
+    if (filter_type >= 3) again = false; /* Incorrect result, read again! */
+    goto again; /* Read twice */
+  }
+  usSID("  Filters type: %u = %s\n", filter_type, backsid_filters[filter_type]);
+  return;
+}
+
+/**
+ * @brief Set the backsid filter type and print afterwards
+ * @note Reverse engineered from `backsid223.prg`
+ *
+ * @param uint8_t base_address
+ * @param uint8_t type
+ */
+void set_backsid_filter_type(uint8_t base_address, uint8_t type)
+{
+  uint8_t type_set = ((type >= 3) ? 0 : type); /* Failsafe defaults to 6581 */
+  usNFO("\n");
+  usSID("Settings BackSID Filters:\n");
+  usSID("  requested: %u\n", type);
+  usSID("  actual:    %u = %s\n",
+    type_set, backsid_filters[type_set]);
+  /* LDX #$03  ~ 2 cycles */
+  /* STX $d41b ~ 4 cycles */
+  cycled_write_operation((base_address + BACKSID_REG), BACKSID_FLT, 6); /* Set filter register */
+  /* LDA #$nn  ~ 2 cycles but ignored due to loading before previous write */
+  /* STA $d41c ~ 4 cycles */
+  cycled_write_operation((base_address + BACKSID_WR), type, 4);         /* Write filter type */
+  /* LDA #$b5  ~ 2 cycles */
+  /* STA $d41d ~ 4 cycles */
+  cycled_write_operation((base_address + BACKSID_HS1), BACKSID_HV1,6); /* Write handshake 1 */
+  /* LDA #$1d  ~ 2 cycles */
+  /* STA $d41e ~ 4 cycles */
+  cycled_write_operation((base_address + BACKSID_HS2), BACKSID_HV2,6); /* Write handshake 2 */
+  sleep_ms(1327); /* 79 Jiffies of 16,8ms each */
+  print_backsid_filter_type(base_address);
+  return;
+}
+
+/**
+ * @brief Read configuration from am ARM(2)SID at supplied address
+ * @note Routine from 1541Ultimate-II
+ *
+ * @param uint8_t base_address
+ */
+void read_armsid_configuration(uint8_t base_address)
+{
+  usSID("Read ARM(2)SID configuration @ $%02x\n", base_address);
+  cycled_write_operation((ARMSID_W1 + base_address),ARMSID_S,6); /* $1d -> 0x53 'S' */
+  // sleep_us(10);
+  cycled_write_operation((ARMSID_W2 + base_address),ARMSID_I,6); /* $1e -> 0x49 'I' */
+  // sleep_us(10);
+  cycled_write_operation((ARMSID_W3 + base_address),ARMSID_D,6); /* $1f -> 0x44 'D' */
+
+  sleep_ms(2);
+
+  cycled_write_operation((ARMSID_W3 + base_address),ARMSID_V,6); /* $1f -> 0x56 'V' */
+  // sleep_us(10);
+  cycled_write_operation((ARMSID_W2 + base_address),ARMSID_I,6); /* $1e -> 0x49 'I' */
+  // sleep_us(10);
+
+  sleep_ms(2);
+
+  uint8_t vh = cycled_read_operation((ARMSID_R1 + base_address), 4); /* $1b */
+  // sleep_us(10);
+  uint8_t vl = cycled_read_operation((ARMSID_R2 + base_address), 4); /* $1c */
+  // sleep_us(10);
+
+  cycled_write_operation((ARMSID_W3 + base_address),ARMSID_F,6); /* $1f -> 0x46 'F' */
+  // sleep_us(10);
+  cycled_write_operation((ARMSID_W2 + base_address),ARMSID_F,6); /* $1e -> 0x49 'I' */
+  // sleep_us(10);
+  sleep_ms(2);
+
+  uint8_t chip = cycled_read_operation((ARMSID_R1 + base_address), 4); /* $1b */
+  // sleep_us(10);
+
+  cycled_write_operation((ARMSID_W3 + base_address),ARMSID_U,6); /* $1f -> 0x55 'U' */
+  // sleep_us(10);
+  cycled_write_operation((ARMSID_W2 + base_address),ARMSID_F,6); /* $1e -> 0x49 'I' */
+  // sleep_us(10);
+
+  sleep_ms(10);
+
+  uint8_t v1 = cycled_read_operation((ARMSID_R1 + base_address), 4); /* $1b */
+  sleep_us(10);
+  uint8_t v2 = cycled_read_operation((ARMSID_R2 + base_address), 4); /* $1c */
+  int v = v1 * 256 + v2;
+
+  cycled_write_operation((ARMSID_W3 + base_address),ARMSID_H,6); /* $1f -> 0x48 'H' */
+  // sleep_us(10);
+  cycled_write_operation((ARMSID_W2 + base_address),ARMSID_F,6); /* $1e -> 0x49 'I' */
+  // sleep_us(10);
+
+  sleep_ms(10);
+
+  uint8_t p = cycled_read_operation((ARMSID_R1 + base_address), 4); /* $1b */
+  // sleep_us(10);
+  uint8_t q = cycled_read_operation((ARMSID_R2 + base_address), 4); /* $1c */
+
+  usSID("Current ARMSID settings\n");
+  usSID("  Chip: %c5xx FW: %d.%d Filt: %b %b  (Voltage = %d mV (%d %d))\n",
+    chip, vh, vl, p, q, v, v1, v2);
+
+  cycled_write_operation((ARMSID_W1 + base_address), 0, 6); /* $1d -> Exit config */
+
+  return;
+}
+
+/**
+ * @brief Read configuration from a SIDEmu device at supplied address
+ *
+ * @note Not yet implemented, function body is a stub
+ *
+ * @param uint8_t base_address
+ */
+void read_sidemu_configuration(uint8_t base_address)
+{ /* TODO: Finish */
+  return;
+}
+
+/**
+ * @brief Set the sidemu sidtype
+ *
+ * @param uint8_t base_address
+ * @param uint8_t type
+ */
+void set_sidemu_sidtype(uint8_t base_address, uint8_t type)
+{ /* TODO: Finish */
+  usSID("SIDEmu enable config mode\n");
+  /* Enable config mode */
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_1,6); /* #66 */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_2,6); /* #69 */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+
+  usSID("SIDEmu write command #$%02x without result\n", type);
+  /* Command without result :) */
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_OFFS_CMD,6); /* #$ff */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+  cycled_write_operation((SIDEMU_CFG_DATA + base_address),type,6); /* type */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+
+  usSID("SIDEmu disable config mode\n");
+  /* Disable config mode */
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_1,6); /* #66 */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+  cycled_write_operation((SIDEMU_CFG_OFFSET + base_address),SIDEMU_CMD_3,6); /* #96 */
+  clockcycle_delay(SIDEMU_WAIT_CYCLES);
+
+  return;
+}
+
+/**
+ * @brief Read chip configuration for the given command into an output buffer
+ *
+ * Allocates a scratch buffer, dispatches to the matching chip-specific
+ * configuration reader (currently only READ_FPGASID), then copies the
+ * assembled buffer into chip_config_r and frees the scratch buffer.
+ *
+ * @note Only READ_FPGASID is implemented, other commands fall through with an empty buffer
+ *
+ * @param uint8_t base_address
+ * @param int command
+ * @param uint8_t * chip_config_r
+ * @return bool always true
+ */
+bool read_chip_configuration(uint8_t base_address, int command, uint8_t * chip_config_r)
+{ /* TODO: Finish */
+
+  read_config = true;
+  chip_config = (uint8_t*)calloc(1, MAX_BUFFER_SIZE);
+  memset(chip_config, 0, MAX_BUFFER_SIZE);
+
+  chip_config[0] = command;
+  chip_config[1] = VERIFICATION_BYTE;
+
+  switch (command) {
+    case READ_FPGASID:
+      read_fpgasid_configuration(base_address);
+      break;
+    default:
+      break;
+  }
+
+  chip_config[62] = END_BYTE;
+  chip_config[63] = TERMINATION_BYTE;
+
+  usNFO("DATA READ:\n");
+  for (int i = 0; i < MAX_BUFFER_SIZE; i++) usNFO("%02x ", chip_config[i]);
+  usNFO("\n");
+
+  memcpy(chip_config_r, chip_config, 64);
+
+  free(chip_config);
+  read_config = false;
+  return true;
+}
+
+/**
+ * @brief Write chip configuration for the given command
+ *
+ * @note Not yet implemented, function body is a stub that always returns false
+ *
+ * @param int command
+ * @return bool always false
+ */
+bool write_chip_configuration(int command)
+{ /* TODO: Finish */
+
+  return false;
+}

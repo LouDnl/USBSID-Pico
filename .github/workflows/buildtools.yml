@@ -10,6 +10,7 @@ on:
     paths:
       - "examples/config-tool/**"
       - "examples/send_sid/**"
+      - "examples/usbsid-driver.cmake"
       - ".github/workflows/buildtools.yml"
     # Only run on dev branch
     branches: [dev]
@@ -47,10 +48,10 @@ jobs:
               directory: config-tool, buildname: cfg_usbsid }
           - { os: windows-2022, shell: 'msys2 {0}',
               directory: send_sid, buildname: send_sid }
-          - { os: macos-14, shell: 'bash',
-              directory: config-tool, buildname: cfg_usbsid_macos14 }
-          - { os: macos-14, shell: 'bash',
-              directory: send_sid, buildname: send_sid_macos14 }
+          - { os: macos-15, shell: 'bash',
+              directory: config-tool, buildname: cfg_usbsid_macos15 }
+          - { os: macos-15, shell: 'bash',
+              directory: send_sid, buildname: send_sid_macos15 }
           # - { os: macos-14-large, shell: 'bash',
           #     directory: config-tool, buildname: cfg_usbsid_macos14large }
           # - { os: macos-14-large, shell: 'bash',
@@ -65,7 +66,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Forces checkout of the branch head instead of a specific commit SHA
           ref: ${{ github.ref }}
@@ -78,18 +79,26 @@ jobs:
         if: matrix.os == 'windows-2022'
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           update: true
           install: >-
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-libusb
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-pkg-config
-            mingw-w64-x86_64-ninja
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-libusb
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-pkg-config
+            mingw-w64-ucrt-x86_64-ninja
+
+      # Both tools link USBSID-Pico-driver, found by examples/usbsid-driver.cmake
+      # in repo/lib/usbsid-driver.
+      - name: 📇 Checkout USBSID-Pico-driver
+        uses: actions/checkout@v5
+        with:
+          repository: LouDnl/USBSID-Pico-driver
+          path: repo/lib/usbsid-driver
 
       - name: 📇 Checkout USBSID-Player
-        if: ${{ matrix.buildname == 'send_sid' }}
-        uses: actions/checkout@v4
+        if: ${{ matrix.directory == 'send_sid' }}
+        uses: actions/checkout@v5
         with:
           repository: loudnl/usbsid-player
           path: repo/lib/usbsid-player
@@ -98,18 +107,18 @@ jobs:
       # build step below runs from. An absolute ${{github.workspace}} path would
       # be backslash separated on Windows and mangled by the time cmake sees it.
       - name: 📇 Set USBSID-Player EMUDIR
-        if: ${{ matrix.buildname == 'send_sid' }}
+        if: ${{ matrix.directory == 'send_sid' }}
         run: |
           echo "EMUDIR=../../lib/usbsid-player" >> $GITHUB_ENV
 
       - name: Install dependencies (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config cmake build-essential libusb-1.0-0 libusb-1.0-0-dev
+          sudo apt-get -o Acquire::Retries=5 update
+          sudo apt-get -o Acquire::Retries=5 install -y pkg-config cmake build-essential libusb-1.0-0 libusb-1.0-0-dev
 
       # - name: Install dependencies (MacOs)
-      #   if: matrix.os == 'macos-14' || matrix.os == 'macos-15-intel'
+      #   if: matrix.os == 'macos-15' || matrix.os == 'macos-15-intel'
       #   run: |
       #     brew update
       #     brew install pkg-config cmake ninja libusb
@@ -129,7 +138,7 @@ jobs:
           popd
 
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: tools-${{ matrix.buildname }}-${{ matrix.os }}
           path: |

@@ -1,0 +1,421 @@
+# Gitea Actions copy of .github/workflows/tagged_build.yml (git.loudai.nl). Gitea runs
+# .gitea/workflows/ and ignores .github/workflows/ when this directory exists.
+# Differences: no macos-14 (no Apple Silicon runner), repositories under
+# LouDnl/ on GitHub live under usbsid/ here, releases go through Gitea's API.
+
+name: USBSID-Pico Tagged Build
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  BUILD_THREADS: 4
+  BUILD_TYPE: Release
+  # Pico-SDK version
+  PICO_SDK_REF: 2.2.0
+  PICO_EXTRAS_REF: sdk-2.2.0
+  PICOTOOL_REF: 2.2.0
+
+on:
+  push:
+    tags:
+      - "d[0-9a-z]+" # any tag name that looks like a a date 20250101 etc.
+    branches: [master, dev]
+  # Allows you to run this workflow manually from the Actions tab when needed
+  workflow_dispatch:
+  # Enables calling from other workflows
+  workflow_call:
+
+jobs:
+  cleanup_previous_builds: # Delete unfinished draft prereleases, and prereleases older than 30 days (but keep at least 10)
+    name: Cleanup Previous Builds
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/d')
+    steps:
+      # Same policy as the GitHub workflow, through Gitea's API: drafts left by
+      # failed builds go; of the prereleases, the 10 newest stay, older ones go
+      # once they are more than 30 days old.
+      - name: Cleanup previous prereleases
+        env:
+          TOKEN: ${{ secrets.GITEA_TOKEN }}
+          API: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request, datetime
+          api, tok = os.environ["API"], os.environ["TOKEN"]
+          def call(method, path):
+              req = urllib.request.Request(api + path, method=method,
+                                           headers={"Authorization": "token " + tok})
+              with urllib.request.urlopen(req) as r:
+                  body = r.read()
+                  return json.loads(body) if body else None
+          releases, page = [], 1
+          while True:
+              batch = call("GET", f"/releases?limit=50&page={page}")
+              if not batch: break
+              releases += batch; page += 1
+          releases.sort(key=lambda r: r["created_at"], reverse=True)
+          now = datetime.datetime.now(datetime.timezone.utc)
+          keep, delete = 0, []
+          for r in releases:
+              if not r["prerelease"]: continue
+              if r["draft"]:
+                  print("Will delete draft prerelease:", r["tag_name"]); delete.append(r["id"]); continue
+              keep += 1
+              if keep <= 10: continue
+              age = (now - datetime.datetime.fromisoformat(r["created_at"].replace("Z", "+00:00"))).days
+              if age <= 30: continue
+              print("Will delete old prerelease:", r["tag_name"]); delete.append(r["id"])
+          for rid in delete:
+              call("DELETE", f"/releases/{rid}")
+          print("Done.")
+          PY
+
+
+  create_release:
+    name: Create Draft Release
+    needs: cleanup_previous_builds
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/d')
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_id: ${{ steps.create_release.outputs.release_id }}
+    steps:
+      - name: Create draft prerelease
+        id: create_release
+        env:
+          TOKEN: ${{ secrets.GITEA_TOKEN }}
+          API: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF#refs/tags/}"
+          payload=$(TAG="$TAG" python3 -c 'import json,os; t=os.environ["TAG"]; print(json.dumps({"tag_name": t, "name": t + " snapshot", "draft": True, "prerelease": True, "target_commitish": os.environ["SHA"]}))')
+          id=$(curl -fsS -H "Authorization: token $TOKEN" -H 'Content-Type: application/json' \
+                 -X POST "$API/releases" -d "$payload" \
+               | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+          echo "release_id=$id" >> "$GITHUB_OUTPUT"
+          echo "upload_url=$API/releases/$id/assets" >> "$GITHUB_OUTPUT"
+          echo "draft prerelease $TAG: id $id"
+
+
+  build:
+    name: Build
+    needs: create_release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/d')
+    strategy:
+      matrix:
+        include:
+          - {
+              buildname: Pico,
+              directory: pico,
+              pico_board: pico,
+              pico_platform: rp2040,
+              withemulator: 0,
+              extra_cmake_args: "",
+            }
+          - {
+              buildname: Pico_Emulator,
+              directory: pico_em,
+              pico_board: pico,
+              pico_platform: rp2040,
+              withemulator: 1,
+              extra_cmake_args: "",
+            }
+          - {
+              buildname: Pico_W,
+              directory: picow,
+              pico_board: pico_w,
+              pico_platform: rp2040,
+              withemulator: 0,
+              extra_cmake_args: "",
+            }
+          - {
+              buildname: Pico_W_Emulator,
+              directory: picow_em,
+              pico_board: pico_w,
+              pico_platform: rp2040,
+              withemulator: 1,
+              extra_cmake_args: "",
+            }
+          - {
+              buildname: Pico_W_Net_NSD,
+              directory: picow_net,
+              pico_board: pico_w,
+              pico_platform: rp2040,
+              withemulator: 0,
+              extra_cmake_args: "-DENABLE_NET=1",
+            }
+          - {
+              buildname: Pico2,
+              directory: pico2,
+              pico_board: pico2,
+              pico_platform: rp2350-arm-s,
+              withemulator: 0,
+              extra_cmake_args: "",
+            }
+          - {
+              buildname: Pico2_Emulator,
+              directory: pico2_em,
+              pico_board: pico2,
+              pico_platform: rp2350-arm-s,
+              withemulator: 1,
+              extra_cmake_args: "",
+            }
+          - {
+              buildname: Pico2_W,
+              directory: pico2w,
+              pico_board: pico2_w,
+              pico_platform: rp2350-arm-s,
+              withemulator: 0,
+              extra_cmake_args: "",
+            }
+          - {
+              buildname: Pico2_W_Emulator_Net_NSD,
+              directory: pico2w_emnet,
+              pico_board: pico2_w,
+              pico_platform: rp2350-arm-s,
+              withemulator: 1,
+              extra_cmake_args: "-DENABLE_NET=1",
+            }
+
+      fail-fast: false
+
+    steps:
+      - name: 🗒️ Set tag output
+        id: vars
+        run: |
+          echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+
+      - name: 🗒️ Check tag output
+        env:
+          RELEASE_VERSION: ${{ steps.vars.outputs.tag }}
+        run: |
+          echo $RELEASE_VERSION
+          echo ${{ steps.vars.outputs.tag }}
+
+      - name: 🛠️ Arm GNU Toolchain (arm-none-eabi-gcc)
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
+
+      - name: Install Act dependencies
+        if: ${{ env.ACT }}
+        run: |
+          apt-get -o Acquire::Retries=5 update && apt-get -o Acquire::Retries=5 install sudo -y
+
+      - name: Install dependencies
+        if: ${{ env.ACT }}
+        run: |
+          sudo apt-get -o Acquire::Retries=5 update && sudo apt-get -o Acquire::Retries=5 install curl build-essential cmake -y
+
+      - name: Install USBSID-Player xa dependency
+        if: ${{matrix.withemulator == 1 }}
+        run: |
+          sudo apt-get -o Acquire::Retries=5 update && sudo apt-get -o Acquire::Retries=5 install -y xa65
+
+      - name: Checkout bin2h source
+        if: ${{matrix.withemulator == 1 }}
+        # Anonymous clone from github.com: actions/checkout would send Gitea's token there.
+        run: |
+          git clone --filter=blob:none https://github.com/elnormous/bin2h.git bin2h-src
+
+      - name: Build and add to PATH
+        if: ${{matrix.withemulator == 1 }}
+        run: |
+          cd bin2h-src
+          make
+          # Add the current directory containing the built 'bin2h' to the runner's PATH
+          echo "$(pwd)" >> $GITHUB_PATH
+
+      - name: Verify installation
+        if: ${{matrix.withemulator == 1 }}
+        run: bin2h --help
+
+      - name: 🗒️ Check GCC Version
+        id: compiler-version
+        run: |
+          arm-none-eabi-gcc --version
+          ver=$(arm-none-eabi-gcc --version | head -1)
+          echo "CC_VERSION=$ver" >> $GITHUB_OUTPUT
+
+      - name: 💽 Cache Pico-SDK
+        id: cache-pico-sdk
+        uses: actions/cache@v4
+        with:
+          path: pico-sdk
+          key: ${{runner.os}}-pico-sdk-${{env.PICO_SDK_REF}}
+
+      - name: 📇 Checkout Pico-SDK
+        if: ${{ steps.cache-pico-sdk.outputs.cache-hit != 'true' }}
+        # Anonymous clone from github.com: actions/checkout would send Gitea's token there.
+        run: |
+          git clone --filter=blob:none --branch "${{env.PICO_SDK_REF}}" --recurse-submodules https://github.com/raspberrypi/pico-sdk.git pico-sdk
+
+      - name: 🔖 Add PICO_SDK_PATH to Environment
+        run: |
+          echo "PICO_SDK_PATH=${{github.workspace}}/pico-sdk" >> $GITHUB_ENV
+          cd pico-sdk/lib/tinyusb
+          python3 tools/get_deps.py ${{matrix.pico_platform}}
+
+      - name: 💽 Cache Pico-Extras
+        id: cache-pico-extras
+        uses: actions/cache@v4
+        with:
+          path: pico-extras
+          key: ${{runner.os}}-pico-extras-${{env.PICO_EXTRAS_REF}}
+
+      - name: 📇 Checkout Pico-Extras
+        if: ${{steps.cache-pico-extras.outputs.cache-hit != 'true' }}
+        # Anonymous clone from github.com: actions/checkout would send Gitea's token there.
+        run: |
+          git clone --filter=blob:none --branch "${{env.PICO_EXTRAS_REF}}" --recurse-submodules https://github.com/raspberrypi/pico-extras.git pico-extras
+
+      - name: 🔖 Add PICO_EXTRAS_PATH to Environment
+        run: |
+          echo "PICO_EXTRAS_PATH=${{github.workspace}}/pico-extras" >> $GITHUB_ENV
+          ls pico-extras/external -la
+
+      - name: 💽 Cache picotool
+        id: cache-picotool
+        uses: actions/cache@v4
+        with:
+          path: picotool
+          key: ${{runner.os}}-picotool-${{env.PICOTOOL_REF}}
+
+      - name: 📇 Checkout picotool
+        if: ${{steps.cache-picotool.outputs.cache-hit != 'true' }}
+        # Anonymous clone from github.com: actions/checkout would send Gitea's token there.
+        run: |
+          git clone --filter=blob:none --branch "${{env.PICOTOOL_REF}}" --recurse-submodules https://github.com/raspberrypi/picotool.git picotool-src
+
+      - name: 🏭 Build picotool
+        if: ${{steps.cache-picotool.outputs.cache-hit != 'true' }}
+        run: |
+          cmake -S picotool-src -B picotool-src/build -DCMAKE_INSTALL_PREFIX=${{github.workspace}}/picotool -DPICOTOOL_FLAT_INSTALL=1
+          cd picotool-src/build
+          make -j ${{env.BUILD_THREADS}} install
+
+      - name: 📇 Checkout project
+        uses: actions/checkout@v4
+        with:
+          path: master
+
+      - name: 📇 Checkout USBSID-Player
+        if: ${{matrix.withemulator == 1 }}
+        uses: actions/checkout@v4
+        with:
+          repository: usbsid/usbsid-player
+          path: master/lib/usbsid-player
+
+      - name: 📇 Set USBSID-Player EMUDIR
+        if: ${{matrix.withemulator == 1 }}
+        run: |
+          echo "EMUDIR=${{github.workspace}}/master/lib/usbsid-player" >> $GITHUB_ENV
+
+      - name: 🏭 Create build directory
+        run: |
+          mkdir -p ${{github.workspace}}/master/build_${{matrix.directory}}
+
+      - name: 🏭 Setup CMAKE
+        run: |
+          unset PICO_PLATFORM
+          unset PICO_BOARD
+          cmake -S master \
+            -B ${{github.workspace}}/master/build_${{matrix.directory}} \
+            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -DPICO_PLATFORM=${{matrix.pico_platform}} \
+            -DPICO_BOARD=${{matrix.pico_board}} \
+            -Dpicotool_DIR=${{github.workspace}}/picotool/picotool \
+            -DONBOARD_EMULATOR=${{matrix.withemulator}} \
+            -DEMUDIR=${{env.EMUDIR}} \
+            ${{matrix.extra_cmake_args}}
+
+      - name: 🏭 Build ${{matrix.buildname}}
+        run: |
+          cmake --build ${{github.workspace}}/master/build_${{matrix.directory}} --config ${{env.BUILD_TYPE}} -j ${{env.BUILD_THREADS}}
+
+      - name: List build files
+        run: |
+          ls ${{github.workspace}}/master/build_${{matrix.directory}}/*.uf2 -la
+
+      - name: 💾 Gather Artifact Files
+        working-directory: ${{github.workspace}}/master
+        run: |
+          mkdir usbsid${{matrix.directory}}
+          cp -av build_${{matrix.directory}}/*.uf2 usbsid${{matrix.directory}}/
+          zip -r usbsid${{matrix.directory}}-taggedbuild-${{ steps.vars.outputs.tag }}.zip usbsid${{matrix.directory}}/
+
+      - name: Get current branch
+        run: |
+          echo "BRANCHNAME=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_ENV
+
+      - name: Get current datetime
+        run: |
+          echo "DATETIME=$(date +'%Y%m%dT%H%M%S')" >> $GITHUB_ENV
+
+      - name: 💾 Upload Artifacts
+        id: upload_artifacts
+        env:
+          TOKEN: ${{ secrets.GITEA_TOKEN }}
+          UPLOAD_URL: ${{ needs.create_release.outputs.upload_url }}
+          ASSET_PATH: ${{github.workspace}}/master/usbsid${{matrix.directory}}-taggedbuild-${{ steps.vars.outputs.tag }}.zip
+          ASSET_NAME: usbsid${{matrix.directory}}-taggedbuild-${{ steps.vars.outputs.tag }}.zip
+        run: |
+          curl -fsS --retry 3 -H "Authorization: token $TOKEN" -X POST \
+            -F "attachment=@$ASSET_PATH" "$UPLOAD_URL?name=$ASSET_NAME" >/dev/null
+          echo "uploaded $ASSET_NAME"
+
+
+  build-tools:
+    name: Build Tools
+    needs: create_release
+    if: startsWith(github.ref, 'refs/tags/d')
+    uses: ./.gitea/workflows/buildtools.yml
+    with:
+      force_run: true  # This overrides the 'if' logic in the child
+
+  # Final job to collect everything and upload to the release
+  upload-tools:
+    name: Upload tools
+    needs: [create_release, build-tools]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/d')
+    steps:
+      - name: Download Tools Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*'
+          path: tools-output
+          merge-multiple: true
+
+      - name: Zip tools
+        # -r for recursive, -j to junk paths so files are at the zip root
+        run: zip -r -j tools.zip ./tools-output
+
+      - name: Upload tools zip for Release
+        env:
+          TOKEN: ${{ secrets.GITEA_TOKEN }}
+          API: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
+          RELEASE_ID: ${{ needs.create_release.outputs.release_id }}
+        run: |
+          curl -fsS --retry 3 -H "Authorization: token $TOKEN" -X POST \
+            -F "attachment=@tools.zip" "$API/releases/$RELEASE_ID/assets?name=tools.zip" >/dev/null
+          echo "uploaded tools.zip"
+
+
+  publish_release:
+    name: Publish Release
+    needs: [create_release, build, upload-tools]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/d')
+    steps:
+      - name: Publish the release (draft -> final)
+        env:
+          TOKEN: ${{ secrets.GITEA_TOKEN }}
+          API: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
+          RELEASE_ID: ${{ needs.create_release.outputs.release_id }}
+        run: |
+          curl -fsS -H "Authorization: token $TOKEN" -H 'Content-Type: application/json' \
+            -X PATCH "$API/releases/$RELEASE_ID" -d '{"draft": false}' >/dev/null
+          echo "release $RELEASE_ID published"

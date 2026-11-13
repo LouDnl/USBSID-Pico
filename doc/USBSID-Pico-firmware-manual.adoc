@@ -32,10 +32,10 @@ Below are the filenames used for each Pico and board type, take great care in se
 The 1.X in each filename equals for the PCB revision as mentioned under firmware types. Don't worry if you flash a firmware for the incorrect PCB revision, this causes no harm. +
 
 === Firmware naming
-`usbsidA-BC.uf2` examples: `usbsidpico-v1.0-rgb.uf2`, `usbsidpico2_w-v1.3.uf2` or `usbsidpico2-v1.5-rgb_sp`. +
+`usbsidA-BC.uf2` examples: `usbsidpico-v1.0-rgb.uf2`, `usbsidpico2_w-v1.3.uf2` or `usbsidpico2-v1.5-rgb_em`. +
 A: The pico board type e.g. `pico`, `pico2`, `pico_2` or `pico2_w` +
 B: The PCB version e.g. `v1.0`, `v1.3` or `v1.5` +
-C: A combination of optional features e.g. `-rgb`, `_sp` or `_sp_cc`
+C: A combination of optional features e.g. `-rgb`, `_em` or `_net`
 
 === Firmware naming per Pico type
 Firmwares suitable for rp2040 Pico1 boards start with `usbsidpico-`
@@ -49,7 +49,7 @@ Firmware naming suited for the pico 1 always start with `usbsidpico-` +
 `usbsidpico-rgb-v1.X.uf2` for black clone rp2040 Pico boards with RGB LED onboard. +
 `usbsidpico_w-v1.X.uf2` for regular green rp2040 PicoW boards.
 
-**NOTE!** Due to the hardware limitations of the RP2040, highly demanding, cycle-exact SID tunes (dense per-cycle register writes, e.g. some digi/sample tunes) may not play at full speed on Pico1 or Pico1_w boards. Use a Pico2 or Pico2_w (rp2350) board for these tunes. +
+**NOTE!** Highly demanding cycle-exact SID tunes (e.g. some digi/sample tunes) may not play at full speed on Pico1 or Pico1_w boards (RP2040). Use a Pico2 or Pico2_w (rp2350) board for these tunes. +
 
 === Naming examples for the rp2350 Pico2
 Firmware naming suited for the pico 2 always start with `usbsidpico2-` +
@@ -57,19 +57,13 @@ Firmware naming suited for the pico 2 always start with `usbsidpico2-` +
 `usbsidpico2-rgb-v1.X.uf2` for black clone rp2350 Pico2 boards with RGB LED onboard. +
 `usbsidpico2_w-v1.X.uf2` for regular green rp2350 Pico2W boards.
 
-=== Firmwares with embedded USBSID-Player
-Starting with firmware version v0.6.0-BETA firmwares ending with `_sp` have an embedded emulator that can play PSID and RSID tunes and PSID64 PRG/P00 files. +
-For example `usbsidpico2-v1.0_sp.uf2`, `usbsidpico2-v1.3-rgb_sp.uf2` or `usbsidpico2-v1.5_sp.uf2` +
+=== Firmwares with embedded USBSID-Player and Cynthcart
+Firmwares ending with `_em` have an embedded USBSID-Player that can play PSID and RSID tunes and PSID64 PRG/P00 files and can start Cynthcart via CC commands. Both use the same embedded player core. +
+For example `usbsidpico-v1.0_em.uf2`, `usbsidpico2-v1.3-rgb_em.uf2` or `usbsidpico2_w-v1.5_em_net.uf2` +
 This USBSID-Player is still in active development and some tunes might not work or play at all. +
-The embedded USBSID-Player requires more then 256KB RAM and an overclocked CPU which makes this firmware only available for rp2350 Pico2 boards. +
-**WARNING!** Whenever the USBSID-Player is used the Pico MCU is overclocked to 250MHz, regardless of Pico type. Passive cooling _might/could_ be needed. +
-See the `USBSID-Player-manual` file for more information.
-
-=== Firmwares with Cynthcart embedded
-Starting with firmware version v0.8.0 firmwares ending with `_cc` can start Cynthcart with CC commands. +
-For example `usbsidpico-v1.0_sp_cc.uf2`, `usbsidpico2-rgb-v1.3_sp_cc.uf2` or `usbsidpico2-v1.5_sp_cc.uf2` +
-**WARNING!** Cynthcart runs through the embedded USBSID-Player, so the same 250MHz overclock (regardless of Pico type) and possible need for passive cooling applies here too. +
-See the `USBSID-Pico-Cynthcart-manual` file for more information.
+The embedded player needs a lot of RAM (80% on rp2040, 40% on rp2350) and an overclocked CPU. It is built for every Pico type. On `pico2_w` it comes bundled with Network SID Device support (`_em_net`). +
+**WARNING!** Whenever the embedded player or Cynthcart is used the Pico MCU is overclocked to 250MHz. Passive cooling _might/could_ be needed. +
+See the `USBSID-Player-manual` and `USBSID-Pico-Cynthcart-manual` files for more information.
 
 
 == How to flash your Pico
@@ -127,9 +121,12 @@ or
 == Firmware configuration
 USBSID-Pico has an extensive set of configuration options that expands with each firmware release. +
 
+=== Drivers
+include::drivers.adoc[]
+
 === USBSID-Configtool
 You can configurate your board by using the official USBSID-Configtool +
-The tool is available here https://github.com/LouDnl/USBSID-Configtool[USBSID-Configtool] in the releases section
+The tool is available at https://github.com/LouDnl/USBSID-Configtool[USBSID-Configtool] in the releases section
 
 === Commandline configuration tool
 You can configurate your board with:
@@ -154,13 +151,15 @@ https://github.com/LouDnl/USBSID-Pico/blob/master/examples/config-tool/libwinpth
 https://usbsid.loudai.nl/?player=webusb[USBSID web configuration tool] (requires a Chrome based browser). +
 If needed you can change your USBSID configuration after selecting WebUSB and clicking on `Open config`. +
 image:images/firmware/usbsidpico-configwebsite.png[Title=Config Commodore theme,500] +
-_The player is set up with borrowed code from Deepsid using Hermit's JsSID implementation._
+_The player is set up with borrowed code from Deepsid using Hermit's JsSID implementation._ +
+The SID Presets buttons are `SINGLE`, `DUAL`, `SINGLE (S2)` (single SID in socket two), `MIRRORED`, `DUAL MIRRORED` (both sockets get the same writes), `TRIPLE (S1)`, `TRIPLE (S2)`, `QUAD`, `DUAL-S1`, `DUAL-S2`, `DUAL-FLIP`, `QUAD-FLIP`, `QUAD-MIX` and `QUAD-FLIP+MIX`.
 
 === Default configuration (depends on the board version)
 The default configuration differs slightly between Pico1 (rp2040) and Pico2 (rp2350) boards. +
 An explanation for these settings can be found further on in this document. +
 Board clock rate: `1000000Hz (DEFAULT)` for rp2040, `985248Hz (PAL)` for rp2350 +
 Clock rate locked: `False` +
+Clock link: `False` +
 Audio mode: `Mono` +
 Preset silent auto detection: `False` (`True` for PCB revision v1.5+) +
 Socket One Enabled: `True` +
@@ -186,6 +185,13 @@ CDC Enabled: `True` +
 WebUSB Enabled: `True` +
 Asid Enabled: `True` +
 Midi Enabled: `True` +
+USB RX ringbuffer: `True` +
+WiFi Enabled: `False` (`_w` boards only) +
+NSD Enabled: `True` (`_w` boards only, needs WiFi Enabled) +
+Discovery Enabled: `True` (`_w` boards only) +
+Bluetooth NSD Enabled: `False` (`_w` boards only) +
+NSD port: `6581` (`_w` boards only) +
+Hostname: `USBSID-Pico` (`_w` boards only) +
 FMOpl Enabled: `False` +
 FMOpl SID no: `0`
 
@@ -193,12 +199,25 @@ FMOpl SID no: `0`
 The Commodore64 has different clockrates depending on where you live, USBSID-Pico supports these different clock rates as configuration setting. +
 Supported SID players will automatically send a new clock rate request to the board to switch to. +
 Available options are: +
-`DEFAULT 1000000Hz`, `PAL 985248Hz`, `NTSC 1022727`, `DREAN 1023440`, `NTSC2 1022730`
+`0` `DEFAULT 1000000Hz`, `1` `PAL 985248Hz`, `2` `NTSC 1022727`, `3` `DREAN 1023440`, `4` `NTSC2 1022730` +
+The clock rate can also be set manually with `cfg_usbsid -sc N` (`--set-clock`), the web configuration page, the Configtool or `clock_rate` in an ini file. +
+When `Clock rate locked` is enabled, clock rate change requests from players are ignored.
 
 === Clock rate locked
 Some players start sending data directly after the clockrate is changed. While in most cases this is no issue, some SID clones need some time to start up. This causes issues when the clock rate is changed on the fly. +
 Also changing the clock rate multiple times after another can cause data corruption to the SID which causes garbled sound. +
 To overcome this it is possible to lock the clockrate to the current setting it is set to. This blocks the ability for on the fly change requests. +
+Available options are: +
+`False`, `True`
+
+=== Clock link
+Mirrors the generated SID clock to the second clock pin `PHI2` as well as `PHI1`, or when an external clock is detected on `PHI2`, derives the `PHI1` output from that input. +
+With the clock link disabled the clock is only output on `PHI1`, external clock detection on `PHI1` runs on PCB v1.0 only. +
+When an external clock is detected the clock rate falls back to `PAL`. +
+Changing the setting saves the configuration and reboots the board. Sending the current value does nothing. +
+The state is reported in `READ_CONFIG` byte 6, bit 1. The command to change it is `LINK_CLOCK` `0x84`. +
+Change it with `cfg_usbsid -lclk 0|1` (`--link-clock`) or with the `Clock link` toggle on the Clock screen of the Configtool. +
+Default is `False`. +
 Available options are: +
 `False`, `True`
 
@@ -220,20 +239,20 @@ Available options are: +
 _PCB revision v1.5 only_ +
 The board boots with 5v and 9v enabled to automatically detect any changes in the socket / chip configuration, it does this by running a chip and SID detection. +
 When a change is detected the boards turns off the 9v and 5v and the onboard (RGB)LED starts flashing, making the board unusable until the configuration is validated and confirmed. +
-_Please verify the configuration with care before confirming, failure to do so might damage/kill your SID chips, and we don't want that!_ +
+_Please verify the configuration with care before confirming, failure to verify might damage/kill your SID chips, and that must be avoided!_ +
 There are multiple ways to validate and confirm the configuration: +
 **GUI Configtool** +
-On opening the configtool and connecting to the board there will be a text stating the configuration needs to be confirmed. Verify the config on the `SOCKETS` tab and when done click `CONFIRM` +
+Opening the configtool and connecting to the board shows a text stating the configuration needs to be confirmed. Verify the config on the `SOCKETS` tab and when done click `CONFIRM` +
 image:images/firmware/configgui-v1.5-confirm.png[Title=GUI Confirm] +
 **Web Configtool** +
-On opening the config website and connecting to the board there will be a text stating the configuration needs to be confirmed. Verify the config on the `CONFIG` tab by clicking `RETRIEVE CONFIG` first and when done validating click `CONFIRM CONFIG`. Both buttons will glow when a click is needed +
+Opening the config website and connecting to the board shows a text stating the configuration needs to be confirmed. Verify the config on the `CONFIG` tab by clicking `RETRIEVE CONFIG` first and when done validating click `CONFIRM CONFIG`. Both buttons glow when a click is needed +
 image:images/firmware/configwebsite-v1.5-confirm.png[Title=Web Confirm] +
 **CLI Configtool** +
-First read the configuration with `cfg_usbsid -r`, the printed configuration will have a line that states the config needs confirmation. You can do this with `cfg_usbsid -ack`.
+First read the configuration with `cfg_usbsid -r`, the printed configuration has a line stating the config needs confirmation. Confirm with `cfg_usbsid -ack`.
 
 === Disable socket change detection
 _PCB revision v1.5 only_ +
-When you have a fixed socket setup, e.g. you do not plan on changing the chips anytime soon, it is possible to disable the change detection on boot. This will make the board start up with 5v and 9v and then - if 12v is required - switch to the required voltage setting during the boot process by switching the voltage back off, setting the correct hv voltage and then switching it back on. +
+When you have a fixed socket setup, e.g. you do not plan on changing the chips anytime soon, it is possible to disable the change detection on boot. The board then starts up with 5v and 9v and, if 12v is required, switches the voltage back off, sets the correct hv voltage and switches it back on during boot. +
 When the socket detection _is_ on, the board will _always_ try to detect any changes in the configuration _before_ the required voltage is applied. +
 By setting the `Disable socket detection on boot` option you can control the above behaviour: +
 **GUI Configtool** +
@@ -276,12 +295,12 @@ Available options are: +
 `False`, `True`
 
 ==== Flip Socket One and Socket Two
-When enabled, Socket One and Socket Two are swapped so Socket One's physical position responds as Socket Two and vice versa. +
+When enabled, Socket One and Socket Two are swapped: Socket One's physical position responds as Socket Two and vice versa. +
 Available options are: +
 `False`, `True`
 
 ==== Mix socket addresses (Quad SID only)
-When enabled, addresses for a 4-SID setup are mixed between sockets instead of being assigned sequentially per socket. Combine with `Flip` for the remaining address orderings. +
+When enabled, addresses for a 4-SID setup are mixed between sockets and not assigned sequentially per socket. Combine with `Flip` for the remaining address orderings. +
 Available options are: +
 `False`, `True`
 
@@ -289,7 +308,8 @@ Available options are: +
 When enabled, the board silently re-runs chip/SID auto detection before applying a preset. +
 Default is `False` on PCB revision v1.0~v1.3 and `True` on PCB revision v1.5+. +
 Available options are: +
-`False`, `True`
+`False`, `True` +
+Change it with `cfg_usbsid -pad 0|1` (`--preset-detect`, `PRESET_DETECT` `0xFE`, saved without a reboot), `SET_CONFIG` item 16 (`BOARD_PADETECT`), the `Preset Auto Detect` setting on the web configuration page or the `Preset auto detect` toggle under ADVANCED in the Configtool.
 
 === LED Enabled
 Disable or enable the use of the onboard LED. +
@@ -333,8 +353,10 @@ Available options are: +
 `False`, `True`
 
 === FMOpl SID number
-_This setting cannot be changed manually_
-This setting will automatically be set to the correct SID number when all requirements are met as described under `FMOpl Enabled`
+This setting is set automatically to the correct SID number when the requirements under `FMOpl Enabled` are met. +
+It can also be set manually with `SET_CONFIG` item 9 (`BOARD_FMOPL`) and the SID number, or with the `FMOpl SID No.` selector on the Sockets screen of the Configtool. +
+A SID without an assigned address is refused. +
+Auto detection and socket change detection (PCB v1.5+) always override a manual setting.
 
 === CDC Enabled
 _This config setting is intended for future use_
@@ -355,6 +377,91 @@ Available options are: +
 Disable or enable MIDI input handling (note/CC/voice control of the SID(s)). +
 Available options are: +
 `False`, `True`
+
+=== USB RX ringbuffer
+The firmware keeps up to 8 incoming USB packets (64 bytes each, USB OUT transfers from host to device) in a ring and plays them from the main loop, USB keeps receiving between SID writes. +
+Without the ring, one packet is playing and one is waiting in the USB controller, which is about 160 us of writes in hand at 94k writes/s. A host USB scheduling delay longer than that (busy USB bus, mouse) leaves the SID idle, which is audible as a crack on write-heavy tunes (digis, e.g. Justinblue_tune_6 at about 94k writes/s). +
+With the ring about 1.4 ms of writes are in hand at that rate. +
+Applies to the CDC and WebUSB (vendor) interfaces and therefore to all host software (usplayer, VICE, sidplayfp, web player). +
+Default is `True` on all boards and Pico types (rp2040 and rp2350). When set to `False` the original receive path is used. +
+The change applies after a reboot, the setting is latched at boot. +
+Notes: +
+MIDI and ASID input arriving while a USB packet is playing is handled right after that packet. +
+Reads and commands queue in arrival order behind up to 8 packets. +
+On rp2040 a very write-heavy tune (about 94k writes/s) plays about 0.12% behind real time (inaudible), rp2350 shows no drift. +
+Resource use: the ringbuffer costs about 0.6 KB RAM and about 1.5 KB flash on every board type (v1.5 firmware, measured against the same firmware without the ringbuffer). RAM figures include the reserved stack and heap, they are an upper bound. +
+
+[cols="2,>1,>1,>1,>1,>1", options="header"]
+|===
+| Firmware | Flash (bytes) | Flash delta | RAM (bytes) | RAM delta | RAM of chip
+| pico | 148988 | +1464 | 35932 | +608 | 13.3%
+| pico _em | 248400 | +1488 | 225124 | +604 | 83.3%
+| pico_w | 390936 | +1464 | 38232 | +604 | 14.1%
+| pico_w _net | 564336 | +1504 | 125868 | +608 | 46.6%
+| pico2 | 144816 | +1352 | 36704 | +592 | 6.9%
+| pico2 _em | 239312 | +1544 | 226120 | +588 | 42.5%
+| pico2_w | 388436 | +1352 | 39220 | +588 | 7.4%
+| pico2_w _em_net | 648420 | +1488 | 316128 | +588 | 59.4%
+|===
+
+How to change it: +
+`cfg_usbsid -rxring 0` (off) or `cfg_usbsid -rxring 1` (on), the board saves and reboots when the value changes. Inside a `-w` write chain the same option sets the config value, it applies after save and reboot. +
+Web config: `USB RX ringbuffer` in the `USB` box, changing it saves the config and reboots the board. +
+Configtool: `USB RX ringbuffer` in the Features section (advanced), applies after writing and saving the config. +
+All three tools offer the setting on firmware newer than v0.8.1. +
+Protocol details for host tool authors: config field `rx_ring`, set with `SET_CONFIG` item 17 (`BOARD_RXRING`) or with the dedicated command `0x83` (`SET_RX_RING`, value 0 or 1) which saves the config and reboots, a value equal to the current setting does nothing. The setting is read back in the `READ_CONFIG` reply byte 59 (0 or 1). +
+Available options are: +
+`False`, `True`
+
+=== WiFi Enabled
+_`pico_w`/`pico2_w` boards firmware with _net only_ +
+_No GUI/Web configtool support yet, use the `cfg_usbsid` commandline configtool: `-ssid`, `-psk`, `-host`, `-wen`, `-wapply`_ +
+Enables the board's WiFi station connection. Requires a provisioned SSID and password. +
+Available options are: +
+`False`, `True`
+
+=== WiFi state and IP address
+_`pico_w`/`pico2_w` boards firmware with _net only_ +
+Two read-only queries report the WiFi connection: +
+`WIFI_STATUS` replies with 2 bytes, the link (`0` down, `1` connected) and the NSD session (`0` no session, `1` active). A byte is `0xFF` when the firmware is built without WiFi (link) or NSD (session). +
+`WIFI_READ_IP` replies with 5 bytes, the WiFi state followed by the IPv4 address, first octet first. State `0` is off (WiFi not started), `1` down (no link, waiting to connect), `2` connecting, `3` connected and `0xFF` firmware built without WiFi. The address bytes are zero unless the state is `3`. +
+The commandline configtool prints both with `cfg_usbsid -wifis`, and `cfg_usbsid -rnc` prints the IP address with the network config.
+
+=== NSD Enabled
+_`pico_w`/`pico2_w` boards firmware with _net only_ +
+_No GUI/Web configtool support yet, use the `cfg_usbsid` commandline configtool: `-nsden`, `-nsdp`, `-wapply`_ +
+Enables the Network SID Device (NSD) server, a TCP listener (default port `6581`) plus a UDP discovery responder. NSD clients such as ACID 64, JSidplay2 and SIDPlay find and drive the board over the LAN. Only one NSD session (WiFi or Bluetooth) is active at a time. USB has priority over the SID bus. +
+Changes to `NSD Enabled` and `Discovery Enabled` apply at once, no reboot needed. Disabling NSD closes the listener and ends a running TCP NSD session. A new port applies on `-wapply`, which also saves the network config. A listener that cannot bind its port retries every second. +
+The NSD server buffers writes in a ring of 4096 entries and reports `BUSY` to the client above about 160 ms of queued cycles (PAL), accepting writes again below about 120 ms. Read-only config queries (`READ_CONFIG`, `READ_NETCFG`, `WIFI_STATUS`, `WIFI_READ_IP`, version and feature queries and similar) do not take the SID bus. +
+FM OPL over NSD uses the NSD v5 addressing. A `TRY_WRITE_EX` or `TRY_READ_EX` entry at `$DF40` writes the FM OPL address/index port and an entry at `$DF50` the FM OPL data port of the socket set under `FMOpl SID no`. One entry is one port write with its delay as given. Any other `$DFxx` address writes nothing and keeps its delay. A client enables FM OPL with `TRY_SET_FM_OPL`, it is disabled on each new connection. Enabling a disabled FM OPL resets the chip and answers `BUSY` when MIDI or ASID holds the bus. Enabling an enabled FM OPL answers OK without a reset. USBSID-Player v1.4.0 and older do not support this addressing. +
+Available options are: +
+`False`, `True`
+
+=== Discovery Enabled
+_`pico_w`/`pico2_w` boards firmware with _net only_ +
+_No GUI/Web configtool support yet, use the `cfg_usbsid` commandline configtool: `-discen`, `-wapply`_ +
+Enables the UDP discovery responder that answers NSD clients searching the LAN for a board. It listens on UDP port `6581` for any TCP port `NSD Enabled` uses. Applies at once. +
+Available options are: +
+`False`, `True`
+
+=== Bluetooth NSD Enabled
+_`pico_w`/`pico2_w` boards firmware with _net only_ +
+_No GUI/Web configtool support yet, use the `cfg_usbsid` commandline configtool: `-bten`_ +
+Enables the Bluetooth Classic SPP transport for the same Network SID Device protocol as `NSD Enabled` above. No NSD client speaks Bluetooth SPP directly, existing players need a host-side RFCOMM-to-TCP bridge (see `examples/nsd_spp_bridge.py`). +
+Available options are: +
+`False`, `True`
+
+== SID register reads
+Per the SID datasheet only registers `$19` to `$1C` are readable. A real or unknown chip answers a read of any other register with the value left on the data bus. That value goes to the host, the register mirror (used by the onboard emulator and the SID register stream) keeps the last written value. Clone chips keep full register readback. In mirrored mode (`Socket Two Act as One`) both sockets must hold a clone chip for this.
+
+== SID register stream (FastReads)
+_Optional build feature, off in the default builds_ +
+Firmware built with `-DENABLE_SID_STREAM=1` adds a second vendor USB interface (interface `7`, bulk endpoints `0x07` and `0x87`) that streams SID register frames to the host, one 63 byte frame per enabled SID per tick, up to 1000 ticks per second. Vendor control requests start and stop the stream, it stops on unmount and suspend. The build reports the feature in bit 6 of the `US_FEATURES` byte and sets `bcdDevice` to `0x0101`. Default builds have no interface 7 and `bcdDevice` `0x0100`. +
+The frames are copied from the board's register mirror, the stream does not read from the SID chips. +
+Batch reads are part of every build and do not need this option. One `READ` packet with a register count reads up to 63 registers. Hosts detect it by firmware version 0.8.1 or newer.
+
+=== Debug logging
+The CDC and vendor (WebUSB) event logs (mount, line state, line coding, break, vendor TX and control requests) print only when the build has USB IO debugging enabled (`USBIO_DEBUGGING` in `CMakeLists.txt`, default `0`). Earlier builds always printed them over UART, each log line stalled playback for milliseconds.
 
 == License
 include::license-software.adoc[]

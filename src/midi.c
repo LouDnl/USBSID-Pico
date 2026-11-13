@@ -41,30 +41,24 @@
 #include <midi_queue.h>
 #include <sysex.h>
 
-#if defined(ONBOARD_CYNTHCART)
+#if defined(ONBOARD_EMULATOR)
 #include <usbsid.h> /* emulator variables */
+#include <sid_player.h> /* emulator variables */
 #include <cynthcart_embedded.h> /* Cynthcart ~ USBSID-Player */
 queue_t cynthcart_queue;
-#endif /* ONBOARD_CYNTHCART */
+#endif /* ONBOARD_EMULATOR */
 
 
 /* MIDI state machine (declared extern in midi.h) */
 midi_machine midimachine;
 
-/* Compile-time defaults, always the CC map's starting point at boot;
- * midi_processor_init() then calls midi_config_load() (midi_config.c) as its
- * last step, which overwrites this with a saved ccmap from flash if
- * verify_midiconfig_offset() finds a valid one - see
- * midi_handler_set_ccmap() (midi_handler.c). */
+/* Compile-time defaults, the CC map's starting point at boot until
+ * midi_config_load() (midi_config.c) overwrites it from flash, if valid. */
 const midi_ccvalues midi_ccvalues_defaults = MIDI_DEFAULT_CCVALUES_INIT;
 
-/* USB-MIDI 1.0 Code Index Number (low nibble of byte 0 in a 4-byte USB-MIDI
- * event packet). The high nibble of byte 0 is the cable number, which this
- * firmware does not yet route anywhere: the descriptor exposes one embedded
- * cable (TUD_MIDI_DESCRIPTOR, usb_descriptors.c), so cable is always 0 on
- * the wire today. process_usb_midi_packet() already masks the cable nibble
- * out rather than assuming 0, so the routing side is ready whenever a
- * multi-cable descriptor lands. */
+/* USB-MIDI 1.0 Code Index Number (low nibble of byte 0 in a 4-byte event
+ * packet). High nibble is cable number. Only one embedded cable exists
+ * today (TUD_MIDI_DESCRIPTOR, usb_descriptors.c). It's always 0. */
 typedef enum {
   CIN_MISC          = 0x0, /* reserved, unused */
   CIN_CABLE_EVENT   = 0x1, /* reserved, unused */
@@ -85,17 +79,16 @@ typedef enum {
 } usb_midi_cin;
 
 /* MIDI clock: 24 PPQN, BPM estimated from an EWMA of pulse intervals,
- * published via midi_clock_bpm_x100() / midi_clock_present() (midi.h) for
- * the core1 engine to read when syncing the arpeggiator or an LFO. Runs on
- * core0, same as the rest of this file's SysEx/realtime handling; the
- * engine only ever reads these, never writes them, so no lock is needed. */
+ * published via midi_clock_bpm_x100()/midi_clock_present() (midi.h) for
+ * the core1 engine (arp/LFO sync). Runs on core0. Engine only reads, never
+ * writes: no lock needed. */
 static volatile uint32_t clock_pulse_count   = 0;      /* 0..23 within the current quarter note */
 static volatile uint32_t clock_total_pulses  = 0;      /* monotonic, for clock-synced division counting */
 static volatile uint64_t clock_last_pulse_us = 0;
 static volatile uint32_t clock_bpm_x100      = 12000;  /* 120.00 BPM, fixed point *100, until pulses say otherwise */
 static volatile bool     clock_running       = false;
 
-/* A pulse more than half a second old is treated as "no clock", so the
+/* A pulse more than half a second old is treated as "no clock". The
  * engine can fall back to its own free-running rate instead of a rate
  * estimate frozen from whenever a DAW last sent clock. */
 #define MIDI_CLOCK_PRESENT_TIMEOUT_US 500000ull
@@ -104,15 +97,12 @@ static volatile bool     clock_running       = false;
 /**
  * @brief Initialise the MIDI state machine and start the buffer processor
  *
- * Resets midimachine's state and index, clears the stream buffer, and
- * initialises the MIDI queue and buffer processor. Runs on core0 before
- * core1 is released to its main loop, so there is no consumer racing the
- * queue init.
+ * Runs on core0 before core1 is released: nothing races the queue init.
  */
 void midi_init(void)
 {
   usNFO("\n");
-  usNFO("[MIDI] Init\n");
+  usMIDI("Init\n");
 
   /* Set initial stream state and index */
   midimachine.bus = FREE;
@@ -124,7 +114,7 @@ void midi_init(void)
   /* Clear stream buffers once */
   memset(midimachine.streambuffer, 0, sizeof midimachine.streambuffer);
 
-  /* Runs on core0 before core1 is released to its main loop, so there is no
+  /* Runs on core0 before core1 is released to its main loop: there is no
    * consumer racing this yet */
   midi_queue_init();
 
@@ -134,7 +124,7 @@ void midi_init(void)
   return;
 }
 
-#if defined(ONBOARD_CYNTHCART)
+#if defined(ONBOARD_EMULATOR)
 /**
  * @brief Initialise the Cynthcart data queue
  *
@@ -143,7 +133,6 @@ void midi_init(void)
  */
 void emulator_queue_init(void)
 {
-  /* emudore */
   queue_init(&cynthcart_queue, sizeof(cynthcart_queue_entry_t), 128); /* 128 entries as buffer */
 }
 
@@ -155,9 +144,7 @@ void emulator_queue_init(void)
  */
 inline void emulator_queue_deinit(void)
 {
-  /* emudore */
   queue_free(&cynthcart_queue);
-  reset_sid();
   reset_sid_registers();
 }
 
@@ -184,7 +171,7 @@ inline void handle_emulater_data(void)
  * @brief Request Cynthcart emulator startup
  *
  * Initialises the Cynthcart queue and sets the flags core1 uses to hand off
- * to the emulator on its next loop iteration.
+ * to the emulator on its following loop iteration.
  */
 inline void emulator_enable(void)
 {
@@ -247,7 +234,7 @@ static const void handle_emulator_cc(void)
   }
   return;
 }
-#endif /* ONBOARD_CYNTHCART */
+#endif /* ONBOARD_EMULATOR */
 
 /**
  * @brief Process one MIDI clock pulse and update the smoothed BPM estimate
@@ -256,7 +243,7 @@ static const void handle_emulator_cc(void)
  * quarter note). Computes the interval since the previous pulse and, if it
  * falls within a plausible tempo range (roughly 1..1000 BPM), folds it into
  * `clock_bpm_x100` via an EWMA (alpha = 1/8) that smooths jitter without
- * lagging tempo changes for more than a beat or so. Advances the 0..23
+ * lagging tempo changes for more than a beat, roughly. Advances the 0..23
  * pulse counter and the monotonic total pulse count.
  */
 static void handle_midi_clock(void)
@@ -277,7 +264,7 @@ static void handle_midi_clock(void)
        *            = 250,000,000 / interval */
       uint32_t inst_bpm_x100 = (uint32_t)(250000000ull / interval);
       /* EWMA, alpha = 1/8: smooths jitter without lagging tempo changes
-       * for more than a beat or so */
+       * for more than a beat, roughly */
       clock_bpm_x100 = (uint32_t)(((uint64_t)clock_bpm_x100 * 7 + inst_bpm_x100) / 8);
     }
   }
@@ -291,14 +278,14 @@ static void handle_midi_clock(void)
 /**
  * @brief Handle a MIDI Start (0xFA) message
  *
- * Resets the pulse phase and clears the last pulse timestamp so the next
+ * Resets the pulse phase and clears the last pulse timestamp. The following
  * clock pulse does not compute an interval against a stale value, then
  * marks the clock as running.
  */
 static void handle_midi_start(void)
 {
   clock_pulse_count = 0;
-  clock_last_pulse_us = 0;  /* next pulse must not compute an interval against a stale timestamp */
+  clock_last_pulse_us = 0;  /* following pulse must not compute an interval against a stale timestamp */
   clock_running = true;
   return;
 }
@@ -307,7 +294,7 @@ static void handle_midi_start(void)
  * @brief Handle a MIDI Continue (0xFB) message
  *
  * Resumes the clock without resetting the pulse phase, unlike Start. Clears
- * the last pulse timestamp so the next pulse's interval is not computed
+ * the last pulse timestamp. The following pulse's interval is not computed
  * against a stale value.
  */
 static void handle_midi_continue(void)
@@ -353,7 +340,7 @@ bool midi_clock_running(void)
  * @brief Check whether MIDI clock pulses are currently arriving
  *
  * The clock is considered present when running and the last pulse was
- * received less than MIDI_CLOCK_PRESENT_TIMEOUT_US ago, so a caller can
+ * received less than MIDI_CLOCK_PRESENT_TIMEOUT_US ago, letting a caller
  * fall back to a free-running rate once a DAW stops sending clock.
  *
  * @return bool true when clock pulses are present
@@ -388,27 +375,20 @@ uint32_t midi_clock_total_pulses(void)
  * @brief Hand a complete channel voice message off to the emulator
  *        interception, or enqueue it for the core1 MIDI engine
  *
- * Shared by the legacy byte state machine (`midi_buffer_task`) and the USB
- * packet fast path (`process_usb_midi_packet`), so a full message always
- * takes the exact same route regardless of which one assembled it. Both
- * callers are required to have already placed the message in
- * `midimachine.streambuffer` and set `midimachine.index` to its length.
- *
- * The Cynthcart interception (CC's and, once running, Cynthcart data),
- * present under `ONBOARD_CYNTHCART`, stays on core0 exactly as before: it never touches the
- * SID bus, so it never needed to move. Only the "otherwise it is a normal
- * MIDI message" branch changed, from calling `process_midi()` directly to
- * enqueueing it for `midi_engine_task()` on core1, which is where the SID
- * bus writes now happen. `usbsid_config.Midi.enabled` gates this branch the
- * same way it gates the consumer, so disabling MIDI stops it at the source
- * instead of quietly filling a ring nothing will ever drain.
+ * Shared by the legacy byte state machine (midi_buffer_task()) and the USB
+ * packet fast path (process_usb_midi_packet()). Both callers must already
+ * have the message in midimachine.streambuffer with midimachine.index set
+ * to its length.
+ * Cynthcart interception stays on core0 and a regular MIDI message is queued
+ * for midi_engine_task() on core1, gated by usbsid_config.Midi.enabled.
+ * A disabled MIDI path never fills a queue nothing drains.
  */
 static inline void dispatch_complete_message(void)
 {
   usMCMD("\n");
   dtype = midi; /* Set data type to midi */
 
-  #if defined(ONBOARD_CYNTHCART)
+  #if defined(ONBOARD_EMULATOR)
   if (((midimachine.streambuffer[0] & 0xF0) == 0xB0) /* Control mode change */
     && (midimachine.streambuffer[1] >= midi_ccvalues_defaults.CC_CEN)
     && (midimachine.streambuffer[1] <= midi_ccvalues_defaults.CC_CRE)) {
@@ -421,7 +401,7 @@ static inline void dispatch_complete_message(void)
     if (usbsid_config.Midi.enabled) {
       midi_queue_push(midimachine.streambuffer, (uint8_t)midimachine.index);
     }
-  #if defined(ONBOARD_CYNTHCART)
+  #if defined(ONBOARD_EMULATOR)
   }
   #endif
 
@@ -435,11 +415,9 @@ static inline void dispatch_complete_message(void)
 /**
  * @brief Feed one incoming byte through the legacy MIDI/SysEx byte state machine
  *
- * Figures out whether the stream is System Real-Time, SysEx, or a channel
- * voice message, accumulates bytes into `midimachine.streambuffer`, and
- * dispatches the message via process_sysex() or dispatch_complete_message()
- * once complete. Also handles MIDI running status by re-entering itself
- * with the cached last_status byte.
+ * Classifies the stream as Real-Time, SysEx, or a channel voice message,
+ * accumulates into midimachine.streambuffer, and dispatches once complete.
+ * Also handles running status by re-entering with the cached last_status.
  *
  * @param uint8_t buffer, one incoming MIDI byte
  */
@@ -589,14 +567,9 @@ static inline void dispatch_packet_message(const uint8_t *buf, uint8_t n)
 /**
  * @brief Entry point for the USB MIDI packet API
  *
- * `tud_midi_n_stream_read` strips the 4-byte USB-MIDI framing before this
- * firmware ever sees it, which is exactly why the CIN fast path used to be
- * `#if 0`'d out with a note that it "will _not_ work with tinyusb and stream
- * reading". Reading full 4-byte event packets instead means every channel
- * voice message arrives already framed, with no byte-wise state machine
- * needed at all. SysEx and single-byte System Real-Time messages still go
- * through the existing byte state machine, unchanged, since they are the
- * cases that state machine exists for.
+ * Reads full 4-byte USB-MIDI event packets: a channel voice message
+ * arrives already framed with no byte-wise state machine needed. SysEx and
+ * single-byte System Real-Time messages still go through midi_buffer_task().
  *
  * @param uint8_t pkt[4], one USB-MIDI event packet
  */
@@ -618,7 +591,7 @@ void process_usb_midi_packet(uint8_t pkt[4])
       break;
     case CIN_1BYTE_DATA:
       /* Realtime (>= 0xF8) and other single-byte system messages both
-       * arrive this way; midi_buffer_task() already dispatches both */
+       * arrive this way. The midi_buffer_task() already dispatches both */
       midi_buffer_task(pkt[1]);
       break;
     case CIN_SYSEX_START:
@@ -642,7 +615,7 @@ void process_usb_midi_packet(uint8_t pkt[4])
     case CIN_MISC:
     case CIN_CABLE_EVENT:
     default:
-      /* Reserved and unused per USB-MIDI 1.0; tinyusb's own stream reader
+      /* Reserved and unused per USB-MIDI 1.0. TinyUSB's own stream reader
        * skips these the same way */
       break;
   }

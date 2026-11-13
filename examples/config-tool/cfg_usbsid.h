@@ -43,7 +43,16 @@
 #define ACM_CTRL_DTR   0x01
 #define ACM_CTRL_RTS   0x02
 
-/* usbsid-pico variables */
+/* init local driver variables */
+static int debug = 0;
+static USBSIDitf us = NULL;
+static int len, rc;
+static int usid_dev = -1;
+static char target_serial[USBSID_SERIAL_LEN] = {0}; /* Board to open, empty = use target_index */
+static int target_index = 0;                         /* Index in enumerate_USBSID() order */
+
+/* -----USBSID-Pico------ */
+
 enum
 {
   PACKET_TYPE  = 0xC0,  /* 0b11000000 ~ 192  */
@@ -120,8 +129,28 @@ enum
   SAVE_MIDI_STATE  = 0x61,
   RESET_MIDI_STATE = 0x63,
 
+  WIFI_STATUS      = 0x70,  /* Returns {link_up, session_active} */
+  WIFI_SET_SSID    = 0x71,  /* buffer[1] = length, buffer[2..] = SSID bytes */
+  WIFI_SET_PSK     = 0x72,  /* buffer[1] = length, buffer[2..] = PSK bytes, write-only */
+  WIFI_SET_HOSTNAME= 0x73,  /* buffer[1] = length, buffer[2..] = hostname bytes */
+  WIFI_ENABLE      = 0x74,  /* buffer[1] = 0/1 */
+  NSD_ENABLE       = 0x75,  /* buffer[1] = 0/1 */
+  NSD_SET_PORT     = 0x76,  /* buffer[1..2] = port, big-endian */
+  WIFI_APPLY       = 0x77,  /* Persist net_cfg to flash and apply live */
+  WIFI_FORGET      = 0x78,  /* Erase stored credentials */
+  BT_NSD_ENABLE    = 0x79,  /* buffer[1] = 0/1 */
+  READ_NETCFG      = 0x7A,  /* Read net config as bytes */
+  WIFI_READ_IP     = 0x7B,  /* Returns {state, ip0..ip3} */
+  DISCOVERY_ENABLE = 0x7C,  /* buffer[1] = 0/1 */
+  USBNET_IP_MODE   = 0x7D,  /* buffer[1] = 0 DHCP client / 1 static / 2 DHCP server (default), USB network build only, persisted by WIFI_APPLY */
+  USBNET_SET_STATIC= 0x7E,  /* buffer[1..4] ip, [5..8] netmask, [9..12] gateway, USB network build only, persisted by WIFI_APPLY */
+  USBNET_READ_IPCFG= 0x7F,  /* Returns {mode, ip[4], netmask[4], gateway[4]} */
+
   USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
   US_PCB_VERSION   = 0x81,  /* Read PCB version */
+  US_FEATURES      = 0x82,  /* Read USBSID compiled features, bit 4 = net, bit 5 = nsd */
+  SET_RX_RING      = 0x83,  /* buffer[1] = 0/1, USB RX ringbuffer, board saves and reboots on change */
+  LINK_CLOCK       = 0x84,  /* buffer[1] = 0/1, link with external clock, board saves and reboots on change */
 
   RESTART_BUS      = 0x85,  /* Restart DMA & PIO */
   RESTART_BUS_CLK  = 0x86,  /* Restart PIO clocks */
@@ -139,6 +168,12 @@ enum
 
   CONFIG_ACK       = 0xFA,  /* Acknowledge the current configuration and switch on regulators (v1.5+ boards only) */
   SOCKET_DETECT    = 0xFD,  /* Disable/enable automatic socket change detection on boot (v1.5+ boards only) */
+  PRESET_DETECT    = 0xFE,  /* Enable/disable and save silent automatic detection on preset change */
+};
+
+/* SET_CONFIG item ids (buffer[1]) not covered by a named command */
+enum {
+  BOARD_RXRING = 17,  /* USB RX ringbuffer 0/1, set only, applies after SAVE_CONFIG and reboot */
 };
 
 /* Config constants */
@@ -177,6 +212,7 @@ enum config_clockrates
     NTSC2   = CLOCK_NTSC2,    /* 4 */
 };
 
+/* Buffer arrays */
 uint8_t read_data[1];
 uint8_t read_data_max[64];
 uint8_t read_data_uber[128];
@@ -185,10 +221,12 @@ uint8_t write_buffer[3]    = { (uint8_t)(WRITE << 6), 0x0, 0x0 };
 uint8_t command_buffer[3]  = { (uint8_t)(COMMAND << 6), 0x0, 0x0 };
 uint8_t config_buffer[6]   = { (uint8_t)((COMMAND << 6) | 18), 0x0, 0x0, 0x0, 0x0, 0x0 };
 
+/* Config string variables */
 const char * error_type[]  = { "ERROR" };
 const char * enabled[]     = { "Disabled", "Enabled" };
 const char * intext[]      = { "Internal", "External" };
 const char * onoff[]       = { "Off", "On" };
+const char * usbnet_ip_modes[] = { "dhcp", "static", "server" };
 const char * truefalse[]   = { "False", "True" };
 const char * locked[]      = { "Unlocked", "Locked" };
 const char * us_socket[]   = { "Single SID", "Dual SID" };
@@ -213,6 +251,22 @@ typedef struct Socket {
   bool    enabled : 1;           /* enable / disable this socket */
   bool    dualsid : 1;           /* enable / disable dual SID support for this socket (requires clone) */
 } Socket;
+
+/* WiFi/Bluetooth/NSD config, wire-visible fields only (no flash-persistence
+ * fields like magic/version/save_id, and no PSK - it is write-only and never
+ * read back, mirrors firmware's WIFI_SET_PSK handling) */
+typedef struct NetConfig {
+  char     ssid[33];
+  char     hostname[24];
+  uint16_t nsd_port;
+  struct {
+    bool wifi_enabled      : 1;
+    bool nsd_enabled       : 1;
+    bool bt_nsd_enabled    : 1;
+    bool discovery_enabled : 1;
+  } flags;
+  uint8_t usbnet_ip_mode;  /* USB network build only, 0 dhcp / 1 static / 2 server (default), flags byte bits 4-5 */
+} NetConfig;
 
 typedef struct Config {
   /* Don't care from here */
@@ -247,6 +301,7 @@ typedef struct Config {
     bool enabled : 1;            /* Requires a clone SID! */
   } FMOpl;                       /* 9 */
   bool external_clock : 1;       /* enable / disable external oscillator */
+  bool board_clock_link : 1;     /* link PHI1 generation to the external clock input (READ_CONFIG byte 6 bit 1) */
   bool lock_clockrate : 1;       /* lock the set clockspeed from being changed */
   bool stereo_en : 1;            /* audio switch is off (mono) or on (stereo) ~ (PCB v1.3+ only) */
   bool lock_audio_sw : 1;        /* lock the audio switch into it's current stateand prevent it from being changed ~ (PCB v1.3+ only) */
@@ -256,6 +311,7 @@ typedef struct Config {
   bool need_confirmation : 1;    /* (PCB v1.5+) current configuration needs confirmation, SID's are disabled until confirmed! */
   bool socket_change_detect : 1; /* (PCB v1.5+) disables socket change detection on boot */
   bool preset_auto_detect : 1;   /* disables silent auto detection before present change */
+  bool rx_ring : 1;              /* USB RX ringbuffer, applied after save and reboot */
 } Config;
 
 #define USBSID_DEFAULT_CONFIG_INIT { \
@@ -318,6 +374,7 @@ typedef struct Config {
     .enabled = false, \
   }, \
   .external_clock = false, \
+  .board_clock_link = false, \
   .lock_clockrate = false, \
   .stereo_en = false, \
   .lock_audio_sw = false, \
@@ -327,7 +384,57 @@ typedef struct Config {
   .need_confirmation = false, \
   .socket_change_detect = true, /* WARNING: This setting _can_ and _will_ fry your 9v SID if config is set to 6581 (12v) */ \
   .preset_auto_detect = true, \
+  .rx_ring = true, \
 } \
+
+/* init local usbsid-pico variables */
+static const enum config_clockrates clockrates[] = { DEFAULT, PAL, NTSC, DREAN, NTSC2 };
+static uint32_t read_clock_rate;
+static char version[MAX_BUFFER_SIZE] = {0};
+static char pcb_version[MAX_BUFFER_SIZE] = {0};
+static char project_version[MAX_BUFFER_SIZE] = {0};
+static uint8_t config[FLASH_PAGE_SIZE] = {0};
+static uint8_t socket_config[SOCKET_BUFFER_SIZE] = {0};
+static Config usbsid_config = USBSID_DEFAULT_CONFIG_INIT;
+static uint8_t net_config[MAX_BUFFER_SIZE] = {0};
+static uint8_t wifi_status[2] = {0};
+static NetConfig net_cfg = {0};
+static uint8_t us_features = 0;
+static bool us_features_read = false;
+
+/* Help menu declarations */
+const char * help_args[] = {
+  "options", "sidchips", "config",
+  "features", "network", "presets",
+  "ini", "manual", "other"
+};
+const int menu_count = count_of(help_args);
+
+void print_help_separator(void);
+void print_help_extended(void);
+void print_help_options(void);
+void print_help_sidchips(void);
+void print_help_config(void);
+void print_help_features(void);
+void print_help_network(void);
+void print_help_presets(void);
+void print_help_ini(void);
+void print_help_manual(void);
+void print_help_other(void);
+
+typedef void (*f_help_menu)(void);
+f_help_menu help_menus[] = {
+  print_help_options, print_help_sidchips, print_help_config,
+  print_help_features, print_help_network, print_help_presets,
+  print_help_ini, print_help_manual, print_help_other
+};
+
+/* NSD declarations */
+static const char * const wifi_states[4] = { "Off", "Down", "Connecting", "Connected" };
+bool board_has_net(void);
+bool board_has_nsd(void);
+bool require_net_support(void);
+bool read_us_features(void);
 
 
 #ifdef __cplusplus

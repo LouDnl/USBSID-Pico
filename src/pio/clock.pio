@@ -37,20 +37,25 @@
 ; PHI1 SID Clock ~ PIO0 SM0
 .program clock
 
+.side_set 1
+
 .wrap_target ; Free 0 cycle unconditional jump
-set pins, 1  ; Drive pin high, binary 1 <--- 250 ns execution time with 4MHz clock
-set pins, 2  ; Drive pin low,  binary 0 <--- 250 ns ;total 500 ns period
+set pins, 1  side 1 ; Drive pin high, binary 1 <--- 250 ns execution time with 4MHz clock
+set pins, 2  side 0 ; Drive pin low,  binary 0 <--- 250 ns ;total 500 ns period
 .wrap
 
 
 %c-sdk{
   /* Program to initialise the PIO */
-  static inline void clock_program_init(PIO pio, uint sm, uint offset, uint pin, float clk_div) {
+  static inline void clock_program_init(PIO pio, uint sm, uint offset, uint pin, uint pin2, float clk_div) {
     pio_sm_config c = clock_program_get_default_config(offset); /* Get default configurations for the PIO state machine */
     sm_config_set_set_pins(&c, pin, 1);                         /* Set the state machine configurations on the given pin */
+    if (pin2 >= 0) sm_config_set_sideset_pin_base(&c, pin2);
     sm_config_set_clkdiv(&c, clk_div);                          /* Set the state machine clock divider */
     pio_gpio_init(pio, pin);                                    /* Setup the function select for a GPIO pin to use output from the given PIO instance */
     pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);      /* Use a state machine to set the pin direction for one pins for the PIO instance */
+    if (pin2 >= 0) pio_gpio_init(pio, pin2);
+    if (pin2 >= 0) pio_sm_set_consecutive_pindirs(pio, sm, pin2, 1, true);
     pio_sm_init(pio, sm, offset, &c);                           /* Resets the state machine to a consistent state, and configures it */
     pio_sm_set_enabled(pio, sm, true);                          /* Enable or disable a PIO state machine */
   }
