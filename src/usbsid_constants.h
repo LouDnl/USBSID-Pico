@@ -41,6 +41,9 @@ extern "C" {
 #include "pico/types.h"
 #include "pico/platform.h"
 
+/* Project includes, ChipType lives in the protocol header */
+#include <usbsid_protocol.h>
+
 
 /**
  * @brief Logging helper
@@ -123,27 +126,6 @@ typedef struct {
   bool flipped;
   bool mixed;
 } PresetDef;
-
-
-/**
- * @brief Known Chip types
- * These are the currently chiptypes USBSID-Pico can identify
- *
- */
-typedef enum ChipType
-{
-  CHIP_REAL = 0,  /* Real SID chip (assumed) */
-  CHIP_UNKNOWN,   /* Unknown SID chip */
-  CHIP_SKPICO,    /* SIDKick-pico */
-  CHIP_ARMSID,    /* ARMSID */
-  CHIP_ARM2SID,   /* ARM2SID */
-  CHIP_FPGASID,   /* FPGASID */
-  CHIP_REDIPSID,  /* RedipSID */
-  CHIP_PDSID,     /* Public Domain SID */
-  CHIP_BACKSID,   /* BackSID */
-  CHIP_SIDEMU,    /* SIDEmu */
-  CHIP_COUNT,     /* Number of chiptypes */
-} ChipType;
 
 /**
  * @brief SID types

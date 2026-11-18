@@ -40,6 +40,9 @@
 /* TinyUSB */
 #include "tusb.h"
 
+/* Project headers */
+#include <usbsid_protocol.h>  /* STREAM_* wire constants */
+
 
 /* SID memory stream on its own vendor interface (STREAM_ITF_NUM)
  *
@@ -72,23 +75,12 @@
  *   [44-47]  reserved, 0
  *   [48]     session, incremented by every STREAM_REQUEST_START
  *   [49-62]  reserved, 0
+ *
+ * Wire constants (STREAM_REQUEST_*, STREAM_*_LEN, STREAM_FRAME_*,
+ * STREAM_FORMAT_VERSION, STREAM_FLAG_OTHER_OWNER) live in usbsid_protocol.h
  */
-enum {
-  STREAM_REQUEST_START = 0x10,
-  STREAM_REQUEST_STOP  = 0x11,
-  STREAM_REQUEST_INFO  = 0x12,
-};
-
-#define STREAM_FORMAT_VERSION 1
-#define STREAM_FRAME_SIZE     63
-#define STREAM_FRAME_SID      0x53
-#define STREAM_START_LEN      4
-#define STREAM_INFO_LEN       16
 #define STREAM_DEFAULT_RATE   50
 #define STREAM_MAX_RATE       1000
-
-/* frame[1] flag bits */
-#define STREAM_FLAG_OTHER_OWNER 0x40
 
 
 /* Variables from stream.c */

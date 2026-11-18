@@ -84,6 +84,7 @@
 #include <macros.h>
 #include <sid_defs.h>
 #include <usbsid_defs.h>
+#include <usbsid_protocol.h>  /* Command bytes, config ids, reply layout */
 
 
 /* Compile time variable settings */
@@ -117,11 +118,7 @@
 #define WUSB_ITF_NUM 4    /* WebUSB Vendor (WUSB_ITF) */
 #define WUSB_EP_OUT  0x04
 #define WUSB_EP_IN   0x84
-#if defined(USE_SID_STREAM)
-#define STREAM_ITF_NUM 7  /* SID stream, own class driver in stream.c */
-#define STREAM_EP_OUT  0x07
-#define STREAM_EP_IN   0x87
-#endif /* USE_SID_STREAM */
+/* SID stream STREAM_ITF_NUM, STREAM_EP_OUT and STREAM_EP_IN: usbsid_protocol.h */
 
 #define MIDI_CABLE 0
 
@@ -137,43 +134,6 @@ enum
   VENDOR_REQUEST_MICROSOFT = 2,
 };
 extern uint8_t const desc_ms_os_20[];
-
-/* USBSID command byte */
-enum
-{
-  PACKET_TYPE  = 0xC0,  /* 0b11000000 ~ 192  */
-  BYTE_MASK    = 0x3F,  /*   0b111111 ~  63  */
-  COMMAND_MASK = 0x1F,  /*    0b11111 ~  31  */
-
-  /* BYTE 0 - top 2 bits */
-  WRITE        =   0,   /*        0b0 ~ 0x00 */
-  READ         =   1,   /*        0b1 ~ 0x40 */
-  CYCLED_WRITE =   2,   /*       0b10 ~ 0x80 */
-  COMMAND      =   3,   /*       0b11 ~ 0xC0 */
-  /* BYTE 0 - lower 6 bits for byte count */
-  /* BYTE 0 - lower 5 bits for Commands */
-  CYCLED_READ  =   4,   /*      0b100 ~ 0x04 */
-  DELAY_CYCLES =   5,   /*      0b101 ~ 0x05 */
-  PAUSE        =  10,   /*     0b1010 ~ 0x0A */
-  UNPAUSE      =  11,   /*     0b1011 ~ 0x0B */
-  MUTE         =  12,   /*     0b1100 ~ 0x0C */
-  UNMUTE       =  13,   /*     0b1101 ~ 0x0D */
-  RESET_SID    =  14,   /*     0b1110 ~ 0x0E */
-  DISABLE_SID  =  15,   /*     0b1111 ~ 0x0F */
-  ENABLE_SID   =  16,   /*    0b10000 ~ 0x10 */
-  CLEAR_BUS    =  17,   /*    0b10001 ~ 0x11 */
-  CONFIG       =  18,   /*    0b10010 ~ 0x12 */
-  RESET_MCU    =  19,   /*    0b10011 ~ 0x13 */
-  BOOTLOADER   =  20,   /*    0b10100 ~ 0x14 */
-
-  /* WEBSUSB ADDITIONAL COMMANDS */
-  WEBUSB_COMMAND  = 0xFF,
-  WEBUSB_RESET    = 0x15,
-  WEBUSB_CONTINUE = 0x16,
-  WEBUSB_NUMSIDS  = 0x39,
-  WEBUSB_FMOPLSID = 0x3A,
-  WEBUSB_TOGGLEAU = 0x3B,
-};
 
 /* USBSID Uart */
 enum {

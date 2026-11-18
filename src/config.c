@@ -183,25 +183,25 @@ void read_config(Config* config)
   config_array[0] = READ_CONFIG;       /* Initiator byte */
   config_array[1] = VERIFICATION_BYTE; /* Verification byte */
 
-  config_array[2] = (int)config_unacknowledged();      /* (PCB v1.5+) Need configuration confirmation */
-  config_array[3] = (int)config->socket_change_detect; /* (PCB v1.5+) Socket change detection */
-  config_array[4] = (int)(config->last_preset & 0x7f); /* The last applied preset */
-  config_array[4] |=
+  config_array[CFG_IDX_UNACK]      = (int)config_unacknowledged();      /* (PCB v1.5+) Need configuration confirmation */
+  config_array[CFG_IDX_SOCKDETECT] = (int)config->socket_change_detect; /* (PCB v1.5+) Socket change detection */
+  config_array[CFG_IDX_PRESET]     = (int)(config->last_preset & 0x7f); /* The last applied preset */
+  config_array[CFG_IDX_PRESET]     |=
     (int)((int)(config->preset_auto_detect << 7) & 0x80);   /* Socket auto detection during preset applying */
 
   /* Clockworx */
-  config_array[5] = (int)config->lock_clockrate;
-  config_array[6] = (int)config->external_clock | ((int)config->board_clock_link << 1);
-  config_array[7] = (config->clock_rate >> 16) & BYTE;
-  config_array[8] = (config->clock_rate >> 8) & BYTE;
-  config_array[9] = config->clock_rate & BYTE;
+  config_array[CFG_IDX_LOCKCLOCK] = (int)config->lock_clockrate;
+  config_array[CFG_IDX_EXTCLOCK]  = (int)config->external_clock | ((int)config->board_clock_link << 1);
+  config_array[CFG_IDX_CLOCKHZ]   = (config->clock_rate >> 16) & BYTE;
+  config_array[CFG_IDX_CLOCKHZ+1] = (config->clock_rate >> 8) & BYTE;
+  config_array[CFG_IDX_CLOCKHZ+2] = config->clock_rate & BYTE;
   /* Socket One */
-  config_array[10] = (int)config->socketOne.enabled;
-  config_array[11] = (int)config->socketOne.dualsid;
-  config_array[12] = config->socketOne.chiptype;
-  config_array[13] = (config->socketOne.sid1.id | (config->socketOne.sid2.id << 4));
-  config_array[14] = config->socketOne.sid1.type;
-  config_array[15] = config->socketOne.sid2.type;
+  config_array[CFG_IDX_S1_ENABLED]  = (int)config->socketOne.enabled;
+  config_array[CFG_IDX_S1_DUALSID]  = (int)config->socketOne.dualsid;
+  config_array[CFG_IDX_S1_CHIPTYPE] = config->socketOne.chiptype;
+  config_array[CFG_IDX_S1_SIDIDS]   = (config->socketOne.sid1.id | (config->socketOne.sid2.id << 4));
+  config_array[CFG_IDX_S1_SID1TYPE] = config->socketOne.sid1.type;
+  config_array[CFG_IDX_S1_SID2TYPE] = config->socketOne.sid2.type;
 
   config_array[16] = 0x00; /* Unused */
   config_array[17] = 0x00; /* Unused */
@@ -209,21 +209,21 @@ void read_config(Config* config)
   config_array[19] = 0x00; /* Unused */
 
   /* Socket Two */
-  config_array[20] = (int)config->socketTwo.enabled;
-  config_array[21] = (int)config->socketTwo.dualsid;
-  config_array[22] = (int)config->mirrored; /* NOTE: Pre v0.7.0 fw backwards compatibility */
-  config_array[23] = config->socketTwo.chiptype;
-  config_array[24] = (config->socketTwo.sid1.id | (config->socketTwo.sid2.id << 4));
-  config_array[25] = config->socketTwo.sid1.type;
-  config_array[26] = config->socketTwo.sid2.type;
+  config_array[CFG_IDX_S2_ENABLED]      = (int)config->socketTwo.enabled;
+  config_array[CFG_IDX_S2_DUALSID]      = (int)config->socketTwo.dualsid;
+  config_array[CFG_IDX_MIRRORED_COMPAT] = (int)config->mirrored; /* NOTE: Pre v0.7.0 fw backwards compatibility */
+  config_array[CFG_IDX_S2_CHIPTYPE]     = config->socketTwo.chiptype;
+  config_array[CFG_IDX_S2_SIDIDS]       = (config->socketTwo.sid1.id | (config->socketTwo.sid2.id << 4));
+  config_array[CFG_IDX_S2_SID1TYPE]     = config->socketTwo.sid1.type;
+  config_array[CFG_IDX_S2_SID2TYPE]     = config->socketTwo.sid2.type;
 
   config_array[27] = 0x00; /* Unused */
   config_array[28] = 0x00; /* Unused */
   config_array[29] = 0x00; /* Unused */
 
   /* Bright light, bright light!! */
-  config_array[30] = (int)config->LED.enabled;
-  config_array[31] = (int)config->LED.idle_breathe;
+  config_array[CFG_IDX_LED_ENABLED] = (int)config->LED.enabled;
+  config_array[CFG_IDX_LED_BREATHE] = (int)config->LED.idle_breathe;
 
   config_array[32] = 0x00; /* Unused */
   config_array[33] = 0x00; /* Unused */
@@ -235,10 +235,10 @@ void read_config(Config* config)
   config_array[39] = 0x00; /* Unused */
 
   /* Colors! */
-  config_array[40] = (int)config->RGBLED.enabled;
-  config_array[41] = (int)config->RGBLED.idle_breathe;
-  config_array[42] = config->RGBLED.brightness;
-  config_array[43] = (int)config->RGBLED.sid_to_use;
+  config_array[CFG_IDX_RGB_ENABLED]    = (int)config->RGBLED.enabled;
+  config_array[CFG_IDX_RGB_BREATHE]    = (int)config->RGBLED.idle_breathe;
+  config_array[CFG_IDX_RGB_BRIGHTNESS] = config->RGBLED.brightness;
+  config_array[CFG_IDX_RGB_SIDTOUSE]   = (int)config->RGBLED.sid_to_use;
 
   config_array[44] = 0x00; /* Unused */
   config_array[45] = 0x00; /* Unused */
@@ -249,22 +249,25 @@ void read_config(Config* config)
   config_array[50] = 0x00; /* Unused */
 
   /* Stuffs */
-  config_array[51] = (int)config->Cdc.enabled;
-  config_array[52] = (int)config->WebUSB.enabled;
-  config_array[53] = (int)config->Asid.enabled;
-  config_array[54] = (int)config->Midi.enabled;
+  config_array[CFG_IDX_CDC_ENABLED]    = (int)config->Cdc.enabled;
+  config_array[CFG_IDX_WEBUSB_ENABLED] = (int)config->WebUSB.enabled;
+  config_array[CFG_IDX_ASID_ENABLED]   = (int)config->Asid.enabled;
+  config_array[CFG_IDX_MIDI_ENABLED]   = (int)config->Midi.enabled;
 
   /* Stuff for keyboard people */
-  config_array[55] = (int)config->FMOpl.enabled;
-  config_array[56] = config->FMOpl.sidno;
+  config_array[CFG_IDX_FMOPL_EN]  = (int)config->FMOpl.enabled;
+  config_array[CFG_IDX_FMOPL_SID] = config->FMOpl.sidno;
 
   /* Headphonez on! */
-  config_array[57] = config->stereo_en;
-  config_array[58] = config->lock_audio_sw;
+  config_array[CFG_IDX_STEREO]    = config->stereo_en;
+  config_array[CFG_IDX_AUDIOLOCK] = config->lock_audio_sw;
 
-  config_array[59] = (int)config->rx_ring;  /* USB RX ringbuffer */
+  config_array[CFG_IDX_RX_RING] = (int)config->rx_ring;  /* USB RX ringbuffer */
 
-  config_array[60] = ((int)config->mirrored | ((int)config->flipped << 1) | ((int)config->mixed << 2));
+  config_array[CFG_IDX_SOCKMODE] = (
+    (int)config->mirrored
+    | ((int)config->flipped << 1)
+    | ((int)config->mixed << 2));
 
   config_array[61] = 0x00; /* Unused */
 
@@ -1699,7 +1702,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
       maxplaytime = 300000; /* Reset max playtime on upload back to 5 minutes in milliseconds */
       receiving_sidfile = true;
       sidbytes_received = 0;
-      is_prg = ((buffer[1] == PRG_FILE) ? true : false);
+      is_prg = ((buffer[1] == UPLOAD_FILE_PRG) ? true : false);
       usplayer_upload_start();
       break;
     case UPLOAD_SID_DATA:

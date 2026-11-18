@@ -33,6 +33,7 @@
 
 /* Project includes required for this header */
 #include <usbsid_constants.h>
+#include <usbsid_protocol.h>
 
 
 #ifdef PICO_DEFAULT_LED_PIN
@@ -151,12 +152,8 @@ typedef struct NetConfig {
  * DHCP client: needs a host bridge from USB link to LAN.
  * Static: needs host routing, proxy ARP or a bridge.
  * Do not bridge the USB network interface into a LAN that has its own DHCP
- * server while in DHCP server mode. */
-enum {
-  USBNET_IP_MODE_DHCP_CLIENT = 0,  /* Lease from a LAN DHCP server via host bridge */
-  USBNET_IP_MODE_STATIC      = 1,  /* usbnet_ip / usbnet_netmask / usbnet_gateway */
-  USBNET_IP_MODE_DHCP_SERVER = 2,  /* Factory default, serves the USB link only */
-};
+ * server while in DHCP server mode.
+ * USBNET_IP_MODE_* ids: see usbsid_protocol.h. */
 
 /* Factory default IP mode, 0 on builds without USB net (flags byte unchanged) */
 #if defined(USE_USB_NET)
@@ -396,194 +393,13 @@ typedef struct RuntimeCFG {
 
 } RuntimeCFG;
 
-/* Config command byte */
+/* Firmware-only config sub-commands, protocol ids live in usbsid_protocol.h */
 enum
 {
-  RESET_USBSID     = 0x20,  /* Resets the MCU including the USB connection */
-
-  READ_CONFIG      = 0x30,  /* Read full config as bytes */
-  APPLY_CONFIG     = 0x31,  /* Apply config from memory */
-  SET_CONFIG       = 0x32,  /* Set single config item */
-  SAVE_CONFIG      = 0x33,  /* Save and load config and then reboot */
-  SAVE_NORESET     = 0x34,  /* Save, load and apply config */
-  RESET_CONFIG     = 0x35,  /* Reset to default settings */
-  WRITE_CONFIG     = 0x36,  /* Write full config as bytes */
-  READ_SOCKETCFG   = 0x37,  /* Read socket config as bytes */
-  RELOAD_CONFIG    = 0x38,  /* Reload and apply stored config from flash */
-  READ_NUMSIDS     = 0x39,  /* Returns the number of SIDs in byte 0 */
-  READ_FMOPLSID    = 0x3A,  /* Returns the sidno for FMOpl 1~4, 0 is disable */
-  READ_CONFIGACK   = 0x3F,  /* Returns 1 if socket power is disabled and read/writes are dropped */
-
-  SINGLE_SID       = 0x40,  /* Single SID Socket One */
-  DUAL_SID         = 0x41,  /* Dual SID Socket One */
-  QUAD_SID         = 0x42,  /* Four SID's in 2 sockets */
-  TRIPLE_SID       = 0x43,  /* Two SID's in socket One, One SID in socket two */
-  TRIPLE_SID_TWO   = 0x44,  /* One SID in Socket One, Two SID's in socket two */
-  MIRRORED_SID     = 0x45,  /* Socket Two is linked to Socket One */
-  DUAL_SOCKET1     = 0x46,  /* Two SID's in socket One, Socket Two disabled */
-  DUAL_SOCKET2     = 0x47,  /* Two SID's in socket Two, Socket One disabled */
-  DUAL_FLIPPED     = 0x48,  /* Two SID's in 2 sockets, sockets flipped */
-  QUAD_FLIPPED     = 0x49,  /* Four SID's in 2 sockets, sockets flipped */
-  QUAD_MIXED       = 0x4A,  /* Four SID's in 2 sockets, mixed addresses */
-  QUAD_FLIPMIX     = 0x4B,  /* Four SID's in 2 sockets, sockets flipped and addresses flipped */
-  HOTFLIP_SOCKETS  = 0x4F,  /* Socket Two is Socket One and vice versa */
-
-  SET_CLOCK        = 0x50,  /* Change SID clock frequency by array id */
-  DETECT_SIDS      = 0x51,  /* Try to detect the SID types per socket ~ routines see sid_detection.c */
-  TEST_ALLSIDS     = 0x52,  /* Runs a very long test on all SID's */
-  TEST_SID1        = 0x53,  /* Runs a very long test on SID 1 */
-  TEST_SID2        = 0x54,  /* Runs a very long test on SID 2 */
-  TEST_SID3        = 0x55,  /* Runs a very long test on SID 3 */
-  TEST_SID4        = 0x56,  /* Runs a very long test on SID 4 */
-  GET_CLOCK        = 0x57,  /* Returns the clockrate as array id in byte 0 */
-  LOCK_CLOCK       = 0x58,  /* Locks the clockrate from being changed, saved in config */
-  STOP_TESTS       = 0x59,  /* Interrupt any running SID tests */
-  DETECT_CLONES    = 0x5A,  /* Detect clone SID types */
-  AUTO_DETECT      = 0x5B,  /* Run auto detection routine (fallback/workaround for rp2350 bug) */
-
-  LOAD_MIDI_STATE  = 0x60,
-  SAVE_MIDI_STATE  = 0x61,
-  RESET_MIDI_STATE = 0x63,
-
-  /* Network SID Device (WiFi/Bluetooth) provisioning. Only meaningfully
-   * handled when USE_NET is compiled in. USE_USB_NET handles NSD,
-   * discovery, apply, forget and USBNET_* subset.
-   * pico/pico2 build replies ERROR (see handle_config_request()). */
-  WIFI_STATUS      = 0x70,  /* Returns {link_up, session_active} */
-  WIFI_SET_SSID    = 0x71,  /* buffer[1] = length, buffer[2..] = SSID bytes */
-  WIFI_SET_PSK     = 0x72,  /* buffer[1] = length, buffer[2..] = PSK bytes, write-only */
-  WIFI_SET_HOSTNAME= 0x73,  /* buffer[1] = length, buffer[2..] = hostname bytes */
-  WIFI_ENABLE      = 0x74,  /* buffer[1] = 0/1 */
-  NSD_ENABLE       = 0x75,  /* buffer[1] = 0/1 */
-  NSD_SET_PORT     = 0x76,  /* buffer[1..2] = port, big-endian */
-  WIFI_APPLY       = 0x77,  /* Persist net_cfg to flash and apply live */
-  WIFI_FORGET      = 0x78,  /* Erase stored credentials */
-  BT_NSD_ENABLE    = 0x79,  /* buffer[1] = 0/1 */
-  READ_NETCFG      = 0x7A,  /* Read net config as bytes */
-  WIFI_READ_IP     = 0x7B,  /* Returns {state, ip0, ip1, ip2, ip3}, every build */
-  DISCOVERY_ENABLE = 0x7C,  /* buffer[1] = 0/1, applied live, persisted by WIFI_APPLY */
-  USBNET_IP_MODE   = 0x7D,  /* buffer[1] = USBNET_IP_MODE_*, USB net only, persisted by WIFI_APPLY */
-  USBNET_SET_STATIC= 0x7E,  /* buffer[1..4] ip, [5..8] netmask, [9..12] gateway, USB net only, persisted by WIFI_APPLY */
-  USBNET_READ_IPCFG= 0x7F,  /* Returns {mode, ip[4], netmask[4], gateway[4]}, USB net only */
-
-  USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
-  US_PCB_VERSION   = 0x81,  /* Read PCB version */
-  US_FEATURES      = 0x82,  /* Read USBSID compiled features */
-  SET_RX_RING      = 0x83,  /* Enable/Disable the USB RX ringbuffer (auto save and reboot) */
-
-  LINK_CLOCK       = 0x84,  /* Enable/Disable link with external clock feature (auto save and reboot) */
-  RESTART_BUS      = 0x85,  /* Restart DMA & PIO */
-  RESTART_BUS_CLK  = 0x86,  /* Restart PIO clocks */
-  SYNC_PIOS        = 0x87,  /* Sync PIO clocks */
-  TOGGLE_AUDIO     = 0x88,  /* Toggle mono <-> stereo (v1.3+ boards only) */
-  SET_AUDIO        = 0x89,  /* Set mono <-> stereo (v1.3+ boards only) */
-  LOCK_AUDIO       = 0x90,  /* Locks the audio switch into it's current state (v1.3+ boards only) */
-  GET_AUDIO        = 0x91,  /* Get current audio switch setting */
-
   TEST_FN          = 0x99,  /* TODO: Remove before v1 release */
-
-  /* Hardware SID clone configuration related */
-  READ_CLONECHIP   = 0xA0,  /* Chip config read initiator byte */
-  WRITE_CLONECHIP  = 0xB0,  /* Chip config write initiator byte */
-  /* legacy commands */
-  PDSID            = 0xA3,  /* Holds the reset line for 5 seconds to change SID type on a PDSID */
-
 #if defined(ONBOARD_EMULATOR)
-  /* Internal SID player */
-  UPLOAD_SID_START    = 0xD0,  /* Start command for USBSID to go into receiving mode */
-  UPLOAD_SID_DATA     = 0xD1,  /* Init byte for each packet containing data */
-  UPLOAD_SID_END      = 0xD2,  /* End command for USBSID to exit receiving mode */
-  UPLOAD_SID_SIZE     = 0xD3,  /* Packet containing the actual file size */
-  UPLOAD_SID_PLAYTIME = 0xD4,  /* Provide max playtime for current tune, will run 5 minutes otherwise */
-
-  /* Internal SID player */
-  SID_PLAYER_TUNE     = 0xE0,  /* Load SID file into SID player memory and initialise internal SID player */
-  SID_PLAYER_START    = 0xE1,  /* Start SID file play */
-  SID_PLAYER_STOP     = 0xE2,  /* Stop SID file play */
-  SID_PLAYER_PAUSE    = 0xE3,  /* Pause/Unpause SID file play */
-  SID_PLAYER_NEXT     = 0xE4,  /* Following SID subtune play */
-  SID_PLAYER_PREV     = 0xE5,  /* Previous SID subtune play */
-  SID_PLAYER_TWO      = 0xE6,  /* Force play to play on socket two or sid two */
-  SID_PLAYER_FFWD     = 0xE7,  /* Tune fast forward */
-  SID_PLAYER_RWND     = 0xE8,  /* Tune rewind // NOTE: Not implemented */
-  SID_PLAYER_MUTE     = 0xE9,  /* Full mute, mute a voice or only one chip/SID */
-  SID_PLAYER_MUTED    = 0xEA,  /* Read a the muted state */
-  SID_PLAYER_TIME     = 0xEB,  /* Read play time of current track */
-  TEST_FN2            = 0xEF,  /* TODO: Remove before v1 release */
-
-  /* Filetypes we can receive and process */
-  SID_FILE         = 0x01,
-  PRG_FILE         = 0x02,
+  TEST_FN2         = 0xEF,  /* TODO: Remove before v1 release */
 #endif
-
-  CONFIG_ACK       = 0xFA,  /* (v1.5+ PCB) Acknowledge and save the current configuration and switch on regulators */
-  SOCKET_DETECT    = 0xFD,  /* (v1.5+ PCB) Enable/disable and save automatic socket change detection on boot */
-  PRESET_DETECT    = 0xFE,  /* Enable/disable and save automatic detection on preset change */
-};
-
-/* Config read/write bytes */
-enum {
-  FULL_CONFIG       = READ_CONFIG,    /* 0x30 */
-  SOCKET_CONFIG     = READ_SOCKETCFG, /* 0x37 */
-  MIDI_CONFIG       = 0x60, /* Not implemented */
-  MIDI_CCVALUES     = 0x6A, /* Not implemented */
-  NETWORK_CONFIG    = READ_NETCFG,    /* 0x7A */
-  VERIFICATION_BYTE = 0x7F, /* After init byte */
-  END_BYTE          = 0x8F, /* Before termination byte, but only if buffer can be more then 64 bytes */
-  TERMINATION_BYTE  = 0xFF, /* Last byte in buffer */
-};
-
-/* Clone chip config read/write initiator bytes */
-enum {
-  READ_SKPICO    = (READ_CLONECHIP|CHIP_SKPICO),    /* a2 */
-  READ_ARMSID    = (READ_CLONECHIP|CHIP_ARMSID),    /* a3 */
-  READ_ARM2SID   = (READ_CLONECHIP|CHIP_ARM2SID),   /* a4 */
-  READ_FPGASID   = (READ_CLONECHIP|CHIP_FPGASID),   /* a5 */
-  READ_REDIPSID  = (READ_CLONECHIP|CHIP_REDIPSID),  /* a6 */
-  READ_PDSID     = (READ_CLONECHIP|CHIP_PDSID),     /* a7 */
-  READ_BACKSID   = (READ_CLONECHIP|CHIP_BACKSID),   /* a8 */
-  READ_SIDEMU    = (READ_CLONECHIP|CHIP_SIDEMU),    /* a9 */
-  //
-  WRITE_SKPICO   = (WRITE_CLONECHIP|CHIP_SKPICO),   /* b2 */
-  WRITE_ARMSID   = (WRITE_CLONECHIP|CHIP_ARMSID),   /* b3 */
-  WRITE_ARM2SID  = (WRITE_CLONECHIP|CHIP_ARM2SID),  /* b4 */
-  WRITE_FPGASID  = (WRITE_CLONECHIP|CHIP_FPGASID),  /* b5 */
-  WRITE_REDIPSID = (WRITE_CLONECHIP|CHIP_REDIPSID), /* b6 */
-  WRITE_PDSID    = (WRITE_CLONECHIP|CHIP_PDSID),    /* b7 */
-  WRITE_BACKSID  = (WRITE_CLONECHIP|CHIP_BACKSID),  /* b8 */
-  WRITE_SIDEMU   = (WRITE_CLONECHIP|CHIP_SIDEMU),   /* b9 */
-};
-
-/* SET_CONFIG values */
-enum {
-  CONFIG_ENABLED  =  0,
-  BOARD_CLOCKRATE =  0,
-  SOCKET_ONE      =  1,
-  SOCKET_TWO      =  2,
-  SOCKET_DUALSID  =  1,
-  SOCKET_CHIPTYPE =  2,
-  SOCKET_UNUSED   =  3,
-  SOCKET_SID1TYPE =  4,
-  SOCKET_SID2TYPE =  5,
-  OLD_S2_MIRRORED =  6, /* Deprecated post fw v0.7.0 */
-  BOARD_LED       =  3,
-  BOARD_RGBLED    =  4,
-  LED_IDLEBREATH  =  1,
-  LED_BRIGHTNESS  =  2,
-  LED_SIDTOUSE    =  3,
-  BOARD_CDC       =  5,
-  BOARD_WEBUSB    =  6,
-  BOARD_ASID      =  7,
-  BOARD_MIDI      =  8,
-  BOARD_FMOPL     =  9,
-  BOARD_AUSWITCH  = 10,
-  BOARD_AULOCK    = 11,
-  BOARD_MIRRORED  = 12,
-  BOARD_FLIPPED   = 13,
-  BOARD_MIXED     = 14,
-  BOARD_SDETECT   = 15, /* (PCB v1.5+) Automatic socket change detection */
-  BOARD_PADETECT  = 16, /* (PCB v1.5+) Preset automatic detection */
-  BOARD_RXRING    = 17, /* USB RX ringbuffer, applied after save and reboot */
 };
 
 /* Global variables from config.c */
@@ -638,13 +454,13 @@ static const uint8_t us_features = (
 );
 
 /* Const feature variables */
-static const bool is_rp2350     = (us_features & 0b00000001); /* 0 */
-static const bool has_rgb_vu    = (us_features & 0b00000100); /* 2 */
-static const bool has_pio_uart  = (us_features & 0b00001000); /* 3 */
-static const bool has_net       = (us_features & 0b00010000); /* 4 */
-static const bool has_nsd       = (us_features & 0b00100000); /* 5 */
-static const bool has_sidstream = (us_features & 0b01000000); /* 6 */
-static const bool has_emulator  = (us_features & 0b10000000); /* 7 */
+static const bool is_rp2350     = (us_features & US_FEATURE_RP2350);    /* 0 0b00000001 */
+static const bool has_rgb_vu    = (us_features & US_FEATURE_RGBVU);     /* 2 0b00000100 */
+static const bool has_pio_uart  = (us_features & US_FEATURE_PIOUART);   /* 3 0b00001000 */
+static const bool has_net       = (us_features & US_FEATURE_NET);       /* 4 0b00010000 */
+static const bool has_nsd       = (us_features & US_FEATURE_NSD);       /* 5 0b00100000 */
+static const bool has_sidstream = (us_features & US_FEATURE_SIDSTREAM); /* 6 0b01000000 */
+static const bool has_emulator  = (us_features & US_FEATURE_EMULATOR);  /* 7 0b10000000*/
 
 /* Functions from config.c */
 void        write_back_data(size_t buffersize);

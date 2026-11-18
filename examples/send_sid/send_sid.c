@@ -35,7 +35,7 @@
 #include <ctype.h>
 #include <time.h>   // `nanosleep()`
 
-#include "USBSIDInterface.h"
+#include <USBSIDInterface.h>
 
 /* Compile with CMake, the tool links USBSID-Pico-driver and the player's songlengths:
  * cmake -S . -B build && cmake --build build
@@ -49,12 +49,6 @@ int tune_no = 1;
 const char * songlengths_path = NULL;
 extern uint32_t find_songlenth_db(bool is_sid, int tune_no, const char * filename, const char * songlengths_path);
 
-
-enum {
-  FROM_STDIN       = 0x00,  /* Read data from stdin */
-  SID_FILE         = 0x01,  /* File is SID */
-  PRG_FILE         = 0x02,  /* File is PRG */
-};
 
 void teardown_wait(void)
 {
@@ -482,7 +476,7 @@ int main(int argc, char* argv[])
         fprintf(stdout, "Stopping current playback, if any!\n");
         player_command(USBSID_PLAYER_STOP);
       }
-      if (!send_sid((input_f ? input_f : stdin), (sidfile ? SID_FILE : prgfile ? PRG_FILE : FROM_STDIN))) {
+      if (!send_sid((input_f ? input_f : stdin), (sidfile ? USBSID_UPLOAD_FILE_SID : prgfile ? USBSID_UPLOAD_FILE_PRG : USBSID_UPLOAD_FILE_STDIN))) {
         goto exit;
       }
       sentfile = true;
@@ -494,7 +488,7 @@ int main(int argc, char* argv[])
         fprintf(stdout, "Stopping current playback, if any!\n");
         player_command(USBSID_PLAYER_STOP);
       }
-      if (!send_sid(stdin, FROM_STDIN)) {
+      if (!send_sid(stdin, USBSID_UPLOAD_FILE_STDIN)) {
         goto exit;
       }
       sentfile = true;

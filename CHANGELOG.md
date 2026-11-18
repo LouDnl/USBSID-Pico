@@ -3,6 +3,35 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 
 #### Version: Unreleased
 * Build tools in full static without dependencies
+* Move shared global enums and defines into `usbsid_protocol.h` for cross repo use
+  - header is included once per scope and carries no pragma once
+  - no wire values change
+  - anonymous enums are now named
+  - from `config.h`:
+    - `CommandBytes`, `ConfigSubCommands`, `ConfigIOBytes`
+    - `EmulatorCommands`, `EmulatorUploadTypes`
+    - `CloneChipIOBytes`, `SetConfigTypes`
+    - the `USBNET_IP_MODE_*` ids as `USFeatures`
+  - move the `ChipType` enum typedef from `usbsid_constants.h`
+  - move the `US_FEATURE_*` bit names as `NetModes` from `USBSID.h`
+  - move `CONFIG_BUFFER_SIZE` from `usbsid_defs.h`
+  - mvoe `SOCKET_BUFFER_SIZE`, `UPLOAD_PACKET_SIZE` and `UPLOAD_PAYLOAD_SIZE` from `USBSID.h`
+  - move config indexes as `ReadConfigOffsets` from `USBSIDInterface.h`
+  - remove the duplicated enums from the source headers
+  - keep `TEST_FN` and `TEST_FN2` firmware-only in `config.h`
+  - define the values the C driver API needs once as `USBSID_*` macros in a `_USBSID_PROTOCOL_DEFS_` section: feature bits, config offsets, reply sizes, player commands, upload types and `USBSID_FW_VERSION_BATCH_READ`
+  - derive the `USFeatures`, `ReadConfigOffsets`, `SID_PLAYER_*` and `EmulatorUploadTypes` entries and `CONFIG_BUFFER_SIZE` and `SOCKET_BUFFER_SIZE` from those macros
+  - add `USBSID_PROTOCOL_MACROS_ONLY` to include the macros without the enums, for C code that must not see the global enum names
+  - align the macro and `CommandBytes` columns
+  - use `CFG_IDX_*` for the reply offsets in `read_config()` in `config.c`
+  - use `US_FEATURE_*` for the feature flag consts in `config.h`
+  - name the remaining `read_config()` reply offsets as `CFG_IDX_*` in `ReadConfigOffsets`: socket one and two, LED, RGB LED, emulator app, CDC, WebUSB, ASID, MIDI and RX ring
+  - use those names in `read_config()` in `config.c`
+  - add the SID stream wire constants as `USBSID_*` macros and the `StreamConstants` enum, and remove their definitions from `globals.h` and `stream.h`
+  - compare `STREAM_ITF_NUM` as an int in the interface number check in `usb_descriptors.c`
+  - use `UPLOAD_FILE_PRG` for the PRG upload check in `config.c`
+  - include `usbsid_protocol.h` in the config tool example and remove its duplicated command, sub-command and `SOCKET_BUFFER_SIZE` definitions from `cfg_usbsid.h`
+  - replace the local file type enum in `send_sid.c` with the `USBSID_UPLOAD_FILE_*` macros from `USBSIDInterface.h`
 
 #### Version: 0.9.0
 * Add batch READ of up to 63 registers

@@ -339,7 +339,7 @@ TU_VERIFY_STATIC(sizeof(desc_ms_os_20) == MS_OS_20_DESC_LEN, "Incorrect size");
 TU_VERIFY_STATIC(sizeof(desc_fs_configuration) == CONFIG_TOTAL_LEN, "CONFIG_TOTAL_LEN out of sync");
 TU_VERIFY_STATIC(ITF_NUM_VENDOR == WUSB_ITF_NUM, "WUSB_ITF_NUM out of sync");
 #if defined(USE_SID_STREAM)
-TU_VERIFY_STATIC(ITF_NUM_VENDOR_2 == STREAM_ITF_NUM, "STREAM_ITF_NUM out of sync");
+TU_VERIFY_STATIC(ITF_NUM_VENDOR_2 == (int)STREAM_ITF_NUM, "STREAM_ITF_NUM out of sync");
 #endif
 #if defined(USE_USB_NET)
 /* NCM pair is appended last, existing interfaces keep their numbers */

@@ -27,6 +27,8 @@
 #define _CFG_USBSID_H_
 #pragma once
 
+#include <usbsid_protocol.h>
+
 #ifdef __cplusplus
   extern "C" {
 #endif
@@ -51,136 +53,10 @@ static int usid_dev = -1;
 static char target_serial[USBSID_SERIAL_LEN] = {0}; /* Board to open, empty = use target_index */
 static int target_index = 0;                         /* Index in enumerate_USBSID() order */
 
-/* -----USBSID-Pico------ */
-
-enum
-{
-  PACKET_TYPE  = 0xC0,  /* 0b11000000 ~ 192  */
-  BYTE_MASK    = 0x3F,  /*   0b111111 ~  63  */
-  COMMAND_MASK = 0x1F,  /*    0b11111 ~  31  */
-
-  /* BYTE 0 */
-  /* Top 2 bits */
-  WRITE        =   0,   /*        0b0 ~ 0x00 */
-  READ         =   1,   /*        0b1 ~ 0x40 */
-  CYCLED_WRITE =   2,   /*       0b10 ~ 0x80 */
-  COMMAND      =   3,   /*       0b11 ~ 0xC0 */
-  /* Lower 6 bits for byte count */
-  /* Lower 6 bits for Commands */
-  CYCLED_READ  =   4,   /*      0b100 ~ 0x04 */
-  PAUSE        =  10,   /*     0b1010 ~ 0x0A */
-  UNPAUSE      =  11,   /*     0b1011 ~ 0x0B */
-  MUTE         =  12,   /*     0b1100 ~ 0x0C */
-  UNMUTE       =  13,   /*     0b1101 ~ 0x0D */
-  RESET_SID    =  14,   /*     0b1110 ~ 0x0E */
-  DISABLE_SID  =  15,   /*     0b1111 ~ 0x0F */
-  ENABLE_SID   =  16,   /*    0b10000 ~ 0x10 */
-  CLEAR_BUS    =  17,   /*    0b10001 ~ 0x11 */
-  CONFIG       =  18,   /*    0b10010 ~ 0x12 */
-  RESET_MCU    =  19,   /*    0b10011 ~ 0x13 */
-  BOOTLOADER   =  20,   /*    0b10100 ~ 0x14 */
-};
-
-enum
-{
-  RESET_USBSID     = 0x20,  /* Resets the MCU including the USB connection */
-
-  READ_CONFIG      = 0x30,  /* Read full config as bytes */
-  APPLY_CONFIG     = 0x31,  /* Apply config from memory */
-  SET_CONFIG       = 0x32,  /* Set single config item */
-  SAVE_CONFIG      = 0x33,  /* Save and load config and then reboot */
-  SAVE_NORESET     = 0x34,  /* Save, load and apply config */
-  RESET_CONFIG     = 0x35,  /* Reset to default settings */
-  WRITE_CONFIG     = 0x36,  /* Write full config as bytes */
-  READ_SOCKETCFG   = 0x37,  /* Read socket config as bytes */
-  RELOAD_CONFIG    = 0x38,  /* Reload and apply stored config from flash */
-  READ_NUMSIDS     = 0x39,  /* Returns the number of SIDs in byte 0 */
-  READ_FMOPLSID    = 0x3A,  /* Returns the sidno for FMOpl 1~4, 0 is disable */
-  READ_CONFIGACK   = 0x3F,  /* Returns 1 if socket power is disabled and read/writes are dropped */
-
-  SINGLE_SID       = 0x40,  /* Single SID Socket One */
-  DUAL_SID         = 0x41,  /* Dual SID Socket One */
-  QUAD_SID         = 0x42,  /* Four SID's in 2 sockets */
-  TRIPLE_SID       = 0x43,  /* Two SID's in socket One, One SID in socket two */
-  TRIPLE_SID_TWO   = 0x44,  /* One SID in Socket One, Two SID's in socket two */
-  MIRRORED_SID     = 0x45,  /* Socket Two is linked to Socket One */
-  DUAL_SOCKET1     = 0x46,  /* Two SID's in socket One, Socket Two disabled */
-  DUAL_SOCKET2     = 0x47,  /* Two SID's in socket Two, Socket One disabled */
-  DUAL_FLIPPED     = 0x48,  /* Two SID's in 2 sockets, sockets flipped */
-  QUAD_FLIPPED     = 0x49,  /* Four SID's in 2 sockets, sockets flipped */
-  QUAD_MIXED       = 0x4A,  /* Four SID's in 2 sockets, mixed addresses */
-  QUAD_FLIPMIX     = 0x4B,  /* Four SID's in 2 sockets, sockets flipped and addresses flipped */
-  HOTFLIP_SOCKETS  = 0x4F,  /* Socket Two is Socket One and vice versa */
-
-  SET_CLOCK        = 0x50,  /* Change SID clock frequency by array id */
-  DETECT_SIDS      = 0x51,  /* Try to detect the SID types per socket ~ routines see sid_detection.c */
-  TEST_ALLSIDS     = 0x52,  /* Runs a very long test on all SID's */
-  TEST_SID1        = 0x53,  /* Runs a very long test on SID 1 */
-  TEST_SID2        = 0x54,  /* Runs a very long test on SID 2 */
-  TEST_SID3        = 0x55,  /* Runs a very long test on SID 3 */
-  TEST_SID4        = 0x56,  /* Runs a very long test on SID 4 */
-  GET_CLOCK        = 0x57,  /* Returns the clockrate as array id in byte 0 */
-  LOCK_CLOCK       = 0x58,  /* Locks the clockrate from being changed, saved in config */
-  STOP_TESTS       = 0x59,  /* Interrupt any running SID tests */
-  DETECT_CLONES    = 0x5A,  /* Detect clone SID types */
-  AUTO_DETECT      = 0x5B,  /* Run auto detection routine (fallback/workaround for rp2350 bug) */
-
-  LOAD_MIDI_STATE  = 0x60,
-  SAVE_MIDI_STATE  = 0x61,
-  RESET_MIDI_STATE = 0x63,
-
-  WIFI_STATUS      = 0x70,  /* Returns {link_up, session_active} */
-  WIFI_SET_SSID    = 0x71,  /* buffer[1] = length, buffer[2..] = SSID bytes */
-  WIFI_SET_PSK     = 0x72,  /* buffer[1] = length, buffer[2..] = PSK bytes, write-only */
-  WIFI_SET_HOSTNAME= 0x73,  /* buffer[1] = length, buffer[2..] = hostname bytes */
-  WIFI_ENABLE      = 0x74,  /* buffer[1] = 0/1 */
-  NSD_ENABLE       = 0x75,  /* buffer[1] = 0/1 */
-  NSD_SET_PORT     = 0x76,  /* buffer[1..2] = port, big-endian */
-  WIFI_APPLY       = 0x77,  /* Persist net_cfg to flash and apply live */
-  WIFI_FORGET      = 0x78,  /* Erase stored credentials */
-  BT_NSD_ENABLE    = 0x79,  /* buffer[1] = 0/1 */
-  READ_NETCFG      = 0x7A,  /* Read net config as bytes */
-  WIFI_READ_IP     = 0x7B,  /* Returns {state, ip0..ip3} */
-  DISCOVERY_ENABLE = 0x7C,  /* buffer[1] = 0/1 */
-  USBNET_IP_MODE   = 0x7D,  /* buffer[1] = 0 DHCP client / 1 static / 2 DHCP server (default), USB network build only, persisted by WIFI_APPLY */
-  USBNET_SET_STATIC= 0x7E,  /* buffer[1..4] ip, [5..8] netmask, [9..12] gateway, USB network build only, persisted by WIFI_APPLY */
-  USBNET_READ_IPCFG= 0x7F,  /* Returns {mode, ip[4], netmask[4], gateway[4]} */
-
-  USBSID_VERSION   = 0x80,  /* Read version identifier as uint32_t */
-  US_PCB_VERSION   = 0x81,  /* Read PCB version */
-  US_FEATURES      = 0x82,  /* Read USBSID compiled features, bit 4 = net, bit 5 = nsd */
-  SET_RX_RING      = 0x83,  /* buffer[1] = 0/1, USB RX ringbuffer, board saves and reboots on change */
-  LINK_CLOCK       = 0x84,  /* buffer[1] = 0/1, link with external clock, board saves and reboots on change */
-
-  RESTART_BUS      = 0x85,  /* Restart DMA & PIO */
-  RESTART_BUS_CLK  = 0x86,  /* Restart PIO clocks */
-  SYNC_PIOS        = 0x87,  /* Sync PIO clocks */
-  TOGGLE_AUDIO     = 0x88,  /* Toggle mono <-> stereo (v1.3+ boards only) */
-  SET_AUDIO        = 0x89,  /* Set mono <-> stereo (v1.3+ boards only) */
-  LOCK_AUDIO       = 0x90,  /* Locks the audio switch into it's current state (v1.3+ boards only) */
-  GET_AUDIO        = 0x91,  /* Get current audio switch setting */
-
-  /* Hardware SID clone configuration related */
-  FPGASID          = 0xA0,  /* Config initiator byte for FPGASID */
-  SKPICO           = 0xA1,  /* Config initiator byte for SIDKICK-pico */
-  ARMSID           = 0xA2,  /* Config initiator byte for ARMSID */
-  PDSID            = 0xA3,  /* Holds the reset line for 5 seconds to change SID type on a PDSID */
-
-  CONFIG_ACK       = 0xFA,  /* Acknowledge the current configuration and switch on regulators (v1.5+ boards only) */
-  SOCKET_DETECT    = 0xFD,  /* Disable/enable automatic socket change detection on boot (v1.5+ boards only) */
-  PRESET_DETECT    = 0xFE,  /* Enable/disable and save silent automatic detection on preset change */
-};
-
-/* SET_CONFIG item ids (buffer[1]) not covered by a named command */
-enum {
-  BOARD_RXRING = 17,  /* USB RX ringbuffer 0/1, set only, applies after SAVE_CONFIG and reboot */
-};
-
-/* Config constants */
+/* Config constants not in usbsid_protocol.h */
 enum {
   FLASH_PAGE_SIZE    = 256,
   MAX_BUFFER_SIZE    = 64,
-  SOCKET_BUFFER_SIZE = 12,
 };
 
 /* Clock cycles per second
