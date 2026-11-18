@@ -441,7 +441,7 @@ static const uint8_t us_features = (
 #if defined(USE_PIO_UART)
   | (1 << 3)
 #endif
-#if defined(USE_NET) /* Also enables WIFI_READ_IP command */
+#if defined(USE_NET) || defined(USE_USB_NET) /* Also enables WIFI_READ_IP command */
   | (1 << 4)
 #endif
 #if defined(USE_NSD) /* Also enables DISCOVERY_ENABLE command */

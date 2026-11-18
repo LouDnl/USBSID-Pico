@@ -1606,6 +1606,9 @@ int main()
     #endif
     if (has_pio_uart)  usDBG("  - PIO Uart\n");
     if (has_net)       usDBG("  - WiFi & Bluetooth\n");
+    #if defined(USE_USB_NET)
+    if (has_net)       usDBG("  - USB Ethernet\n");
+    #endif
     if (has_nsd)       usDBG("    - with Network SID Device\n");
     if (has_emulator)  usDBG("  - Embedded USBSID-Player\n");
     if (has_emulator)  usDBG("    - with Cynthcart (© Paul Slocum)\n");

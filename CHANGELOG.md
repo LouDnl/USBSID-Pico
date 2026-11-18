@@ -78,6 +78,7 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
   - use `UPLOAD_FILE_PRG` for the PRG upload check in `config.c`
   - include `usbsid_protocol.h` in the config tool example and remove its duplicated command, sub-command and `SOCKET_BUFFER_SIZE` definitions from `cfg_usbsid.h`
   - replace the local file type enum in `send_sid.c` with the `USBSID_UPLOAD_FILE_*` macros from `USBSIDInterface.h`
+* Add debug logging for USB Ethernet compilation option
 * Build tools in full static without dependencies
 * Fix regex tag catching in release workflows by changing them to globs
 * Fix `get_audio_switch` always returning `true`
