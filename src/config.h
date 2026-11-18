@@ -229,6 +229,7 @@ typedef struct Config { // TODO: Add overrides for detect_default_config and add
   } Asid;                        /* 7 */
   struct {
     bool enabled : 1;
+    uint8_t emulator_app : 3;    /* ONBOARD_EMULATOR: c64app_t, 0 Cynthcart, 1 SID SYNTH. Shares the byte with enabled, old saves read 0 */
   } Midi;                        /* 8 */
   struct {
     int sidno;                   /* 0 = disabled, saves the sidno of the sid set to FMOpl */
@@ -325,7 +326,8 @@ typedef struct Config { // TODO: Add overrides for detect_default_config and add
     /* .buffered = false */ \
   }, \
   .Midi = { \
-    .enabled = true \
+    .enabled = true, \
+    .emulator_app = 0, \
   }, \
   .FMOpl = { \
     .sidno = 0, \
@@ -425,7 +427,7 @@ extern const char    *pcb_version;
  * 5 = Network SID Device: 0 No, 1 Yes
  * 6 = SID Stream: 0 No, 1 Yes
  *     An extra Vendor interface is available for reading a SID register stream
- * 7 = Embedded SID player & Cynthcart: 0 No, 1 Yes
+ * 7 = Embedded SID player & Emulator: 0 No, 1 Yes
  */
 static const uint8_t us_features = (
   0b00000000 /* 0 */

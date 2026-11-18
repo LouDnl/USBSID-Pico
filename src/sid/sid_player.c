@@ -47,8 +47,8 @@ volatile char tuneno = 0;
 volatile bool is_prg = false; /* Default to SID file */
 volatile uint32_t playtime = 0;
 volatile uint32_t maxplaytime = 300000; /* 5 minutes in milliseconds */
-/* Cynthcart, via USBSID-Player's MC68B50 ACIA */
-#include <cynthcart_embedded.h>
+/* C64 MIDI apps (Cynthcart, SID SYNTH), via USBSID-Player's MC68B50 ACIA */
+#include <c64app_embedded.h>
 volatile bool emulator_running = false;
 volatile bool starting_emulator = false;
 volatile bool stopping_emulator = false;

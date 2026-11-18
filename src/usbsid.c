@@ -59,7 +59,7 @@
 #if defined(ONBOARD_EMULATOR)
 #include <sid_player.h>
 #include <usplayer.h>
-#include <cynthcart_embedded.h>
+#include <c64app_embedded.h>
 #endif
 
 
@@ -1147,7 +1147,7 @@ void __us_noreturn core0_loop(void)
  * - Midi engine event queue
  * - Network SID Device event queue
  * - Embedded USBSID-Player
- * - Embedded Cynthcart
+ * - Embedded Emulator (Cynthcart / SID SYNTH)
  * - Write queue debug logging
  *
  */
@@ -1180,7 +1180,7 @@ void __us_noreturn core1_loop(void)
      * to keep USB callbacks on Core0 uninterrupted
      */
     #ifdef ONBOARD_EMULATOR
-    /* Skip if embedded Cynthcart is running  */
+    /* Skip if embedded emulator is running  */
     if __us_likely(!emulator_running) {
     #endif
       midi_engine_task();
@@ -1197,7 +1197,7 @@ void __us_noreturn core1_loop(void)
     #endif
 
     /* The Embedded SID player is completely run by Core1 and
-     * is mutually exclusive with Cynthcart.
+     * is mutually exclusive with emulator.
      * There can be only 1 :-)
      */
     #ifdef ONBOARD_EMULATOR
@@ -1258,7 +1258,7 @@ void __us_noreturn core1_loop(void)
         maxplaytime = 300000;
       }
     }
-    /* The Cynthcart emulation uses the Embedded SID player as
+    /* The C64 MIDI apps (Cynthcart, SID SYNTH) use the Embedded SID player as
      * platform to run on. It is only available if the player is
      * also compiled in as feature.
      */
@@ -1266,11 +1266,11 @@ void __us_noreturn core1_loop(void)
       starting_emulator = false;
       emulator_running = true;
       offload_ledrunner = true;
-      start_cynthcart();
+      start_c64app(usbsid_config.Midi.emulator_app);
     }
     if ((emulator_running && !starting_emulator) && !sidplayer_playing) {
       if (bus_try_claim(BUS_OWNER_PLAYER)) { /* USB still wins if it's active, see bus.c */
-        run_cynthcart();
+        run_c64app();
         bus_release(BUS_OWNER_PLAYER);
       }
     }
@@ -1319,7 +1319,7 @@ void __us_noreturn core1_loop(void)
  *
  * After sync, the main loop runs the LED runner, drains the SID test queue,
  * drains the MIDI event ring (midi_engine_task), and drives the onboard
- * SID player / Cynthcart emulator state machines when those features are
+ * SID player / emulator state machines when those features are
  * compiled in.
  *
  */
@@ -1608,7 +1608,8 @@ int main()
     if (has_net)       usDBG("  - WiFi & Bluetooth\n");
     if (has_nsd)       usDBG("    - with Network SID Device\n");
     if (has_emulator)  usDBG("  - Embedded USBSID-Player\n");
-    if (has_emulator)  usDBG("    - with Cynthcart\n");
+    if (has_emulator)  usDBG("    - with Cynthcart (© Paul Slocum)\n");
+    if (has_emulator)  usDBG("    - with SID SYNTH (© LukHash)\n");
   }
 
   { /* Separate code block */

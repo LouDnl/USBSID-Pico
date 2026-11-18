@@ -107,6 +107,8 @@ const char * truefalse[]   = { "False", "True" };
 const char * locked[]      = { "Unlocked", "Locked" };
 const char * us_socket[]   = { "Single SID", "Dual SID" };
 const char * mono_stereo[] = { "Mono", "Stereo" };
+/* Embedded C64 MIDI apps, index matches the firmware C64App enum (usbsid_constants.h) */
+const char * c64_midiapps[] = { "Cynthcart", "SID SYNTH" };
 
 const char * chiptypes[]   = { "MOS", "Unknown", "SKPico", "ARMSID", "ARM2SID", "FPGASID", "RedipSID", "PDSID", "BackSID", "SIDEmu" };
 const char * sidtypes[]    = { "Unknown", "N/A", "8580", "6581", "FMOpl" };
@@ -282,7 +284,7 @@ static bool us_features_read = false;
 const char * help_args[] = {
   "options", "sidchips", "config",
   "features", "network", "presets",
-  "ini", "manual", "other"
+  "ini", "manual", "midi", "other"
 };
 const int menu_count = count_of(help_args);
 
@@ -296,13 +298,14 @@ void print_help_network(void);
 void print_help_presets(void);
 void print_help_ini(void);
 void print_help_manual(void);
+void print_help_midi(void);
 void print_help_other(void);
 
 typedef void (*f_help_menu)(void);
 f_help_menu help_menus[] = {
   print_help_options, print_help_sidchips, print_help_config,
   print_help_features, print_help_network, print_help_presets,
-  print_help_ini, print_help_manual, print_help_other
+  print_help_ini, print_help_manual, print_help_midi, print_help_other
 };
 
 /* NSD declarations */

@@ -13,7 +13,7 @@ $ cfg_usbsid [arguments]
 --[OPTIONS]-------------------------------------------------------------------------------------------------------------
   -h,       --help              : Show this help message
   -h itm,   --help item         : Show item help message, items are:
-                                  options,sidchips,config,features,network,presets,ini,manual,other
+                                  options,sidchips,config,features,network,presets,ini,manual,midi,other
                                   or the first three letters of each item
   -v,       --version           : Read and print USBSID-Pico firmware version
   -lb,      --list-boards       : List every attached board's serial number and exit
@@ -150,6 +150,15 @@ $ cfg_usbsid [arguments]
                                   (Available for 'Clone' chiptype only!)
   -a1 N,    --as-one N          : Socket 2 mirrors socket 1 (Socket 2 setting only!)
                                   Enabled (1) or Disabled (0)
+--[MIDI]----------------------------------------------------------------------------------------------------------------
+  -mls,     --midi-load-state   : Load the saved MIDI config (channels, patches, arp tables, CC map) from flash
+  -mss,     --midi-save-state   : Save the current MIDI config to flash
+  -mrs,     --midi-reset-state  : Reset the MIDI config to defaults and erase all saved MIDI config slots
+  -sapp N,  --set-c64-app N     : Set and save the embedded C64 MIDI app (embedded emulator only!)
+                                  0: Cynthcart, 1: SID SYNTH
+  -startapp,   --start-c64-app  : Start the configured C64 MIDI app (embedded emulator only!)
+  -stopapp,    --stop-c64-app   : Stop the configured C64 MIDI app (embedded emulator only!)
+  -restartapp, --restart-c64-app: Restart the configured C64 MIDI app (embedded emulator only!)
 --[OTHER]---------------------------------------------------------------------------------------------------------------
   -d,       --debug             : Enable debug prints
   -configr N                    : Read back N bytes from a write config command, use _before_ `-config`

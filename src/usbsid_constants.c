@@ -180,6 +180,18 @@ static const char __in_flash("us_statics") *mono_stereo[] = {
 };
 
 /**
+ * @brief C64 embedded application strings
+ *
+ */
+#if defined(ONBOARD_EMULATOR)
+static const char __in_flash("us_statics") *p_c64_apps[] = {
+  [P_C64APP_CYNTHCART] = "Cynthcart",
+  [P_C64APP_SIDSYNTH]  = "SID SYNTH",
+  [P_C64APP_COUNT]     = "None",
+};
+#endif
+
+/**
  * @brief Configured and allowed socket presets
  *
  */
@@ -428,3 +440,19 @@ const char * monostereo_str(ZeroOne val)
   }
   return mono_stereo[0]; /* Mono */
 }
+
+/**
+ * @brief Helper function
+ *
+ * @param C64App app
+ * @return const char* string
+ */
+#if defined(ONBOARD_EMULATOR)
+const char * const embedded_c64app_str(C64App app)
+{
+  if (app >= 0 && app < P_C64APP_COUNT) {
+    return p_c64_apps[app];
+  }
+  return p_c64_apps[P_C64APP_COUNT]; /* None */
+}
+#endif

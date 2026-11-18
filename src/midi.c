@@ -44,8 +44,10 @@
 #if defined(ONBOARD_EMULATOR)
 #include <usbsid.h> /* emulator variables */
 #include <sid_player.h> /* emulator variables */
-#include <cynthcart_embedded.h> /* Cynthcart ~ USBSID-Player */
-queue_t cynthcart_queue;
+#include <c64app_embedded.h> /* Cynthcart, SID SYNTH ~ USBSID-Player */
+/* Read by the emulated MC68B50 ACIA on core1 (player-repo src/cart/MC68B50.cpp) */
+queue_t c64midi_queue;
+#define C64MIDI_QUEUE_ENTRIES 512 /* A SID SYNTH Editor patch burst is ~200 bytes */
 #endif /* ONBOARD_EMULATOR */
 
 
@@ -118,6 +120,11 @@ void midi_init(void)
    * consumer racing this yet */
   midi_queue_init();
 
+  #if defined(ONBOARD_EMULATOR)
+  /* Allocated once, never freed: the ACIA on core1 may still poll it while core0 stops the emulator */
+  queue_init(&c64midi_queue, sizeof(c64midi_queue_entry_t), C64MIDI_QUEUE_ENTRIES);
+  #endif /* ONBOARD_EMULATOR */
+
   /* Start the processor of midi buffers */
   midi_processor_init();
 
@@ -126,56 +133,37 @@ void midi_init(void)
 
 #if defined(ONBOARD_EMULATOR)
 /**
- * @brief Initialise the Cynthcart data queue
- *
- * Allocates a 128 entry queue used to hand MIDI/emulator data bytes to the
- * embedded Cynthcart (emudore-derived) C64 core.
+ * @brief Drop every byte still waiting for the C64 MIDI app
  */
-void emulator_queue_init(void)
+static void emulator_queue_drain(void)
 {
-  queue_init(&cynthcart_queue, sizeof(cynthcart_queue_entry_t), 128); /* 128 entries as buffer */
+  c64midi_queue_entry_t entry;
+  while (queue_try_remove(&c64midi_queue, &entry)) {}
 }
 
 /**
- * @brief Free the Cynthcart data queue and reset the SID
- *
- * Releases the queue allocated by emulator_queue_init() and resets the SID
- * chip and its registers.
- */
-inline void emulator_queue_deinit(void)
-{
-  queue_free(&cynthcart_queue);
-  reset_sid_registers();
-}
-
-/**
- * @brief Forward the current MIDI stream buffer to the Cynthcart queue
+ * @brief Forward the current MIDI stream buffer to the C64 MIDI app queue
  *
  * Pushes every byte of `midimachine.streambuffer` (up to `midimachine.index`)
- * onto the Cynthcart queue, blocking if the queue is full.
+ * onto c64midi_queue, blocking if the queue is full.
  */
-inline void handle_emulater_data(void)
+static inline void handle_emulater_data(void)
 {
   for (size_t e = 0; e < midimachine.index; e++) {
-    /* Create queue entry */
-    cynthcart_queue_entry_t cq_entry;
-    /* Add byte to queue */
+    c64midi_queue_entry_t cq_entry;
     cq_entry.data = midimachine.streambuffer[e];
-    /* Add to queue (blocking wait if queue is full) */
-    queue_add_blocking(&cynthcart_queue, &cq_entry);
+    queue_add_blocking(&c64midi_queue, &cq_entry);
   }
   return;
 }
 
 /**
- * @brief Request Cynthcart emulator startup
- *
- * Initialises the Cynthcart queue and sets the flags core1 uses to hand off
- * to the emulator on its following loop iteration.
+ * @brief Request emulator startup, core1 starts Midi.emulator_app on its next loop
  */
-inline void emulator_enable(void)
+static inline void emulator_enable(void)
 {
-  emulator_queue_init();
+  usMIDI("[EMULATOR] Starting '%s'\n", embedded_c64app_str(usbsid_config.Midi.emulator_app));
+  emulator_queue_drain();
   emulator_running = false;
   offload_ledrunner = true;
   starting_emulator = true;
@@ -183,33 +171,67 @@ inline void emulator_enable(void)
 }
 
 /**
- * @brief Stop the Cynthcart emulator and release its resources
- *
- * Signals the emulator to stop, tears down Cynthcart, and frees the queue.
+ * @brief Stop the C64 MIDI app and reset the SID
  */
-void emulator_disable(void)
+static void emulator_disable(void)
 {
+  usMIDI("[EMULATOR] Stopping '%s'\n", embedded_c64app_str(usbsid_config.Midi.emulator_app));
   emulator_running = false;
   stopping_emulator = true;
-  stop_cynthcart();
+  stop_c64app();
   offload_ledrunner = false;
-  emulator_queue_deinit();
+  emulator_queue_drain();
+  reset_sid_registers();
   return;
 }
 
 /**
- * @brief Reset the Cynthcart emulator
- *
- * @note Not implemented yet, only logs a message
+ * @brief Restart the C64 MIDI app, a fresh boot of Midi.emulator_app
  */
-inline void emulator_reset(void)
+static inline void emulator_reset(void)
 {
-  usMIDI("Emulator reset not implemented yet!\n");
+  usMIDI("[EMULATOR] Restarting '%s'\n", embedded_c64app_str(usbsid_config.Midi.emulator_app));
+  emulator_disable();
+  emulator_enable();
   return;
 }
 
 /**
- * @brief Dispatch a Control Change message to the Cynthcart enable/disable/reset handlers
+ * @brief Run an emulator control command from SysEx SYSEX_EMULATOR
+ *
+ * @param uint8_t op EMULATOR_STOP, EMULATOR_START or EMULATOR_RESTART
+ * @param int app c64app_t to select first (RAM only, SAVE_CONFIG persists it), < 0 keeps the current one
+ */
+void emulator_command(uint8_t op, int app)
+{
+  if (app >= 0) {
+    if (app < C64APP_COUNT) {
+      usbsid_config.Midi.emulator_app = (uint8_t)app;
+    } else {
+      usERR("[EMULATOR] app %d out of range, max %d\n", app, C64APP_COUNT - 1);
+      return;
+    }
+  }
+  usMIDI("[EMULATOR] op %u app %u running %d\n", op, usbsid_config.Midi.emulator_app, (int)emulator_running);
+  switch (op) {
+    case EMULATOR_STOP:
+      if (emulator_running || starting_emulator) emulator_disable();
+      starting_emulator = false;
+      break;
+    case EMULATOR_START:
+      if (!emulator_running) emulator_enable();
+      break;
+    case EMULATOR_RESTART:
+      emulator_reset();
+      break;
+    default:
+      break;
+  }
+  return;
+}
+
+/**
+ * @brief Dispatch a Control Change message to the emulator enable/disable/reset handlers
  *
  * Compares the CC number in `midimachine.streambuffer[1]` against the
  * CC_CEN/CC_CDI/CC_CRE control values and calls the matching
@@ -379,8 +401,10 @@ uint32_t midi_clock_total_pulses(void)
  * packet fast path (process_usb_midi_packet()). Both callers must already
  * have the message in midimachine.streambuffer with midimachine.index set
  * to its length.
- * Cynthcart interception stays on core0 and a regular MIDI message is queued
- * for midi_engine_task() on core1, gated by usbsid_config.Midi.enabled.
+ * Emulator interception stays on core0: CC 117-119 enable/disable/reset the
+ * embedded C64 MIDI app (Cynthcart or SID SYNTH) and a running app gets every
+ * other message. A regular MIDI message is queued for midi_engine_task() on
+ * core1, gated by usbsid_config.Midi.enabled.
  * A disabled MIDI path never fills a queue nothing drains.
  */
 static inline void dispatch_complete_message(void)
@@ -394,7 +418,7 @@ static inline void dispatch_complete_message(void)
     && (midimachine.streambuffer[1] <= midi_ccvalues_defaults.CC_CRE)) {
       handle_emulator_cc();
   } else
-  if (emulator_running) { /* Cynthcart, yeah baby yeah! */
+  if (emulator_running) { /* Cynthcart or SID SYNTH, yeah baby yeah! */
     handle_emulater_data();
   } else {
   #endif

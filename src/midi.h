@@ -86,10 +86,20 @@ typedef struct {
 /* Global MIDI state machine (defined in midi.c) */
 extern midi_machine midimachine;
 
-/* Cynthcart~Emudore queue */
+/* MIDI bytes for the C64 MIDI app in the onboard emulator (Cynthcart, SID SYNTH) */
 typedef struct {
   uint8_t data;
-} cynthcart_queue_entry_t;
+} c64midi_queue_entry_t;
+
+#if defined(ONBOARD_EMULATOR)
+/* Emulator control (SysEx SYSEX_EMULATOR), app < 0 keeps Midi.emulator_app */
+enum {
+  EMULATOR_STOP    = 0,
+  EMULATOR_START   = 1,
+  EMULATOR_RESTART = 2,
+};
+void emulator_command(uint8_t op, int app);
+#endif /* ONBOARD_EMULATOR */
 
 /* Global MIDI CC values defaults (defined in midi.c) */
 extern const midi_ccvalues midi_ccvalues_defaults;

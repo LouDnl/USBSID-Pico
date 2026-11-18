@@ -143,6 +143,19 @@ typedef enum SIDType
 } SIDType;
 
 /**
+ * @brief Available embedded c64 applications
+ * Matches c64app_embedded.h:c64app_t
+ *
+ */
+#if defined(ONBOARD_EMULATOR)
+typedef enum C64App {
+  P_C64APP_CYNTHCART = 0, /* Cynthcart by Paul Slocum */
+  P_C64APP_SIDSYNTH  = 1, /* SID SYNTH by LukHash */
+  P_C64APP_COUNT
+} C64App;
+#endif
+
+/**
  * @brief Per-socket detection results
  *
  */
@@ -187,6 +200,9 @@ extern const char * const changed_str(ZeroOne val);
 extern const char * const locked_str(ZeroOne val);
 extern const char * const dualsingle_str(ZeroOne val);
 extern const char * const monostereo_str(ZeroOne val);
+#if defined(ONBOARD_EMULATOR)
+extern const char * const embedded_c64app_str(C64App app);
+#endif
 
 
 #ifdef __cplusplus

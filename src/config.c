@@ -43,6 +43,9 @@
 #include <config_socket.h>
 #include <config_logging.h>
 #include <logging.h>
+#if defined(ONBOARD_EMULATOR)
+#include <c64app_embedded.h> /* C64APP_COUNT ~ USBSID-Player */
+#endif /* ONBOARD_EMULATOR */
 #ifdef USE_NET
 #include <net_wifi.h>
 #include <net_config.h>
@@ -245,7 +248,7 @@ void read_config(Config* config)
   config_array[46] = 0x00; /* Unused */
   config_array[47] = 0x00; /* Unused */
   config_array[48] = 0x00; /* Unused */
-  config_array[49] = 0x00; /* Unused */
+  config_array[CFG_IDX_EMULATOR_APP] = config->Midi.emulator_app; /* ONBOARD_EMULATOR: C64 MIDI app, 0 Cynthcart, 1 SID SYNTH */
   config_array[50] = 0x00; /* Unused */
 
   /* Stuffs */
@@ -957,6 +960,15 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
             usbsid_config.rx_ring = (bool)buffer[2];
           };
           break;
+        case BOARD_EMUAPP:    /* C64 MIDI app for the emulator, used on its next start */
+          #if defined(ONBOARD_EMULATOR)
+          if (buffer[2] < C64APP_COUNT) {
+            usbsid_config.Midi.emulator_app = buffer[2];
+          } else {
+            usERR("BOARD_EMUAPP %u out of range, max %u\n", buffer[2], C64APP_COUNT - 1);
+          };
+          #endif
+          break;
         default:
           break;
       };
@@ -1062,6 +1074,44 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case RESET_MIDI_STATE:
       usCFG("RESET_MIDI_STATE\n");
       midi_config_reset();
+      break;
+    case SET_C64_MIDIAPP:
+      usCFG("SET_C64_MIDIAPP\n");
+      #if defined(ONBOARD_EMULATOR)
+      if (buffer[1] < C64APP_COUNT) {
+        if (usbsid_config.Midi.emulator_app != buffer[1]) {
+          usCFG("Updating default embedded application from '%s' to '%s'\n",
+            embedded_c64app_str(usbsid_config.Midi.emulator_app), embedded_c64app_str(buffer[1]));
+          usbsid_config.Midi.emulator_app = buffer[1];
+          if (buffer[2] == 1) {  /* Save and apply if set to a 1 */
+            usCFG("Saving config\n");
+            save_load_apply_config(false);
+          }
+        } else {
+          usCFG("Not updating the default embedded application, source and target are equal.\n");
+        }
+      } else {
+        usERR("SET_C64_MIDIAPP %u out of range, max %u\n", buffer[2], C64APP_COUNT - 1);
+      };
+      #endif
+      break;
+    case START_C64_MIDIAPP:
+      usCFG("START_C64_MIDIAPP\n");
+      #if defined(ONBOARD_EMULATOR)
+      emulator_command(EMULATOR_START, usbsid_config.Midi.emulator_app);
+      #endif
+      break;
+    case STOP_C64_MIDIAPP:
+      usCFG("STOP_C64_MIDIAPP\n");
+      #if defined(ONBOARD_EMULATOR)
+      emulator_command(EMULATOR_STOP, usbsid_config.Midi.emulator_app);
+      #endif
+      break;
+    case RESTART_C64_MIDIAPP:
+      usCFG("RESTART_C64_MIDIAPP\n");
+      #if defined(ONBOARD_EMULATOR)
+      emulator_command(EMULATOR_RESTART, usbsid_config.Midi.emulator_app);
+      #endif
       break;
     case WIFI_STATUS: /* Not available on non _w, always returns 0xFF 0xFF */
       usCFG("WIFI_STATUS\n");
@@ -1669,6 +1719,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
     case WRITE_CLONECHIP: /* Write configuration / data to clone Chips */
       write_chip_configuration(buffer[2]);
       break;
+    #if 0 /* TODO: Deprecate and remove */
     case PDSID: /* TODO: Deprecate and remove */
       if (buffer[1] == 0) {
         usCFG("Toggle PDSID type\n");
@@ -1686,6 +1737,7 @@ void handle_config_request(uint8_t * buffer, uint32_t size)
         break;
       }
       break;
+    #endif
 #if defined(ONBOARD_EMULATOR)
     case UPLOAD_SID_START:
       /* REVERT NOTE: this used to stage the incoming file in its own

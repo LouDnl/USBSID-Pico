@@ -47,6 +47,7 @@
  #include <midi_arp_table.h>
  #include <midi_fmopl.h>
  #include <midi_handler.h>
+ #include <midi.h> /* emulator_command() */
 
 
 /* Custom commands */
@@ -107,7 +108,6 @@ enum {
    * persists it. */
   SYSEX_MIDI_PATCH_SAVE  = 0x2A,
   SYSEX_FMOPL_PATCH_SAVE = 0x2B,
-};
   /* CC map commands, RAM only, persist with SYSEX_MIDI_SAVE.
    * Encode values as encode_byte() nibbles, MIDI_CC_UNASSIGNED = unbound.
    * Send no ack on SET, log refusal via usERR, verify with a DUMP.
@@ -117,6 +117,11 @@ enum {
   SYSEX_MIDI_CCMAP_DUMP  = 0x2D,  /* request: page */
   SYSEX_MIDI_CCMAP_DATA  = 0x2E,  /* response: device -> host, page + 48 nibbles */
   SYSEX_MIDI_CCMAP_RESET = 0x2F,  /* host -> device: mode */
+  /* ONBOARD_EMULATOR: C64 MIDI app control, works with MIDI disabled in config.
+   * F0 50 30 <op> [app] F7, op 0 stop, 1 start, 2 restart (EMULATOR_* in midi.h),
+   * app (c64app_t: 0 Cynthcart, 1 SID SYNTH) selects first, RAM only. */
+  SYSEX_EMULATOR = 0x30,
+};
 
 
 /* Every midi_patch_t field sent as two 7-bit-safe nibble bytes (0-15 each),
@@ -632,11 +637,6 @@ static void handle_arptable_dump(uint8_t *buffer, int size)
   return;
 }
 
-
-/**
- * @brief Dispatch a USBSID custom SysEx command (buffer[2] = command id)
- *
- * Handles TOGGLE_AUDIO (routed through handle_config_request), the MIDI
 #define CCMAP_SYSEX_SET_SIZE      7  /* F0 50 2C id hi lo F7 */
 #define CCMAP_SYSEX_IDS_PER_PAGE  24
 #define CCMAP_SYSEX_PAGES         (MIDI_CC_MAP_SLOTS / CCMAP_SYSEX_IDS_PER_PAGE)
@@ -727,11 +727,38 @@ static void handle_ccmap_reset(uint8_t *buffer, int size)
   usCFG("[SYSEX] SYSEX_MIDI_CCMAP_RESET: mode %d applied in RAM\n", mode);
   return;
 }
+
+#if defined(ONBOARD_EMULATOR)
+/**
+ * @brief SYSEX_EMULATOR: F0 50 30 <op> [app] F7, see the command enum
+ *
+ * @param uint8_t * buffer
+ * @param int size
+ */
+static void handle_emulator_sysex(uint8_t *buffer, int size)
+{
+  if (size < 4 || buffer[3] > EMULATOR_RESTART) {
+    usERR("[SYSEX] SYSEX_EMULATOR: missing or invalid op\n");
+    return;
+  }
+  const int app = (size >= 5 && buffer[4] < 0x80) ? (int)buffer[4] : -1;
+  emulator_command(buffer[3], app);
+  return;
+}
+#endif /* ONBOARD_EMULATOR */
+
+
+/**
+ * @brief Dispatch a USBSID custom SysEx command (buffer[2] = command id)
+ *
+ * Handles TOGGLE_AUDIO (routed through handle_config_request), the MIDI
  * config SAVE/LOAD/RESET triggers, the LOAD/DUMP command pairs for SID
  * patches, FMOpl patches and arp tables, the SAVE command pair that captures
- * a channel's live state into a SID or FMOpl patch slot, plus the FMOpl
- * clock override. Ignored while the bus is in reset state or MIDI is
- * disabled in config.
+ * a channel's live state into a SID or FMOpl patch slot, the FMOpl clock
+ * override, plus the CC map SET/DUMP/RESET commands (DATA is device ->
+ * host only, ignored on input). Ignored while the bus is in reset state
+ * or MIDI is disabled in config, except the emulator control command
+ * (ONBOARD_EMULATOR builds), which only checks the reset state.
  *
  * @param uint8_t * buffer
  * @param int size
@@ -739,6 +766,13 @@ static void handle_ccmap_reset(uint8_t *buffer, int size)
 void decode_sysex_command(uint8_t * buffer, int size)
 {
   if __us_unlikely(get_reset_state()) return;
+  #if defined(ONBOARD_EMULATOR)
+  /* Before the MIDI enabled gate, like the CC 117-119 emulator control */
+  if (buffer[2] == SYSEX_EMULATOR) {
+    handle_emulator_sysex(buffer, size);
+    return;
+  }
+  #endif /* ONBOARD_EMULATOR */
   if __us_unlikely(!usbsid_config.Midi.enabled) return;
 
   uint8_t config_buffer[5] = {0};
@@ -787,6 +821,15 @@ void decode_sysex_command(uint8_t * buffer, int size)
     case SYSEX_FMOPL_PATCH_SAVE:
       handle_fmopl_patch_save(buffer, size);
       break;
+    case SYSEX_MIDI_CCMAP_SET:
+      handle_ccmap_set(buffer, size);
+      break;
+    case SYSEX_MIDI_CCMAP_DUMP:
+      handle_ccmap_dump(buffer, size);
+      break;
+    case SYSEX_MIDI_CCMAP_RESET:
+      handle_ccmap_reset(buffer, size);
+      break;
     default:
       break;
   }
@@ -820,12 +863,3 @@ void process_sysex(uint8_t* buffer, int size)
   }
   return;
 }
-    case SYSEX_MIDI_CCMAP_SET:
-      handle_ccmap_set(buffer, size);
-      break;
-    case SYSEX_MIDI_CCMAP_DUMP:
-      handle_ccmap_dump(buffer, size);
-      break;
-    case SYSEX_MIDI_CCMAP_RESET:
-      handle_ccmap_reset(buffer, size);
-      break;

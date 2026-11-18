@@ -2,36 +2,14 @@
 Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on version changes
 
 #### Version: Unreleased
-* Build tools in full static without dependencies
-* Move shared global enums and defines into `usbsid_protocol.h` for cross repo use
-  - header is included once per scope and carries no pragma once
-  - no wire values change
-  - anonymous enums are now named
-  - from `config.h`:
-    - `CommandBytes`, `ConfigSubCommands`, `ConfigIOBytes`
-    - `EmulatorCommands`, `EmulatorUploadTypes`
-    - `CloneChipIOBytes`, `SetConfigTypes`
-    - the `USBNET_IP_MODE_*` ids as `USFeatures`
-  - move the `ChipType` enum typedef from `usbsid_constants.h`
-  - move the `US_FEATURE_*` bit names as `NetModes` from `USBSID.h`
-  - move `CONFIG_BUFFER_SIZE` from `usbsid_defs.h`
-  - mvoe `SOCKET_BUFFER_SIZE`, `UPLOAD_PACKET_SIZE` and `UPLOAD_PAYLOAD_SIZE` from `USBSID.h`
-  - move config indexes as `ReadConfigOffsets` from `USBSIDInterface.h`
-  - remove the duplicated enums from the source headers
-  - keep `TEST_FN` and `TEST_FN2` firmware-only in `config.h`
-  - define the values the C driver API needs once as `USBSID_*` macros in a `_USBSID_PROTOCOL_DEFS_` section: feature bits, config offsets, reply sizes, player commands, upload types and `USBSID_FW_VERSION_BATCH_READ`
-  - derive the `USFeatures`, `ReadConfigOffsets`, `SID_PLAYER_*` and `EmulatorUploadTypes` entries and `CONFIG_BUFFER_SIZE` and `SOCKET_BUFFER_SIZE` from those macros
-  - add `USBSID_PROTOCOL_MACROS_ONLY` to include the macros without the enums, for C code that must not see the global enum names
-  - align the macro and `CommandBytes` columns
-  - use `CFG_IDX_*` for the reply offsets in `read_config()` in `config.c`
-  - use `US_FEATURE_*` for the feature flag consts in `config.h`
-  - name the remaining `read_config()` reply offsets as `CFG_IDX_*` in `ReadConfigOffsets`: socket one and two, LED, RGB LED, emulator app, CDC, WebUSB, ASID, MIDI and RX ring
-  - use those names in `read_config()` in `config.c`
-  - add the SID stream wire constants as `USBSID_*` macros and the `StreamConstants` enum, and remove their definitions from `globals.h` and `stream.h`
-  - compare `STREAM_ITF_NUM` as an int in the interface number check in `usb_descriptors.c`
-  - use `UPLOAD_FILE_PRG` for the PRG upload check in `config.c`
-  - include `usbsid_protocol.h` in the config tool example and remove its duplicated command, sub-command and `SOCKET_BUFFER_SIZE` definitions from `cfg_usbsid.h`
-  - replace the local file type enum in `send_sid.c` with the `USBSID_UPLOAD_FILE_*` macros from `USBSIDInterface.h`
+* Add SID SYNTH as second embedded C64 Midi application
+  - add SID SYNTH by LukHash as second embedded C64 Midi application next to Cynthcart, selected with the new persisted `Midi.emulator_app` config item (0 Cynthcart, 1 SID SYNTH), the item shares its byte with `Midi.enabled` and older saved configs read 0
+  - add the `C64App` enum and `embedded_c64app_str()` in `usbsid_constants`
+  - start, stop and restart the selected application with CC 117, 118 and 119 and with the new SysEx `SYSEX_EMULATOR` (0x30, `F0 50 30 <op> [app] F7`), the SysEx command can select the application first and is handled before the Midi enabled setting
+  - restart is a real fresh boot of the selected application
+  - run the application through the new generic embedded application loader in the USBSID-Player, `usbsid.c` and `sid_player.c` use `start_c64app()` and `run_c64app()`
+  - add the config commands `SET_C64_MIDIAPP` (save with byte 3 = 1) plus start, stop and restart to `config.c`
+  - add `-sapp`, `-startapp`, `-stopapp`, `-restartapp` and the Midi help page to `cfg_usbsid`
 * Add a user remappable MIDI CC map with SysEx control
   - give all 64 CC functions a fixed function id in `midi_defs.h`, one global map for all 16 channels, ids 0-51 remappable and ids 52-63 fixed
   - renumber the default CC map to MIDI 1.0 conform numbers, the embedded application enable, disable and reset CCs move from 85-87 to 117-119

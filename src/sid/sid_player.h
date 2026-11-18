@@ -44,7 +44,7 @@ extern volatile bool
 extern volatile char tuneno;
 extern volatile bool is_prg;
 extern volatile uint32_t playtime, maxplaytime;
-/* Cynthcart */
+/* Cynthcart & SID SYNTH */
 extern volatile bool
   emulator_running,
   starting_emulator,

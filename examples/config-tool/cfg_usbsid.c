@@ -1087,6 +1087,11 @@ bool board_has_rgbvu(void)
   return board_feature(0b00000100);
 }
 
+bool board_has_pio_uart(void)
+{
+  return board_feature(0b00001000);
+}
+
 bool board_has_net(void)
 {
   return board_feature(0b00010000);
@@ -1133,6 +1138,19 @@ bool require_wifi_support(void)
   return true;
 }
 
+bool require_emulator_support(void)
+{ /* SET/START/STOP/RESTART_C64_MIDIAPP are no-ops on firmware without ONBOARD_EMULATOR */
+  if (!read_us_features()) {
+    printf("Could not query board features, C64 MIDI app command aborted!\n");
+    return false;
+  }
+  if (!board_has_emulator()) {
+    printf("This USBSID-Pico was not built with the embedded emulator, C64 MIDI app command unavailable!\n");
+    return false;
+  }
+  return true;
+}
+
 bool require_nsd_support(void)
 {
   if (!require_net_support()) return false;
@@ -1161,11 +1179,13 @@ void print_config(void)
     } else {
       printf("    - LED Status indicator\n");
     }
+    if (board_has_pio_uart()) printf("    - PIO UART\n");
     if (board_has_net())      printf("    - WiFi & Bluetooth\n");
     if (board_has_nsd())      printf("      - with Network SID Device\n");
     if (board_has_sidstream()) printf("    - SID register stream\n");
     if (board_has_emulator()) printf("    - Embedded USBSID-Player\n");
-    if (board_has_emulator()) printf("      - with Cynthcart\n");
+    if (board_has_emulator()) printf("      - with Cynthcart (© Paul Slocum)\n");
+    if (board_has_emulator()) printf("      - with SID SYNTH (© LukHash)\n");
   }
   printf("\n");
   printf("  Clock settings:\n");
@@ -1935,7 +1955,7 @@ void print_help_separator(void)
 void print_help_extended(void)
 {
   printf("  -h itm,   --help item         : Show item help message, items are:\n");
-  printf("                                  options,sidchips,config,features,network,presets,ini,manual,other\n");
+  printf("                                  options,sidchips,config,features,network,presets,ini,manual,midi,other\n");
   return;
 }
 
@@ -2133,6 +2153,21 @@ void print_help_manual(void)
   return;
 }
 
+void print_help_midi(void)
+{
+  printf("--[MIDI]----------------------------------------------------------------------------------------------------------------\n");
+  printf("  -mls,     --midi-load-state   : Load the saved MIDI config (channels, patches, arp tables, CC map) from flash\n");
+  printf("  -mss,     --midi-save-state   : Save the current MIDI config to flash\n");
+  printf("  -mrs,     --midi-reset-state  : Reset the MIDI config to defaults and erase all saved MIDI config slots\n");
+  printf("  -sapp N,  --set-c64-app N     : Set and save the embedded C64 MIDI app (embedded emulator only!)\n");
+  printf("                                  0: %s, 1: %s\n", c64_midiapps[0], c64_midiapps[1]);
+  printf("  -startapp,   --start-c64-app  : Start the configured C64 MIDI app (embedded emulator only!)\n");
+  printf("  -stopapp,    --stop-c64-app   : Stop the configured C64 MIDI app (embedded emulator only!)\n");
+  printf("  -restartapp, --restart-c64-app: Restart the configured C64 MIDI app (embedded emulator only!)\n");
+
+  return;
+}
+
 void print_help_other(void)
 {
   printf("--[OTHER]---------------------------------------------------------------------------------------------------------------\n");
@@ -2155,6 +2190,7 @@ void print_help_all(void)
   print_help_presets();
   print_help_ini();
   print_help_manual();
+  print_help_midi();
   print_help_other();
 
   return;
@@ -2426,6 +2462,54 @@ void config_usbsidpico(int argc, char **argv)
       break;
     }
 
+    if (!strcmp(argv[param_count], "-mls") || !strcmp(argv[param_count], "--midi-load-state")) {
+      printf("Loading MIDI config from flash\n");
+      write_config_command(LOAD_MIDI_STATE, 0x0, 0x0, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-mss") || !strcmp(argv[param_count], "--midi-save-state")) {
+      printf("Saving MIDI config to flash\n");
+      write_config_command(SAVE_MIDI_STATE, 0x0, 0x0, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-mrs") || !strcmp(argv[param_count], "--midi-reset-state")) {
+      printf("Resetting MIDI config to defaults and erasing its flash slots\n");
+      write_config_command(RESET_MIDI_STATE, 0x0, 0x0, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-sapp") || !strcmp(argv[param_count], "--set-c64-app")) {
+      if (++param_count >= argc) {
+        printf("Missing C64 MIDI app number!\n");
+        goto exit;
+      }
+      int app = atoi(argv[param_count]);
+      if (app < 0 || app >= (int)count_of(c64_midiapps)) {
+        printf("%d is not a correct C64 MIDI app option!\n", app);
+        goto exit;
+      }
+      if (!require_emulator_support()) goto exit;
+      printf("Set C64 MIDI app to '%s' and save config\n", c64_midiapps[app]);
+      write_config_command(SET_C64_MIDIAPP, app, 0x1, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-startapp") || !strcmp(argv[param_count], "--start-c64-app")) {
+      if (!require_emulator_support()) goto exit;
+      printf("Starting C64 MIDI app\n");
+      write_config_command(START_C64_MIDIAPP, 0x0, 0x0, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-stopapp") || !strcmp(argv[param_count], "--stop-c64-app")) {
+      if (!require_emulator_support()) goto exit;
+      printf("Stopping C64 MIDI app\n");
+      write_config_command(STOP_C64_MIDIAPP, 0x0, 0x0, 0x0, 0x0);
+      break;
+    }
+    if (!strcmp(argv[param_count], "-restartapp") || !strcmp(argv[param_count], "--restart-c64-app")) {
+      if (!require_emulator_support()) goto exit;
+      printf("Restarting C64 MIDI app\n");
+      write_config_command(RESTART_C64_MIDIAPP, 0x0, 0x0, 0x0, 0x0);
+      break;
+    }
     if (!strcmp(argv[param_count], "-wifis") || !strcmp(argv[param_count], "--wifi-status")) {
       if (!require_net_support()) goto exit;
       printf("Reading WiFi/NSD status\n");
