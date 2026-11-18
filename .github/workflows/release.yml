@@ -16,7 +16,7 @@ on:
   push:
     branches: [master]
     tags:
-      - 'v(\d|\.|-|[A-Z])+' # Only if the tag contains 'v0.0.0' etc
+      - 'v[0-9]+.[0-9]+.[0-9]+*' # Glob, not regex: v0.0.0, v0.0.0-BETA etc
   # Allows you to run this workflow manually from the Actions tab when needed
   workflow_dispatch:
   # Enables calling from other workflows

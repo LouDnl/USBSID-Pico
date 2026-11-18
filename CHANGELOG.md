@@ -62,6 +62,7 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
 * Update the MIDI examples to the renumbered default CCs
   - use the new default CC numbers in the Strudel and TidalCycles examples, for example `CC_FMEN` is CC 31 and the embedded application CCs are 117-119
   - update the VMPK instrument definition and extra controllers file to the new numbers
+* Fix regex tag catching in release workflows by changing them to globs
 
 #### Version: 0.9.0
 * Add batch READ of up to 63 registers
