@@ -10,6 +10,15 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
   - run the application through the new generic embedded application loader in the USBSID-Player, `usbsid.c` and `sid_player.c` use `start_c64app()` and `run_c64app()`
   - add the config commands `SET_C64_MIDIAPP` (save with byte 3 = 1) plus start, stop and restart to `config.c`
   - add `-sapp`, `-startapp`, `-stopapp`, `-restartapp` and the Midi help page to `cfg_usbsid`
+* Add a manual for the embedded C64 Midi applications and credit LukHash
+  - rename the Cynthcart manual to the Embedded C64 Midi Applications manual with a section per application
+  - document the CC and SysEx control, saving the application choice with `cfg_usbsid -sapp`, switching applications, the SID layout and the SID SYNTH CC list
+  - describe the Windows SID SYNTH Editor and its VST3 plugin, how to point them at the USBSID-Pico midi port and why SID SYNTH has to be started first
+  - point to the Neon Airlines album on Bandcamp for the official SID SYNTH manuals and bonus disk and add no copy of them
+  - list SID SYNTH and the SysEx command `SYSEX_EMULATOR` (0x30) in the MIDI manual and rename its Cynthcart section to embedded C64 applications
+  - point the MIDI, firmware and USBSID-Player manuals to the renamed manual
+  - credit LukHash next to Paul Slocum in the README and update the README links to the renamed manual
+  - regenerate the PDFs of the changed manuals
 * Add a user remappable MIDI CC map with SysEx control
   - give all 64 CC functions a fixed function id in `midi_defs.h`, one global map for all 16 channels, ids 0-51 remappable and ids 52-63 fixed
   - renumber the default CC map to MIDI 1.0 conform numbers, the embedded application enable, disable and reset CCs move from 85-87 to 117-119

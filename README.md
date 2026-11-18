@@ -43,7 +43,7 @@ In development is a modular USBSID-Pro featuring 4 SID sockets with 4 mono out p
   * [Configuring your board's firmware](#configuring-your-boards-firmware)
     * [Testing your board](#testing-your-board)
   * [Firmware features](#firmware-features)
-    * [Embedded Cynthcart](doc/USBSID-Pico-Cynthcart-manual.adoc) [(PDF)](doc/USBSID-Pico-Cynthcart-manual.pdf)
+    * [Embedded C64 Midi applications (Cynthcart & SID SYNTH)](doc/USBSID-Pico-Embedded-C64-Midi-Applications-manual.adoc) [(PDF)](doc/USBSID-Pico-Embedded-C64-Midi-Applications-manual.pdf)
     * [Embedded USBSID-Player](doc/USBSID-Player-manual.adoc) [(PDF)](doc/USBSID-Player-manual.pdf)
   * [Firmware types and naming](doc/USBSID-Pico-firmware-manual.adoc) [(PDF)](doc/USBSID-Pico-firmware-manual.pdf)
   * [How to flash new firmware](doc/USBSID-Pico-firmware-manual.adoc) [(PDF)](doc/USBSID-Pico-firmware-manual.pdf)
@@ -227,7 +227,7 @@ See the [Software manual](doc/USBSID-Pico-software-manual.adoc) for driver insta
 # Firmware
 See the [releases page](https://github.com/LouDnl/USBSID-Pico/releases) for more information on what's changed and previous releases.  
 
-**WARNING!** Whenever the embedded USBSID-Player or Cynthcart is used the Pico MCU is overclocked to 250MHz (rp2040 & rp2350). Passive cooling _might/could_ be needed.  
+**WARNING!** Whenever the embedded USBSID-Player, Cynthcart or SID SYNTH is used the Pico MCU is overclocked to 250MHz (rp2040 & rp2350). Passive cooling _might/could_ be needed.  
 
 ### Configuring your board's firmware
 Use the new official [USBSID-Configtool](https://github.com/LouDnl/USBSID-Configtool) to configure your board.  
@@ -250,9 +250,9 @@ The firmware is still in development so features might change, be added or remov
   - Play SID files in your (midi supporting) browser via [IneSID](https://inesid.fazibear.me/) by Fazibear
 - Midi device support over USB
   - Use your USBSID-Pico as Synth with your Midi controller
-- Cynthcart embedded (special firmwares only)
-  - Starting with firmware version v0.6.0-BETA and up some firmwares have Cynthcart as midi input  
-    See the [USBSID-Pico Cynthcart manual](doc/USBSID-Pico-Cynthcart-manual.pdf) for more information!
+- Cynthcart and SID SYNTH embedded (special firmwares only)
+  - Starting with firmware version v0.6.0-BETA and up some firmwares have Cynthcart as midi input, SID SYNTH by LukHash is added as second application  
+    See the [USBSID-Pico Embedded C64 Midi Applications manual](doc/USBSID-Pico-Embedded-C64-Midi-Applications-manual.pdf) for more information!
 - Embedded USBSID-Player for playing PSID, RSID, PRG or P00 files without a computer operated emulator!
   - Starting with firmware version v0.6.0-BETA and up some firmwares have USBSID-Player embedded  
     See the [USBSID-Player manual](doc/USBSID-Player-manual.pdf) for more information!
@@ -461,6 +461,8 @@ Thanks to [@erique](https://github.com/erique) and [@koobo](https://github.com/k
 Thanks to [@Chordian](https://github.com/Chordian) for implementing my crappy webusb solution into deepsid.  
 Thanks to [@kenchis](https://sourceforge.net/u/kenchis/profile/) for adding webusb support to jsidplay2's c64jukebox.  
 Thanks to [PiCiJi](https://bitbucket.org/piciji/workspace/overview) for adding support to Denise.  
+Thanks to [Paul Slocum](https://github.com/PaulSlocum) for creating Cynthcart and to Mario Ballano for creating emudore.  
+Thanks to [LukHash](https://lukhash.bandcamp.com/) for creating SID SYNTH and for allowing it to be embedded in the firmware. Buy the [Neon Airlines](https://lukhash.bandcamp.com/album/neon-airlines) album to get the SID SYNTH bonus disk and manuals!  
 
 Some portions of this code and board are heavily inspired on projects by other great people.
 Some of those projects are - in no particular order:
@@ -470,6 +472,7 @@ Some of those projects are - in no particular order:
 * [TeensyROM by Sensorium Embedded](https://github.com/SensoriumEmbedded/TeensyROM)
 * [SID Factory II by Chordian](https://github.com/Chordian/sidfactory2)
 * [Cynthcart by PaulSlocum](https://github.com/PaulSlocum/cynthcart)
+* [SID SYNTH by LukHash](https://lukhash.bandcamp.com/album/neon-airlines)
 
 
 # Disclaimer

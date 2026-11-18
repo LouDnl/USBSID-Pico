@@ -1,0 +1,188 @@
+= *USBSID-Pico Embedded C64 Midi Applications manual*
+:author: LouD
+:description: This document contains information about the embedded emulator running Cynthcart and SID SYNTH and how to use them
+:url-repo: https://www.github.com/LouDnl/USBSID-Pico
+:revdate: {localdate}
+:hide-uri-scheme:
+:toc:
+:toclevels: 4
+:toc-placement!:
+
+Author: {author} - generated on {revdate}
+
+toc::[]
+[%always]
+<<<
+
+== Disclaimer
+include::disclaimer.adoc[]
+
+
+== Thank you
+First off thanks go out to Paul Slocum for creating Cynthcart and Mario Ballano for creating emudore. +
+Many thanks to LukHash for creating SID SYNTH and for giving permission to embed it in the USBSID-Pico firmware. +
+Please support his work and buy the Neon Airlines album, the SID SYNTH bonus disk and its manuals come with it: https://lukhash.bandcamp.com/album/neon-airlines +
+
+
+== Firmwares with embedded C64 Midi applications
+Starting with firmware version v0.8.0 firmwares ending with `_em` can run an embedded C64 Midi application. +
+For example `usbsidpico-v1.0_em.uf2` or `usbsidpico2-rgb-v1.3_em.uf2` +
+The applications run through the embedded USBSID-Player, all `_em` firmwares come with the onboard USBSID-Player included. See the `USBSID-Player-manual` file for more information. +
+The applications are played with USB-midi, no C64 keyboard is needed.
+
+**WARNING!** The applications run through the embedded USBSID-Player and overclock the Pico MCU to 250MHz (rp2040 & rp2350). Passive cooling _might/could_ be needed.
+
+=== Available applications
+[cols="1,2,3"]
+|===
+| Number | Application | By
+
+| 0 | Cynthcart (default) | Paul Slocum
+| 1 | SID SYNTH | LukHash
+|===
+
+One application is selected at a time. The selection is stored in the board config and is applied the next time the application is started. +
+SID SYNTH needs the firmware v0.9.1 or newer, Cynthcart only needs v0.8.0.
+
+
+== Usage
+To start the emulator and an application you will need an USB-midi connection to USBSID-Pico. +
+Starting an application boots a fresh C64 in the emulator and loads the selected application. All Midi data except the control messages below is passed on to the running application.
+
+=== CC messages
+These three CC numbers are fixed and are not part of the remappable CC map of the general Midi implementation, see the `USBSID-Pico midi manual`. They work on any midi channel and act on the selected application. +
+
+117 (0x75) ~ Start the selected application +
+118 (0x76) ~ Stop the selected application and reset the SID +
+119 (0x77) ~ Restart the selected application, this is a fresh boot of the application
+
+The CC value is not checked, use 127 by convention. While an application is running all other CC numbers, including 85 to 87, belong to that application. +
+The control messages are handled before the Midi enabled setting, starting an application works with Midi disabled in the board config.
+
+=== SysEx message
+The control messages are also available as SysEx message and the SysEx message can select the application first. +
+`F0 50 30 <op> [app] F7`
+
+[cols="1,3"]
+|===
+| Field | Value
+
+| `op` | 0 stop, 1 start, 2 restart
+| `app` | optional, 0 Cynthcart, 1 SID SYNTH. Selects the application before the command and is **not** saved to flash
+|===
+
+For example `F0 50 30 01 01 F7` starts SID SYNTH and `F0 50 30 00 F7` stops the running application.
+
+=== Selecting and saving the application
+The `cfg_usbsid` config tool can select the application and save the selection to the board config. +
+
+[source,bash]
+----
+cfg_usbsid -sapp 1       # select and save SID SYNTH
+cfg_usbsid -startapp     # start the selected application
+cfg_usbsid -stopapp      # stop the selected application
+cfg_usbsid -restartapp   # restart the selected application
+----
+
+`-sapp` takes 0 for Cynthcart and 1 for SID SYNTH. Read back the setting with `cfg_usbsid -r`.
+
+=== Switching between applications
+. Stop the running application with CC 118 value 127 (or `cfg_usbsid -stopapp`)
+. Select the other application with `cfg_usbsid -sapp <0 or 1>`, or send a SysEx message that carries the application number
+. Start it with CC 117 value 127 (or `cfg_usbsid -startapp`)
+
+The SysEx start message does steps two and three in one go: `F0 50 30 01 01 F7` starts SID SYNTH, `F0 50 30 01 00 F7` starts Cynthcart. Only `cfg_usbsid -sapp` saves the selection, a selection made by SysEx is forgotten at the next reboot of the board.
+
+The SID is reset when an application stops, sounds and settings of the previous application are not carried over to the next one.
+
+=== SID layout
+Both applications play on two SIDs, the second SID at address `$D420`. The USBSID-Pico routes the writes for the second SID to the socket you configured for SID 2, see the `USBSID-Pico-firmware-manual`. +
+On a board with only one SID socket configured the writes for the second SID are dropped, the first SID plays the first three voices and the voices of the second SID stay silent.
+
+
+== Cynthcart
+Cynthcart by Paul Slocum is a polyphonic synthesizer for the Commodore 64.
+
+=== Cynthcart control
+For all other midi CC messages to control Cynthcart please refer to the Cynthcart manual. +
+Page two in https://github.com/PaulSlocum/cynthcart/blob/master/manual/cynthcart2.0.1.pdf [cynthcart2.0.1.pdf] or https://github.com/PaulSlocum/cynthcart/blob/master/manual/cynthcart2.0.1_5x7.pdf[cynthcart2.0.1_5x7.pdf] +
+On the right side of https://github.com/PaulSlocum/cynthcart/blob/master/manual/keyboardReferenceCharts/cynthcartCommandChart1.pdf[cynthcartCommandChart1.pdf] +
+Or on the bottom of https://github.com/PaulSlocum/cynthcart/blob/master/manual/keyboardReferenceCharts/cynthcartCommandChart2.pdf[cynthcartCommandChart2.pdf]
+
+
+== SID SYNTH
+SID SYNTH by LukHash is a live chiptune synthesizer for the Commodore 64. It has three voices per SID (six with a second SID), eight waveforms, an ADSR envelope, a multimode filter, PWM, vibrato, portamento, tremolo, ring modulation, hard sync, arpeggios that can follow the midi clock and 54 instrument slots. +
+SID SYNTH is part of the Neon Airlines album by LukHash and is shared as a free bonus disk with it. +
+Buy the album to get the bonus disk with the official SID SYNTH manual and quick start guide: https://lukhash.bandcamp.com/album/neon-airlines +
+These manuals are not part of this repository and cannot be downloaded from this project, they come with the album.
+
+=== Starting SID SYNTH
+. Use an `_em` firmware, v0.9.1 or newer
+. Select SID SYNTH and save the choice: `cfg_usbsid -sapp 1`
+. Send CC 117 with value 127 on any midi channel, or run `cfg_usbsid -startapp`
+. Wait a few seconds, the C64 needs to boot and load the application
+
+The SID SYNTH on the board is a patched version of the original. Midi is switched on at boot with the Datel interface type (the interface that the emulator provides) and the second SID is enabled at `$D420`. You do not need to open the SID SYNTH menu to set these. +
+There is no C64 keyboard on the board, play SID SYNTH with a midi keyboard or a DAW.
+
+=== Playing SID SYNTH
+Notes, pitch bend, the mod wheel (CC 1), program change (switches the instrument slot, program 1 selects the first slot) and the midi clock for the arpeggiator work as described in the official SID SYNTH manual. +
+The knobs of SID SYNTH are controlled with these CC numbers:
+
+[cols="1,3,1,1,3,1"]
+|===
+| CC | Parameter | Range | CC | Parameter | Range
+
+| 1 | mod wheel (live vibrato) | - | 77 | vibrato depth | 0-31
+| 14 | tremolo rate | 0-31 | 78 | vibrato delay | 0-31
+| 15 | tremolo on | 0-1 | 79 | vibrato type | 0-7
+| 22 | mode / octave plus / arpeggio plus (shared) | 0-4 / 0-1 / 0-1 | 80 | vibrato retrigger | -
+| 23 | arpeggio direction | 0-2 | 81 | vibrato on | 0-1
+| 25 | ring modulation | 0-1 | 82 | filter sweep rate | 0-31
+| 26 | hard sync | 0-1 | 83 | filter sweep cycle | 0-4
+| 27 | attack click | 0-1 | 85 | filter mode | 0-3
+| 28 | waveform | 0-7 | 86 | filter retrigger | 0-2
+| 30 | portamento | 0-1 | 87 | envelope retrigger | 0-2
+| 31 | speed | 1-31 | 102 | pulse width | 0-31
+| 70 | sustain | 0-15 | 103 | PWM rate | 0-31
+| 71 | resonance | 0-15 | 104 | PWM depth | 0-31
+| 72 | release | 0-15 | 105 | PWM cycle | 1-4
+| 73 | attack | 0-15 | 106 | PWM retrigger | 0-2
+| 74 | filter cutoff | 0-31 | 107 | PWM on | 0-1
+| 75 | decay | 0-15 | | |
+| 76 | vibrato rate | 1-32 | | |
+|===
+
+The CC assignments can be changed on the SID SYNTH MIDI CC SETUP screen, the table above is the default. +
+CC 85 to 87 reach SID SYNTH like all other CC numbers, the application control messages are 117 to 119.
+
+When the Midi CC map of the USBSID-Pico firmware is remapped, SID SYNTH is not affected. The CC numbers for SID SYNTH are those of the application itself.
+
+=== Instrument slots and presets
+SID SYNTH holds 54 instrument slots in the memory of the emulated C64. +
+The five factory preset banks `PRESETS1.SLO` to `PRESETS5.SLO` of the bonus disk are included in the firmware and can be loaded from the SID SYNTH menu. The firmware provides a read only virtual drive 8 for this. The disk menu of SID SYNTH shows the preset banks like the files on a disk. +
+Saving to disk is not possible. The drive is write protected and SID SYNTH reports `26,WRITE PROTECT ON`, the synth keeps running. +
+The slots live in the memory of the emulated C64. Stopping, restarting or rebooting the application starts SID SYNTH from scratch and edits you made are lost.
+
+=== SID SYNTH Editor (Windows application and VST3 plugin)
+The Neon Airlines download comes with the SID SYNTH Editor for Windows 10 and 11 (64-bit). It shows every SID SYNTH setting as a knob, slider or switch and sends the whole sound to the C64 over midi. It comes in two forms with the same screen: +
+
+* `SID SYNTH Editor.exe`, a stand-alone program that needs no installation
+* `SID SYNTH Editor.vst3`, a VST3 instrument plugin for your DAW (copy the whole `.vst3` folder to your VST3 folder)
+
+Both send midi to a midi output of the PC. To use the editor with the embedded SID SYNTH, pick the USBSID-Pico midi port as the PORT in the editor, the USBSID-Pico takes the place of the C64 midi interface in the official manual. In a DAW the plugin can also send through the DAW, see the official SID SYNTH Editor manual for the PORT and DAW options and for the midi channel. The channel of SID SYNTH is set to OMNI as it comes, any midi channel works. +
+
+**NOTE!** Start SID SYNTH first (CC 117, see <<Starting SID SYNTH>>). While no application is running the USBSID-Pico treats the CC numbers and notes from the editor as regular midi and plays them on its own SIDs. +
+Make sure your DAW does not use the USBSID-Pico midi output itself while the plugin sends to it, as the official editor manual describes.
+
+The editor is a Windows program. It has been run under Wine on Linux with the USBSID-Pico midi port. Neither the editor nor the plugin is part of this repository, they come with the album, and the manual of the editor comes with them.
+
+
+== License
+SID SYNTH is (c) LukHash and is included in the firmware with the permission of the author. SID SYNTH and its factory preset banks are not covered by the license of this repository. +
+
+include::license-software.adoc[]
+
+include::license-hardware.adoc[]
+
+Author: {author} - generated on {revdate}

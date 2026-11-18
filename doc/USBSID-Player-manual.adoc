@@ -28,7 +28,7 @@ From v0.8.1 and later these files are for example `usbsidpico-v1.0_em.uf2`, `usb
 This USBSID-Player is in active development and some tunes might not work or play at all, let me know if you come across any! +
 **NOTE!** Highly demanding cycle-exact SID tunes (e.g. some digi/sample tunes) may not play at full speed on Pico1 or Pico1_w boards (RP2040). Use a Pico2 or Pico2_w (rp2350) board for these tunes. +
 **WARNING!** Whenever the USBSID-Player is compiled into the firmware the Pico MCU is overclocked to 250MHz. Passive cooling _might/could_ be needed. +
-Cynthcart also runs through the embedded USBSID-Player ~ see the `USBSID-Pico-Cynthcart-manual` file for more information. +
+Cynthcart and SID SYNTH also run through the embedded USBSID-Player ~ see the `USBSID-Pico-Embedded-C64-Midi-Applications-manual` file for more information. +
 
 
 == Usage

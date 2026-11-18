@@ -57,13 +57,13 @@ Firmware naming suited for the pico 2 always start with `usbsidpico2-` +
 `usbsidpico2-rgb-v1.X.uf2` for black clone rp2350 Pico2 boards with RGB LED onboard. +
 `usbsidpico2_w-v1.X.uf2` for regular green rp2350 Pico2W boards.
 
-=== Firmwares with embedded USBSID-Player and Cynthcart
-Firmwares ending with `_em` have an embedded USBSID-Player that can play PSID and RSID tunes and PSID64 PRG/P00 files and can start Cynthcart via CC commands. Both use the same embedded player core. +
+=== Firmwares with embedded USBSID-Player and C64 Midi applications
+Firmwares ending with `_em` have an embedded USBSID-Player that can play PSID and RSID tunes and PSID64 PRG/P00 files and can start Cynthcart or SID SYNTH via CC commands. Both use the same embedded player core. +
 For example `usbsidpico-v1.0_em.uf2`, `usbsidpico2-v1.3-rgb_em.uf2` or `usbsidpico2_w-v1.5_em_net.uf2` +
 This USBSID-Player is still in active development and some tunes might not work or play at all. +
 The embedded player needs a lot of RAM (80% on rp2040, 40% on rp2350) and an overclocked CPU. It is built for every Pico type. On `pico2_w` it comes bundled with Network SID Device support (`_em_net`). +
-**WARNING!** Whenever the embedded player or Cynthcart is used the Pico MCU is overclocked to 250MHz. Passive cooling _might/could_ be needed. +
-See the `USBSID-Player-manual` and `USBSID-Pico-Cynthcart-manual` files for more information.
+**WARNING!** Whenever the embedded player, Cynthcart or SID SYNTH is used the Pico MCU is overclocked to 250MHz. Passive cooling _might/could_ be needed. +
+See the `USBSID-Player-manual` and `USBSID-Pico-Embedded-C64-Midi-Applications-manual` files for more information.
 
 
 == How to flash your Pico

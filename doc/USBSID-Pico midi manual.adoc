@@ -188,8 +188,8 @@ The center oscillator plays the struck pitch, the other two are detuned up and d
 
 These three are not channel-scoped. Any one of them on any channel silences the whole device, SID voices and FMOpl chip. Send one when starting a new song, in case a note was left stuck.
 
-=== Cynthcart
-Only relevant on a firmware build with `_em` (Cynthcart running through the C64 core of USBSID-Player, see `USBSID-Pico-Cynthcart-manual`). These three CC numbers are fixed and not part of the general CC map:
+=== Embedded C64 applications (Cynthcart and SID SYNTH)
+Only relevant on a firmware build with `_em` (Cynthcart or SID SYNTH running through the C64 core of USBSID-Player, see `USBSID-Pico-Embedded-C64-Midi-Applications-manual`). These three CC numbers are fixed and not part of the general CC map:
 
 [cols="1,1,3"]
 |===
@@ -200,7 +200,8 @@ Only relevant on a firmware build with `_em` (Cynthcart running through the C64 
 |119 |`CC_CRE` |Reset the embedded application (Cynthcart or SID SYNTH)
 |===
 
-While Cynthcart is active it takes over several CC numbers used elsewhere in this document (filter, envelope, tremolo, waveform selection, ...). See the Cynthcart manual for that CC list.
+While Cynthcart or SID SYNTH is running it receives every other MIDI message and takes over the CC numbers used elsewhere in this document (filter, envelope, tremolo, waveform selection, ...). The channel routing, the patches and the CC map of this document do not apply until the application is stopped. See the Cynthcart manual for the Cynthcart CC list. SID SYNTH uses its own CC numbers (for example 70-76 for the envelope and cutoff, 85-87 for the filter and envelope retrigger), see `USBSID-Pico-Embedded-C64-Midi-Applications-manual`. +
+Which of the two applications is started is chosen with the config item `Midi.emulator_app`, with `cfg_usbsid -sapp <0 Cynthcart, 1 SID SYNTH>` or with the SysEx command `SYSEX_EMULATOR` in <<Authoring your own patches over SysEx>>. The manual for the embedded applications also lists the Windows SID SYNTH Editor and its VST3 plugin.
 
 === Deprecated
 The old copy/link voice or SID family (`CC_CVCE`/8, `CC_CSID`/9, `CC_LVCE`/40, `CC_LSID`/56) is removed, no field is left in the CC map. CC numbers 8, 9, 40 and 56 are unassigned and silently ignored like any other CC without a handler.
@@ -356,6 +357,7 @@ Patches can be written, read back, saved and reset over MIDI without the config 
 |`0x22` |`SYSEX_MIDI_PATCH_DATA` |Device -> host response to a `0x21` request, same 48-nibble shape as `0x20` input
 |`0x2A` |`SYSEX_MIDI_PATCH_SAVE` |`F0 50 2A <channel> <slot> F7` ~ the inverse of LOAD, captures the current live state of the given channel into a patch slot, RAM only
 |`0x2C`-`0x2F` |`SYSEX_MIDI_CCMAP_SET`/`DUMP`/`DATA`/`RESET` |CC map commands, see <<Remapping CCs>>
+|`0x30` |`SYSEX_EMULATOR` |`F0 50 30 <op> [app] F7` ~ `_em` firmware only, op 0 stops, 1 starts and 2 restarts the embedded C64 application, the optional `[app]` (0 Cynthcart, 1 SID SYNTH) selects the application first, RAM only. Works with MIDI disabled in the config
 |`0x10` |`SYSEX_MIDI_SAVE` |`F0 50 10 F7` ~ persists all patches and the routing of every channel to flash
 |`0x11` |`SYSEX_MIDI_LOAD` |`F0 50 11 F7` ~ reloads the last saved data (also runs at boot and on a MIDI System Reset)
 |`0x12` |`SYSEX_MIDI_RESET` |`F0 50 12 F7` ~ erases all saved slots and resets all patches and channels to compiled defaults
