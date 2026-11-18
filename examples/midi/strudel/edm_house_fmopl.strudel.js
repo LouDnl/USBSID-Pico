@@ -8,7 +8,7 @@
 // firmware stock default), channel 4 = the FMOpl slot. If your own board's
 // channel mapping differs, adjust the midichan() calls below.
 //
-// FMOpl needs one extra step SID channels don't: CC_FMEN (CC 88) must be
+// FMOpl needs one extra step SID channels don't: CC_FMEN (CC 31) must be
 // sent on channel 4 BEFORE Program Change or notes reach the OPL chip at
 // all - a channel targets a SID by default, targeting FMOpl is opt-in per
 // channel (repo/src/midi_fmopl.h). Unlike SID's boot-silent MODVOL, FMOpl
@@ -30,10 +30,10 @@ $: ccn(123).ccv(1).midi('Midi Through Port-0').midichan(1).init()  // All Notes 
 // testing (or an earlier run of this song, on the SID channels) would
 // silently break this one. Explicitly reset channels 1/2/3 to SID and
 // channel 4 to FMOpl every time, don't assume the board's current state.
-$: ccn(88).ccv(0).midi('Midi Through Port-0').midichan(1).init()  // Reset channel 1 to SID (CC_FMEN off)
-$: ccn(88).ccv(0).midi('Midi Through Port-0').midichan(2).init()  // Reset channel 2 to SID (CC_FMEN off)
-$: ccn(88).ccv(0).midi('Midi Through Port-0').midichan(3).init()  // Reset channel 3 to SID (CC_FMEN off)
-$: ccn(88).ccv(1).midi('Midi Through Port-0').midichan(4).init()  // Enable FMOpl targeting on channel 4 (CC_FMEN)
+$: ccn(31).ccv(0).midi('Midi Through Port-0').midichan(1).init()  // Reset channel 1 to SID (CC_FMEN off)
+$: ccn(31).ccv(0).midi('Midi Through Port-0').midichan(2).init()  // Reset channel 2 to SID (CC_FMEN off)
+$: ccn(31).ccv(0).midi('Midi Through Port-0').midichan(3).init()  // Reset channel 3 to SID (CC_FMEN off)
+$: ccn(31).ccv(1).midi('Midi Through Port-0').midichan(4).init()  // Enable FMOpl targeting on channel 4 (CC_FMEN)
 
 $: ccn(7).ccv(1).midi('Midi Through Port-0').midichan(1).progNum(14).init()  // SID1: Wide bass
 $: ccn(7).ccv(1).midi('Midi Through Port-0').midichan(2).progNum(6).init()   // SID2: Filtered lead (stabs)

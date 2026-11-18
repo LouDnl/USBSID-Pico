@@ -26,13 +26,13 @@ let init = register('init', (pat) => pat.filterWhen((begin) => begin<1))
 // MIDI message shape but doesn't matter for this particular CC.
 $: ccn(123).ccv(1).midi('USBSID-Pico').midichan(1).init()  // All Notes Off (SID + FMOpl)
 
-// CC_FMEN (CC 88) is sticky per-channel firmware state - if a channel was
+// CC_FMEN (CC 31) is sticky per-channel firmware state - if a channel was
 // ever set to target the FMOpl chip (manual CC testing, or one of the
 // FMOpl demo songs), it stays that way until told otherwise. Reset
 // channels 1/2/3 to SID here rather than assuming the board's current state.
-$: ccn(88).ccv(0).midi('USBSID-Pico').midichan(1).init()  // Reset channel 1 to SID (CC_FMEN off)
-$: ccn(88).ccv(0).midi('USBSID-Pico').midichan(2).init()  // Reset channel 2 to SID (CC_FMEN off)
-$: ccn(88).ccv(0).midi('USBSID-Pico').midichan(3).init()  // Reset channel 3 to SID (CC_FMEN off)
+$: ccn(31).ccv(0).midi('USBSID-Pico').midichan(1).init()  // Reset channel 1 to SID (CC_FMEN off)
+$: ccn(31).ccv(0).midi('USBSID-Pico').midichan(2).init()  // Reset channel 2 to SID (CC_FMEN off)
+$: ccn(31).ccv(0).midi('USBSID-Pico').midichan(3).init()  // Reset channel 3 to SID (CC_FMEN off)
 
 $: ccn(7).ccv(1).midi('USBSID-Pico').midichan(1).progNum(3).init()  // SID1: Bass
 $: ccn(7).ccv(1).midi('USBSID-Pico').midichan(2).progNum(5).init()  // SID2: Organ pad

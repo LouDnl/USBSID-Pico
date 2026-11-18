@@ -24,10 +24,10 @@ $: ccn(123).ccv(1).midi('Midi Through Port-0').midichan(1).init()  // All Notes 
 // between songs/sessions, so a channel left targeting FMOpl by earlier
 // testing would silently break this one. Explicitly reset channels 1/2/3
 // to SID and channel 4 to FMOpl every time, don't assume current state.
-$: ccn(88).ccv(0).midi('Midi Through Port-0').midichan(1).init()  // Reset channel 1 to SID (CC_FMEN off)
-$: ccn(88).ccv(0).midi('Midi Through Port-0').midichan(2).init()  // Reset channel 2 to SID (CC_FMEN off)
-$: ccn(88).ccv(0).midi('Midi Through Port-0').midichan(3).init()  // Reset channel 3 to SID (CC_FMEN off)
-$: ccn(88).ccv(1).midi('Midi Through Port-0').midichan(4).init()  // Enable FMOpl targeting on channel 4 (CC_FMEN)
+$: ccn(31).ccv(0).midi('Midi Through Port-0').midichan(1).init()  // Reset channel 1 to SID (CC_FMEN off)
+$: ccn(31).ccv(0).midi('Midi Through Port-0').midichan(2).init()  // Reset channel 2 to SID (CC_FMEN off)
+$: ccn(31).ccv(0).midi('Midi Through Port-0').midichan(3).init()  // Reset channel 3 to SID (CC_FMEN off)
+$: ccn(31).ccv(1).midi('Midi Through Port-0').midichan(4).init()  // Enable FMOpl targeting on channel 4 (CC_FMEN)
 
 $: ccn(7).ccv(1).midi('Midi Through Port-0').midichan(1).progNum(3).init()  // SID1: Bass
 $: ccn(7).ccv(1).midi('Midi Through Port-0').midichan(2).progNum(7).init()  // SID2: Slow pad

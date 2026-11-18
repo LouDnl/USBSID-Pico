@@ -30,16 +30,16 @@ once $ ccn 123 # ccv 127 # s "usbsidpico" # midichan 0  -- normalized 1 -> 127
 -- Reset channels to plain SID targeting (CC_FMEN off) - same hygiene as
 -- every other demo here, in case FMOpl targeting was left on from testing.
 do
-  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 0
-  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 1
+  once $ ccn 31 # ccv 0 # s "usbsidpico" # midichan 0
+  once $ ccn 31 # ccv 0 # s "usbsidpico" # midichan 1
   once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 0 # progNum 0  -- SID1: Default patch (plain triangle) - the arp voice
   once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 1 # progNum 3  -- SID2: Bass
 -- Arpeggiator setup on channel 1 - this is what actually turns held chord
 -- notes into the fast note-cycling trick, see CC map in the MIDI manual.
-  once $ ccn 6  # ccv 0   # s "usbsidpico" # midichan 0  -- CC_ARPM: Up (cycle root->3rd->5th->repeat), normalized 0.0 -> 0
-  once $ ccn 11 # ccv 0   # s "usbsidpico" # midichan 0  -- CC_ARPO: 0 extra octaves - stay inside the triad, the classic effect, normalized 0.0 -> 0
-  once $ ccn 10 # ccv 127 # s "usbsidpico" # midichan 0  -- CC_ARPR: fastest MIDI-clock division (1 pulse), normalized 1.0 -> 127 - only matters once a clock is present
-  once $ ccn 12 # ccv 127 # s "usbsidpico" # midichan 0  -- CC_ARPE: arp on for channel 1, normalized 1 -> 127 - notes now feed the arp's held pattern instead of sounding directly
+  once $ ccn 113  # ccv 0   # s "usbsidpico" # midichan 0  -- CC_ARPM: Up (cycle root->3rd->5th->repeat), normalized 0.0 -> 0
+  once $ ccn 115 # ccv 0   # s "usbsidpico" # midichan 0  -- CC_ARPO: 0 extra octaves - stay inside the triad, the classic effect, normalized 0.0 -> 0
+  once $ ccn 114 # ccv 127 # s "usbsidpico" # midichan 0  -- CC_ARPR: fastest MIDI-clock division (1 pulse), normalized 1.0 -> 127 - only matters once a clock is present
+  once $ ccn 112 # ccv 127 # s "usbsidpico" # midichan 0  -- CC_ARPE: arp on for channel 1, normalized 1 -> 127 - notes now feed the arp's held pattern instead of sounding directly
 
 -- setcps 0.53 -- ~128 BPM (1 cycle = 4 beats: cps = BPM/240). At 128 BPM,
 -- 24 MIDI clock pulses/quarter note works out to ~19.5ms/pulse - a 1-pulse

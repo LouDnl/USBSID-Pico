@@ -63,9 +63,9 @@
 -- lazy_jones.tidal: the timbre is built live from CC rather than baked
 -- into midi_patch.c's factory bank.
 --
--- CC map used here (repo/src/midi_defs.h): CC_ANOF=123, CC_FMEN=88,
--- CC_ARPE=12, CC_UNIS=41, CC_LFOD=3, CC_LFO2D=15, CC_TRIA=23, CC_PULS=21,
--- CC_ATT=17, CC_DEC=18, CC_SUS=19, CC_REL=29, CC_PWM=1.
+-- CC map used here (repo/src/midi_defs.h): CC_ANOF=123, CC_FMEN=31,
+-- CC_ARPE=112, CC_UNIS=93, CC_LFOD=77, CC_LFO2D=15, CC_TRIA=23, CC_PULS=21,
+-- CC_ATT=73, CC_DEC=75, CC_SUS=70, CC_REL=72, CC_PWM=1.
 --
 -- Uses the "usbsidpico" MIDI destination (a virtual MIDI-usbsidpico port), not
 -- the direct "usbsidpico" one.
@@ -73,35 +73,35 @@
 once $ ccn 123 # ccv 127 # s "usbsidpico" # midichan 1  -- All Notes Off (SID + FMOpl), normalized 1 -> 127
 
 do
-  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 1  -- Reset channel 1 to SID (CC_FMEN off)
-  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 2  -- Reset channel 2 to SID (CC_FMEN off)
-  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 3  -- Reset channel 3 to SID (CC_FMEN off)
+  once $ ccn 31 # ccv 0 # s "usbsidpico" # midichan 1  -- Reset channel 1 to SID (CC_FMEN off)
+  once $ ccn 31 # ccv 0 # s "usbsidpico" # midichan 2  -- Reset channel 2 to SID (CC_FMEN off)
+  once $ ccn 31 # ccv 0 # s "usbsidpico" # midichan 3  -- Reset channel 3 to SID (CC_FMEN off)
   -- CC_ARPE/CC_UNIS/CC_LFOD/CC_LFO2D are all sticky per-channel state - see
   -- pop_classical.tidal / lazy_jones.tidal for why these get reset every time.
-  once $ ccn 12 # ccv 0 # s "usbsidpico" # midichan 1  -- arp off ch1
-  once $ ccn 12 # ccv 0 # s "usbsidpico" # midichan 2  -- arp off ch2
-  once $ ccn 41 # ccv 0 # s "usbsidpico" # midichan 1  -- unison off ch1
-  once $ ccn 41 # ccv 0 # s "usbsidpico" # midichan 2  -- unison off ch2
-  once $ ccn 3  # ccv 0 # s "usbsidpico" # midichan 1  -- LFO1 depth off ch1
-  once $ ccn 3  # ccv 0 # s "usbsidpico" # midichan 2  -- LFO1 depth off ch2
+  once $ ccn 112 # ccv 0 # s "usbsidpico" # midichan 1  -- arp off ch1
+  once $ ccn 112 # ccv 0 # s "usbsidpico" # midichan 2  -- arp off ch2
+  once $ ccn 93 # ccv 0 # s "usbsidpico" # midichan 1  -- unison off ch1
+  once $ ccn 93 # ccv 0 # s "usbsidpico" # midichan 2  -- unison off ch2
+  once $ ccn 77  # ccv 0 # s "usbsidpico" # midichan 1  -- LFO1 depth off ch1
+  once $ ccn 77  # ccv 0 # s "usbsidpico" # midichan 2  -- LFO1 depth off ch2
   once $ ccn 15 # ccv 0 # s "usbsidpico" # midichan 1  -- LFO2 depth off ch1
   once $ ccn 15 # ccv 0 # s "usbsidpico" # midichan 2  -- LFO2 depth off ch2
 -- Channel 1 timbre = SID-A voice 1's real envelope/waveform/PW.
   once $ ccn 23 # ccv 0   # s "usbsidpico" # midichan 1  -- CC_TRIA off ch1
   once $ ccn 21 # ccv 127 # s "usbsidpico" # midichan 1  -- CC_PULS on ch1
-  once $ ccn 17 # ccv 0   # s "usbsidpico" # midichan 1  -- CC_ATT: 0
-  once $ ccn 18 # ccv 0   # s "usbsidpico" # midichan 1  -- CC_DEC: 0
-  once $ ccn 19 # ccv 127 # s "usbsidpico" # midichan 1  -- CC_SUS: 15/15
-  once $ ccn 29 # ccv 68  # s "usbsidpico" # midichan 1  -- CC_REL: 8/15
+  once $ ccn 73 # ccv 0   # s "usbsidpico" # midichan 1  -- CC_ATT: 0
+  once $ ccn 75 # ccv 0   # s "usbsidpico" # midichan 1  -- CC_DEC: 0
+  once $ ccn 70 # ccv 127 # s "usbsidpico" # midichan 1  -- CC_SUS: 15/15
+  once $ ccn 72 # ccv 68  # s "usbsidpico" # midichan 1  -- CC_REL: 8/15
   once $ ccn 1  # ccv 24  # s "usbsidpico" # midichan 1  -- CC_PWM: ~19% duty
 -- Channel 2 timbre = SID-B voices 2/3's real envelope/waveform/PW (exact
 -- match for both).
   once $ ccn 23 # ccv 0   # s "usbsidpico" # midichan 2  -- CC_TRIA off ch2
   once $ ccn 21 # ccv 127 # s "usbsidpico" # midichan 2  -- CC_PULS on ch2
-  once $ ccn 17 # ccv 0   # s "usbsidpico" # midichan 2  -- CC_ATT: 0
-  once $ ccn 18 # ccv 0   # s "usbsidpico" # midichan 2  -- CC_DEC: 0
-  once $ ccn 19 # ccv 68  # s "usbsidpico" # midichan 2  -- CC_SUS: 8/15
-  once $ ccn 29 # ccv 102 # s "usbsidpico" # midichan 2  -- CC_REL: 12/15
+  once $ ccn 73 # ccv 0   # s "usbsidpico" # midichan 2  -- CC_ATT: 0
+  once $ ccn 75 # ccv 0   # s "usbsidpico" # midichan 2  -- CC_DEC: 0
+  once $ ccn 70 # ccv 68  # s "usbsidpico" # midichan 2  -- CC_SUS: 8/15
+  once $ ccn 72 # ccv 102 # s "usbsidpico" # midichan 2  -- CC_REL: 12/15
   once $ ccn 1  # ccv 8   # s "usbsidpico" # midichan 2  -- CC_PWM: ~6% duty
 -- Volume - SIDs boot silent and need this before anything is audible.
   once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 1

@@ -13,18 +13,18 @@
 once $ ccn 123 # ccv 127 # s "usbsidpico" # midichan 1  -- All Notes Off (SID + FMOpl), normalized 1 -> 127
 
 do
-  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 1  -- Reset channel 1 to SID (CC_FMEN off)
-  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 2  -- Reset channel 2 to SID (CC_FMEN off)
-  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 3  -- Reset channel 3 to SID (CC_FMEN off)
+  once $ ccn 31 # ccv 0 # s "usbsidpico" # midichan 1  -- Reset channel 1 to SID (CC_FMEN off)
+  once $ ccn 31 # ccv 0 # s "usbsidpico" # midichan 2  -- Reset channel 2 to SID (CC_FMEN off)
+  once $ ccn 31 # ccv 0 # s "usbsidpico" # midichan 3  -- Reset channel 3 to SID (CC_FMEN off)
   -- CC_ARPE/CC_UNIS are sticky too (same as CC_FMEN) - a previous demo
   -- (e.g. big_top_showcase leaves channel 3's arp ON) would otherwise
   -- hijack this song's note input on that channel.
-  once $ ccn 12 # ccv 0 # s "usbsidpico" # midichan 1  -- arp off ch1
-  once $ ccn 12 # ccv 0 # s "usbsidpico" # midichan 2  -- arp off ch2
-  once $ ccn 12 # ccv 0 # s "usbsidpico" # midichan 3  -- arp off ch3
-  once $ ccn 41 # ccv 0 # s "usbsidpico" # midichan 1  -- unison off ch1
-  once $ ccn 41 # ccv 0 # s "usbsidpico" # midichan 2  -- unison off ch2
-  once $ ccn 41 # ccv 0 # s "usbsidpico" # midichan 3  -- unison off ch3
+  once $ ccn 112 # ccv 0 # s "usbsidpico" # midichan 1  -- arp off ch1
+  once $ ccn 112 # ccv 0 # s "usbsidpico" # midichan 2  -- arp off ch2
+  once $ ccn 112 # ccv 0 # s "usbsidpico" # midichan 3  -- arp off ch3
+  once $ ccn 93 # ccv 0 # s "usbsidpico" # midichan 1  -- unison off ch1
+  once $ ccn 93 # ccv 0 # s "usbsidpico" # midichan 2  -- unison off ch2
+  once $ ccn 93 # ccv 0 # s "usbsidpico" # midichan 3  -- unison off ch3
   once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 1 # progNum 14  -- SID1: Wide bass
   once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 2 # progNum 6   -- SID2: Filtered lead (stabs)
   once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 3 # progNum 2   -- SID3: Pulse lead (arp)

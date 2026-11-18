@@ -59,6 +59,9 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
   - update the CC numbers of the embedded application enable, disable and reset to 117-119 in the MIDI and Cynthcart manuals
   - update the default CC numbers that changed in the MIDI 1.0 conform renumbering
   - regenerate the MIDI and Cynthcart manual PDFs from the updated sources
+* Update the MIDI examples to the renumbered default CCs
+  - use the new default CC numbers in the Strudel and TidalCycles examples, for example `CC_FMEN` is CC 31 and the embedded application CCs are 117-119
+  - update the VMPK instrument definition and extra controllers file to the new numbers
 
 #### Version: 0.9.0
 * Add batch READ of up to 63 registers

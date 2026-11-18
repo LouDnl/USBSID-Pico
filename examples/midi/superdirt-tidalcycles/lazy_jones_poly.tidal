@@ -56,9 +56,9 @@
 -- SID2 (voice 2, melody/arp) - matches every other demo in this folder. If
 -- your board's channel config differs, adjust the midichan values below.
 --
--- CC map used here (repo/src/midi_defs.h): CC_ANOF=123, CC_FMEN=88,
--- CC_ARPE=12, CC_UNIS=41, CC_LFOD=3, CC_LFO2D=15, CC_TRIA=23, CC_SAWT=22,
--- CC_ATT=17, CC_DEC=18, CC_SUS=19, CC_REL=29.
+-- CC map used here (repo/src/midi_defs.h): CC_ANOF=123, CC_FMEN=31,
+-- CC_ARPE=112, CC_UNIS=93, CC_LFOD=77, CC_LFO2D=15, CC_TRIA=23, CC_SAWT=22,
+-- CC_ATT=73, CC_DEC=75, CC_SUS=70, CC_REL=72.
 --
 -- Uses the "usbsidpico" MIDI destination (a virtual MIDI-usbsidpico port), not
 -- the direct "usbsidpico" one.
@@ -66,18 +66,18 @@
 once $ ccn 123 # ccv 127 # s "usbsidpico" # midichan 0  -- All Notes Off (SID + FMOpl), normalized 1 -> 127
 
 do
-  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 0  -- Reset channel 0 to SID (CC_FMEN off)
-  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 1  -- Reset channel 1 to SID (CC_FMEN off)
-  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 2  -- Reset channel 2 to SID (CC_FMEN off)
-  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 3  -- Reset channel 3 to SID (CC_FMEN off)
-  once $ ccn 88 # ccv 0 # s "usbsidpico" # midichan 4  -- Reset channel 4 to SID (CC_FMEN off)
+  once $ ccn 31 # ccv 0 # s "usbsidpico" # midichan 0  -- Reset channel 0 to SID (CC_FMEN off)
+  once $ ccn 31 # ccv 0 # s "usbsidpico" # midichan 1  -- Reset channel 1 to SID (CC_FMEN off)
+  once $ ccn 31 # ccv 0 # s "usbsidpico" # midichan 2  -- Reset channel 2 to SID (CC_FMEN off)
+  once $ ccn 31 # ccv 0 # s "usbsidpico" # midichan 3  -- Reset channel 3 to SID (CC_FMEN off)
+  once $ ccn 31 # ccv 0 # s "usbsidpico" # midichan 4  -- Reset channel 4 to SID (CC_FMEN off)
   -- CC_ARPE/CC_UNIS/CC_LFOD/CC_LFO2D are all sticky per-channel state - a
   -- previous demo could otherwise hijack or detune this song's notes, same
   -- reasoning as every other demo here (see pop_classical.tidal). This is
   -- the fix for the "goes out of tune" / "not playing together" report.
-  once $ ccn 12 # ccv 0 # s "usbsidpico" # midichan 0  -- arp off ch1
-  once $ ccn 41 # ccv 0 # s "usbsidpico" # midichan 0  -- unison off ch1
-  once $ ccn 3  # ccv 0 # s "usbsidpico" # midichan 0  -- LFO1 depth off ch1
+  once $ ccn 112 # ccv 0 # s "usbsidpico" # midichan 0  -- arp off ch1
+  once $ ccn 93 # ccv 0 # s "usbsidpico" # midichan 0  -- unison off ch1
+  once $ ccn 77  # ccv 0 # s "usbsidpico" # midichan 0  -- LFO1 depth off ch1
   once $ ccn 15 # ccv 0 # s "usbsidpico" # midichan 0  -- LFO2 depth off ch1
   once $ ccn 104 # ccv 0 # s "usbsidpico" # midichan 0
   once $ ccn 105 # ccv 0 # s "usbsidpico" # midichan 0
@@ -92,10 +92,10 @@ do
 -- switch the waveform bit explicitly: sawtooth on, triangle off.
   once $ ccn 23 # ccv 0   # s "usbsidpico" # midichan 0  -- CC_TRIA off ch1
   once $ ccn 22 # ccv 127 # s "usbsidpico" # midichan 0  -- CC_SAWT on ch1
-  once $ ccn 17 # ccv 51  # s "usbsidpico" # midichan 0  -- CC_ATT: 6/15
-  once $ ccn 18 # ccv 51  # s "usbsidpico" # midichan 0  -- CC_DEC: 6/15
-  once $ ccn 19 # ccv 0   # s "usbsidpico" # midichan 0  -- CC_SUS: 0
-  once $ ccn 29 # ccv 0   # s "usbsidpico" # midichan 0  -- CC_REL: 0
+  once $ ccn 73 # ccv 51  # s "usbsidpico" # midichan 0  -- CC_ATT: 6/15
+  once $ ccn 75 # ccv 51  # s "usbsidpico" # midichan 0  -- CC_DEC: 6/15
+  once $ ccn 70 # ccv 0   # s "usbsidpico" # midichan 0  -- CC_SUS: 0
+  once $ ccn 72 # ccv 0   # s "usbsidpico" # midichan 0  -- CC_REL: 0
 -- Volume - SIDs boot silent and need this before anything is audible.
   once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 0
 

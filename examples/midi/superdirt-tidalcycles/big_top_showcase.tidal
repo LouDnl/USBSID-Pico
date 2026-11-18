@@ -32,9 +32,9 @@
 --   1  Sawtooth lead    - plain, clean base for the clock-synced arp chord
 --   FMOpl 1 Electric piano (bars 1-2) / FMOpl 4 Bell (bars 3-4, the drop)
 --
--- CC map used here (repo/src/midi_defs.h): CC_VOL=7, CC_FMEN=88, CC_ANOF=123,
--- CC_UNIS=41, CC_UDET=42, CC_LFOW/R/D/T=0/2/3/4, CC_LFO2W/R/D/T=13/14/15/16,
--- CC_ARPM/R/O/E=6/10/11/12.
+-- CC map used here (repo/src/midi_defs.h): CC_VOL=7, CC_FMEN=31, CC_ANOF=123,
+-- CC_UNIS=93, CC_UDET=94, CC_LFOW/R/D/T=102/76/77/103, CC_LFO2W/R/D/T=89/14/15/90,
+-- CC_ARPM/R/O/E=113/114/115/112.
 --
 -- Uses the "usbsidpico" MIDI destination (a virtual MIDI-usbsidpico port), not
 -- the direct "usbsidpico" one. Route that port to the board yourself (e.g.
@@ -49,16 +49,16 @@ once $ ccn 123 # ccv 127 # s "usbsidpico" # midichan 1  -- normalized 1 -> 127
 -- none of them reset themselves between songs, so explicitly force every
 -- channel back to a known baseline before turning any of them on again.
 do
-  once $ ccn 88 # ccv 0   # s "usbsidpico" # midichan 1  -- ch1 SID target (FMEN off)
-  once $ ccn 88 # ccv 0   # s "usbsidpico" # midichan 2  -- ch2 SID target
-  once $ ccn 88 # ccv 0   # s "usbsidpico" # midichan 3  -- ch3 SID target
-  once $ ccn 88 # ccv 127 # s "usbsidpico" # midichan 4  -- ch4 -> FMOpl, normalized 1 -> 127
-  once $ ccn 41 # ccv 0   # s "usbsidpico" # midichan 1  -- unison off ch1
-  once $ ccn 41 # ccv 0   # s "usbsidpico" # midichan 2  -- unison off ch2 (set on below)
-  once $ ccn 41 # ccv 0   # s "usbsidpico" # midichan 3  -- unison off ch3
-  once $ ccn 12 # ccv 0   # s "usbsidpico" # midichan 1  -- arp off ch1
-  once $ ccn 12 # ccv 0   # s "usbsidpico" # midichan 2  -- arp off ch2
-  once $ ccn 12 # ccv 0   # s "usbsidpico" # midichan 3  -- arp off ch3 (set on below)
+  once $ ccn 31 # ccv 0   # s "usbsidpico" # midichan 1  -- ch1 SID target (FMEN off)
+  once $ ccn 31 # ccv 0   # s "usbsidpico" # midichan 2  -- ch2 SID target
+  once $ ccn 31 # ccv 0   # s "usbsidpico" # midichan 3  -- ch3 SID target
+  once $ ccn 31 # ccv 127 # s "usbsidpico" # midichan 4  -- ch4 -> FMOpl, normalized 1 -> 127
+  once $ ccn 93 # ccv 0   # s "usbsidpico" # midichan 1  -- unison off ch1
+  once $ ccn 93 # ccv 0   # s "usbsidpico" # midichan 2  -- unison off ch2 (set on below)
+  once $ ccn 93 # ccv 0   # s "usbsidpico" # midichan 3  -- unison off ch3
+  once $ ccn 112 # ccv 0   # s "usbsidpico" # midichan 1  -- arp off ch1
+  once $ ccn 112 # ccv 0   # s "usbsidpico" # midichan 2  -- arp off ch2
+  once $ ccn 112 # ccv 0   # s "usbsidpico" # midichan 3  -- arp off ch3 (set on below)
 -- Volume - SIDs boot silent and need this before anything is audible.
   once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 1
   once $ ccn 7 # ccv 127 # s "usbsidpico" # midichan 2
@@ -79,28 +79,28 @@ do
 -- sets the detune spread. Turning unison on drops the channel to 1 note/SID,
 -- which is exactly what we want here: this lead is meant to sound like one
 -- thick oscillator, not three thin ones.
-  once $ ccn 41 # ccv 127 # s "usbsidpico" # midichan 2  -- CC_UNIS: on, normalized 1 -> 127
-  once $ ccn 42 # ccv 51  # s "usbsidpico" # midichan 2  -- CC_UDET: moderate spread, normalized 0.4 -> 51
+  once $ ccn 93 # ccv 127 # s "usbsidpico" # midichan 2  -- CC_UNIS: on, normalized 1 -> 127
+  once $ ccn 94 # ccv 51  # s "usbsidpico" # midichan 2  -- CC_UDET: moderate spread, normalized 0.4 -> 51
 -- SID2 LFO1: slow pitch vibrato, subtle - gives the unison lead some life
 -- without turning it into a siren.
-  once $ ccn 0 # ccv 0  # s "usbsidpico" # midichan 2  -- CC_LFOW: Triangle, normalized 0.0 -> 0
-  once $ ccn 2 # ccv 32 # s "usbsidpico" # midichan 2  -- CC_LFOR: slow-ish rate, normalized 0.25 -> 32
-  once $ ccn 3 # ccv 38 # s "usbsidpico" # midichan 2  -- CC_LFOD: subtle depth, normalized 0.3 -> 38
-  once $ ccn 4 # ccv 0  # s "usbsidpico" # midichan 2  -- CC_LFOT: Pitch, normalized 0.0 -> 0
+  once $ ccn 102 # ccv 0  # s "usbsidpico" # midichan 2  -- CC_LFOW: Triangle, normalized 0.0 -> 0
+  once $ ccn 76 # ccv 32 # s "usbsidpico" # midichan 2  -- CC_LFOR: slow-ish rate, normalized 0.25 -> 32
+  once $ ccn 77 # ccv 38 # s "usbsidpico" # midichan 2  -- CC_LFOD: subtle depth, normalized 0.3 -> 38
+  once $ ccn 103 # ccv 0  # s "usbsidpico" # midichan 2  -- CC_LFOT: Pitch, normalized 0.0 -> 0
 -- SID3 LFO2: square-wave wah on the filter cutoff, deep and syncopated -
 -- this is what turns the plain arp'd chord into something that breathes.
-  once $ ccn 13 # ccv 76  # s "usbsidpico" # midichan 3  -- CC_LFO2W: Square, normalized 0.6 -> 76
+  once $ ccn 89 # ccv 76  # s "usbsidpico" # midichan 3  -- CC_LFO2W: Square, normalized 0.6 -> 76
   once $ ccn 14 # ccv 38  # s "usbsidpico" # midichan 3  -- CC_LFO2R: moderate rate, normalized 0.3 -> 38
   once $ ccn 15 # ccv 89  # s "usbsidpico" # midichan 3  -- CC_LFO2D: deep, normalized 0.7 -> 89
-  once $ ccn 16 # ccv 127 # s "usbsidpico" # midichan 3  -- CC_LFO2T: Cutoff, normalized 1.0 -> 127
+  once $ ccn 90 # ccv 127 # s "usbsidpico" # midichan 3  -- CC_LFO2T: Cutoff, normalized 1.0 -> 127
 -- SID3 arpeggiator, MIDI-clock-synced (see arp_chord_clocksync.tidal for the
 -- full clock-division writeup) - this is what turns the held chord below
 -- into the "multi-keypress" shimmer: three real simultaneous note-ons,
 -- cycled fast enough by the firmware's own engine to read as one texture.
-  once $ ccn 6  # ccv 0   # s "usbsidpico" # midichan 3  -- CC_ARPM: Up, normalized 0.0 -> 0
-  once $ ccn 11 # ccv 0   # s "usbsidpico" # midichan 3  -- CC_ARPO: 0 extra octaves, stay in the triad, normalized 0.0 -> 0
-  once $ ccn 10 # ccv 108 # s "usbsidpico" # midichan 3  -- CC_ARPR: fast clock division, normalized 0.85 -> 108
-  once $ ccn 12 # ccv 127 # s "usbsidpico" # midichan 3  -- CC_ARPE: on, normalized 1 -> 127
+  once $ ccn 113  # ccv 0   # s "usbsidpico" # midichan 3  -- CC_ARPM: Up, normalized 0.0 -> 0
+  once $ ccn 115 # ccv 0   # s "usbsidpico" # midichan 3  -- CC_ARPO: 0 extra octaves, stay in the triad, normalized 0.0 -> 0
+  once $ ccn 114 # ccv 108 # s "usbsidpico" # midichan 3  -- CC_ARPR: fast clock division, normalized 0.85 -> 108
+  once $ ccn 112 # ccv 127 # s "usbsidpico" # midichan 3  -- CC_ARPE: on, normalized 1 -> 127
 
 setcps 0.65 -- uncomment and tune to taste - up-tempo, circus-EDM pace
 

@@ -54,9 +54,9 @@
 // live from CC (waveform + ADSR CCs) below rather than baked into
 // midi_patch.c's factory bank.
 //
-// CC map used here (repo/src/midi_defs.h): CC_ANOF=123, CC_FMEN=88,
-// CC_ARPE=12, CC_UNIS=41, CC_LFOD=3, CC_LFO2D=15, CC_TRIA=23, CC_SAWT=22,
-// CC_ATT=17, CC_DEC=18, CC_SUS=19, CC_REL=29, CC_SID1..4=104-107,
+// CC map used here (repo/src/midi_defs.h): CC_ANOF=123, CC_FMEN=31,
+// CC_ARPE=112, CC_UNIS=93, CC_LFOD=77, CC_LFO2D=15, CC_TRIA=23, CC_SAWT=22,
+// CC_ATT=73, CC_DEC=75, CC_SUS=70, CC_REL=72, CC_SID1..4=104-107,
 // CC_VOICE1..3=108-110. ccv() below is 0-1 (Strudel normalizes to the
 // MIDI 0-127 byte), unlike the raw 0-127 ccn/ccv pairs in the .tidal file.
 //
@@ -71,21 +71,21 @@ let init = register('init', (pat) => pat.filterWhen((begin) => begin < 1))
 // ringing under this one.
 $: ccn(123).ccv(1).midi('Midi Through Port-0').midichan(1).init()  // All Notes Off (SID + FMOpl)
 
-// CC_FMEN (CC 88) is sticky per-channel state - reset channels 1-5 to SID
+// CC_FMEN (CC 31) is sticky per-channel state - reset channels 1-5 to SID
 // rather than assuming the board's current state.
-$: ccn(88).ccv(0).midi('Midi Through Port-0').midichan(1).init()  // Reset channel 1 to SID (CC_FMEN off)
-$: ccn(88).ccv(0).midi('Midi Through Port-0').midichan(2).init()  // Reset channel 2 to SID (CC_FMEN off)
-$: ccn(88).ccv(0).midi('Midi Through Port-0').midichan(3).init()  // Reset channel 3 to SID (CC_FMEN off)
-$: ccn(88).ccv(0).midi('Midi Through Port-0').midichan(4).init()  // Reset channel 4 to SID (CC_FMEN off)
-$: ccn(88).ccv(0).midi('Midi Through Port-0').midichan(5).init()  // Reset channel 5 to SID (CC_FMEN off)
+$: ccn(31).ccv(0).midi('Midi Through Port-0').midichan(1).init()  // Reset channel 1 to SID (CC_FMEN off)
+$: ccn(31).ccv(0).midi('Midi Through Port-0').midichan(2).init()  // Reset channel 2 to SID (CC_FMEN off)
+$: ccn(31).ccv(0).midi('Midi Through Port-0').midichan(3).init()  // Reset channel 3 to SID (CC_FMEN off)
+$: ccn(31).ccv(0).midi('Midi Through Port-0').midichan(4).init()  // Reset channel 4 to SID (CC_FMEN off)
+$: ccn(31).ccv(0).midi('Midi Through Port-0').midichan(5).init()  // Reset channel 5 to SID (CC_FMEN off)
 
 // CC_ARPE/CC_UNIS/CC_LFOD/CC_LFO2D and the SID/voice override CCs are all
 // sticky per-channel state too - a previous demo could otherwise hijack or
 // detune this song's notes. This is the fix for the original "goes out of
 // tune" / "not playing together" report against this file.
-$: ccn(12).ccv(0).midi('Midi Through Port-0').midichan(1).init()   // arp off
-$: ccn(41).ccv(0).midi('Midi Through Port-0').midichan(1).init()   // unison off
-$: ccn(3).ccv(0).midi('Midi Through Port-0').midichan(1).init()    // LFO1 depth off
+$: ccn(112).ccv(0).midi('Midi Through Port-0').midichan(1).init()   // arp off
+$: ccn(93).ccv(0).midi('Midi Through Port-0').midichan(1).init()   // unison off
+$: ccn(77).ccv(0).midi('Midi Through Port-0').midichan(1).init()    // LFO1 depth off
 $: ccn(15).ccv(0).midi('Midi Through Port-0').midichan(1).init()   // LFO2 depth off
 $: ccn(104).ccv(0).midi('Midi Through Port-0').midichan(1).init()  // SID1 override off
 $: ccn(105).ccv(0).midi('Midi Through Port-0').midichan(1).init()  // SID2 override off
@@ -100,10 +100,10 @@ $: ccn(110).ccv(0).midi('Midi Through Port-0').midichan(1).init()  // Voice3 ove
 // explicitly: sawtooth on, triangle off.
 $: ccn(23).ccv(0).midi('Midi Through Port-0').midichan(1).init()   // CC_TRIA off
 $: ccn(22).ccv(1).midi('Midi Through Port-0').midichan(1).init()   // CC_SAWT on
-$: ccn(17).ccv(0.4).midi('Midi Through Port-0').midichan(1).init() // CC_ATT: 6/15
-$: ccn(18).ccv(0.4).midi('Midi Through Port-0').midichan(1).init() // CC_DEC: 6/15
-$: ccn(19).ccv(0).midi('Midi Through Port-0').midichan(1).init()   // CC_SUS: 0
-$: ccn(29).ccv(0).midi('Midi Through Port-0').midichan(1).init()   // CC_REL: 0
+$: ccn(73).ccv(0.4).midi('Midi Through Port-0').midichan(1).init() // CC_ATT: 6/15
+$: ccn(75).ccv(0.4).midi('Midi Through Port-0').midichan(1).init() // CC_DEC: 6/15
+$: ccn(70).ccv(0).midi('Midi Through Port-0').midichan(1).init()   // CC_SUS: 0
+$: ccn(72).ccv(0).midi('Midi Through Port-0').midichan(1).init()   // CC_REL: 0
 
 // Volume - SIDs boot silent and need this before anything is audible.
 $: ccn(7).ccv(1).midi('Midi Through Port-0').midichan(1).init()

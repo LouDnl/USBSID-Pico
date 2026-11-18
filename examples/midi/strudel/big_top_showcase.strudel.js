@@ -29,9 +29,9 @@
 //   1  Sawtooth lead   - plain, clean base for the clock-synced arp chord
 //   FMOpl 1 Electric piano (bars 1-2) / FMOpl 4 Bell (bars 3-4, the drop)
 //
-// CC map used here (repo/src/midi_defs.h): CC_VOL=7, CC_FMEN=88, CC_ANOF=123,
-// CC_UNIS=41, CC_UDET=42, CC_LFOW/R/D/T=0/2/3/4, CC_LFO2W/R/D/T=13/14/15/16,
-// CC_ARPM/R/O/E=6/10/11/12.
+// CC map used here (repo/src/midi_defs.h): CC_VOL=7, CC_FMEN=31, CC_ANOF=123,
+// CC_UNIS=93, CC_UDET=94, CC_LFOW/R/D/T=102/76/77/103, CC_LFO2W/R/D/T=89/14/15/90,
+// CC_ARPM/R/O/E=113/114/115/112.
 
 let init = register('init', (pat) => pat.filterWhen((begin) => begin<1))
 
@@ -42,16 +42,16 @@ $: ccn(123).ccv(1).midi('Midi Through Port-0').midichan(1).init()
 // CC_FMEN, CC_UNIS and CC_ARPE are all sticky per-channel firmware state -
 // none of them reset themselves between songs, so explicitly force every
 // channel back to a known baseline before turning any of them on again.
-$: ccn(88).ccv(0).midi('Midi Through Port-0').midichan(1).init()   // ch1 SID target (FMEN off)
-$: ccn(88).ccv(0).midi('Midi Through Port-0').midichan(2).init()   // ch2 SID target
-$: ccn(88).ccv(0).midi('Midi Through Port-0').midichan(3).init()   // ch3 SID target
-$: ccn(88).ccv(1).midi('Midi Through Port-0').midichan(4).init()   // ch4 -> FMOpl
-$: ccn(41).ccv(0).midi('Midi Through Port-0').midichan(1).init()   // unison off ch1
-$: ccn(41).ccv(0).midi('Midi Through Port-0').midichan(2).init()   // unison off ch2 (set on below)
-$: ccn(41).ccv(0).midi('Midi Through Port-0').midichan(3).init()   // unison off ch3
-$: ccn(12).ccv(0).midi('Midi Through Port-0').midichan(1).init()   // arp off ch1
-$: ccn(12).ccv(0).midi('Midi Through Port-0').midichan(2).init()   // arp off ch2
-$: ccn(12).ccv(0).midi('Midi Through Port-0').midichan(3).init()   // arp off ch3 (set on below)
+$: ccn(31).ccv(0).midi('Midi Through Port-0').midichan(1).init()   // ch1 SID target (FMEN off)
+$: ccn(31).ccv(0).midi('Midi Through Port-0').midichan(2).init()   // ch2 SID target
+$: ccn(31).ccv(0).midi('Midi Through Port-0').midichan(3).init()   // ch3 SID target
+$: ccn(31).ccv(1).midi('Midi Through Port-0').midichan(4).init()   // ch4 -> FMOpl
+$: ccn(93).ccv(0).midi('Midi Through Port-0').midichan(1).init()   // unison off ch1
+$: ccn(93).ccv(0).midi('Midi Through Port-0').midichan(2).init()   // unison off ch2 (set on below)
+$: ccn(93).ccv(0).midi('Midi Through Port-0').midichan(3).init()   // unison off ch3
+$: ccn(112).ccv(0).midi('Midi Through Port-0').midichan(1).init()   // arp off ch1
+$: ccn(112).ccv(0).midi('Midi Through Port-0').midichan(2).init()   // arp off ch2
+$: ccn(112).ccv(0).midi('Midi Through Port-0').midichan(3).init()   // arp off ch3 (set on below)
 
 // Volume - SIDs boot silent and need this before anything is audible.
 $: ccn(7).ccv(1).midi('Midi Through Port-0').midichan(1).init()
@@ -71,31 +71,31 @@ $: ccn(7).ccv(1).midi('Midi Through Port-0').midichan(4).progNum(1).init()   // 
 // sets the detune spread. Turning unison on drops the channel to 1 note/SID,
 // which is exactly what we want here: this lead is meant to sound like one
 // thick oscillator, not three thin ones.
-$: ccn(41).ccv(1).midi('Midi Through Port-0').midichan(2).init()   // CC_UNIS: on
-$: ccn(42).ccv(0.4).midi('Midi Through Port-0').midichan(2).init() // CC_UDET: moderate spread
+$: ccn(93).ccv(1).midi('Midi Through Port-0').midichan(2).init()   // CC_UNIS: on
+$: ccn(94).ccv(0.4).midi('Midi Through Port-0').midichan(2).init() // CC_UDET: moderate spread
 
 // SID2 LFO1: slow pitch vibrato, subtle - gives the unison lead some life
 // without turning it into a siren.
-$: ccn(0).ccv(0.0).midi('Midi Through Port-0').midichan(2).init()  // CC_LFOW: Triangle
-$: ccn(2).ccv(0.25).midi('Midi Through Port-0').midichan(2).init() // CC_LFOR: slow-ish rate
-$: ccn(3).ccv(0.3).midi('Midi Through Port-0').midichan(2).init()  // CC_LFOD: subtle depth
-$: ccn(4).ccv(0.0).midi('Midi Through Port-0').midichan(2).init()  // CC_LFOT: Pitch
+$: ccn(102).ccv(0.0).midi('Midi Through Port-0').midichan(2).init()  // CC_LFOW: Triangle
+$: ccn(76).ccv(0.25).midi('Midi Through Port-0').midichan(2).init() // CC_LFOR: slow-ish rate
+$: ccn(77).ccv(0.3).midi('Midi Through Port-0').midichan(2).init()  // CC_LFOD: subtle depth
+$: ccn(103).ccv(0.0).midi('Midi Through Port-0').midichan(2).init()  // CC_LFOT: Pitch
 
 // SID3 LFO2: square-wave wah on the filter cutoff, deep and syncopated -
 // this is what turns the plain arp'd chord into something that breathes.
-$: ccn(13).ccv(0.6).midi('Midi Through Port-0').midichan(3).init() // CC_LFO2W: Square
+$: ccn(89).ccv(0.6).midi('Midi Through Port-0').midichan(3).init() // CC_LFO2W: Square
 $: ccn(14).ccv(0.3).midi('Midi Through Port-0').midichan(3).init() // CC_LFO2R: moderate rate
 $: ccn(15).ccv(0.7).midi('Midi Through Port-0').midichan(3).init() // CC_LFO2D: deep
-$: ccn(16).ccv(1.0).midi('Midi Through Port-0').midichan(3).init() // CC_LFO2T: Cutoff
+$: ccn(90).ccv(1.0).midi('Midi Through Port-0').midichan(3).init() // CC_LFO2T: Cutoff
 
 // SID3 arpeggiator, MIDI-clock-synced (see arp_chord_clocksync.strudel.js
 // for the full clock-division writeup) - this is what turns the held chord
 // below into the "multi-keypress" shimmer: three real simultaneous note-ons,
 // cycled fast enough by the firmware's own engine to read as one texture.
-$: ccn(6).ccv(0.0).midi('Midi Through Port-0').midichan(3).init()  // CC_ARPM: Up
-$: ccn(11).ccv(0.0).midi('Midi Through Port-0').midichan(3).init() // CC_ARPO: 0 extra octaves, stay in the triad
-$: ccn(10).ccv(0.85).midi('Midi Through Port-0').midichan(3).init()// CC_ARPR: fast clock division
-$: ccn(12).ccv(1).midi('Midi Through Port-0').midichan(3).init()   // CC_ARPE: on
+$: ccn(113).ccv(0.0).midi('Midi Through Port-0').midichan(3).init()  // CC_ARPM: Up
+$: ccn(115).ccv(0.0).midi('Midi Through Port-0').midichan(3).init() // CC_ARPO: 0 extra octaves, stay in the triad
+$: ccn(114).ccv(0.85).midi('Midi Through Port-0').midichan(3).init()// CC_ARPR: fast clock division
+$: ccn(112).ccv(1).midi('Midi Through Port-0').midichan(3).init()   // CC_ARPE: on
 
 // setcps(0.85) // uncomment and tune to taste - up-tempo, circus-EDM pace
 

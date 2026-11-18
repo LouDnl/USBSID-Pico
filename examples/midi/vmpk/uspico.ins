@@ -156,39 +156,39 @@
 27=Gate bit
 
 ;Envelope (ADSR)
-17=Attack
-18=Decay
-19=Sustain
-29=Release (moved off 0x14, collided with CC_NOIS)
+73=Attack
+75=Decay
+70=Sustain
+72=Release
 
 ;Default values=Chip related
-32=Filter Frequency Cutoff
-33=Filter resonance
-34=Filter voice 1
-35=Filter voice 2
-36=Filter voice 3
-37=Filter external
-48=Voice 3 disconnect
-49=High pass
-50=Band pass
-51=Low pass
+74=Filter Frequency Cutoff
+71=Filter resonance
+16=Filter voice 1
+17=Filter voice 2
+18=Filter voice 3
+19=Filter external
+83=Voice 3 disconnect
+82=High pass
+81=Band pass
+80=Low pass
 7=Channel Volume
 
 ;Default values=Phase 4 modulation and timing
-0=LFO waveform
-2=LFO rate
-3=LFO depth
-4=LFO destination
-13=LFO 2 waveform
+102=LFO waveform
+76=LFO rate
+77=LFO depth
+103=LFO destination
+89=LFO 2 waveform
 14=LFO 2 rate
 15=LFO 2 depth
-16=LFO 2 destination
+90=LFO 2 destination
 5=Portamento time
-6=Arpeggiator mode
-10=Arpeggiator rate
-11=Arpeggiator octave range
-12=Arpeggiator enable
-30=Arpeggiator table select
+113=Arpeggiator mode
+114=Arpeggiator rate
+115=Arpeggiator octave range
+112=Arpeggiator enable
+116=Arpeggiator table select
 
 ;Default CC values=SID / Voice selection
 104=Select SID 1
@@ -201,17 +201,13 @@
 
 ;Default CC values=custom commands
 111=Turn on polyfonic for current SID
-119=Gate auto enabled on noteon note off
-8=Enable copy voice mode
-9=Enable copy SID mode (moved off 0x18, collided with CC_TEST)
-40=Link/Unlink voice
-56=Link/Unlink SID
-72=Velocity Mode
+29=Gate auto enabled on noteon note off
+30=Velocity Mode
 
 ; other per-voice-shape override CC
-41=Unison mode on/off
-42=Unison detune spread
-88=Target this channel at the FMOpl chip instead of a SID
+93=Unison mode on/off
+94=Unison detune spread
+31=Target this channel at the FMOpl chip instead of a SID
 
 ;Midi related=Fixed values
 120=All Sound Off
@@ -220,10 +216,10 @@
 126=Mono Mode On=Poly off & all notes off
 127=Poly Mode On=Mono off & all notes off
 
-;Cynthcart related _FIXED_ CC values
-85=Enable Cynthcart
-86=Disable Cynthcart
-87=Reset Cynthcart
+;Embedded application _FIXED_ CC values
+117=Enable embedded app
+118=Disable embedded app
+119=Reset embedded app
 
 ;Unused values=Midi related
 255=Bank Select MSB
@@ -245,9 +241,9 @@
 13=Osc Waveform (all voices)
 14=Osc Waveform (voice 2 only)
 15=Osc Waveform (voice 3 only)
-85=Start Cynthcart
-86=Stop Cynthcart
-87=Reset Cynthcart
+117=Start embedded app
+118=Stop embedded app
+119=Reset embedded app
 
 ; ----------------------------------------------------------------------
 

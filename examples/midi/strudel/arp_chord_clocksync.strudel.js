@@ -32,18 +32,18 @@ $: ccn(123).ccv(1).midi('Midi Through Port-0').midichan(1).init()
 
 // Reset channels to plain SID targeting (CC_FMEN off) - same hygiene as
 // every other demo here, in case FMOpl targeting was left on from testing.
-$: ccn(88).ccv(0).midi('Midi Through Port-0').midichan(1).init()
-$: ccn(88).ccv(0).midi('Midi Through Port-0').midichan(2).init()
+$: ccn(31).ccv(0).midi('Midi Through Port-0').midichan(1).init()
+$: ccn(31).ccv(0).midi('Midi Through Port-0').midichan(2).init()
 
 $: ccn(7).ccv(1).midi('Midi Through Port-0').midichan(1).progNum(0).init()   // SID1: Default patch (plain triangle) - the arp voice
 $: ccn(7).ccv(1).midi('Midi Through Port-0').midichan(2).progNum(3).init()   // SID2: Bass
 
 // Arpeggiator setup on channel 1 - this is what actually turns held chord
 // notes into the fast note-cycling trick, see CC map in the MIDI manual.
-$: ccn(6).ccv(0.0).midi('Midi Through Port-0').midichan(1).init()    // CC_ARPM: Up (cycle root->3rd->5th->repeat)
-$: ccn(11).ccv(0.0).midi('Midi Through Port-0').midichan(1).init()   // CC_ARPO: 0 extra octaves - stay inside the triad, the classic effect
-$: ccn(10).ccv(1.0).midi('Midi Through Port-0').midichan(1).init()   // CC_ARPR: fastest MIDI-clock division (1 pulse) - only matters once a clock is present
-$: ccn(12).ccv(1).midi('Midi Through Port-0').midichan(1).init()     // CC_ARPE: arp on for channel 1 - notes now feed the arp's held pattern instead of sounding directly
+$: ccn(113).ccv(0.0).midi('Midi Through Port-0').midichan(1).init()    // CC_ARPM: Up (cycle root->3rd->5th->repeat)
+$: ccn(115).ccv(0.0).midi('Midi Through Port-0').midichan(1).init()   // CC_ARPO: 0 extra octaves - stay inside the triad, the classic effect
+$: ccn(114).ccv(1.0).midi('Midi Through Port-0').midichan(1).init()   // CC_ARPR: fastest MIDI-clock division (1 pulse) - only matters once a clock is present
+$: ccn(112).ccv(1).midi('Midi Through Port-0').midichan(1).init()     // CC_ARPE: arp on for channel 1 - notes now feed the arp's held pattern instead of sounding directly
 
 // setcps(0.53) // ~128 BPM (1 cycle = 4 beats: cps = BPM/240). At 128 BPM,
 // 24 MIDI clock pulses/quarter note works out to ~19.5ms/pulse - a 1-pulse
