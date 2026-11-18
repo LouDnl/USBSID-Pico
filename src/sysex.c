@@ -108,6 +108,15 @@ enum {
   SYSEX_MIDI_PATCH_SAVE  = 0x2A,
   SYSEX_FMOPL_PATCH_SAVE = 0x2B,
 };
+  /* CC map commands, RAM only, persist with SYSEX_MIDI_SAVE.
+   * Encode values as encode_byte() nibbles, MIDI_CC_UNASSIGNED = unbound.
+   * Send no ack on SET, log refusal via usERR, verify with a DUMP.
+   * Page DUMP by 24 ids, pages 0-3 cover MIDI_CC_MAP_SLOTS.
+   * RESET mode 0 = defaults, mode 1 = unassign every remappable id. */
+  SYSEX_MIDI_CCMAP_SET   = 0x2C,  /* host -> device: id, hi, lo */
+  SYSEX_MIDI_CCMAP_DUMP  = 0x2D,  /* request: page */
+  SYSEX_MIDI_CCMAP_DATA  = 0x2E,  /* response: device -> host, page + 48 nibbles */
+  SYSEX_MIDI_CCMAP_RESET = 0x2F,  /* host -> device: mode */
 
 
 /* Every midi_patch_t field sent as two 7-bit-safe nibble bytes (0-15 each),
@@ -628,6 +637,96 @@ static void handle_arptable_dump(uint8_t *buffer, int size)
  * @brief Dispatch a USBSID custom SysEx command (buffer[2] = command id)
  *
  * Handles TOGGLE_AUDIO (routed through handle_config_request), the MIDI
+#define CCMAP_SYSEX_SET_SIZE      7  /* F0 50 2C id hi lo F7 */
+#define CCMAP_SYSEX_IDS_PER_PAGE  24
+#define CCMAP_SYSEX_PAGES         (MIDI_CC_MAP_SLOTS / CCMAP_SYSEX_IDS_PER_PAGE)
+#define CCMAP_SYSEX_NIBBLES       (CCMAP_SYSEX_IDS_PER_PAGE * 2)
+static_assert(MIDI_CC_MAP_SLOTS % CCMAP_SYSEX_IDS_PER_PAGE == 0, "CC map slots not a whole number of pages");
+static_assert(4 + CCMAP_SYSEX_NIBBLES + 1 == 53, "CC map DATA message size != 53");
+
+/**
+ * @brief: Handle SYSEX_MIDI_CCMAP_SET, bind one CC map id to a CC number, RAM only
+ *
+ * @param uint8_t * buffer, F0 50 2C <id> <hi> <lo> F7
+ * @param int size
+ */
+static void handle_ccmap_set(uint8_t *buffer, int size)
+{
+  if (size < CCMAP_SYSEX_SET_SIZE) {
+    usERR("[SYSEX] SYSEX_MIDI_CCMAP_SET: message too short (%d < %d)\n", size, CCMAP_SYSEX_SET_SIZE);
+    return;
+  }
+  uint8_t id = buffer[3];
+  uint8_t cc = decode_byte(&buffer[4]);
+  if (!midi_handler_set_cc(id, cc)) {
+    usERR("[SYSEX] SYSEX_MIDI_CCMAP_SET: id %d -> CC 0x%02X refused\n", id, cc);
+    return;
+  }
+  usCFG("[SYSEX] SYSEX_MIDI_CCMAP_SET: id %d -> CC 0x%02X in RAM (SYSEX_MIDI_SAVE to persist it)\n", id, cc);
+  return;
+}
+
+/**
+ * @brief: Handle SYSEX_MIDI_CCMAP_DUMP, send one CC map page as SYSEX_MIDI_CCMAP_DATA
+ *
+ * Report ids at or above MIDI_CC_FN_COUNT as MIDI_CC_UNASSIGNED.
+ *
+ * @param uint8_t * buffer, F0 50 2D <page> F7
+ * @param int size
+ */
+static void handle_ccmap_dump(uint8_t *buffer, int size)
+{
+  if (size < 4) {
+    usERR("[SYSEX] SYSEX_MIDI_CCMAP_DUMP: message too short\n");
+    return;
+  }
+  uint8_t page = buffer[3];
+  if (page >= CCMAP_SYSEX_PAGES) {
+    usERR("[SYSEX] SYSEX_MIDI_CCMAP_DUMP: page %d out of range (max %d)\n", page, CCMAP_SYSEX_PAGES - 1);
+    return;
+  }
+  /* Index bytes by function id, struct order = id */
+  midi_ccvalues map;
+  midi_handler_get_ccmap(&map);
+  const uint8_t *bytes = (const uint8_t *)&map;
+
+  uint8_t out[4 + CCMAP_SYSEX_NIBBLES + 1];
+  out[0] = 0xF0;
+  out[1] = 0x50;
+  out[2] = SYSEX_MIDI_CCMAP_DATA;
+  out[3] = page;
+  for (uint8_t i = 0; i < CCMAP_SYSEX_IDS_PER_PAGE; i++) {
+    uint8_t id = (uint8_t)(page * CCMAP_SYSEX_IDS_PER_PAGE + i);
+    uint8_t cc = (id < MIDI_CC_FN_COUNT) ? bytes[id] : MIDI_CC_UNASSIGNED;
+    encode_byte(cc, &out[4 + i * 2]);
+  }
+  out[4 + CCMAP_SYSEX_NIBBLES] = 0xF7;
+  tud_midi_stream_write(MIDI_CABLE, out, sizeof(out));
+  usCFG("[SYSEX] SYSEX_MIDI_CCMAP_DUMP: sent page %d\n", page);
+  return;
+}
+
+/**
+ * @brief: Handle SYSEX_MIDI_CCMAP_RESET, restore the CC map, RAM only
+ *
+ * @param uint8_t * buffer, F0 50 2F <mode> F7, mode 0 = defaults, 1 = clear remappable
+ * @param int size
+ */
+static void handle_ccmap_reset(uint8_t *buffer, int size)
+{
+  if (size < 4) {
+    usERR("[SYSEX] SYSEX_MIDI_CCMAP_RESET: message too short\n");
+    return;
+  }
+  uint8_t mode = buffer[3];
+  if (mode != MIDI_CCMAP_RESET_DEFAULTS && mode != MIDI_CCMAP_RESET_CLEAR) {
+    usERR("[SYSEX] SYSEX_MIDI_CCMAP_RESET: mode %d invalid (0 = defaults, 1 = clear)\n", mode);
+    return;
+  }
+  midi_handler_reset_ccmap(mode);
+  usCFG("[SYSEX] SYSEX_MIDI_CCMAP_RESET: mode %d applied in RAM\n", mode);
+  return;
+}
  * config SAVE/LOAD/RESET triggers, the LOAD/DUMP command pairs for SID
  * patches, FMOpl patches and arp tables, the SAVE command pair that captures
  * a channel's live state into a SID or FMOpl patch slot, plus the FMOpl
@@ -721,3 +820,12 @@ void process_sysex(uint8_t* buffer, int size)
   }
   return;
 }
+    case SYSEX_MIDI_CCMAP_SET:
+      handle_ccmap_set(buffer, size);
+      break;
+    case SYSEX_MIDI_CCMAP_DUMP:
+      handle_ccmap_dump(buffer, size);
+      break;
+    case SYSEX_MIDI_CCMAP_RESET:
+      handle_ccmap_reset(buffer, size);
+      break;

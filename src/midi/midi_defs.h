@@ -30,12 +30,16 @@
 #define _USBSID_MIDI_CC_H_
 #pragma once
 
+#include <stddef.h>
+#include <assert.h>
+
 #ifdef __cplusplus
   extern "C" {
 #endif
 
 
 typedef struct midi_ccvalues {
+  /* Field order = CC function id (enum midi_cc_fn). Append only, never reorder. */
   /* Voice related */
   uint8_t CC_NOTE;  /* Note frequency */
   uint8_t CC_PWM;   /* Pulse Width Modulation (Modulation wheel) */
@@ -74,10 +78,6 @@ typedef struct midi_ccvalues {
   /* Custom commands */
   uint8_t CC_GTEN;  /* Gate auto enabled on noteon note off */
   uint8_t CC_SPLY;  /* Turn on polyfonic for current SID */
-  // uint8_t CC_CVCE;  /* Enable copy voice mode */ /* DEPRECATED */
-  // uint8_t CC_CSID;  /* Enable copy SID mode */ /* DEPRECATED */
-  // uint8_t CC_LVCE;  /* Link/Unlink voice */ /* DEPRECATED */
-  // uint8_t CC_LSID;  /* Link/Unlink SID */ /* DEPRECATED */
   uint8_t CC_VELM;  /* Velocity Mode */
   /* Modulation and timing */
   uint8_t CC_LFOW;  /* LFO waveform */
@@ -102,10 +102,10 @@ typedef struct midi_ccvalues {
   uint8_t CC_UDET;  /* Unison detune spread */
   /* FMOpl (midi_fmopl.h/.c) */
   uint8_t CC_FMEN;  /* Target this channel's notes at the FMOpl chip instead of a SID */
-  /* Fixed CC values ~ Cynthcart related */
-  uint8_t CC_CEN;   /* Enable  Cynthcart */
-  uint8_t CC_CDI;   /* Disable Cynthcart */
-  uint8_t CC_CRE;   /* Reset Cynthcart */
+  /* Fixed CC values ~ Embedded application (Cynthcart, SID SYNTH) */
+  uint8_t CC_CEN;   /* Enable embedded application */
+  uint8_t CC_CDI;   /* Disable embedded application */
+  uint8_t CC_CRE;   /* Reset embedded application */
   /* Midi related */
   uint8_t CC_BMSB;  /* Bank Select MSB */
   uint8_t CC_BLSB;  /* Bank Select LSB */
@@ -118,10 +118,148 @@ typedef struct midi_ccvalues {
   uint8_t CC_POLY;  /* Poly Mode On ~ Mono off & all notes off */
 } midi_ccvalues;
 
+#define MIDI_CC_MAP_SLOTS 96
+#define MIDI_CC_UNASSIGNED 0xFF
+#define MIDI_CC_FN_COUNT 64
+
+enum midi_cc_fn {
+  MIDI_CC_FN_NOTE = 0,
+  MIDI_CC_FN_PWM,
+  MIDI_CC_FN_NOIS,
+  MIDI_CC_FN_PULS,
+  MIDI_CC_FN_SAWT,
+  MIDI_CC_FN_TRIA,
+  MIDI_CC_FN_TEST,
+  MIDI_CC_FN_RMOD,
+  MIDI_CC_FN_SYNC,
+  MIDI_CC_FN_GATE,
+  MIDI_CC_FN_ATT,
+  MIDI_CC_FN_DEC,
+  MIDI_CC_FN_SUS,
+  MIDI_CC_FN_REL,
+  MIDI_CC_FN_FFC,
+  MIDI_CC_FN_RES,
+  MIDI_CC_FN_FLT1,
+  MIDI_CC_FN_FLT2,
+  MIDI_CC_FN_FLT3,
+  MIDI_CC_FN_FLTE,
+  MIDI_CC_FN_3OFF,
+  MIDI_CC_FN_HPF,
+  MIDI_CC_FN_BPF,
+  MIDI_CC_FN_LPF,
+  MIDI_CC_FN_VOL,
+  MIDI_CC_FN_SID1,
+  MIDI_CC_FN_SID2,
+  MIDI_CC_FN_SID3,
+  MIDI_CC_FN_SID4,
+  MIDI_CC_FN_VCE1,
+  MIDI_CC_FN_VCE2,
+  MIDI_CC_FN_VCE3,
+  MIDI_CC_FN_GTEN,
+  MIDI_CC_FN_SPLY,
+  MIDI_CC_FN_VELM,
+  MIDI_CC_FN_LFOW,
+  MIDI_CC_FN_LFOR,
+  MIDI_CC_FN_LFOD,
+  MIDI_CC_FN_LFOT,
+  MIDI_CC_FN_PORT,
+  MIDI_CC_FN_ARPM,
+  MIDI_CC_FN_ARPR,
+  MIDI_CC_FN_ARPO,
+  MIDI_CC_FN_ARPE,
+  MIDI_CC_FN_ARPT,
+  MIDI_CC_FN_LFO2W,
+  MIDI_CC_FN_LFO2R,
+  MIDI_CC_FN_LFO2D,
+  MIDI_CC_FN_LFO2T,
+  MIDI_CC_FN_UNIS,
+  MIDI_CC_FN_UDET,
+  MIDI_CC_FN_FMEN,
+  MIDI_CC_FN_CEN,
+  MIDI_CC_FN_CDI,
+  MIDI_CC_FN_CRE,
+  MIDI_CC_FN_BMSB,
+  MIDI_CC_FN_BLSB,
+  MIDI_CC_FN_MOD,
+  MIDI_CC_FN_MODL,
+  MIDI_CC_FN_ASOF,
+  MIDI_CC_FN_RACT,
+  MIDI_CC_FN_ANOF,
+  MIDI_CC_FN_MONO,
+  MIDI_CC_FN_POLY
+};
+
+static_assert(offsetof(midi_ccvalues, CC_NOTE) == MIDI_CC_FN_NOTE, "CC_NOTE id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_PWM) == MIDI_CC_FN_PWM, "CC_PWM id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_NOIS) == MIDI_CC_FN_NOIS, "CC_NOIS id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_PULS) == MIDI_CC_FN_PULS, "CC_PULS id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_SAWT) == MIDI_CC_FN_SAWT, "CC_SAWT id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_TRIA) == MIDI_CC_FN_TRIA, "CC_TRIA id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_TEST) == MIDI_CC_FN_TEST, "CC_TEST id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_RMOD) == MIDI_CC_FN_RMOD, "CC_RMOD id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_SYNC) == MIDI_CC_FN_SYNC, "CC_SYNC id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_GATE) == MIDI_CC_FN_GATE, "CC_GATE id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_ATT) == MIDI_CC_FN_ATT, "CC_ATT id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_DEC) == MIDI_CC_FN_DEC, "CC_DEC id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_SUS) == MIDI_CC_FN_SUS, "CC_SUS id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_REL) == MIDI_CC_FN_REL, "CC_REL id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_FFC) == MIDI_CC_FN_FFC, "CC_FFC id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_RES) == MIDI_CC_FN_RES, "CC_RES id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_FLT1) == MIDI_CC_FN_FLT1, "CC_FLT1 id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_FLT2) == MIDI_CC_FN_FLT2, "CC_FLT2 id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_FLT3) == MIDI_CC_FN_FLT3, "CC_FLT3 id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_FLTE) == MIDI_CC_FN_FLTE, "CC_FLTE id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_3OFF) == MIDI_CC_FN_3OFF, "CC_3OFF id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_HPF) == MIDI_CC_FN_HPF, "CC_HPF id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_BPF) == MIDI_CC_FN_BPF, "CC_BPF id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_LPF) == MIDI_CC_FN_LPF, "CC_LPF id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_VOL) == MIDI_CC_FN_VOL, "CC_VOL id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_SID1) == MIDI_CC_FN_SID1, "CC_SID1 id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_SID2) == MIDI_CC_FN_SID2, "CC_SID2 id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_SID3) == MIDI_CC_FN_SID3, "CC_SID3 id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_SID4) == MIDI_CC_FN_SID4, "CC_SID4 id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_VCE1) == MIDI_CC_FN_VCE1, "CC_VCE1 id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_VCE2) == MIDI_CC_FN_VCE2, "CC_VCE2 id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_VCE3) == MIDI_CC_FN_VCE3, "CC_VCE3 id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_GTEN) == MIDI_CC_FN_GTEN, "CC_GTEN id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_SPLY) == MIDI_CC_FN_SPLY, "CC_SPLY id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_VELM) == MIDI_CC_FN_VELM, "CC_VELM id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_LFOW) == MIDI_CC_FN_LFOW, "CC_LFOW id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_LFOR) == MIDI_CC_FN_LFOR, "CC_LFOR id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_LFOD) == MIDI_CC_FN_LFOD, "CC_LFOD id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_LFOT) == MIDI_CC_FN_LFOT, "CC_LFOT id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_PORT) == MIDI_CC_FN_PORT, "CC_PORT id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_ARPM) == MIDI_CC_FN_ARPM, "CC_ARPM id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_ARPR) == MIDI_CC_FN_ARPR, "CC_ARPR id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_ARPO) == MIDI_CC_FN_ARPO, "CC_ARPO id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_ARPE) == MIDI_CC_FN_ARPE, "CC_ARPE id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_ARPT) == MIDI_CC_FN_ARPT, "CC_ARPT id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_LFO2W) == MIDI_CC_FN_LFO2W, "CC_LFO2W id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_LFO2R) == MIDI_CC_FN_LFO2R, "CC_LFO2R id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_LFO2D) == MIDI_CC_FN_LFO2D, "CC_LFO2D id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_LFO2T) == MIDI_CC_FN_LFO2T, "CC_LFO2T id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_UNIS) == MIDI_CC_FN_UNIS, "CC_UNIS id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_UDET) == MIDI_CC_FN_UDET, "CC_UDET id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_FMEN) == MIDI_CC_FN_FMEN, "CC_FMEN id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_CEN) == MIDI_CC_FN_CEN, "CC_CEN id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_CDI) == MIDI_CC_FN_CDI, "CC_CDI id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_CRE) == MIDI_CC_FN_CRE, "CC_CRE id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_BMSB) == MIDI_CC_FN_BMSB, "CC_BMSB id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_BLSB) == MIDI_CC_FN_BLSB, "CC_BLSB id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_MOD) == MIDI_CC_FN_MOD, "CC_MOD id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_MODL) == MIDI_CC_FN_MODL, "CC_MODL id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_ASOF) == MIDI_CC_FN_ASOF, "CC_ASOF id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_RACT) == MIDI_CC_FN_RACT, "CC_RACT id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_ANOF) == MIDI_CC_FN_ANOF, "CC_ANOF id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_MONO) == MIDI_CC_FN_MONO, "CC_MONO id mismatch");
+static_assert(offsetof(midi_ccvalues, CC_POLY) == MIDI_CC_FN_POLY, "CC_POLY id mismatch");
+static_assert(sizeof(midi_ccvalues) == MIDI_CC_FN_COUNT, "midi_ccvalues size != MIDI_CC_FN_COUNT");
+
 /* Default Control Change Byte values */
 #define MIDI_DEFAULT_CCVALUES_INIT { \
   /* Default values ~ Voice related */ \
   .CC_NOTE  =  0x1C,  /*  28 ~ Note frequency for manual input */ \
+  /* TODO: Move CC_PWM off CC 1 once CC_MOD has a real modulation wheel implementation */ \
   .CC_PWM   =  0x01,  /*   1 ~ Pulse Width Modulation (Modulation wheel) */ \
   .CC_NOIS  =  0x14,  /*  20 ~ Noise waveform */ \
   .CC_PULS  =  0x15,  /*  21 ~ Pulse waveform */ \
@@ -131,21 +269,24 @@ typedef struct midi_ccvalues {
   .CC_RMOD  =  0x19,  /*  25 ~ Ring modulator bit */ \
   .CC_SYNC  =  0x1A,  /*  26 ~ Sync bit */ \
   .CC_GATE  =  0x1B,  /*  27 ~ Gate bit */ \
-  .CC_ATT   =  0x11,  /*  17 ~ Attack */ \
-  .CC_DEC   =  0x12,  /*  18 ~ Decay */ \
-  .CC_SUS   =  0x13,  /*  19 ~ Sustain */ \
-  .CC_REL   =  0x1D,  /*  29 ~ Release (moved off 0x14, collided with CC_NOIS) */ \
+  /* Default values ~ Envelope. MIDI 1.0 Sound Controllers */ \
+  .CC_ATT   =  0x49,  /*  73 ~ Attack (Attack Time) */ \
+  .CC_DEC   =  0x4B,  /*  75 ~ Decay (Decay Time) */ \
+  .CC_SUS   =  0x46,  /*  70 ~ Sustain (Sound Controller 1) */ \
+  .CC_REL   =  0x48,  /*  72 ~ Release (Release Time) */ \
   /* Default values ~ Chip related */ \
-  .CC_FFC   =  0x20,  /*  32 ~ Filter Frequency Cutoff */ \
-  .CC_RES   =  0x21,  /*  33 ~ Filter resonance */ \
-  .CC_FLT1  =  0x22,  /*  34 ~ Filter voice 1 */ \
-  .CC_FLT2  =  0x23,  /*  35 ~ Filter voice 2 */ \
-  .CC_FLT3  =  0x24,  /*  36 ~ Filter voice 3 */ \
-  .CC_FLTE  =  0x25,  /*  37 ~ Filter external */ \
-  .CC_3OFF  =  0x30,  /*  48 ~ Voice 3 disconnect */ \
-  .CC_HPF   =  0x31,  /*  49 ~ High pass */ \
-  .CC_BPF   =  0x32,  /*  50 ~ Band pass */ \
-  .CC_LPF   =  0x33,  /*  51 ~ Low pass */ \
+  .CC_FFC   =  0x4A,  /*  74 ~ Filter Frequency Cutoff (Brightness) */ \
+  .CC_RES   =  0x47,  /*  71 ~ Filter resonance (Timbre/Harmonic Intensity) */ \
+  /* Filter routing ~ General Purpose Controllers 1-4 */ \
+  .CC_FLT1  =  0x10,  /*  16 ~ Filter voice 1 */ \
+  .CC_FLT2  =  0x11,  /*  17 ~ Filter voice 2 */ \
+  .CC_FLT3  =  0x12,  /*  18 ~ Filter voice 3 */ \
+  .CC_FLTE  =  0x13,  /*  19 ~ Filter external */ \
+  /* Filter mode ~ General Purpose Controllers 5-8 */ \
+  .CC_LPF   =  0x50,  /*  80 ~ Low pass */ \
+  .CC_BPF   =  0x51,  /*  81 ~ Band pass */ \
+  .CC_HPF   =  0x52,  /*  82 ~ High pass */ \
+  .CC_3OFF  =  0x53,  /*  83 ~ Voice 3 disconnect */ \
   .CC_VOL   =  0x07,  /*   7 ~ Channel Volume */ \
   /* Default CC values ~ SID / Voice selection */ \
   .CC_SID1  =  0x68,  /* 104 ~ Select SID 1 */ \
@@ -156,40 +297,35 @@ typedef struct midi_ccvalues {
   .CC_VCE2  =  0x6D,  /* 109 ~ Select Voice 2 */ \
   .CC_VCE3  =  0x6E,  /* 110 ~ Select Voice 3 */ \
   /* Default CC values ~ custom commands */ \
-  .CC_GTEN  =  0x77,  /* 119 ~ Gate auto enabled on noteon note off */ \
+  .CC_GTEN  =  0x1D,  /*  29 ~ Gate auto enabled on noteon note off */ \
   .CC_SPLY  =  0x6F,  /* 111 ~ Turn on polyfonic for current SID */ \
-  .CC_VELM  =  0x48,  /*  72 ~ Velocity Mode */ \
+  .CC_VELM  =  0x1E,  /*  30 ~ Velocity Mode */ \
   /* Default values ~ modulation and timing */ \
-  .CC_LFOW  =  0x00,  /*   0 ~ LFO waveform */ \
-  .CC_LFOR  =  0x02,  /*   2 ~ LFO rate */ \
-  .CC_LFOD  =  0x03,  /*   3 ~ LFO depth */ \
-  .CC_LFOT  =  0x04,  /*   4 ~ LFO destination */ \
+  .CC_LFOW  =  0x66,  /* 102 ~ LFO waveform */ \
+  .CC_LFOR  =  0x4C,  /*  76 ~ LFO rate (Vibrato Rate) */ \
+  .CC_LFOD  =  0x4D,  /*  77 ~ LFO depth (Vibrato Depth) */ \
+  .CC_LFOT  =  0x67,  /* 103 ~ LFO destination */ \
   .CC_PORT  =  0x05,  /*   5 ~ Portamento time */ \
-  .CC_ARPM  =  0x06,  /*   6 ~ Arpeggiator mode */ \
-  .CC_ARPR  =  0x0A,  /*  10 ~ Arpeggiator rate */ \
-  .CC_ARPO  =  0x0B,  /*  11 ~ Arpeggiator octave range */ \
-  .CC_ARPE  =  0x0C,  /*  12 ~ Arpeggiator enable */ \
-  /* Default values ~ Arpeggiator tables. Adjacent to CC_ARPM/R/O/E */ \
-  /* above but they were already full 0x06/0x0A-0x0C. This sits in the    */ \
-  /* free run instead - see temp/cc_collision_check.py's free list.      */ \
-  .CC_ARPT  =  0x1E,  /*  30 ~ Arpeggiator table select */ \
-  /* Default values ~ second LFO. Contiguous with LFO1's own */ \
-  /* 0x00/0x02-0x05 block (0x01 is CC_PWM, already taken). */ \
-  .CC_LFO2W =  0x0D,  /*  13 ~ LFO 2 waveform */ \
+  /* Default values ~ Arpeggiator */ \
+  .CC_ARPE  =  0x70,  /* 112 ~ Arpeggiator enable */ \
+  .CC_ARPM  =  0x71,  /* 113 ~ Arpeggiator mode */ \
+  .CC_ARPR  =  0x72,  /* 114 ~ Arpeggiator rate */ \
+  .CC_ARPO  =  0x73,  /* 115 ~ Arpeggiator octave range */ \
+  .CC_ARPT  =  0x74,  /* 116 ~ Arpeggiator table select */ \
+  /* Default values ~ second LFO */ \
+  .CC_LFO2W =  0x59,  /*  89 ~ LFO 2 waveform */ \
   .CC_LFO2R =  0x0E,  /*  14 ~ LFO 2 rate */ \
   .CC_LFO2D =  0x0F,  /*  15 ~ LFO 2 depth */ \
-  .CC_LFO2T =  0x10,  /*  16 ~ LFO 2 destination */ \
-  /* Default values ~ unison. Adjacent to CC_LVCE (0x28), the */ \
-  /* other per-voice-shape override CC. */ \
-  .CC_UNIS  =  0x29,  /*  41 ~ Unison mode on/off */ \
-  .CC_UDET  =  0x2A,  /*  42 ~ Unison detune spread */ \
-  /* Default values ~ FMOpl. 88 chosen from the largest free run */ \
-  /* (88-103) left after every CC above (midi_fmopl.h/.c). */ \
-  .CC_FMEN  =  0x58,  /*  88 ~ Target this channel at the FMOpl chip instead of a SID */ \
-  /* Cynthcart related _FIXED_ CC values */ \
-  .CC_CEN   =  0x55,  /*  85 ~ Enable Cynthcart */ \
-  .CC_CDI   =  0x56,  /*  86 ~ Disable Cynthcart */ \
-  .CC_CRE   =  0x57,  /*  87 ~ Reset Cynthcart */ \
+  .CC_LFO2T =  0x5A,  /*  90 ~ LFO 2 destination */ \
+  /* Default values ~ unison. MIDI 1.0 Effects 3/4 Depth (chorus, detune) */ \
+  .CC_UNIS  =  0x5D,  /*  93 ~ Unison mode on/off */ \
+  .CC_UDET  =  0x5E,  /*  94 ~ Unison detune spread */ \
+  /* Default values ~ FMOpl */ \
+  .CC_FMEN  =  0x1F,  /*  31 ~ Target this channel at the FMOpl chip instead of a SID */ \
+  /* Embedded application (Cynthcart, SID SYNTH) _FIXED_ CC values */ \
+  .CC_CEN   =  0x75,  /* 117 ~ Enable embedded application */ \
+  .CC_CDI   =  0x76,  /* 118 ~ Disable embedded application */ \
+  .CC_CRE   =  0x77,  /* 119 ~ Reset embedded application */ \
   /* Midi related ~ Fixed values */ \
   .CC_ASOF  =  0x78,  /* 120 ~ All Sound Off */ \
   .CC_RACT  =  0x79,  /* 121 ~ Reset All Controllers */ \

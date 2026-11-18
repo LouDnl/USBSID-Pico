@@ -1718,116 +1718,192 @@ void midi_tick(void)
   return;
 }
 
-/**
- * @brief Bind a CC number to a handler, refusing collisions at runtime
- *
- * A plain runtime check rather than assert(). A duplicate CC binding
- * is refused the same way on both -DNDEBUG and asserts-on builds.
- *
- * @param const char *name, the CC name, for the log line only
- * @param uint8_t cc, the CC number to bind
- * @param cc_handler_t f_ptr, the handler
- */
-static void assign_func_ptr(const char *name, uint8_t cc, cc_handler_t f_ptr)
+/* CC map core: function id kinds, handler table, rebuild, validation */
+
+/* Highest CC number a remappable id may take, 120-127 = channel mode messages */
+#define MIDI_CC_REMAP_MAX 119
+
+/* Id kinds. Only MIDI_CC_ID_REMAP and MIDI_CC_ID_FMEN ids accept a new CC number */
+enum {
+  MIDI_CC_ID_REMAP = 0,  /* bound through cc_bind_table[] */
+  MIDI_CC_ID_FMEN,       /* remappable, matched in handle_control_change() */
+  MIDI_CC_ID_FIXED,      /* compiled default only: embedded application intercept, channel mode */
+  MIDI_CC_ID_UNWIRED,    /* placeholder, compiled default only */
+};
+
+/* Kind per function id. Unlisted ids are 0 = MIDI_CC_ID_REMAP */
+static const uint8_t cc_id_kind[MIDI_CC_FN_COUNT] = {
+  [MIDI_CC_FN_FMEN] = MIDI_CC_ID_FMEN,
+  [MIDI_CC_FN_CEN]  = MIDI_CC_ID_FIXED,
+  [MIDI_CC_FN_CDI]  = MIDI_CC_ID_FIXED,
+  [MIDI_CC_FN_CRE]  = MIDI_CC_ID_FIXED,
+  [MIDI_CC_FN_BMSB] = MIDI_CC_ID_UNWIRED,
+  [MIDI_CC_FN_BLSB] = MIDI_CC_ID_UNWIRED,
+  [MIDI_CC_FN_MOD]  = MIDI_CC_ID_UNWIRED,
+  [MIDI_CC_FN_MODL] = MIDI_CC_ID_UNWIRED,
+  [MIDI_CC_FN_ASOF] = MIDI_CC_ID_FIXED,
+  [MIDI_CC_FN_RACT] = MIDI_CC_ID_FIXED,
+  [MIDI_CC_FN_ANOF] = MIDI_CC_ID_FIXED,
+  [MIDI_CC_FN_MONO] = MIDI_CC_ID_FIXED,
+  [MIDI_CC_FN_POLY] = MIDI_CC_ID_FIXED,
+};
+
+typedef struct {
+  uint8_t id;        /* enum midi_cc_fn */
+  cc_handler_t fn;
+} cc_bind_t;
+
+/* Function id to handler. Order = bind priority, first match wins a shared CC number */
+static const cc_bind_t cc_bind_table[] = {
+  /* Handler settings */
+  { MIDI_CC_FN_GTEN,  set_handler },
+  { MIDI_CC_FN_SPLY,  set_handler },
+  { MIDI_CC_FN_VELM,  set_handler },
+
+  /* SID / voice mask override */
+  { MIDI_CC_FN_SID1,  set_sid_override },
+  { MIDI_CC_FN_SID2,  set_sid_override },
+  { MIDI_CC_FN_SID3,  set_sid_override },
+  { MIDI_CC_FN_SID4,  set_sid_override },
+  { MIDI_CC_FN_VCE1,  set_voice_override },
+  { MIDI_CC_FN_VCE2,  set_voice_override },
+  { MIDI_CC_FN_VCE3,  set_voice_override },
+
+  /* Per-voice settings */
+  { MIDI_CC_FN_NOTE,  set_notefrequency },
+  { MIDI_CC_FN_PWM,   set_voicepwm },
+  { MIDI_CC_FN_NOIS,  set_controlreg },
+  { MIDI_CC_FN_PULS,  set_controlreg },
+  { MIDI_CC_FN_SAWT,  set_controlreg },
+  { MIDI_CC_FN_TRIA,  set_controlreg },
+  { MIDI_CC_FN_TEST,  set_controlreg },
+  { MIDI_CC_FN_RMOD,  set_controlreg },
+  { MIDI_CC_FN_SYNC,  set_controlreg },
+  { MIDI_CC_FN_GATE,  set_gate },
+  { MIDI_CC_FN_ATT,   set_adsr },
+  { MIDI_CC_FN_DEC,   set_adsr },
+  { MIDI_CC_FN_SUS,   set_adsr },
+  { MIDI_CC_FN_REL,   set_adsr },
+
+  /* Chip-wide settings */
+  { MIDI_CC_FN_FFC,   set_filtercutoff },
+  { MIDI_CC_FN_RES,   set_resfilter },
+  { MIDI_CC_FN_FLT1,  set_resfilter },
+  { MIDI_CC_FN_FLT2,  set_resfilter },
+  { MIDI_CC_FN_FLT3,  set_resfilter },
+  { MIDI_CC_FN_FLTE,  set_resfilter },
+  { MIDI_CC_FN_3OFF,  set_modevolume },
+  { MIDI_CC_FN_HPF,   set_modevolume },
+  { MIDI_CC_FN_BPF,   set_modevolume },
+  { MIDI_CC_FN_LPF,   set_modevolume },
+  { MIDI_CC_FN_VOL,   set_modevolume },
+
+  /* Modulation and timing */
+  { MIDI_CC_FN_LFOW,  set_lfo_wave },
+  { MIDI_CC_FN_LFOR,  set_lfo_rate },
+  { MIDI_CC_FN_LFOD,  set_lfo_depth },
+  { MIDI_CC_FN_LFOT,  set_lfo_dest },
+  { MIDI_CC_FN_PORT,  set_porta_time },
+  { MIDI_CC_FN_LFO2W, set_lfo2_wave },
+  { MIDI_CC_FN_LFO2R, set_lfo2_rate },
+  { MIDI_CC_FN_LFO2D, set_lfo2_depth },
+  { MIDI_CC_FN_LFO2T, set_lfo2_dest },
+  { MIDI_CC_FN_UNIS,  set_unison_enable },
+  { MIDI_CC_FN_UDET,  set_unison_detune },
+  { MIDI_CC_FN_ARPM,  set_arp_mode },
+  { MIDI_CC_FN_ARPR,  set_arp_rate },
+  { MIDI_CC_FN_ARPO,  set_arp_octaves },
+  { MIDI_CC_FN_ARPE,  set_arp_enable },
+  { MIDI_CC_FN_ARPT,  set_arp_table },
+
+  /* Fixed Midi actions */
+  { MIDI_CC_FN_ASOF,  all_notes_off },
+  { MIDI_CC_FN_RACT,  all_notes_off },
+  { MIDI_CC_FN_ANOF,  all_notes_off },
+  { MIDI_CC_FN_MONO,  set_handler },
+  { MIDI_CC_FN_POLY,  set_handler },
+};
+
+/** @brief: Map byte of function id, field offset = id (static_assert in midi_defs.h) */
+static inline uint8_t ccmap_get(const midi_ccvalues *m, uint8_t id)
 {
-  if __us_unlikely(cc > MIDI_CC_MAX) {
-    /* Catches the 0xFF placeholders in the default map, which would otherwise
-     * run off the end of cc_func_ptr_array[128] */
-    usMIDI("[MIDI][CC] %s is 0x%02X, out of range, not registered\n", name, cc);
-    return;
-  }
-  if __us_unlikely(cc_func_ptr_array[cc] != NULL) {
-    usMIDI("[MIDI][CC] %s wants CC %d which is already bound, refusing\n", name, cc);
-    return;
-  }
-  cc_func_ptr_array[cc] = f_ptr;
-  return;
+  return ((const uint8_t *)m)[id];
 }
 
-/* Passes the CC name through. A refusal names the culprit */
-#define ASSIGN_CC(field, fn)  assign_func_ptr(#field, CC.field, fn)
+/** @brief: Set map byte of function id */
+static inline void ccmap_put(midi_ccvalues *m, uint8_t id, uint8_t cc)
+{
+  ((uint8_t *)m)[id] = cc;
+}
 
 /**
- * @brief Reset the CC dispatch table and bind every supported CC number to its handler
+ * @brief: Rebuild cc_func_ptr_array[] in place from the live map
  *
- * Clears cc_func_ptr_array[] and registers each handler via ASSIGN_CC(),
- * grouped by handler-toggle, SID/voice override, per-voice, chip-wide,
- * modulation/timing and fixed-action CCs.
+ * One write per slot, no clear pass. First cc_bind_table[] match wins a
+ * shared CC number, later ones are logged and refused.
  */
 void midi_cc_init(void)
 {
-  for (int i = 0; i < 128; i++) {
-    cc_func_ptr_array[i] = NULL;
+  for (uint8_t cc = 0; cc <= MIDI_CC_MAX; cc++) {
+    cc_handler_t fn = NULL;
+    for (size_t i = 0; i < count_of(cc_bind_table); i++) {
+      if (ccmap_get(&CC, cc_bind_table[i].id) != cc) continue;
+      if __us_unlikely(fn != NULL) {
+        usMIDI("[MIDI][CC] id %d wants CC %d which is already bound, refusing\n", cc_bind_table[i].id, cc);
+        continue;
+      }
+      fn = cc_bind_table[i].fn;
+    }
+    cc_func_ptr_array[cc] = fn;
   }
+  return;
+}
 
-  /* Handler settings */
-  ASSIGN_CC(CC_GTEN, set_handler);
-  ASSIGN_CC(CC_SPLY, set_handler);
-  ASSIGN_CC(CC_VELM, set_handler);
+/**
+ * @brief: Check a full map against the remap rules
+ *
+ * Remappable ids: CC 0-119 or MIDI_CC_UNASSIGNED, never the embedded
+ * application CCs.
+ * Fixed and unwired ids: compiled default only. Any CC number held by two
+ * ids is refused, MIDI_CC_UNASSIGNED excepted.
+ *
+ * @param const midi_ccvalues *m, map to check
+ * @return int8_t, first offending id or -1 when valid
+ */
+static int8_t ccmap_validate(const midi_ccvalues *m)
+{
+  uint32_t seen[4] = { 0 };  /* one bit per CC number 0-127 */
 
-  /* SID / voice mask override */
-  ASSIGN_CC(CC_SID1, set_sid_override);
-  ASSIGN_CC(CC_SID2, set_sid_override);
-  ASSIGN_CC(CC_SID3, set_sid_override);
-  ASSIGN_CC(CC_SID4, set_sid_override);
-  ASSIGN_CC(CC_VCE1, set_voice_override);
-  ASSIGN_CC(CC_VCE2, set_voice_override);
-  ASSIGN_CC(CC_VCE3, set_voice_override);
+  for (uint8_t id = 0; id < MIDI_CC_FN_COUNT; id++) {
+    uint8_t cc = ccmap_get(m, id);
+    uint8_t kind = cc_id_kind[id];
 
-  /* Per-voice settings */
-  ASSIGN_CC(CC_NOTE, set_notefrequency);
-  ASSIGN_CC(CC_PWM, set_voicepwm);
-  ASSIGN_CC(CC_NOIS, set_controlreg);
-  ASSIGN_CC(CC_PULS, set_controlreg);
-  ASSIGN_CC(CC_SAWT, set_controlreg);
-  ASSIGN_CC(CC_TRIA, set_controlreg);
-  ASSIGN_CC(CC_TEST, set_controlreg);
-  ASSIGN_CC(CC_RMOD, set_controlreg);
-  ASSIGN_CC(CC_SYNC, set_controlreg);
-  ASSIGN_CC(CC_GATE, set_gate);
-  ASSIGN_CC(CC_ATT, set_adsr);
-  ASSIGN_CC(CC_DEC, set_adsr);
-  ASSIGN_CC(CC_SUS, set_adsr);
-  ASSIGN_CC(CC_REL, set_adsr);
+    if (kind == MIDI_CC_ID_FIXED || kind == MIDI_CC_ID_UNWIRED) {
+      if (cc != ccmap_get(&midi_ccvalues_defaults, id)) return (int8_t)id;
+    } else if (cc != MIDI_CC_UNASSIGNED) {
+      if (cc > MIDI_CC_REMAP_MAX) return (int8_t)id;
+      if (cc >= midi_ccvalues_defaults.CC_CEN && cc <= midi_ccvalues_defaults.CC_CRE) return (int8_t)id;
+    }
 
-  /* Chip-wide settings */
-  ASSIGN_CC(CC_FFC, set_filtercutoff);
-  ASSIGN_CC(CC_RES, set_resfilter);
-  ASSIGN_CC(CC_FLT1, set_resfilter);
-  ASSIGN_CC(CC_FLT2, set_resfilter);
-  ASSIGN_CC(CC_FLT3, set_resfilter);
-  ASSIGN_CC(CC_FLTE, set_resfilter);
-  ASSIGN_CC(CC_3OFF, set_modevolume);
-  ASSIGN_CC(CC_HPF, set_modevolume);
-  ASSIGN_CC(CC_BPF, set_modevolume);
-  ASSIGN_CC(CC_LPF, set_modevolume);
-  ASSIGN_CC(CC_VOL, set_modevolume);
+    if (cc == MIDI_CC_UNASSIGNED) continue;
+    if (cc > MIDI_CC_MAX) return (int8_t)id;
+    uint32_t bit = 1u << (cc & 31);
+    if (seen[cc >> 5] & bit) return (int8_t)id;
+    seen[cc >> 5] |= bit;
+  }
+  return -1;
+}
 
-  /* Modulation and timing */
-  ASSIGN_CC(CC_LFOW, set_lfo_wave);
-  ASSIGN_CC(CC_LFOR, set_lfo_rate);
-  ASSIGN_CC(CC_LFOD, set_lfo_depth);
-  ASSIGN_CC(CC_LFOT, set_lfo_dest);
-  ASSIGN_CC(CC_PORT, set_porta_time);
-  ASSIGN_CC(CC_LFO2W, set_lfo2_wave);
-  ASSIGN_CC(CC_LFO2R, set_lfo2_rate);
-  ASSIGN_CC(CC_LFO2D, set_lfo2_depth);
-  ASSIGN_CC(CC_LFO2T, set_lfo2_dest);
-  ASSIGN_CC(CC_UNIS, set_unison_enable);
-  ASSIGN_CC(CC_UDET, set_unison_detune);
-  ASSIGN_CC(CC_ARPM, set_arp_mode);
-  ASSIGN_CC(CC_ARPR, set_arp_rate);
-  ASSIGN_CC(CC_ARPO, set_arp_octaves);
-  ASSIGN_CC(CC_ARPE, set_arp_enable);
-  ASSIGN_CC(CC_ARPT, set_arp_table);
-
-  /* Fixed Midi actions */
-  ASSIGN_CC(CC_ASOF, all_notes_off);
-  ASSIGN_CC(CC_RACT, all_notes_off);
-  ASSIGN_CC(CC_ANOF, all_notes_off);
-  ASSIGN_CC(CC_MONO, set_handler);
-  ASSIGN_CC(CC_POLY, set_handler);
-
+/**
+ * @brief: Make a validated map live and rebind the dispatch table
+ *
+ * No cross-core lock: the other core can see one event against a half
+ * written map or slot (byte and 32-bit pointer writes), accepted.
+ */
+static void ccmap_apply(const midi_ccvalues *m)
+{
+  memcpy(&CC, m, sizeof(midi_ccvalues));
+  midi_cc_init();
   return;
 }
 
@@ -1909,9 +1985,11 @@ static void handle_control_change(uint8_t channel, uint8_t *buffer, int size)
     return;
   }
 
-  if (cc_func_ptr_array[cc] != NULL) {
+  /* Load slot once, map rebind on core0 may clear it */
+  cc_handler_t fn = cc_func_ptr_array[cc];
+  if (fn != NULL) {
     usMIDI(" [CHANNEL] %02d [CC] 0x%02X -> %02x\n", channel, cc, value);
-    cc_func_ptr_array[cc](channel, cc, value);
+    fn(channel, cc, value);
   }
   return;
 }
@@ -2004,12 +2082,79 @@ void midi_handler_get_ccmap(midi_ccvalues *out)
 }
 
 /**
- * @brief Replace the current live CC map with the caller's
+ * @brief: Bind one remappable function id to a CC number, RAM only
  *
- * @param const midi_ccvalues * in
+ * @param uint8_t id, enum midi_cc_fn, fixed and unwired ids refused
+ * @param uint8_t cc, CC 0-119 or MIDI_CC_UNASSIGNED, not held by another id
+ * @return bool, false on refusal, map unchanged
  */
-void midi_handler_set_ccmap(const midi_ccvalues *in)
+bool midi_handler_set_cc(uint8_t id, uint8_t cc)
 {
-  memcpy(&CC, in, sizeof(midi_ccvalues));
+  if (id >= MIDI_CC_FN_COUNT) {
+    usERR("[MIDI][CC] Refusing id %d: out of range\n", id);
+    return false;
+  }
+  if (cc_id_kind[id] != MIDI_CC_ID_REMAP && cc_id_kind[id] != MIDI_CC_ID_FMEN) {
+    usERR("[MIDI][CC] Refusing id %d: fixed\n", id);
+    return false;
+  }
+
+  midi_ccvalues map;
+  memcpy(&map, &CC, sizeof(midi_ccvalues));
+  ccmap_put(&map, id, cc);
+  int8_t bad = ccmap_validate(&map);
+  if (bad >= 0) {
+    usERR("[MIDI][CC] Refusing id %d -> CC 0x%02X: rejected at id %d\n", id, cc, bad);
+    return false;
+  }
+  ccmap_apply(&map);
+  return true;
+}
+
+/**
+ * @brief: Replace the live CC map with the caller's, RAM only
+ *
+ * A fixed or unwired id that differs from its compiled default refuses the
+ * whole map.
+ *
+ * @param const midi_ccvalues *in
+ * @return bool, false on an invalid map, live map unchanged
+ */
+bool midi_handler_set_ccmap(const midi_ccvalues *in)
+{
+  midi_ccvalues map;
+  memcpy(&map, in, sizeof(midi_ccvalues));
+  int8_t bad = ccmap_validate(&map);
+  if (bad >= 0) {
+    usERR("[MIDI][CC] Refusing CC map: id %d -> CC 0x%02X invalid\n", bad, ccmap_get(&map, (uint8_t)bad));
+    return false;
+  }
+  ccmap_apply(&map);
+  return true;
+}
+
+/**
+ * @brief: Restore the CC map, RAM only
+ *
+ * @param uint8_t mode, MIDI_CCMAP_RESET_DEFAULTS or MIDI_CCMAP_RESET_CLEAR
+ *   (every remappable id incl. CC_FMEN to MIDI_CC_UNASSIGNED)
+ */
+void midi_handler_reset_ccmap(uint8_t mode)
+{
+  if (mode != MIDI_CCMAP_RESET_DEFAULTS && mode != MIDI_CCMAP_RESET_CLEAR) {
+    usERR("[MIDI][CC] Refusing CC map reset: mode %d\n", mode);
+    return;
+  }
+
+  midi_ccvalues map;
+  memcpy(&map, &midi_ccvalues_defaults, sizeof(midi_ccvalues));
+  if (mode == MIDI_CCMAP_RESET_CLEAR) {
+    for (uint8_t id = 0; id < MIDI_CC_FN_COUNT; id++) {
+      if (cc_id_kind[id] == MIDI_CC_ID_REMAP || cc_id_kind[id] == MIDI_CC_ID_FMEN) {
+        ccmap_put(&map, id, MIDI_CC_UNASSIGNED);
+      }
+    }
+  }
+  ccmap_apply(&map);
   return;
 }

@@ -125,7 +125,8 @@
 
 // MIDI FIFO size of TX and RX
 #define CFG_TUD_MIDI_RX_BUFSIZE   64  // Even at 512KB only 64KB will be used because of TUD_OPT_FULL_SPEED, Pico is only USB2.0
-#define CFG_TUD_MIDI_TX_BUFSIZE   64  // Even at 512KB only 64KB will be used because of TUD_OPT_FULL_SPEED, Pico is only USB2.0
+/* Hold one 53 B SysEx DUMP reply (18 packets, 72 B) */
+#define CFG_TUD_MIDI_TX_BUFSIZE   128  // Even at 512KB only 64KB will be used because of TUD_OPT_FULL_SPEED, Pico is only USB2.0
 
 // Vendor FIFO size of TX and RX
 // If not configured vendor endpoints will not be buffered

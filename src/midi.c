@@ -217,17 +217,17 @@ inline void emulator_reset(void)
  */
 static const void handle_emulator_cc(void)
 {
-  if (midimachine.streambuffer[1] == midi_ccvalues_defaults.CC_CEN) { /* control emulator enable 0x55 (85) */
+  if (midimachine.streambuffer[1] == midi_ccvalues_defaults.CC_CEN) { /* control emulator enable 0x75 (117) */
     if (!emulator_running) {
       emulator_enable();
     }
   } else
-  if (midimachine.streambuffer[1] == midi_ccvalues_defaults.CC_CDI) { /* control emulator disable 0x56 (86) */
+  if (midimachine.streambuffer[1] == midi_ccvalues_defaults.CC_CDI) { /* control emulator disable 0x76 (118) */
     if (emulator_running) {
       emulator_disable();
     }
   } else
-  if (midimachine.streambuffer[1] == midi_ccvalues_defaults.CC_CRE) { /* control emulator reset 0x57 (87) */
+  if (midimachine.streambuffer[1] == midi_ccvalues_defaults.CC_CRE) { /* control emulator reset 0x77 (119) */
     if (emulator_running) {
       emulator_reset();
     }

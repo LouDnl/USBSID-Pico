@@ -32,6 +32,19 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
   - use `UPLOAD_FILE_PRG` for the PRG upload check in `config.c`
   - include `usbsid_protocol.h` in the config tool example and remove its duplicated command, sub-command and `SOCKET_BUFFER_SIZE` definitions from `cfg_usbsid.h`
   - replace the local file type enum in `send_sid.c` with the `USBSID_UPLOAD_FILE_*` macros from `USBSIDInterface.h`
+* Add a user remappable MIDI CC map with SysEx control
+  - give all 64 CC functions a fixed function id in `midi_defs.h`, one global map for all 16 channels, ids 0-51 remappable and ids 52-63 fixed
+  - renumber the default CC map to MIDI 1.0 conform numbers, the embedded application enable, disable and reset CCs move from 85-87 to 117-119
+  - build the CC dispatch table from the map and rebind it on every map change, a saved map is bound at boot too
+  - refuse a map change that uses a CC number above 119, a number held by another function, a reserved embedded application number, or a changed fixed id, and keep the live map untouched
+  - allow unassigning a remappable function with `MIDI_CC_UNASSIGNED`
+  - read the handler slot once in `handle_control_change()` to prevent a NULL call when the map changes from the other core
+  - add SysEx `SYSEX_MIDI_CCMAP_SET` (0x2C), `SYSEX_MIDI_CCMAP_DUMP` (0x2D) with reply `SYSEX_MIDI_CCMAP_DATA` (0x2E, 53 bytes per page, 4 pages) and `SYSEX_MIDI_CCMAP_RESET` (0x2F, 0 defaults, 1 unassign), changes stay in RAM until `SYSEX_MIDI_SAVE`
+  - save the map in the MIDI flash blob, version 4, and migrate a saved version 3 blob with its channels, patches and arp tables intact and the map at its defaults
+  - restore the default map on a MIDI reset and the saved map on a MIDI System Reset
+  - reduce the stack use of the MIDI config load from 2544 to 144 bytes
+  - raise `CFG_TUD_MIDI_TX_BUFSIZE` from 64 to 128 to stop a 53 byte DUMP reply being cut off, which also fixes the truncated patch DUMP reply
+  - update the embedded application CC comments in `midi.c` to 117-119
 
 #### Version: 0.9.0
 * Add batch READ of up to 63 registers

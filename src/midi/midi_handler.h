@@ -31,6 +31,8 @@
   extern "C" {
 #endif
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <midi_defs.h>  /* midi_ccvalues */
 
 
@@ -53,11 +55,17 @@ void midi_tick(void);
  * (< MIDI_PATCH_COUNT) first. See sysex.c's handle_patch_save(). */
 void midi_handler_capture_patch(uint8_t channel, uint8_t patch_index);
 
-/* midi_handler.c's live CC map is private to that file. These exist because
- * midi_config.c's flash persistence can save/restore it. No CC remapping
- * feature yet. This currently always round-trips compiled-in defaults. */
+/* Live CC map, private to midi_handler.c. Setters validate, rebind the
+ * dispatch table and stay RAM only, persistence goes through midi_config.c.
+ * Fixed and unwired ids (embedded application, channel mode, placeholders)
+ * never change. */
+#define MIDI_CCMAP_RESET_DEFAULTS 0  /* compiled default map */
+#define MIDI_CCMAP_RESET_CLEAR    1  /* every remappable id MIDI_CC_UNASSIGNED */
+
 void midi_handler_get_ccmap(midi_ccvalues *out);
-void midi_handler_set_ccmap(const midi_ccvalues *in);
+bool midi_handler_set_cc(uint8_t id, uint8_t cc);
+bool midi_handler_set_ccmap(const midi_ccvalues *in);
+void midi_handler_reset_ccmap(uint8_t mode);
 
 
 #ifdef __cplusplus

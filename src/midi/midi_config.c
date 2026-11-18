@@ -28,7 +28,8 @@
 #include <sid_defs.h>
 #include <logging.h>
 #include <midi_config.h>
-#include <midi_handler.h>  /* midi_handler_get_ccmap/set_ccmap */
+#include <midi.h>          /* midi_ccvalues_defaults */
+#include <midi_handler.h>  /* midi_handler_get_ccmap/set_ccmap/reset_ccmap */
 
 
 midi_channel_cfg_t midi_channels[MAX_CHANNELS];
@@ -174,6 +175,43 @@ uint16_t midi_channel_effective_mask(uint8_t channel)
 
 static_assert(sizeof(midi_config_blob_t) < MIDICONFIG_SLOT_SIZE,
   "[MIDI CONFIG] SAVE ERROR: midi_config_blob_t doesn't fit inside one MIDICONFIG_SLOT_SIZE sector");
+static_assert(MIDI_CC_FN_COUNT <= MIDI_CC_MAP_SLOTS,
+  "[MIDI CONFIG] MIDI_CC_FN_COUNT exceeds MIDI_CC_MAP_SLOTS");
+
+/* Version 3 blob, frozen: load-side migration source only, never written.
+ * Same header as v4, 64-byte midi_ccvalues map in place of ccmap_count/ccmap[]. */
+#define MIDI_CONFIG_VERSION_V3 3
+
+typedef struct {
+  uint32_t magic;
+  uint16_t version;
+  uint16_t size;
+  uint32_t crc32;
+  uint8_t  saveid;
+  uint32_t sequence;
+  midi_ccvalues       ccmap;  /* ignored on load, compiled defaults kept */
+  midi_channel_cfg_t  channel[MAX_CHANNELS];
+  midi_patch_t        patch[MIDI_PATCH_COUNT];
+  midi_arp_table_t    arp_table[MIDI_ARP_TABLE_COUNT];
+} midi_config_blob_v3_t;
+
+/* Shipped v3 layout (arm-none-eabi-gcc, pre-v4 midi_config.h). A change to
+ * midi_channel_cfg_t/midi_patch_t/midi_arp_table_t breaks v3 migration */
+static_assert(sizeof(midi_config_blob_v3_t) == 2484,
+  "[MIDI CONFIG] midi_config_blob_v3_t size differs from the shipped v3 layout");
+static_assert(offsetof(midi_config_blob_v3_t, channel) == 84,
+  "[MIDI CONFIG] midi_config_blob_v3_t channel offset differs from the shipped v3 layout");
+static_assert(offsetof(midi_config_blob_v3_t, patch) == 1364,
+  "[MIDI CONFIG] midi_config_blob_v3_t patch offset differs from the shipped v3 layout");
+static_assert(offsetof(midi_config_blob_v3_t, arp_table) == 2196,
+  "[MIDI CONFIG] midi_config_blob_v3_t arp_table offset differs from the shipped v3 layout");
+/* Slot scan reads the header of either version through midi_config_blob_t */
+static_assert(offsetof(midi_config_blob_v3_t, version)  == offsetof(midi_config_blob_t, version)
+           && offsetof(midi_config_blob_v3_t, size)     == offsetof(midi_config_blob_t, size)
+           && offsetof(midi_config_blob_v3_t, crc32)    == offsetof(midi_config_blob_t, crc32)
+           && offsetof(midi_config_blob_v3_t, saveid)   == offsetof(midi_config_blob_t, saveid)
+           && offsetof(midi_config_blob_v3_t, sequence) == offsetof(midi_config_blob_t, sequence),
+  "[MIDI CONFIG] v3 and v4 blob headers differ");
 
 /* Written into slot 0 the first time midi_config_save() ever runs, then
  * incremented on every save after that (including ones from a later boot,
@@ -222,6 +260,14 @@ static uint32_t midi_blob_crc(const midi_config_blob_t *blob)
   return midi_crc32(start, len);
 }
 
+/** @brief: CRC32 of a frozen v3 blob, same covered range as midi_blob_crc() */
+static uint32_t midi_blob_v3_crc(const midi_config_blob_v3_t *blob)
+{
+  const uint8_t *start = (const uint8_t *)&blob->saveid;
+  size_t len = sizeof(midi_config_blob_v3_t) - offsetof(midi_config_blob_v3_t, saveid);
+  return midi_crc32(start, len);
+}
+
 /* Statically allocated rather than a stack-local: this is the source
  * buffer flash_range_program() reads from, its lifetime crosses the
  * flash_safe_execute() callback where interrupts are disabled, and at
@@ -254,6 +300,7 @@ static void __no_inline_not_in_flash_func(write_midi_config_lowlevel)(void *blob
  *
  * Builds a midi_config_blob_t (channels, patches, arp tables, CC map),
  * stamps it with header/sequence/CRC32, and writes it round-robin.
+ * CC map: MIDI_CC_FN_COUNT live bytes, remaining slots MIDI_CC_UNASSIGNED.
  */
 void midi_config_save(void)
 {
@@ -270,7 +317,11 @@ void midi_config_save(void)
   blob->size    = sizeof(midi_config_blob_t);
   blob->saveid  = midi_saveid;
   blob->sequence = ++midi_sequence;
-  midi_handler_get_ccmap(&blob->ccmap);
+  midi_ccvalues live_map;
+  midi_handler_get_ccmap(&live_map);
+  blob->ccmap_count = MIDI_CC_FN_COUNT;
+  memcpy(blob->ccmap, &live_map, MIDI_CC_FN_COUNT);
+  memset(&blob->ccmap[MIDI_CC_FN_COUNT], MIDI_CC_UNASSIGNED, MIDI_CC_MAP_SLOTS - MIDI_CC_FN_COUNT);
   memcpy(blob->channel, midi_channels, sizeof(blob->channel));
   memcpy(blob->patch, midi_patches, sizeof(blob->patch));
   memcpy(blob->arp_table, arp_tables, sizeof(blob->arp_table));
@@ -323,11 +374,73 @@ static void sanitise_loaded_channels(void)
   return;
 }
 
+/** @brief: Read-only XIP flash address of save slot `slot` */
+static inline const uint8_t *midi_slot_xip(uint8_t slot)
+{
+  return (const uint8_t *)(XIP_BASE + FLASH_MIDICONFIG_OFFSET + (MIDICONFIG_SLOT_SIZE * slot));
+}
+
+/**
+ * @brief: Validate one slot in place, magic + version + size + CRC32
+ *
+ * @param const uint8_t *slot, XIP flash address of the slot
+ * @return uint16_t, MIDI_CONFIG_VERSION, MIDI_CONFIG_VERSION_V3 or 0 when invalid
+ */
+static uint16_t midi_slot_valid_version(const uint8_t *slot)
+{
+  const midi_config_blob_t *b = (const midi_config_blob_t *)slot;
+  if (b->magic != MIDI_CONFIG_MAGIC) return 0;
+  if (b->version == MIDI_CONFIG_VERSION && b->size == sizeof(midi_config_blob_t)) {
+    return (midi_blob_crc(b) == b->crc32) ? MIDI_CONFIG_VERSION : 0;
+  }
+  if (b->version == MIDI_CONFIG_VERSION_V3 && b->size == sizeof(midi_config_blob_v3_t)) {
+    const midi_config_blob_v3_t *v3 = (const midi_config_blob_v3_t *)slot;
+    return (midi_blob_v3_crc(v3) == v3->crc32) ? MIDI_CONFIG_VERSION_V3 : 0;
+  }
+  return 0;  /* other layout, do not trust it */
+}
+
+/**
+ * @brief: Build a midi_ccvalues from a stored v4 map
+ *
+ * Ids below ccmap_count take the stored byte. Ids at or above it take the
+ * compiled default unless an earlier id holds that CC, else MIDI_CC_UNASSIGNED.
+ * Stored ids past MIDI_CC_FN_COUNT are ignored.
+ *
+ * @param const midi_config_blob_t *b, validated v4 blob
+ * @param midi_ccvalues *out, unvalidated map for midi_handler_set_ccmap()
+ */
+static void midi_ccmap_from_blob(const midi_config_blob_t *b, midi_ccvalues *out)
+{
+  uint8_t *m = (uint8_t *)out;
+  const uint8_t *def = (const uint8_t *)&midi_ccvalues_defaults;
+  uint8_t count = (b->ccmap_count > MIDI_CC_FN_COUNT) ? MIDI_CC_FN_COUNT : b->ccmap_count;
+  uint32_t held[4] = { 0 };  /* one bit per CC number 0-127 */
+
+  for (uint8_t id = 0; id < count; id++) {
+    uint8_t cc = b->ccmap[id];
+    m[id] = cc;
+    if (cc <= MIDI_CC_MAX) held[cc >> 5] |= 1u << (cc & 31);
+  }
+  for (uint8_t id = count; id < MIDI_CC_FN_COUNT; id++) {
+    uint8_t cc = def[id];
+    if (cc > MIDI_CC_MAX || (held[cc >> 5] & (1u << (cc & 31)))) {
+      m[id] = MIDI_CC_UNASSIGNED;
+      continue;
+    }
+    m[id] = cc;
+    held[cc >> 5] |= 1u << (cc & 31);
+  }
+  return;
+}
+
 /**
  * @brief Load the most recently saved MIDI configuration from flash
  *
- * Scans all slots, validates magic/size/CRC32, keeps the highest sequence
- * number, and applies it. Leaves compiled-in defaults if no slot is valid.
+ * Scans all slots in place through XIP, validates magic/version/size/CRC32
+ * for v4 and frozen v3, keeps the highest sequence across both and applies
+ * it. v3 keeps the compiled default CC map, an invalid v4 map too (usERR).
+ * Leaves compiled-in defaults if no slot is valid.
  */
 void midi_config_load(void)
 {
@@ -336,26 +449,22 @@ void midi_config_load(void)
     return;
   }
 
-  midi_config_blob_t candidate;
   int32_t best_slot = -1;
+  uint16_t best_version = 0;
   uint32_t best_sequence = 0;
 
   for (uint8_t slot = 0; slot < MIDICONFIG_SAVE_SLOTS; slot++) {
     /* Memory-mapped flash read, same technique load_config() (config.c)
-     * uses - XIP flash is plain memory, no flash_range_* API needed. */
-    memcpy(&candidate,
-      (void *)(XIP_BASE + FLASH_MIDICONFIG_OFFSET + (MIDICONFIG_SLOT_SIZE * slot)),
-      sizeof(candidate));
-    stdio_flush();
+     * uses - XIP flash is plain memory, read in place without a copy. */
+    const uint8_t *p = midi_slot_xip(slot);
+    uint16_t version = midi_slot_valid_version(p);
+    if (version == 0) continue;
 
-    if (candidate.magic != MIDI_CONFIG_MAGIC) continue;
-    if (candidate.size != sizeof(midi_config_blob_t)) continue;  /* different struct layout, do not trust it */
-    uint32_t stored_crc = candidate.crc32;
-    if (midi_blob_crc(&candidate) != stored_crc) continue;
-
-    if (best_slot < 0 || candidate.sequence > best_sequence) {
+    uint32_t sequence = ((const midi_config_blob_t *)p)->sequence;
+    if (best_slot < 0 || sequence > best_sequence) {
       best_slot = slot;
-      best_sequence = candidate.sequence;
+      best_version = version;
+      best_sequence = sequence;
     }
   }
 
@@ -364,22 +473,32 @@ void midi_config_load(void)
     return;
   }
 
-  memcpy(&candidate,
-    (void *)(XIP_BASE + FLASH_MIDICONFIG_OFFSET + (MIDICONFIG_SLOT_SIZE * best_slot)),
-    sizeof(candidate));
-  stdio_flush();
-
-  midi_handler_set_ccmap(&candidate.ccmap);
-  memcpy(midi_channels, candidate.channel, sizeof(midi_channels));
-  memcpy(midi_patches, candidate.patch, sizeof(midi_patches));
-  memcpy(arp_tables, candidate.arp_table, sizeof(arp_tables));
+  const uint8_t *p = midi_slot_xip((uint8_t)best_slot);
+  if (best_version == MIDI_CONFIG_VERSION_V3) {
+    const midi_config_blob_v3_t *v3 = (const midi_config_blob_v3_t *)p;
+    midi_handler_reset_ccmap(MIDI_CCMAP_RESET_DEFAULTS);  /* v3 map never user-chosen */
+    memcpy(midi_channels, v3->channel, sizeof(midi_channels));
+    memcpy(midi_patches, v3->patch, sizeof(midi_patches));
+    memcpy(arp_tables, v3->arp_table, sizeof(arp_tables));
+  } else {
+    const midi_config_blob_t *b = (const midi_config_blob_t *)p;
+    midi_ccvalues map;
+    midi_ccmap_from_blob(b, &map);
+    if (!midi_handler_set_ccmap(&map)) {
+      midi_handler_reset_ccmap(MIDI_CCMAP_RESET_DEFAULTS);
+      usERR("[MIDI CONFIG] Stored CC map in slot %u invalid, keeping compiled defaults\n", (unsigned)best_slot);
+    }
+    memcpy(midi_channels, b->channel, sizeof(midi_channels));
+    memcpy(midi_patches, b->patch, sizeof(midi_patches));
+    memcpy(arp_tables, b->arp_table, sizeof(arp_tables));
+  }
   sanitise_loaded_channels();
 
   midi_saveid = (uint8_t)((best_slot + 1) % MIDICONFIG_SAVE_SLOTS);
   midi_sequence = best_sequence;
 
-  usCFG("[MIDI CONFIG] Loaded slot %u (sequence %u). Next save will use slot %u\n",
-    (unsigned)best_slot, best_sequence, midi_saveid);
+  usCFG("[MIDI CONFIG] Loaded slot %u (v%u, sequence %u). Next save will use slot %u\n",
+    (unsigned)best_slot, (unsigned)best_version, best_sequence, midi_saveid);
   return;
 }
 
@@ -403,14 +522,15 @@ static void __no_inline_not_in_flash_func(erase_one_midi_slot_lowlevel)(void *pa
 /**
  * @brief Reset MIDI configuration to compiled-in defaults and erase flash
  *
- * Reinitialises midi_channels/midi_patches/arp_tables in RAM, then erases
- * every flash slot and resets the save/sequence counters.
+ * Reinitialises midi_channels/midi_patches/arp_tables and the CC map in RAM,
+ * then erases every flash slot and resets the save/sequence counters.
  */
 void midi_config_reset(void)
 {
   midi_config_init();
   midi_patch_init();
   midi_arp_table_init();
+  midi_handler_reset_ccmap(MIDI_CCMAP_RESET_DEFAULTS);
 
   if (!midiconfig_offset_ok) {
     usERR("[MIDI CONFIG] Reset applied to RAM only: MIDI flash offset failed its boot-time cross-check\n");

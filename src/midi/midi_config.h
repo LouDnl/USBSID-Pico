@@ -215,9 +215,9 @@ uint16_t midi_channel_effective_mask(uint8_t channel);
  * valid data from garbage once the ring has wrapped. */
 
 #define MIDI_CONFIG_MAGIC   0x4D494431u  /* 'MID1', fixed, independent of MAGIC_SMOKE */
-#define MIDI_CONFIG_VERSION 3  /* bump whenever the blob layout changes. The
-                                   size check in midi_config_load() falls
-                                   back to defaults on an old blob */
+#define MIDI_CONFIG_VERSION 4  /* bump on every blob layout change. Load
+                                   accepts v4 and the frozen v3 layout
+                                   (midi_config.c), anything else is skipped */
 
 typedef struct {
   uint32_t magic;
@@ -226,7 +226,8 @@ typedef struct {
   uint32_t crc32;      /* over every byte from `saveid` onward */
   uint8_t  saveid;      /* which of the MIDICONFIG_SAVE_SLOTS slots this was written to */
   uint32_t sequence;    /* monotonic write counter. Highest valid wins on load */
-  midi_ccvalues       ccmap;
+  uint8_t             ccmap_count;  /* function ids valid at save time */
+  uint8_t             ccmap[MIDI_CC_MAP_SLOTS];  /* CC per function id, unused slots MIDI_CC_UNASSIGNED */
   midi_channel_cfg_t  channel[MAX_CHANNELS];  /* whole live struct, see midi_config_load()
                                                   for why the transient runtime fields inside
                                                   it are safe to persist as-is */
@@ -239,15 +240,16 @@ typedef struct {
  * sectors. Refuses if verify_midiconfig_offset() found a mismatch. */
 void midi_config_save(void);
 
-/* Loads the highest-sequence slot that passes magic+size+crc32, then
- * sanitises transient runtime fields in midi_channels[] (bend offset,
- * portamento target, overrides, LFO phase, arp held notes/voice) since
- * those describe a moment mid-performance, not a setting. Falls back to
- * compiled-in defaults if no slot validates. */
+/* Loads the highest-sequence v3 or v4 slot that passes magic+version+
+ * size+crc32, then sanitises transient runtime fields in midi_channels[]
+ * (bend offset, portamento target, overrides, LFO phase, arp held
+ * notes/voice) since those describe a moment mid-performance, not a
+ * setting. v3 and an invalid stored map keep the compiled default CC map.
+ * Falls back to compiled-in defaults if no slot validates. */
 void midi_config_load(void);
 
-/* Re-initialises midi_channels[]/midi_patches[] to compiled-in defaults
- * and erases every save slot - a real factory reset. */
+/* Re-initialises midi_channels[]/midi_patches[]/arp tables and the CC map
+ * to compiled-in defaults and erases every save slot - a real factory reset. */
 void midi_config_reset(void);
 
 
