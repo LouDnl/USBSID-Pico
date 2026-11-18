@@ -25,6 +25,7 @@ drop-in with no dependency on the other script.
 """
 
 import threading
+import time
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -68,6 +69,41 @@ def send_hex(port, hexstr):
     try:
         midiout.send_message([int(b, 16) for b in hexstr.split()])
     finally:
+        midiout.close_port()
+
+
+def _open_in(port_name):
+    midiin = rtmidi.MidiIn()
+    ports = midiin.get_ports()
+    for i, p in enumerate(ports):
+        if p == port_name or port_name in p or p in port_name:
+            midiin.open_port(i)
+            midiin.ignore_types(sysex=False, timing=True, active_sense=True)
+            return midiin
+    raise RuntimeError(f"MIDI input port not found: {port_name}")
+
+
+def send_hex_and_dump(port, hexstr, timeout_s=1.5):
+    """Send, then collect replies for timeout_s. Returns space-separated hex
+    byte text (may be empty)."""
+    try:
+        midiin = _open_in(port)
+        midiout = _open_out(port)
+    except RuntimeError:
+        return ""
+    try:
+        midiout.send_message([int(b, 16) for b in hexstr.split()])
+        collected = []
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            msg = midiin.get_message()
+            if msg is not None:
+                collected.extend(msg[0])
+            else:
+                time.sleep(0.01)
+        return " ".join(f"{b:02x}" for b in collected)
+    finally:
+        midiin.close_port()
         midiout.close_port()
 
 
@@ -145,10 +181,10 @@ CC_GROUPS = [
         ("CC_RACT", "Reset All Controllers", "button", {"value": 127}),
         ("CC_ANOF", "All Notes Off", "button", {"value": 127}),
     ]),
-    ("Cynthcart (only relevant with ONBOARD_EMULATOR=1)", [
-        ("CC_CEN", "Enable Cynthcart", "button", {"value": 127}),
-        ("CC_CDI", "Disable Cynthcart", "button", {"value": 127}),
-        ("CC_CRE", "Restart Cynthcart", "button", {"value": 127}),
+    ("Embedded application: Cynthcart, SID SYNTH (only relevant with ONBOARD_EMULATOR=1)", [
+        ("CC_CEN", "Enable embedded application", "button", {"value": 127}),
+        ("CC_CDI", "Disable embedded application", "button", {"value": 127}),
+        ("CC_CRE", "Reset embedded application", "button", {"value": 127}),
     ]),
 ]
 
@@ -161,19 +197,100 @@ CC_UNWIRED = ["CC_BMSB (Bank Select MSB)", "CC_BLSB (Bank Select LSB)",
 CC_DEFAULT_NUMBERS = {
     "CC_NOTE": 0x1C, "CC_PWM": 0x01, "CC_NOIS": 0x14, "CC_PULS": 0x15, "CC_SAWT": 0x16,
     "CC_TRIA": 0x17, "CC_TEST": 0x18, "CC_RMOD": 0x19, "CC_SYNC": 0x1A, "CC_GATE": 0x1B,
-    "CC_ATT": 0x11, "CC_DEC": 0x12, "CC_SUS": 0x13, "CC_REL": 0x1D,
-    "CC_FFC": 0x20, "CC_RES": 0x21, "CC_FLT1": 0x22, "CC_FLT2": 0x23, "CC_FLT3": 0x24,
-    "CC_FLTE": 0x25, "CC_3OFF": 0x30, "CC_HPF": 0x31, "CC_BPF": 0x32, "CC_LPF": 0x33, "CC_VOL": 0x07,
+    "CC_ATT": 0x49, "CC_DEC": 0x4B, "CC_SUS": 0x46, "CC_REL": 0x48,
+    "CC_FFC": 0x4A, "CC_RES": 0x47, "CC_FLT1": 0x10, "CC_FLT2": 0x11, "CC_FLT3": 0x12,
+    "CC_FLTE": 0x13, "CC_3OFF": 0x53, "CC_HPF": 0x52, "CC_BPF": 0x51, "CC_LPF": 0x50, "CC_VOL": 0x07,
     "CC_SID1": 0x68, "CC_SID2": 0x69, "CC_SID3": 0x6A, "CC_SID4": 0x6B,
     "CC_VCE1": 0x6C, "CC_VCE2": 0x6D, "CC_VCE3": 0x6E,
-    "CC_GTEN": 0x77, "CC_SPLY": 0x6F, "CC_VELM": 0x48,
-    "CC_LFOW": 0x00, "CC_LFOR": 0x02, "CC_LFOD": 0x03, "CC_LFOT": 0x04, "CC_PORT": 0x05,
-    "CC_ARPM": 0x06, "CC_ARPR": 0x0A, "CC_ARPO": 0x0B, "CC_ARPE": 0x0C, "CC_ARPT": 0x1E,
-    "CC_LFO2W": 0x0D, "CC_LFO2R": 0x0E, "CC_LFO2D": 0x0F, "CC_LFO2T": 0x10,
-    "CC_UNIS": 0x29, "CC_UDET": 0x2A,
-    "CC_CEN": 0x55, "CC_CDI": 0x56, "CC_CRE": 0x57,
+    "CC_GTEN": 0x1D, "CC_SPLY": 0x6F, "CC_VELM": 0x1E, "CC_FMEN": 0x1F,
+    "CC_LFOW": 0x66, "CC_LFOR": 0x4C, "CC_LFOD": 0x4D, "CC_LFOT": 0x67, "CC_PORT": 0x05,
+    "CC_ARPM": 0x71, "CC_ARPR": 0x72, "CC_ARPO": 0x73, "CC_ARPE": 0x70, "CC_ARPT": 0x74,
+    "CC_LFO2W": 0x59, "CC_LFO2R": 0x0E, "CC_LFO2D": 0x0F, "CC_LFO2T": 0x5A,
+    "CC_UNIS": 0x5D, "CC_UDET": 0x5E,
+    "CC_CEN": 0x75, "CC_CDI": 0x76, "CC_CRE": 0x77,
     "CC_ASOF": 0x78, "CC_RACT": 0x79, "CC_ANOF": 0x7B, "CC_MONO": 0x7E, "CC_POLY": 0x7F,
 }
+
+# --- Live CC map (SysEx 0x2C-0x2F, repo/src/sysex.c) ------------------------
+# Function id -> short name, index = id. Ids 0-51 remappable, 52-63 fixed or
+# unwired (device refuses SET on them), 64+ report 0xFF in a DUMP.
+CC_ID_NAMES = (
+    "NOTE PWM NOIS PULS SAWT TRIA TEST RMOD SYNC GATE ATT DEC SUS REL FFC RES "
+    "FLT1 FLT2 FLT3 FLTE 3OFF HPF BPF LPF VOL SID1 SID2 SID3 SID4 VCE1 VCE2 VCE3 "
+    "GTEN SPLY VELM LFOW LFOR LFOD LFOT PORT ARPM ARPR ARPO ARPE ARPT LFO2W LFO2R "
+    "LFO2D LFO2T UNIS UDET FMEN CEN CDI CRE BMSB BLSB MOD MODL ASOF RACT ANOF MONO POLY"
+).split()
+CC_REMAP_COUNT = 52
+CC_ID_BY_FIELD = {f"CC_{n}": i for i, n in enumerate(CC_ID_NAMES)}
+# Standard MIDI controllers: bank select, mod wheel, data entry, sustain, NRPN/RPN.
+CC_WARN_NUMBERS = frozenset((0, 1, 6, 32, 38, 64, 98, 99, 100, 101))
+CC_UNASSIGNED = 0xFF
+
+
+def cc_number_legal(number):
+    """Legal CC numbers: 0-119 except 117-119."""
+    return 0 <= number <= 119 and number not in (117, 118, 119)
+
+
+def build_ccmap_set_sysex(cc_id, number):
+    """SET frame, value as two nibbles (high first), None = unassign (0xFF)."""
+    v = CC_UNASSIGNED if number is None else number
+    return f"f0 50 2c {cc_id:02x} {(v >> 4) & 0xF:02x} {v & 0xF:02x} f7"
+
+
+def build_ccmap_dump_sysex(page):
+    return f"f0 50 2d {page:02x} f7"
+
+
+def build_ccmap_reset_sysex(mode):
+    """mode 0 = compiled defaults, 1 = all remappable ids unassigned. RAM only."""
+    return f"f0 50 2f {mode:02x} f7"
+
+
+def parse_ccmap_data(raw_text, expected_page=None):
+    """Extract the 24 map entries from a 0x2E DATA frame in raw_text
+    (space-separated hex bytes). Returns (page, [24 ints]) or None."""
+    try:
+        toks = [int(t, 16) for t in raw_text.split()]
+    except ValueError:
+        return None
+    i = 0
+    while i + 3 < len(toks):
+        if toks[i] == 0xF0 and toks[i + 1] == 0x50 and toks[i + 2] == 0x2E:
+            page = toks[i + 3]
+            try:
+                end = toks.index(0xF7, i)
+            except ValueError:
+                return None
+            nib = toks[i + 4:end]
+            if len(nib) == 48 and all(n <= 0xF for n in nib) and \
+                    (expected_page is None or page == expected_page):
+                return page, [(nib[k] << 4) | nib[k + 1] for k in range(0, 48, 2)]
+            i = end
+        i += 1
+    return None
+
+
+def read_cc_map(port, timeout_s=0.6):
+    """DUMP pages 0-3. Returns a list of 64 entries (0xFF = unassigned),
+    or None when any page gets no valid reply."""
+    out = []
+    for page in range(4):
+        reply = send_hex_and_dump(port, build_ccmap_dump_sysex(page), timeout_s=timeout_s)
+        parsed = parse_ccmap_data(reply, expected_page=page)
+        if parsed is None:
+            return None
+        out += parsed[1]
+    return out
+
+
+def cc_numbers_from_map(ccmap):
+    """field -> CC number (None = unassigned), compiled defaults as base."""
+    nums = dict(CC_DEFAULT_NUMBERS)
+    for field, cc_id in CC_ID_BY_FIELD.items():
+        v = ccmap[cc_id]
+        nums[field] = None if v == CC_UNASSIGNED else v
+    return nums
 
 
 class CCController:
@@ -189,6 +306,9 @@ class CCController:
         self.note_held = False                  # tracks whether Note On has fired without a matching Note Off
 
         self.status = tk.StringVar(value="Ready.")
+        self.cc_numbers = dict(CC_DEFAULT_NUMBERS)  # replaced by the live map when the board replies
+        self.cc_map = None
+        self.cc_row_labels = {}
 
         self._build_ui()
         self._refresh_ports()
@@ -231,9 +351,37 @@ class CCController:
         elif names:
             self.port.set(names[0])
         self._set_status(f"Found {len(ports)} MIDI port(s).")
+        self.refresh_cc_map()
 
     def _run_async(self, fn):
         threading.Thread(target=fn, daemon=True).start()
+
+    # --- live CC map -----------------------------------------------------
+
+    def _cc_row_text(self, field, label):
+        n = self.cc_numbers.get(field)
+        return f"{label} ({field}, " + ("unassigned" if n is None else f"CC {n}") + ")"
+
+    def _apply_cc_map(self, ccmap):
+        self.cc_map = list(ccmap)
+        self.cc_numbers = cc_numbers_from_map(ccmap)
+        for field, (lbl, label) in self.cc_row_labels.items():
+            lbl.config(text=self._cc_row_text(field, label))
+
+    def refresh_cc_map(self):
+        """Read the live map via DUMP pages 0-3, keep defaults when no reply."""
+        port = self._selected_port_id()
+        if not port:
+            return
+
+        def work():
+            ccmap = read_cc_map(port)
+            if ccmap is None:
+                self._set_status("CC map: no reply, using compiled-in defaults.")
+                return
+            self.root.after(0, lambda: self._apply_cc_map(ccmap))
+            self.root.after(0, lambda: self._set_status("CC map read from device."))
+        self._run_async(work)
 
     # --- MIDI actions ----------------------------------------------------
 
@@ -242,7 +390,10 @@ class CCController:
         if not port:
             self._require_port()
             return
-        cc_num = CC_DEFAULT_NUMBERS[field]
+        cc_num = self.cc_numbers.get(field)
+        if cc_num is None:
+            self._set_status(f"{field} is unassigned on the device, nothing sent.")
+            return
         ch = self._channel_nibble()
         value = max(0, min(127, int(value)))
         hexstr = f"b{ch:x} {cc_num:02x} {value:02x}"
@@ -428,10 +579,11 @@ class CCController:
         ttk.Label(status_bar, textvariable=self.status, relief="sunken", anchor="w").pack(fill="x")
 
     def _build_cc_row(self, parent, field, label, kind, extra):
-        cc_num = CC_DEFAULT_NUMBERS[field]
         row = ttk.Frame(parent)
         row.pack(fill="x", pady=2, padx=4)
-        ttk.Label(row, text=f"{label} ({field}, CC {cc_num})", width=42, anchor="w").pack(side="left")
+        name_lbl = ttk.Label(row, text=self._cc_row_text(field, label), width=42, anchor="w")
+        name_lbl.pack(side="left")
+        self.cc_row_labels[field] = (name_lbl, label)
 
         if kind == "toggle":
             var = tk.BooleanVar(value=False)

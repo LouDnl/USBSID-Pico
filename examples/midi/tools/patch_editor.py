@@ -41,6 +41,7 @@ reference. Keep the two in sync by hand; there is no shared source of
 truth between the C firmware and this Python script.
 """
 
+import json
 import os
 import re
 import struct
@@ -669,10 +670,10 @@ CC_GROUPS = [
         ("CC_RACT", "Reset All Controllers", "button", {"value": 127}),
         ("CC_ANOF", "All Notes Off", "button", {"value": 127}),
     ]),
-    ("Cynthcart (only relevant with ONBOARD_EMULATOR=1)", [
-        ("CC_CEN", "Enable Cynthcart", "button", {"value": 127}),
-        ("CC_CDI", "Disable Cynthcart", "button", {"value": 127}),
-        ("CC_CRE", "Restart Cynthcart", "button", {"value": 127}),
+    ("Embedded application: Cynthcart, SID SYNTH (only relevant with ONBOARD_EMULATOR=1)", [
+        ("CC_CEN", "Enable embedded application", "button", {"value": 127}),
+        ("CC_CDI", "Disable embedded application", "button", {"value": 127}),
+        ("CC_CRE", "Reset embedded application", "button", {"value": 127}),
     ]),
 ]
 
@@ -693,19 +694,103 @@ CC_UNWIRED = ["CC_BMSB (Bank Select MSB)", "CC_BLSB (Bank Select LSB)",
 CC_DEFAULT_NUMBERS = {
     "CC_NOTE": 0x1C, "CC_PWM": 0x01, "CC_NOIS": 0x14, "CC_PULS": 0x15, "CC_SAWT": 0x16,
     "CC_TRIA": 0x17, "CC_TEST": 0x18, "CC_RMOD": 0x19, "CC_SYNC": 0x1A, "CC_GATE": 0x1B,
-    "CC_ATT": 0x11, "CC_DEC": 0x12, "CC_SUS": 0x13, "CC_REL": 0x1D,
-    "CC_FFC": 0x20, "CC_RES": 0x21, "CC_FLT1": 0x22, "CC_FLT2": 0x23, "CC_FLT3": 0x24,
-    "CC_FLTE": 0x25, "CC_3OFF": 0x30, "CC_HPF": 0x31, "CC_BPF": 0x32, "CC_LPF": 0x33, "CC_VOL": 0x07,
+    "CC_ATT": 0x49, "CC_DEC": 0x4B, "CC_SUS": 0x46, "CC_REL": 0x48,
+    "CC_FFC": 0x4A, "CC_RES": 0x47, "CC_FLT1": 0x10, "CC_FLT2": 0x11, "CC_FLT3": 0x12,
+    "CC_FLTE": 0x13, "CC_3OFF": 0x53, "CC_HPF": 0x52, "CC_BPF": 0x51, "CC_LPF": 0x50, "CC_VOL": 0x07,
     "CC_SID1": 0x68, "CC_SID2": 0x69, "CC_SID3": 0x6A, "CC_SID4": 0x6B,
     "CC_VCE1": 0x6C, "CC_VCE2": 0x6D, "CC_VCE3": 0x6E,
-    "CC_GTEN": 0x77, "CC_SPLY": 0x6F, "CC_VELM": 0x48,
-    "CC_LFOW": 0x00, "CC_LFOR": 0x02, "CC_LFOD": 0x03, "CC_LFOT": 0x04, "CC_PORT": 0x05,
-    "CC_ARPM": 0x06, "CC_ARPR": 0x0A, "CC_ARPO": 0x0B, "CC_ARPE": 0x0C, "CC_ARPT": 0x1E,
-    "CC_LFO2W": 0x0D, "CC_LFO2R": 0x0E, "CC_LFO2D": 0x0F, "CC_LFO2T": 0x10,
-    "CC_UNIS": 0x29, "CC_UDET": 0x2A,
-    "CC_CEN": 0x55, "CC_CDI": 0x56, "CC_CRE": 0x57,
+    "CC_GTEN": 0x1D, "CC_SPLY": 0x6F, "CC_VELM": 0x1E, "CC_FMEN": 0x1F,
+    "CC_LFOW": 0x66, "CC_LFOR": 0x4C, "CC_LFOD": 0x4D, "CC_LFOT": 0x67, "CC_PORT": 0x05,
+    "CC_ARPM": 0x71, "CC_ARPR": 0x72, "CC_ARPO": 0x73, "CC_ARPE": 0x70, "CC_ARPT": 0x74,
+    "CC_LFO2W": 0x59, "CC_LFO2R": 0x0E, "CC_LFO2D": 0x0F, "CC_LFO2T": 0x5A,
+    "CC_UNIS": 0x5D, "CC_UDET": 0x5E,
+    "CC_CEN": 0x75, "CC_CDI": 0x76, "CC_CRE": 0x77,
     "CC_ASOF": 0x78, "CC_RACT": 0x79, "CC_ANOF": 0x7B, "CC_MONO": 0x7E, "CC_POLY": 0x7F,
 }
+
+# --- Live CC map (SysEx 0x2C-0x2F, repo/src/sysex.c) ------------------------
+# Function id -> short name, index = id. Ids 0-51 remappable, 52-63 fixed or
+# unwired (device refuses SET on them), 64+ report 0xFF in a DUMP.
+CC_ID_NAMES = (
+    "NOTE PWM NOIS PULS SAWT TRIA TEST RMOD SYNC GATE ATT DEC SUS REL FFC RES "
+    "FLT1 FLT2 FLT3 FLTE 3OFF HPF BPF LPF VOL SID1 SID2 SID3 SID4 VCE1 VCE2 VCE3 "
+    "GTEN SPLY VELM LFOW LFOR LFOD LFOT PORT ARPM ARPR ARPO ARPE ARPT LFO2W LFO2R "
+    "LFO2D LFO2T UNIS UDET FMEN CEN CDI CRE BMSB BLSB MOD MODL ASOF RACT ANOF MONO POLY"
+).split()
+CC_REMAP_COUNT = 52
+CC_ID_BY_FIELD = {f"CC_{n}": i for i, n in enumerate(CC_ID_NAMES)}
+# Standard MIDI controllers: bank select, mod wheel, data entry, sustain, NRPN/RPN.
+CC_WARN_NUMBERS = frozenset((0, 1, 6, 32, 38, 64, 98, 99, 100, 101))
+CC_UNASSIGNED = 0xFF
+
+
+def cc_number_legal(number):
+    """Legal CC numbers: 0-119 except 117-119."""
+    return 0 <= number <= 119 and number not in (117, 118, 119)
+
+
+def build_ccmap_set_sysex(cc_id, number):
+    """SET frame, value as two nibbles (high first), None = unassign (0xFF)."""
+    v = CC_UNASSIGNED if number is None else number
+    return f"f0 50 2c {cc_id:02x} {(v >> 4) & 0xF:02x} {v & 0xF:02x} f7"
+
+
+def build_ccmap_dump_sysex(page):
+    return f"f0 50 2d {page:02x} f7"
+
+
+def build_ccmap_reset_sysex(mode):
+    """mode 0 = compiled defaults, 1 = all remappable ids unassigned. RAM only."""
+    return f"f0 50 2f {mode:02x} f7"
+
+
+def parse_ccmap_data(raw_text, expected_page=None):
+    """Extract the 24 map entries from a 0x2E DATA frame in raw_text
+    (space-separated hex bytes). Returns (page, [24 ints]) or None."""
+    try:
+        toks = [int(t, 16) for t in raw_text.split()]
+    except ValueError:
+        return None
+    i = 0
+    while i + 3 < len(toks):
+        if toks[i] == 0xF0 and toks[i + 1] == 0x50 and toks[i + 2] == 0x2E:
+            page = toks[i + 3]
+            try:
+                end = toks.index(0xF7, i)
+            except ValueError:
+                return None
+            nib = toks[i + 4:end]
+            if len(nib) == 48 and all(n <= 0xF for n in nib) and \
+                    (expected_page is None or page == expected_page):
+                return page, [(nib[k] << 4) | nib[k + 1] for k in range(0, 48, 2)]
+            i = end
+        i += 1
+    return None
+
+
+def read_cc_map(port, timeout_s=0.6, progress=None):
+    """DUMP pages 0-3. Returns a list of 64 entries (0xFF = unassigned),
+    or None when any page gets no valid reply. progress(page_no, 4) is
+    called before each page request (page_no 1-4)."""
+    out = []
+    for page in range(4):
+        if progress:
+            progress(page + 1, 4)
+        reply = send_hex_and_dump(port, build_ccmap_dump_sysex(page), timeout_s=timeout_s)
+        parsed = parse_ccmap_data(reply, expected_page=page)
+        if parsed is None:
+            return None
+        out += parsed[1]
+    return out
+
+
+def cc_numbers_from_map(ccmap):
+    """field -> CC number (None = unassigned), compiled defaults as base."""
+    nums = dict(CC_DEFAULT_NUMBERS)
+    for field, cc_id in CC_ID_BY_FIELD.items():
+        v = ccmap[cc_id]
+        nums[field] = None if v == CC_UNASSIGNED else v
+    return nums
 
 
 class PatchEditor:
@@ -789,6 +874,14 @@ class PatchEditor:
         self.arptable_offsets = [tk.IntVar(value=0) for _ in range(ARP_TABLE_SLOT_COUNT)]
         self.arptable_loop_start = tk.IntVar(value=0)
         self.arptable_step_count = tk.IntVar(value=0)
+
+        self.cc_numbers = dict(CC_DEFAULT_NUMBERS)  # replaced by the live map when the board replies
+        self.cc_map = None
+        self.cc_row_labels = {}
+        self.ccmap_vars = {}
+        self.ccmap_state = tk.StringVar(value="Idle")
+        self.ccmap_pb = None
+        self.ccmap_msgs = {}
 
         self._build_ui()
         self._refresh_ports()
@@ -917,6 +1010,7 @@ class PatchEditor:
         elif names:
             self.port.set(names[0])
         self._set_status(f"Found {len(ports)} MIDI port(s).")
+        self.refresh_cc_map()
 
     def _selected_port_id(self):
         # With RtMidi the port "id" is just its name - no separate short id
@@ -1284,9 +1378,9 @@ class PatchEditor:
             return
         ch = self._channel_nibble()
         value = 0x7F if enable else 0x00
-        # CC_FMEN = 88 (repo/src/midi_defs.h default) - targets this channel's
+        # CC_FMEN = 31 (repo/src/midi_defs.h default) - targets this channel's
         # notes at the FMOpl chip instead of a SID.
-        hexstr = f"b{ch:x} 58 {value:02x}"
+        hexstr = f"b{ch:x} 1f {value:02x}"
         self._set_status(f"{'Enabling' if enable else 'Disabling'} FMOpl target on channel {self.channel.get()}...")
         self._run_async(lambda: send_hex(port, hexstr))
 
@@ -1542,6 +1636,7 @@ class PatchEditor:
         self._build_arptable_tab(nb)
         self._build_fmopl_tab(nb)
         self._build_cc_tab(nb)
+        self._build_ccmap_tab(nb)
 
         actions = ttk.LabelFrame(self.root, text="Actions")
         actions.pack(fill="x", **pad)
@@ -1804,7 +1899,10 @@ class PatchEditor:
         if not port:
             self._require_port()
             return
-        cc_num = CC_DEFAULT_NUMBERS[field]
+        cc_num = self.cc_numbers.get(field)
+        if cc_num is None:
+            self._set_status(f"{field} is unassigned on the device, nothing sent.")
+            return
         ch = self._channel_nibble()
         value = max(0, min(127, int(value)))
         hexstr = f"b{ch:x} {cc_num:02x} {value:02x}"
@@ -1821,9 +1919,9 @@ class PatchEditor:
                  "time, on the Channel selected at the top of the window - a different mechanism "
                  "entirely from the Patch and Raw SysEx tools elsewhere in this app: nothing here "
                  "reads or writes a patch slot, and none of it is saved unless you separately send "
-                 "SysEx Save (0x10). CC numbers shown are this firmware's compiled-in defaults "
-                 "(repo/src/midi_defs.h) - if the board's CC map has been reconfigured, these won't "
-                 "match. Note some controls below act on the same live channel state a Patch's "
+                 "SysEx Save (0x10). CC numbers shown come from the board's live CC map (read "
+                 "at start and on port refresh) and fall back to the compiled-in defaults "
+                 "(repo/src/midi_defs.h) when the board does not reply. Note some controls below act on the same live channel state a Patch's "
                  "Program Change also sets (waveform, ADSR, filter, LFO, arp) - the two can "
                  "overwrite each other.",
         )
@@ -1862,11 +1960,316 @@ class PatchEditor:
                   "numbers (see midi_handler.c's ASSIGN_CC table), sending them does nothing.",
                   wraplength=680, justify="left").pack(fill="x", padx=6, pady=4)
 
+    # --- live CC map -----------------------------------------------------
+
+    def _cc_row_text(self, field, label):
+        n = self.cc_numbers.get(field)
+        return f"{label} ({field}, " + ("unassigned" if n is None else f"CC {n}") + ")"
+
+    def _apply_cc_map(self, ccmap):
+        self.cc_map = list(ccmap)
+        self.cc_numbers = cc_numbers_from_map(ccmap)
+        for field, (lbl, label) in self.cc_row_labels.items():
+            lbl.config(text=self._cc_row_text(field, label))
+        self._sync_ccmap_tab()
+
+    def _sync_ccmap_tab(self):
+        if self.cc_map is None:
+            return
+        for i, var in self.ccmap_vars.items():
+            v = self.cc_map[i]
+            var.set("" if v == CC_UNASSIGNED else str(v))
+            warn = v != CC_UNASSIGNED and v in CC_WARN_NUMBERS
+            self.ccmap_msgs[i].set("standard MIDI controller (bank select, mod wheel, data entry, "
+                                   "sustain, NRPN/RPN)" if warn else "")
+
+    def _ccmap_busy(self, text, done=0, total=1):
+        """Show busy text and progress (done of total steps), thread-safe."""
+        def ui():
+            self.ccmap_state.set(text)
+            self.status.set(text)
+            if self.ccmap_pb is not None:
+                self.ccmap_pb.config(maximum=max(total, 1), value=done)
+        self.root.after(0, ui)
+
+    def _ccmap_idle(self, text):
+        """Show the final result and clear the progress bar, thread-safe."""
+        def ui():
+            self.ccmap_state.set("Idle: " + text)
+            self.status.set(text)
+            if self.ccmap_pb is not None:
+                self.ccmap_pb.config(value=0)
+        self.root.after(0, ui)
+
+    def _ccmap_read(self, port, what="Reading", base=0, total=4):
+        """read_cc_map() with per-page progress. base = steps already done."""
+        def prog(page, pages):
+            self._ccmap_busy(f"{what}: reading CC map page {page}/{pages} from device...",
+                             base + page - 1, total)
+        return read_cc_map(port, progress=prog)
+
+    def refresh_cc_map(self, announce=False):
+        """Read the live map via DUMP pages 0-3, keep defaults when no reply."""
+        port = self._selected_port_id()
+        if not port:
+            if announce:
+                self._require_port()
+            return
+
+        def work():
+            ccmap = self._ccmap_read(port, "Read")
+            if ccmap is None:
+                self._ccmap_idle("CC map: no reply, using compiled-in defaults.")
+                return
+            self.root.after(0, lambda: self._apply_cc_map(ccmap))
+            self._ccmap_idle("CC map read from device (4/4 pages).")
+        self._run_async(work)
+
+    @staticmethod
+    def _fmt_cc(v):
+        return "unassigned" if v == CC_UNASSIGNED else f"CC {v}"
+
+    def set_ccmap_id(self, cc_id, number):
+        """SET one id, then DUMP to verify. The device gives no ack and
+        refuses silently. A mismatch after the DUMP means refusal."""
+        port = self._selected_port_id()
+        if not port:
+            self._require_port()
+            return
+        if number is not None:
+            if not cc_number_legal(number):
+                messagebox.showerror("Illegal CC number",
+                                     "CC numbers must be 0-119, excluding 117-119.")
+                return
+            if number in CC_WARN_NUMBERS and not messagebox.askyesno(
+                    "Standard MIDI controller",
+                    f"CC {number} is a standard MIDI controller (bank select, mod wheel, data "
+                    "entry, sustain, NRPN/RPN). Hosts and keyboards send it for other purposes. "
+                    "Assign it anyway?"):
+                return
+        want = CC_UNASSIGNED if number is None else number
+        self.ccmap_msgs[cc_id].set("sending...")
+
+        def work():
+            self._ccmap_busy(f"Writing id {cc_id} ({CC_ID_NAMES[cc_id]}) to device...", 0, 5)
+            send_hex(port, build_ccmap_set_sysex(cc_id, number))
+            time.sleep(0.1)
+            ccmap = self._ccmap_read(port, f"Verify id {cc_id}", base=1, total=5)
+            if ccmap is None:
+                msg = "no DUMP reply, result unknown"
+                self.root.after(0, lambda: self.ccmap_msgs[cc_id].set(msg))
+                self._ccmap_idle(f"CC map id {cc_id}: {msg}.")
+                return
+            got = ccmap[cc_id]
+            if got == want:
+                msg = "ok"
+            else:
+                msg = f"refused by device (map holds {self._fmt_cc(got)})"
+
+            def done():
+                self._apply_cc_map(ccmap)
+                self.ccmap_msgs[cc_id].set(msg)
+                self._ccmap_idle(f"CC map id {cc_id} ({CC_ID_NAMES[cc_id]}): {msg}.")
+            self.root.after(0, done)
+        self._run_async(work)
+
+    def _ccmap_entry_apply(self, cc_id):
+        txt = self.ccmap_vars[cc_id].get().strip()
+        if txt == "":
+            self.set_ccmap_id(cc_id, None)
+            return
+        try:
+            number = int(txt)
+        except ValueError:
+            messagebox.showerror("Illegal CC number", "Enter a decimal number, or leave empty to unassign.")
+            return
+        self.set_ccmap_id(cc_id, number)
+
+    def reset_ccmap(self, mode):
+        port = self._selected_port_id()
+        if not port:
+            self._require_port()
+            return
+        if mode == 1 and not messagebox.askyesno(
+                "Unassign all", "Unassign every remappable CC id (0-51) on the device? "
+                                "RAM only, Save to flash persists it."):
+            return
+        self._set_status("CC map reset (mode %d)..." % mode)
+
+        def work():
+            self._ccmap_busy("Writing CC map reset (mode %d) to device..." % mode, 0, 5)
+            send_hex(port, build_ccmap_reset_sysex(mode))
+            time.sleep(0.15)
+            ccmap = self._ccmap_read(port, "Verify reset", base=1, total=5)
+            if ccmap is None:
+                self._ccmap_idle("CC map reset sent, no DUMP reply to verify.")
+                return
+            self.root.after(0, lambda: self._apply_cc_map(ccmap))
+            self._ccmap_idle("CC map reset (mode %d) done, verified." % mode)
+        self._run_async(work)
+
+    def save_ccmap_preset(self):
+        if self.cc_map is None:
+            messagebox.showerror("No map", "Read the map from the device first.")
+            return
+        path = filedialog.asksaveasfilename(defaultextension=".json",
+                                            filetypes=[("CC map preset", "*.json")])
+        if not path:
+            return
+        data = {"format": "usbsid-ccmap", "version": 1,
+                "map": {CC_ID_NAMES[i]: (None if self.cc_map[i] == CC_UNASSIGNED else self.cc_map[i])
+                        for i in range(CC_REMAP_COUNT)}}
+        try:
+            with open(path, "w") as f:
+                json.dump(data, f, indent=2)
+        except OSError as e:
+            messagebox.showerror("Save failed", str(e))
+            return
+        self._set_status(f"CC map preset saved: {path}")
+
+    def load_ccmap_preset(self):
+        port = self._selected_port_id()
+        if not port:
+            self._require_port()
+            return
+        path = filedialog.askopenfilename(filetypes=[("CC map preset", "*.json")])
+        if not path:
+            return
+        try:
+            with open(path) as f:
+                data = json.load(f)
+            m = data["map"]
+            if data.get("format") != "usbsid-ccmap" or not isinstance(m, dict):
+                raise ValueError("not a usbsid-ccmap preset")
+            plan = {}
+            for name, num in m.items():
+                if name not in CC_ID_NAMES[:CC_REMAP_COUNT]:
+                    raise ValueError(f"unknown or fixed id name: {name}")
+                if num is None:
+                    continue
+                if not isinstance(num, int) or not cc_number_legal(num):
+                    raise ValueError(f"illegal CC number for {name}: {num}")
+                plan[CC_ID_NAMES.index(name)] = num
+            if len(set(plan.values())) != len(plan):
+                raise ValueError("duplicate CC numbers in preset")
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            messagebox.showerror("Preset load failed", str(e))
+            return
+        warned = sorted({n for n in plan.values() if n in CC_WARN_NUMBERS})
+        text = f"Apply preset ({len(plan)} assignments)? RAM only: RESET 1, then one SET per id."
+        if warned:
+            text += f"\nStandard MIDI controllers used: {warned}"
+        if not messagebox.askyesno("Apply preset", text):
+            return
+        self._set_status("Applying CC map preset...")
+
+        def work():
+            total = 1 + len(plan) + 4
+            self._ccmap_busy(f"Writing preset: reset (1/{1 + len(plan)})...", 0, total)
+            send_hex(port, build_ccmap_reset_sysex(1))
+            time.sleep(0.15)
+            for n, (cc_id, num) in enumerate(sorted(plan.items()), start=1):
+                self._ccmap_busy(f"Writing preset: id {cc_id} {CC_ID_NAMES[cc_id]} "
+                                 f"({n + 1}/{1 + len(plan)})...", n, total)
+                send_hex(port, build_ccmap_set_sysex(cc_id, num))
+                time.sleep(0.03)
+            time.sleep(0.1)
+            ccmap = self._ccmap_read(port, "Verify preset", base=1 + len(plan), total=total)
+            if ccmap is None:
+                self._ccmap_idle("Preset sent, no DUMP reply to verify.")
+                return
+            bad = [CC_ID_NAMES[i] for i in range(CC_REMAP_COUNT)
+                   if ccmap[i] != plan.get(i, CC_UNASSIGNED)]
+            self.root.after(0, lambda: self._apply_cc_map(ccmap))
+            if bad:
+                self._ccmap_idle("Preset applied, mismatch after DUMP (refused): " + ", ".join(bad))
+            else:
+                self._ccmap_idle("Preset applied and verified.")
+        self._run_async(work)
+
+    def _build_ccmap_tab(self, nb):
+        outer = ttk.Frame(nb)
+        nb.add(outer, text="CC Map")
+        ttk.Label(
+            outer, justify="left", wraplength=680,
+            text="Remap which CC number triggers each function (SysEx 0x2C-0x2F). Changes are "
+                 "RAM only until Save to flash. The device gives no ack and refuses illegal or "
+                 "colliding numbers silently: each Set is verified with a DUMP and a refusal "
+                 "is shown on the row. Legal: 0-119 except 117-119. Empty entry = unassigned. "
+                 "Ids 52-63 are fixed.",
+        ).pack(fill="x", padx=8, pady=(8, 4))
+
+        bar = ttk.Frame(outer)
+        bar.pack(fill="x", padx=8, pady=2)
+        ttk.Button(bar, text="Read from device", command=lambda: self.refresh_cc_map(True)).pack(side="left", padx=3)
+        ttk.Button(bar, text="Reset to defaults (0)", command=lambda: self.reset_ccmap(0)).pack(side="left", padx=3)
+        ttk.Button(bar, text="Unassign all (1)", command=lambda: self.reset_ccmap(1)).pack(side="left", padx=3)
+        ttk.Button(bar, text="Save to flash", command=lambda: self.flash_action(0x10, "Saving to flash")).pack(side="left", padx=3)
+        ttk.Button(bar, text="Save preset...", command=self.save_ccmap_preset).pack(side="left", padx=3)
+        ttk.Button(bar, text="Load preset...", command=self.load_ccmap_preset).pack(side="left", padx=3)
+
+        prog = ttk.Frame(outer)
+        prog.pack(fill="x", padx=8, pady=(2, 0))
+        ttk.Label(prog, textvariable=self.ccmap_state, anchor="w").pack(side="left", padx=3)
+        self.ccmap_pb = ttk.Progressbar(prog, mode="determinate", length=220, maximum=1, value=0)
+        self.ccmap_pb.pack(side="left", padx=6)
+
+        canvas = tk.Canvas(outer, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        body = ttk.Frame(canvas)
+        body.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        win = canvas.create_window((0, 0), window=body, anchor="nw")
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win, width=e.width))
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        def wheel(e):
+            if e.num == 4:
+                step = -1
+            elif e.num == 5:
+                step = 1
+            else:
+                step = -1 if e.delta > 0 else 1
+                if abs(e.delta) >= 120:
+                    step *= abs(e.delta) // 120
+            canvas.yview_scroll(step, "units")
+
+        def bind_wheel(_e=None):
+            canvas.bind_all("<MouseWheel>", wheel)
+            canvas.bind_all("<Button-4>", wheel)
+            canvas.bind_all("<Button-5>", wheel)
+
+        def unbind_wheel(_e=None):
+            canvas.unbind_all("<MouseWheel>")
+            canvas.unbind_all("<Button-4>")
+            canvas.unbind_all("<Button-5>")
+        outer.bind("<Enter>", bind_wheel)
+        outer.bind("<Leave>", unbind_wheel)
+        canvas.pack(side="left", fill="both", expand=True, padx=(8, 0), pady=4)
+        scrollbar.pack(side="right", fill="y", pady=4)
+
+        for i in range(CC_REMAP_COUNT):
+            row = ttk.Frame(body)
+            row.pack(fill="x", pady=1, padx=4)
+            ttk.Label(row, text=f"{i:2d}  {CC_ID_NAMES[i]}", width=12, anchor="w").pack(side="left")
+            n = self.cc_numbers.get(f"CC_{CC_ID_NAMES[i]}")
+            var = tk.StringVar(value="" if n is None else str(n))
+            msg = tk.StringVar(value="")
+            self.ccmap_vars[i] = var
+            self.ccmap_msgs[i] = msg
+            ent = ttk.Entry(row, textvariable=var, width=5)
+            ent.pack(side="left")
+            ent.bind("<Return>", lambda e, k=i: self._ccmap_entry_apply(k))
+            ttk.Button(row, text="Set", width=5, command=lambda k=i: self._ccmap_entry_apply(k)).pack(side="left", padx=3)
+            ttk.Button(row, text="Unassign", width=9,
+                       command=lambda k=i: (self.ccmap_vars[k].set(""), self.set_ccmap_id(k, None))).pack(side="left")
+            ttk.Label(row, textvariable=msg, anchor="w").pack(side="left", padx=6)
+
     def _build_cc_row(self, parent, field, label, kind, extra):
-        cc_num = CC_DEFAULT_NUMBERS[field]
         row = ttk.Frame(parent)
         row.pack(fill="x", pady=2, padx=4)
-        ttk.Label(row, text=f"{label} ({field}, CC {cc_num})", width=42, anchor="w").pack(side="left")
+        name_lbl = ttk.Label(row, text=self._cc_row_text(field, label), width=42, anchor="w")
+        name_lbl.pack(side="left")
+        self.cc_row_labels[field] = (name_lbl, label)
 
         if kind == "toggle":
             var = tk.BooleanVar(value=False)

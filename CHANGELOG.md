@@ -45,6 +45,13 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
   - reduce the stack use of the MIDI config load from 2544 to 144 bytes
   - raise `CFG_TUD_MIDI_TX_BUFSIZE` from 64 to 128 to stop a 53 byte DUMP reply being cut off, which also fixes the truncated patch DUMP reply
   - update the embedded application CC comments in `midi.c` to 117-119
+* Add a CC Map tab and live CC map support to the MIDI example tools
+  - add a CC Map tab to `patch_editor.py` to set or unassign each function, reset to defaults, unassign all, save to flash and save or load JSON presets
+  - verify every set, reset and preset with a DUMP and show a refusal on the row, as the device sends no ack
+  - show a busy line and progress bar with per page status while reading from or writing to the device
+  - scroll the CC Map tab with the mouse wheel and let the rows follow the window width
+  - read the live CC map from the board in `patch_editor.py` and `cc_controller.py` for the CC sliders and numbers, fall back to the compiled defaults when the board does not reply
+  - use the renumbered default CC numbers
 
 #### Version: 0.9.0
 * Add batch READ of up to 63 registers
