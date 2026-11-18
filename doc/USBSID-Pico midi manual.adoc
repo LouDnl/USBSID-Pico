@@ -53,6 +53,11 @@ Every MIDI channel (1-16) has independent routing, separate from the loaded patc
 == Control Change reference
 All CC numbers below are the *compiled-in defaults* (`repo/src/midi_defs.h`, `MIDI_DEFAULT_CCVALUES_INIT`). The CC map can be reconfigured (saved with the rest of the MIDI flash blob, see <<Saving your settings>>). If a CC below does nothing, check the CC map of your board.
 
+[NOTE]
+====
+The default CC numbers changed in this firmware version to follow the MIDI 1.0 Control Change assignments. A CC map saved by older firmware is replaced by the new defaults on first boot. Controllers and scripts that use the old numbers need updating.
+====
+
 === Voice waveform and envelope
 Each channel has one live template (waveform, envelope, pulse width) that is applied to each new note and pushed live to the notes held on the channel. A waveform or envelope CC change is heard on a held chord immediately.
 
@@ -68,10 +73,10 @@ Each channel has one live template (waveform, envelope, pulse width) that is app
 |25 |`CC_RMOD` |Toggle ring modulation
 |26 |`CC_SYNC` |Toggle hard sync
 |27 |`CC_GATE` |Manual gate open/close on all voices the channel holds, separate from the automatic note-on/note-off gate. For holding a drone open
-|17 |`CC_ATT` |Attack
-|18 |`CC_DEC` |Decay
-|19 |`CC_SUS` |Sustain
-|29 |`CC_REL` |Release
+|73 |`CC_ATT` |Attack
+|75 |`CC_DEC` |Decay
+|70 |`CC_SUS` |Sustain
+|72 |`CC_REL` |Release
 |1  |`CC_PWM` |Pulse width (modulation wheel on most controllers), only audible with the pulse waveform active
 |28 |`CC_NOTE`|One-shot manual pitch entry for the notes the channel holds
 |===
@@ -85,16 +90,16 @@ Filter and volume are chip wide registers ~ a CC in this section affects all SID
 |===
 |CC |Name |What it does
 
-|32 |`CC_FFC`  |Filter cutoff frequency
-|33 |`CC_RES`  |Filter resonance
-|34 |`CC_FLT1` |Route voice 1 through the filter
-|35 |`CC_FLT2` |Route voice 2 through the filter
-|36 |`CC_FLT3` |Route voice 3 through the filter
-|37 |`CC_FLTE` |Route the external input through the filter
-|48 |`CC_3OFF` |Disconnect voice 3 from the output entirely
-|49 |`CC_HPF`  |Enable the high-pass filter mode
-|50 |`CC_BPF`  |Enable the band-pass filter mode
-|51 |`CC_LPF`  |Enable the low-pass filter mode
+|74 |`CC_FFC`  |Filter cutoff frequency
+|71 |`CC_RES`  |Filter resonance
+|16 |`CC_FLT1` |Route voice 1 through the filter
+|17 |`CC_FLT2` |Route voice 2 through the filter
+|18 |`CC_FLT3` |Route voice 3 through the filter
+|19 |`CC_FLTE` |Route the external input through the filter
+|83 |`CC_3OFF` |Disconnect voice 3 from the output entirely
+|82 |`CC_HPF`  |Enable the high-pass filter mode
+|81 |`CC_BPF`  |Enable the band-pass filter mode
+|80 |`CC_LPF`  |Enable the low-pass filter mode
 |7  |`CC_VOL`  |Channel volume
 |===
 
@@ -116,8 +121,8 @@ On real SID hardware a voice routed into the filter (`CC_FLT1`-`3`/`CC_FLTE`) gi
 |109 |`CC_VCE2` |Narrow this channel to voice position 2
 |110 |`CC_VCE3` |Narrow this channel to voice position 3
 |111 |`CC_SPLY` |Toggle full polyphony for this channel without silencing held notes
-|119 |`CC_GTEN` |Toggle automatic gate (gate follows note-on/note-off) - on by default
-|72  |`CC_VELM` |Toggle velocity mode (velocity scales decay) - off by default
+|29  |`CC_GTEN` |Toggle automatic gate (gate follows note-on/note-off) - on by default
+|30  |`CC_VELM` |Toggle velocity mode (velocity scales decay) - off by default
 |126 |`CC_MONO` |Force this channel monophonic, silencing what it currently holds
 |127 |`CC_POLY` |Force this channel fully polyphonic, silencing what it currently holds
 |===
@@ -129,16 +134,16 @@ One LFO, one arpeggiator and one portamento (glide) engine per channel, driven b
 |===
 |CC |Name |What it does
 
-|0 |`CC_LFOW` |LFO waveform: triangle, sawtooth, square, or sample & hold
-|2 |`CC_LFOR` |LFO rate
-|3 |`CC_LFOD` |LFO depth, `0` turns the LFO off (an idle LFO costs nothing)
-|4 |`CC_LFOT` |LFO destination: pitch, pulse width, or filter cutoff
+|102 |`CC_LFOW` |LFO waveform: triangle, sawtooth, square, or sample & hold
+|76 |`CC_LFOR` |LFO rate
+|77 |`CC_LFOD` |LFO depth, `0` turns the LFO off (an idle LFO costs nothing)
+|103 |`CC_LFOT` |LFO destination: pitch, pulse width, or filter cutoff
 |5 |`CC_PORT` |Portamento (glide) time, `0` is off. A new note glides in from the previous note of the channel
-|6 |`CC_ARPM` |Arpeggiator pattern: up, down, up/down, random, as-played, or table (see <<Arp-tables,Arp tables>>)
-|10 |`CC_ARPR` |Arpeggiator rate, free-running unless a MIDI clock is present, then read as a clock division
-|11 |`CC_ARPO` |Arpeggiator octave range (repeats the held pattern up to 3 extra octaves), ignored in table mode, see <<Arp-tables,Arp tables>>
-|12 |`CC_ARPE` |Arpeggiator on/off for this channel, held notes feed the arpeggiator input pattern while on
-|30 |`CC_ARPT` |Arp table select (0-15), the table slot the `CC_ARPM` table pattern reads. Needs table mode, see <<Arp-tables,Arp tables>>
+|113 |`CC_ARPM` |Arpeggiator pattern: up, down, up/down, random, as-played, or table (see <<Arp-tables,Arp tables>>)
+|114 |`CC_ARPR` |Arpeggiator rate, free-running unless a MIDI clock is present, then read as a clock division
+|115 |`CC_ARPO` |Arpeggiator octave range (repeats the held pattern up to 3 extra octaves), ignored in table mode, see <<Arp-tables,Arp tables>>
+|112 |`CC_ARPE` |Arpeggiator on/off for this channel, held notes feed the arpeggiator input pattern while on
+|116 |`CC_ARPT` |Arp table select (0-15), the table slot the `CC_ARPM` table pattern reads. Needs table mode, see <<Arp-tables,Arp tables>>
 |===
 
 If PAL/PWM LFO pitch modulation is set as aftertouch target (`AT_VIBRATO`), channel pressure becomes a vibrato-on-pressure controller without touching `CC_LFOD`.
@@ -150,10 +155,10 @@ A second LFO of the same shape, stacked on top of the first. If both LFOs target
 |===
 |CC |Name |What it does
 
-|13 |`CC_LFO2W` |LFO 2 waveform: triangle, sawtooth, square, or sample & hold
+|89 |`CC_LFO2W` |LFO 2 waveform: triangle, sawtooth, square, or sample & hold
 |14 |`CC_LFO2R` |LFO 2 rate
 |15 |`CC_LFO2D` |LFO 2 depth, `0` turns LFO 2 off, independent of LFO 1
-|16 |`CC_LFO2T` |LFO 2 destination: pitch, pulse width, or filter cutoff
+|90 |`CC_LFO2T` |LFO 2 destination: pitch, pulse width, or filter cutoff
 |===
 
 Everything above for LFO 1 (idle at depth 0, patch and live CC interaction, `AT_VIBRATO`) applies to LFO 2 independently.
@@ -165,8 +170,8 @@ Stacks 3 oscillators onto one note for a thicker, detuned unison sound (MBSID Le
 |===
 |CC |Name |What it does
 
-|41 |`CC_UNIS` |Unison mode on/off for this channel (`>= 64` = on, `< 64` = off), only affects the *following* note-on
-|42 |`CC_UDET` |Detune spread (0-127 range but takes the full 0-255 byte), `0` = no detune, higher values spread the outer two oscillators, up to roughly a semitone at full spread
+|93 |`CC_UNIS` |Unison mode on/off for this channel (`>= 64` = on, `< 64` = off), only affects the *following* note-on
+|94 |`CC_UDET` |Detune spread (0-127 range but takes the full 0-255 byte), `0` = no detune, higher values spread the outer two oscillators, up to roughly a semitone at full spread
 |===
 
 The center oscillator plays the struck pitch, the other two are detuned up and down around it by the spread amount. Waveform, envelope and pulse width CCs and patch fields apply to all 3 oscillators together. They cannot get different waveforms or envelopes.
@@ -190,9 +195,9 @@ Only relevant on a firmware build with `_em` (Cynthcart running through the C64 
 |===
 |CC |Name |What it does
 
-|85 |`CC_CEN` |Enable Cynthcart
-|86 |`CC_CDI` |Disable Cynthcart
-|87 |`CC_CRE` |Reset Cynthcart
+|117 |`CC_CEN` |Enable the embedded application (Cynthcart or SID SYNTH)
+|118 |`CC_CDI` |Disable the embedded application (Cynthcart or SID SYNTH)
+|119 |`CC_CRE` |Reset the embedded application (Cynthcart or SID SYNTH)
 |===
 
 While Cynthcart is active it takes over several CC numbers used elsewhere in this document (filter, envelope, tremolo, waveform selection, ...). See the Cynthcart manual for that CC list.
@@ -202,6 +207,110 @@ The old copy/link voice or SID family (`CC_CVCE`/8, `CC_CSID`/9, `CC_LVCE`/40, `
 
 === Not wired
 `CC_BMSB`/`CC_BLSB` (Bank Select MSB/LSB) and `CC_MOD`/`CC_MODL` (a second Modulation Wheel MSB/LSB pair, separate from `CC_PWM`) exist in the CC map but have no default number (`0xFF`/255, outside the valid 0-127 range) and no handler. Bank Select has nothing to select, Program Change reaches all 32 patches. Listed for completeness.
+
+
+=== Remapping CCs
+The CC numbers above can be changed at run time over SysEx, without the config tool. There is one global CC map, shared by all 16 MIDI channels. Each function has an id (0-63) and a CC number assigned to it.
+
+Rules:
+
+* Ids 0-51 (`CC_NOTE` up to and including `CC_FMEN`) are remappable. Ids 52-63 are fixed: a SET on them is refused.
+* A target CC number must be 0-119. The numbers 117-119 (embedded application) are refused on every build, 120-127 are refused as well.
+* A target CC number that another id already uses, fixed ids included, is refused. Nothing is stolen from the other function. To swap two functions, unassign one first.
+* Target `0xFF` unassigns a function: no CC reaches it any more. Channel aftertouch to filter or volume keeps working.
+* A refused SET gives no reply and changes nothing. Send a DUMP to check the result.
+
+Value bytes are sent as two nibbles, high nibble first (a CC number of 40 = `0x28` is sent as `02 08`).
+
+[cols="1,1,3"]
+|===
+|Byte |Command |What it does
+
+|`0x2C` |`SYSEX_MIDI_CCMAP_SET` |`F0 50 2C <id> <hi> <lo> F7` ~ assigns CC number `<hi><lo>` to function `<id>`, RAM only, no reply
+|`0x2D` |`SYSEX_MIDI_CCMAP_DUMP` |`F0 50 2D <page> F7` ~ asks for one page of the map, `<page>` is 0-3
+|`0x2E` |`SYSEX_MIDI_CCMAP_DATA` |`F0 50 2E <page> <48 nibbles> F7` ~ device -> host response to a `0x2D` request, ids `page*24` to `page*24+23`, ids 64 and up read `FF`
+|`0x2F` |`SYSEX_MIDI_CCMAP_RESET` |`F0 50 2F <mode> F7` ~ mode 0 restores the default map, mode 1 leaves every remappable id unassigned (fixed ids keep their numbers)
+|===
+
+Example, move noise waveform (`CC_NOIS`, id 2) to CC 40 on Linux with ALSA:
+
+----
+amidi -p hw:X -S 'F0 50 2C 02 02 08 F7'
+----
+
+The map lives in RAM until `SYSEX_MIDI_SAVE`, see <<Saving your settings>>. The demos and the CC charts in this manual assume the default map. `patch-editor/patch_editor.py` has a CC map tab to edit, send and read the map.
+
+Function ids, default CC numbers and whether the id can be remapped:
+
+[cols="1,2,2,1"]
+|===
+|Id |Name |Default CC |Remap
+
+|0 |`CC_NOTE` |28 |yes
+|1 |`CC_PWM` |1 |yes
+|2 |`CC_NOIS` |20 |yes
+|3 |`CC_PULS` |21 |yes
+|4 |`CC_SAWT` |22 |yes
+|5 |`CC_TRIA` |23 |yes
+|6 |`CC_TEST` |24 |yes
+|7 |`CC_RMOD` |25 |yes
+|8 |`CC_SYNC` |26 |yes
+|9 |`CC_GATE` |27 |yes
+|10 |`CC_ATT` |73 |yes
+|11 |`CC_DEC` |75 |yes
+|12 |`CC_SUS` |70 |yes
+|13 |`CC_REL` |72 |yes
+|14 |`CC_FFC` |74 |yes
+|15 |`CC_RES` |71 |yes
+|16 |`CC_FLT1` |16 |yes
+|17 |`CC_FLT2` |17 |yes
+|18 |`CC_FLT3` |18 |yes
+|19 |`CC_FLTE` |19 |yes
+|20 |`CC_3OFF` |83 |yes
+|21 |`CC_HPF` |82 |yes
+|22 |`CC_BPF` |81 |yes
+|23 |`CC_LPF` |80 |yes
+|24 |`CC_VOL` |7 |yes
+|25 |`CC_SID1` |104 |yes
+|26 |`CC_SID2` |105 |yes
+|27 |`CC_SID3` |106 |yes
+|28 |`CC_SID4` |107 |yes
+|29 |`CC_VCE1` |108 |yes
+|30 |`CC_VCE2` |109 |yes
+|31 |`CC_VCE3` |110 |yes
+|32 |`CC_GTEN` |29 |yes
+|33 |`CC_SPLY` |111 |yes
+|34 |`CC_VELM` |30 |yes
+|35 |`CC_LFOW` |102 |yes
+|36 |`CC_LFOR` |76 |yes
+|37 |`CC_LFOD` |77 |yes
+|38 |`CC_LFOT` |103 |yes
+|39 |`CC_PORT` |5 |yes
+|40 |`CC_ARPM` |113 |yes
+|41 |`CC_ARPR` |114 |yes
+|42 |`CC_ARPO` |115 |yes
+|43 |`CC_ARPE` |112 |yes
+|44 |`CC_ARPT` |116 |yes
+|45 |`CC_LFO2W` |89 |yes
+|46 |`CC_LFO2R` |14 |yes
+|47 |`CC_LFO2D` |15 |yes
+|48 |`CC_LFO2T` |90 |yes
+|49 |`CC_UNIS` |93 |yes
+|50 |`CC_UDET` |94 |yes
+|51 |`CC_FMEN` |31 |yes
+|52 |`CC_CEN` |117 |fixed
+|53 |`CC_CDI` |118 |fixed
+|54 |`CC_CRE` |119 |fixed
+|55 |`CC_BMSB` |none (`0xFF`) |fixed
+|56 |`CC_BLSB` |none (`0xFF`) |fixed
+|57 |`CC_MOD` |none (`0xFF`) |fixed
+|58 |`CC_MODL` |none (`0xFF`) |fixed
+|59 |`CC_ASOF` |120 |fixed
+|60 |`CC_RACT` |121 |fixed
+|61 |`CC_ANOF` |123 |fixed
+|62 |`CC_MONO` |126 |fixed
+|63 |`CC_POLY` |127 |fixed
+|===
 
 
 == Patches
@@ -246,6 +355,7 @@ Patches can be written, read back, saved and reset over MIDI without the config 
 |`0x21` |`SYSEX_MIDI_PATCH_DUMP` |`F0 50 21 <slot> F7` ~ asks the device to send the current data of that patch back over MIDI (as a `0x22` message)
 |`0x22` |`SYSEX_MIDI_PATCH_DATA` |Device -> host response to a `0x21` request, same 48-nibble shape as `0x20` input
 |`0x2A` |`SYSEX_MIDI_PATCH_SAVE` |`F0 50 2A <channel> <slot> F7` ~ the inverse of LOAD, captures the current live state of the given channel into a patch slot, RAM only
+|`0x2C`-`0x2F` |`SYSEX_MIDI_CCMAP_SET`/`DUMP`/`DATA`/`RESET` |CC map commands, see <<Remapping CCs>>
 |`0x10` |`SYSEX_MIDI_SAVE` |`F0 50 10 F7` ~ persists all patches and the routing of every channel to flash
 |`0x11` |`SYSEX_MIDI_LOAD` |`F0 50 11 F7` ~ reloads the last saved data (also runs at boot and on a MIDI System Reset)
 |`0x12` |`SYSEX_MIDI_RESET` |`F0 50 12 F7` ~ erases all saved slots and resets all patches and channels to compiled defaults
@@ -299,13 +409,15 @@ A MIDI System Reset (`0xFF`, a real-time status byte, no SysEx) reloads the last
 
 Channel volume (`CC_VOL`) is never saved or restored by these commands, a client (MIDI player, ASID, your sequencer) is expected to set it. A System Reset or fresh boot comes back at a flat, audible default volume, all patch, routing and arp table settings come back as saved.
 
+The CC map is saved by `SYSEX_MIDI_SAVE` with the rest. `SYSEX_MIDI_RESET` also restores the default map, a MIDI System Reset (`0xFF`) restores the saved map. Upgrading from an older saved MIDI state keeps channels, patches and arp tables, the CC map starts at the defaults. After going back to an older firmware and saving there, save once more after upgrading again to make sure the newest settings are the ones kept.
+
 
 [[FMOpl]]
 == FMOpl
 Some USBSID-Pico configurations have an FMOpl-capable chip installed beside or in place of a SID, either real OPL2 silicon or the software emulation of a clone chip (for example SIDKick-pico FMOpl emulation). It is one chip slot on your board, separate from the SID voice pool: 2-operator FM synthesis, 9 simultaneous notes and a small set of MIDI controls. This section only applies if your board has one configured, check with the config tool if you are not sure.
 
 === Targeting a channel at FMOpl
-By default each MIDI channel targets a SID. `CC_FMEN` (CC 88) targets a channel at FMOpl: send `127` for FMOpl, `0` to go back to a SID. `CC_FMEN` overrides the SID voice mask/routing of the channel while on.
+By default each MIDI channel targets a SID. `CC_FMEN` (CC 31) targets a channel at FMOpl: send `127` for FMOpl, `0` to go back to a SID. `CC_FMEN` overrides the SID voice mask/routing of the channel while on.
 
 *A channel needs `CC_FMEN` enabled before Program Change or notes on it reach the FMOpl chip.* Notes on a channel without `CC_FMEN` set do nothing on the OPL chip. A channel reset to SID with `CC_FMEN 0` plays through the SID pool as normal.
 

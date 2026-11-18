@@ -34,9 +34,9 @@ Cynthcart runs through the embedded USBSID-Player, all Cynthcart firmwares come 
 To start the emulator and Cynthcart you will need an USB-midi connection to USBSID=Pico.
 
 === CC messages
-85 (0x55) ~ Enable Cynthcart +
-86 (0x56) ~ Disable Cynthcart +
-87 (0x57) ~ Reset Cynthcart (**not implemented yet**, currently a no-op)
+117 (0x75) ~ Enable Cynthcart +
+118 (0x76) ~ Disable Cynthcart +
+119 (0x77) ~ Reset Cynthcart (**not implemented yet**, currently a no-op)
 
 === Cynthcart control
 For all other midi CC messages to control Cynthcart please refer to the Cynthcart manual. +

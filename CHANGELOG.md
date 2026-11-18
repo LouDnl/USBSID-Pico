@@ -52,6 +52,13 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
   - scroll the CC Map tab with the mouse wheel and let the rows follow the window width
   - read the live CC map from the board in `patch_editor.py` and `cc_controller.py` for the CC sliders and numbers, fall back to the compiled defaults when the board does not reply
   - use the renumbered default CC numbers
+* Document CC remapping in the MIDI manual
+  - add a "Remapping CCs" section with the function ids, the refusal rules, unassigning, the SysEx 0x2C-0x2F frames and the flash save behavior
+  - add the CC map SysEx commands to the SysEx command table
+  - describe that downgrading to firmware without the CC map and upgrading again can leave a stale map in flash
+  - update the CC numbers of the embedded application enable, disable and reset to 117-119 in the MIDI and Cynthcart manuals
+  - update the default CC numbers that changed in the MIDI 1.0 conform renumbering
+  - regenerate the MIDI and Cynthcart manual PDFs from the updated sources
 
 #### Version: 0.9.0
 * Add batch READ of up to 63 registers
