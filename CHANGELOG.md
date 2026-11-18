@@ -80,6 +80,7 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
   - replace the local file type enum in `send_sid.c` with the `USBSID_UPLOAD_FILE_*` macros from `USBSIDInterface.h`
 * Build tools in full static without dependencies
 * Fix regex tag catching in release workflows by changing them to globs
+* Fix `get_audio_switch` always returning `true`
 
 #### Version: 0.9.0
 * Add batch READ of up to 63 registers

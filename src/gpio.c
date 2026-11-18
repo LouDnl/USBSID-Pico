@@ -220,7 +220,7 @@ void set_audio_switch(bool state)
 bool get_audio_switch(void)
 { /* Get the SPST switch state */
 #if PCB_VERSION_INT >= 13
-  bool audio_state = (bool)(read_bus(1) & bPIN(AU_SW)) >> AU_SW; /* Pinpoint current audio switch state */
+  bool audio_state = (bool)((read_bus(1) & bPIN(AU_SW)) >> AU_SW); /* Pinpoint current audio switch state */
   usbsid_config.stereo_en = audio_state; /* Set the config state to what the actual pin returns */
   return audio_state;
 #else
