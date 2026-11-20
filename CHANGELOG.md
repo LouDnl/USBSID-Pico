@@ -94,6 +94,16 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
   - update the README help output to match `cfg_usbsid -h`
 * Add debug logging for USB Ethernet compilation option
 * Build tools in full static without dependencies
+* Document NSD timing, reset and stop behavior and playing over NSD with usplayer
+  - describe the one cycle the NSD server takes off every delay and the TRY_RESET register clear in the software and firmware manuals
+  - describe the mute at FLUSH and session end and the TRY_SET_FM_OPL answers
+  - add a section to the USBSID-Player manual about usplayer --output=nsd, the overhead default of 0 and the software audio fallback
+* Fix NSD timing, reset and stop behavior to follow the protocol
+  - take one cycle off the delay of every write and read the NSD server plays, the PIO delay timer waits the delay plus one cycle, a client delay then equals the delay between two events
+  - keep the BUSY cycle accounting on the client delay
+  - clear the registers of every active SID in TRY_RESET after the reset pulse, clone chips keep registers over a pulse and tunes that skip registers started wrong after a USB play
+  - mute the SID chips and clear the FM OPL device when a session closes, not only on FLUSH
+  - answer TRY_SET_FM_OPL in protocol order: OK for a state change that is none, ERROR when enabling without an FM OPL socket, BUSY until quiescent, then reset the chip on enable and clear it on disable
 * Fix regex tag catching in release workflows by changing them to globs
 * Fix `get_audio_switch` always returning `true`
 
