@@ -1965,7 +1965,7 @@ void print_help_options(void)
   printf("  -h,       --help              : Show this help message\n");
   print_help_extended();
   printf("                                  or the first three letters of each item\n");
-  printf("  -v,       --version           : Read and print USBSID-Pico firmware version\n");
+  printf("¹ -v,       --version           : Read and print USBSID-Pico firmware version\n");
   printf("  -lb,      --list-boards       : List every attached board's serial number and exit\n");
   printf("  -b=ID,    --board=ID          : Connect to board ID (index from -lb) or serial, default first board\n");
   printf("  -reboot,  --reboot-usp        : Reboot USBSID-Pico\n");
@@ -1981,17 +1981,17 @@ void print_help_sidchips(void)
   printf("  -sidtest N                    : Run SID test routine on available SID's\n");
   printf("                                  0: All, 1: 0x00, 2: 0x20, 3: 0x40, 4: 0x60\n");
   printf("  -stoptests                    : Interrupt and stop any running tests\n");
-  printf("  -auto N,  --auto-detect-all N : Send run autodetection routine command to device and reboot\n");
+  printf("¹ -auto N,  --auto-detect-all N : Send run autodetection routine command to device and reboot\n");
   printf("                                  0: Save, load and apply config\n");
   printf("                                  1: Save to flash and reboot (default if not supplied)\n");
-  printf("  -dsid N,  --detect-sid-types N: Send SID autodetect command to device, returns the config as with '-r' afterwards\n");
+  printf("¹ -dsid N,  --detect-sid-types N: Send SID autodetect command to device, returns the config as with '-r' afterwards\n");
   printf("                                  Leave N empty for sid detection in both sockets (updates but does not save config)\n");
   printf("                                  Provide N to detect with a method below (does not update config, logs to uart)\n");
   printf("                                  0: Voice 3 oscillator detection routine\n");
   printf("                                  1: Voice 3 waveform detection routine\n");
   printf("                                  2: Reflex detection routine\n");
   printf("                                  3: Voice 3 delayed waveform detection routine (Some clones)\n");
-  printf("  -dclone,  --detect-clone-types: Send clone autodetect command to device, returns the config as with '-r' afterwards\n");
+  printf("¹ -dclone,  --detect-clone-types: Send clone autodetect command to device, returns the config as with '-r' afterwards\n");
 
   return;
 }
@@ -1999,19 +1999,24 @@ void print_help_sidchips(void)
 void print_help_config(void)
 {
   printf("--[CONFIG]--------------------------------------------------------------------------------------------------------------\n");
-  printf("  -r,       --read-config       : Read and print USBSID-Pico config settings\n");
-  printf("  -rc,      --read-clock-speed  : Read and print USBSID-Pico SID clock speed\n");
-  printf("  -rs,      --read-sock-config  : Read and print USBSID-Pico socket config settings only\n");
-  printf("  -rn,      --read-num-sids     : Read and print USBSID-Pico configured number of SID's only\n");
-  printf("  -rn,      --read-num-sids     : Read and print USBSID-Pico configured number of SID's only\n");
-  printf("  -ack,     --acknowledge       : Acknowledge the configuration to apply voltage to the sockets (v1.5+ only!)\n");
+  printf("¹ -r,       --read-config       : Read and print USBSID-Pico config settings\n");
+  printf("¹ -rc,      --read-clock-speed  : Read and print USBSID-Pico SID clock speed\n");
+  printf("¹ -rs,      --read-sock-config  : Read and print USBSID-Pico socket config settings only\n");
+  printf("¹ -rn,      --read-num-sids     : Read and print USBSID-Pico configured number of SID's only\n");
+  printf("¹ -rn,      --read-num-sids     : Read and print USBSID-Pico configured number of SID's only\n");
+  printf("¹ -ack,     --acknowledge       : Acknowledge the configuration to apply voltage to the sockets (v1.5+ only!)\n");
   printf("                                  __MAKE SURE YOU READ AND VERIFY THE CONFIG FIRST!__  (v1.5+ only!)\n");
-  printf("  -a,       --apply-config      : Apply the current config settings (from USBSID-Pico memory) that you changed with '-w'\n");
-  printf("  -s,       --save-config       : Send the save config command to USBSID-Pico\n");
+  printf("¹ -a,       --apply-config      : Apply the current config settings (from USBSID-Pico memory) that you changed with '-w'\n");
+  printf("¹ -s,       --save-config       : Send the save config command to USBSID-Pico\n");
   printf("  -sr,      --save-reboot       : Send the save config command to USBSID-Pico and reboot it\n");
-  printf("  -rl,      --reload-config     : Reload the config stored in flash, does not return anything\n");
-  printf("            --config-defaults   : Reset USBSID-Pico config to defaults\n");
+  printf("¹ -rl,      --reload-config     : Reload the config stored in flash, does not return anything\n");
+  printf("¹           --config-defaults   : Reset USBSID-Pico config to defaults\n");
   printf("                                  Add optional positional argument `1` to reboot USBSID-Pico afterwards\n");
+  printf("  Combine:                        `cfg_usbsid -r -rc -rs -rn` or `cfg_usbsid -a -s`\n");
+  printf("  Save:                           '-s' saves once after all other commands, wherever it is given\n");
+  printf("                                  Saved by the command itself: -lc, -sau, -sad, -pad, -ack, -sapp and the presets\n");
+  printf("                                  Needs '-s': -sc, -tau, -lau, -flip, -dsid, -dclone and all '-w' settings\n");
+  printf("                                  Has its own save: WiFi/NSD with -wapply, USB network/NSD with -unapply, MIDI with -mss\n");
 
   return;
 }
@@ -2019,57 +2024,88 @@ void print_help_config(void)
 void print_help_features(void)
 {
   printf("--[FEATURES]------------------------------------------------------------------------------------------------------------\n");
-  printf("  -mute                         : Mute all SID's\n");
-  printf("  -unmute                       : Umute all SID's\n");
-  printf("  -reset,   --reset-sids        : Reset all SID's\n");
-  printf("  --reset-sid-registers         : Reset all SID registers\n");
-  printf("  -flip,    --hotflip-sockets   : (Hot)Flip sockets SocketOne becomes SocketTwo, SocketTwo becomes SocketOne\n");
-  printf("  -sc N,    --set-clock N       : Set and apply USBSID-Pico SID clock speed\n");
+  printf("¹ -mute                         : Mute all SID's\n");
+  printf("¹ -unmute                       : Umute all SID's\n");
+  printf("¹ -reset,   --reset-sids        : Reset all SID's\n");
+  printf("¹ --reset-sid-registers         : Reset all SID registers\n");
+  printf("¹ -flip,    --hotflip-sockets   : (Hot)Flip sockets SocketOne becomes SocketTwo, SocketTwo becomes SocketOne\n");
+  printf("¹ -sc N,    --set-clock N       : Set and apply USBSID-Pico SID clock speed\n");
   printf("                                  0: %d (Default), 1: %d (PAL), 2: %d (NTSC),\n",
     CLOCK_DEFAULT, CLOCK_PAL, CLOCK_NTSC);
   printf("                                  3: %d (DREAN), 4: %d (NTSC2)\n",
     CLOCK_DREAN, CLOCK_NTSC2);
   printf("  -lclk N,  --link-clock N      : Link the clock to the external clock input, the board reboots on change: 1/0\n");
-  printf("  -lc N,    --lock-clockrate N  : Lock and save the clock rate from changing: True (1) False (0)\n");
-  printf("  -tau,     --toggle-audio      : Toggle the mono/stereo audio switch (PCB v1.3+ only!)\n");
-  printf("  -sau,     --set-audio N       : Set and save the mono/stereo audio switch (PCB v1.3+ only!)\n");
+  printf("¹ -lc N,    --lock-clockrate N  : Lock and save the clock rate from changing: True (1) False (0)\n");
+  printf("¹ -tau,     --toggle-audio      : Toggle the mono/stereo audio switch (PCB v1.3+ only!)\n");
+  printf("¹ -sau,     --set-audio N       : Set and save the mono/stereo audio switch (PCB v1.3+ only!)\n");
   printf("                                  0: %s, 1:%s\n", mono_stereo[0], mono_stereo[1]);
-  printf("  -lau N,   --lock-audio N      : Lock and the audio switch in it's current state until reboot: True (1) False (0)\n");
-  printf("  -sad N,   --sock-autodetect N : Disable/enable and save the automatic socket change detection on boot (PCBv1.5+ only!)\n");
+  printf("¹ -lau N,   --lock-audio N      : Lock and the audio switch in it's current state until reboot: True (1) False (0)\n");
+  printf("¹ -sad N,   --sock-autodetect N : Disable/enable and save the automatic socket change detection on boot (PCBv1.5+ only!)\n");
   printf("                                  0: %s, 1:%s\n", enabled[0], enabled[1]);
-  printf("  -pad N,   --preset-detect N   : Disable/enable and save the silent automatic socket detection on preset selection\n");
+  printf("¹ -pad N,   --preset-detect N   : Disable/enable and save the silent automatic socket detection on preset selection\n");
   printf("                                  0: %s, 1:%s\n", enabled[0], enabled[1]);
   printf("  -rxring N, --rx-ring N        : Disable/enable and save the USB RX ringbuffer, the board reboots on change\n");
   printf("                                  0: Disabled, 1:Enabled\n");
+  printf("  Combine:                        `cfg_usbsid -sc 1 -lc 1 -sau 1 -sad 1 -pad 1`\n");
+
+  return;
+}
+
+void print_help_network_wifi(void)
+{
+  printf("--[NETWORK WIFI/BLUETOOTH]-(ONLY AVAILABLE ON _W PICO'S!)---------------------------------------------------------------\n");
+  printf("¹ -wifis,   --wifi-status       : Read and print WiFi link / NSD session status (and WiFi state / IP if supported)\n");
+  printf("¹ -rnc,     --read-net-config   : Read and print WiFi/NSD/Bluetooth network config (and IP if supported)\n");
+  printf("¹ -ssid S,  --wifi-ssid S       : Set the WiFi SSID to S\n");
+  printf("¹ -psk P,   --wifi-psk P        : Set the WiFi PSK/password to P (write-only, never read back)\n");
+  printf("¹ -host H,  --wifi-hostname H   : Set the WiFi hostname to H\n");
+  printf("¹ -wen N,   --wifi-enable N     : Enable (1) or Disable (0) WiFi\n");
+  printf("¹ -bten N,  --bt-nsd-enable N   : Enable (1) or Disable (0) Bluetooth Network SID Device (SPP transport)\n");
+  printf("¹ -wapply,  --wifi-apply        : Persist the network config (WiFi/NSD) to flash and apply live\n");
+  printf("¹ -wforget, --wifi-forget       : Erase stored WiFi credentials and reset network config to defaults\n");
+  printf("  Combine:                        every option above, `-wapply` last to persist and apply, for example\n");
+  printf("                                  `cfg_usbsid -ssid NAME -psk PASS -host usbsid -wen 1 -wapply`\n");
+
+  return;
+}
+
+void print_help_network_nsd(void)
+{
+  printf("--[NETWORK NSD]-(REQUIRES NSD SUPPORT IN THE FIRMWARE)------------------------------------------------------------------\n");
+  printf("¹ -nsden N, --nsd-enable N      : Enable (1) or Disable (0) Network SID Device (NSD)\n");
+  printf("¹ -discen N,--disc-enable N     : Enable (1) or Disable (0) UDP discovery, applied live, persisted by -wapply or -unapply\n");
+  printf("¹ -nsdp N,  --nsd-port N        : Set the Network SID Device port to N\n");
+  printf("  Persist with `-wapply` (WiFi) or `-unapply` (USB network), for example\n");
+  printf("                                  `cfg_usbsid -nsden 1 -discen 1 -nsdp 6581 -wapply`\n");
+
+  return;
+}
+
+void print_help_network_usb(void)
+{
+  printf("--[NETWORK USB]-(ONLY AVAILABLE WITH CUSTOM FIRMWARE!)------------------------------------------------------------------\n");
+  printf("¹ -unipm <server|dhcp|static>,\n");
+  printf("    --usbnet-ip-mode M          : Set the USB network (NCM) IP mode (or 2/0/1), persisted and applied by -unapply\n");
+  printf("                                  server (default): board 192.168.65.1/24, serves the USB link only\n");
+  printf("                                  dhcp: needs a host bridge from the USB net interface to the LAN\n");
+  printf("                                  static: needs host routing/proxy ARP or a bridge (set addresses with -unst)\n");
+  printf("                                  Do not bridge the USB net interface into a LAN while in server mode\n");
+  printf("¹ -unst I,N,G,\n");
+  printf("    --usbnet-static I,N,G       : Set the USB network (NCM) static IP, netmask and gateway (dotted, gateway optional),\n");
+  printf("                                  persisted and applied by -unapply\n");
+  printf("¹ -unipc,   --usbnet-ipcfg      : Read and print the USB network (NCM) IP mode and stored static IP config\n");
+  printf("¹ -unapply, --usbnet-apply      : Persist the network config (USB network/NSD) to flash and apply live, same as -wapply\n");
+  printf("¹ -unforget,--usbnet-forget     : Reset the network config to defaults and persist it, same as -wforget\n");
+  printf("  Combine:                        `cfg_usbsid -unipm static -unst 192.168.65.2,255.255.255.0 -unapply`\n");
 
   return;
 }
 
 void print_help_network(void)
 {
-  printf("--[NETWORK]-(ONLY AVAILABLE ON _W PICO'S!)------------------------------------------------------------------------------\n");
-  printf("  -wifis,   --wifi-status       : Read and print WiFi link / NSD session status (and WiFi state / IP if supported)\n");
-  printf("  -rnc,     --read-net-config   : Read and print WiFi/NSD/Bluetooth network config (and IP if supported)\n");
-  printf("  -ssid S,  --wifi-ssid S       : Set the WiFi SSID to S\n");
-  printf("  -psk P,   --wifi-psk P        : Set the WiFi PSK/password to P (write-only, never read back)\n");
-  printf("  -host H,  --wifi-hostname H   : Set the WiFi hostname to H\n");
-  printf("  -wen N,   --wifi-enable N     : Enable (1) or Disable (0) WiFi\n");
-  printf("  -nsden N, --nsd-enable N      : Enable (1) or Disable (0) Network SID Device (NSD)\n");
-  printf("  -discen N,--disc-enable N     : Enable (1) or Disable (0) UDP discovery, applied live, persisted by -wapply\n");
-  printf("  -nsdp N,  --nsd-port N        : Set the Network SID Device port to N\n");
-  printf("  -unipm <server|dhcp|static>,\n");
-  printf("    --usbnet-ip-mode M          : Set the USB network (NCM) IP mode (or 2/0/1), persisted and applied by -wapply\n");
-  printf("                                  server (default): board 192.168.65.1/24, serves the USB link only\n");
-  printf("                                  dhcp: needs a host bridge from the USB net interface to the LAN\n");
-  printf("                                  static: needs host routing/proxy ARP or a bridge (set addresses with -unst)\n");
-  printf("                                  Do not bridge the USB net interface into a LAN while in server mode\n");
-  printf("  -unst I,N,G,\n");
-  printf("    --usbnet-static I,N,G       : Set the USB network (NCM) static IP, netmask and gateway (dotted, gateway optional),\n");
-  printf("                                  persisted and applied by -wapply\n");
-  printf("  -unipc,   --usbnet-ipcfg      : Read and print the USB network (NCM) IP mode and stored static IP config\n");
-  printf("  -wapply,  --wifi-apply        : Persist WiFi/NSD config to flash and apply live\n");
-  printf("  -wforget, --wifi-forget       : Erase stored WiFi credentials and reset network config to defaults\n");
-  printf("  -bten N,  --bt-nsd-enable N   : Enable (1) or Disable (0) Bluetooth Network SID Device (SPP transport)\n");
+  print_help_network_wifi();
+  print_help_network_nsd();
+  print_help_network_usb();
 
   return;
 }
@@ -2149,6 +2185,8 @@ void print_help_manual(void)
   printf("                                  (Available for 'Clone' chiptype only!)\n");
   printf("  -a1 N,    --as-one N          : Socket 2 mirrors socket 1 (Socket 2 setting only!)\n");
   printf("                                  Enabled (1) or Disabled (0)\n");
+  printf("  Combine:                        `cfg_usbsid -w -c 1 -led 1 -rgb 1 -br 64 -a`\n");
+  printf("                                  `cfg_usbsid -w -sock 1 -en 1 -chip 1 -a`\n");
 
   return;
 }
@@ -2156,14 +2194,15 @@ void print_help_manual(void)
 void print_help_midi(void)
 {
   printf("--[MIDI]----------------------------------------------------------------------------------------------------------------\n");
-  printf("  -mls,     --midi-load-state   : Load the saved MIDI config (channels, patches, arp tables, CC map) from flash\n");
-  printf("  -mss,     --midi-save-state   : Save the current MIDI config to flash\n");
-  printf("  -mrs,     --midi-reset-state  : Reset the MIDI config to defaults and erase all saved MIDI config slots\n");
-  printf("  -sapp N,  --set-c64-app N     : Set and save the embedded C64 MIDI app (embedded emulator only!)\n");
+  printf("¹ -mls,     --midi-load-state   : Load the saved MIDI config (channels, patches, arp tables, CC map) from flash\n");
+  printf("¹ -mss,     --midi-save-state   : Save the current MIDI config to flash\n");
+  printf("¹ -mrs,     --midi-reset-state  : Reset the MIDI config to defaults and erase all saved MIDI config slots\n");
+  printf("¹ -sapp N,  --set-c64-app N     : Set and save the embedded C64 MIDI app (embedded emulator only!)\n");
   printf("                                  0: %s, 1: %s\n", c64_midiapps[0], c64_midiapps[1]);
-  printf("  -startapp,   --start-c64-app  : Start the configured C64 MIDI app (embedded emulator only!)\n");
-  printf("  -stopapp,    --stop-c64-app   : Stop the configured C64 MIDI app (embedded emulator only!)\n");
-  printf("  -restartapp, --restart-c64-app: Restart the configured C64 MIDI app (embedded emulator only!)\n");
+  printf("¹ -startapp,   --start-c64-app  : Start the configured C64 MIDI app (embedded emulator only!)\n");
+  printf("¹ -stopapp,    --stop-c64-app   : Stop the configured C64 MIDI app (embedded emulator only!)\n");
+  printf("¹ -restartapp, --restart-c64-app: Restart the configured C64 MIDI app (embedded emulator only!)\n");
+  printf("  Combine:                        `cfg_usbsid -sapp 1 -mss -startapp`\n");
 
   return;
 }
@@ -2171,7 +2210,7 @@ void print_help_midi(void)
 void print_help_other(void)
 {
   printf("--[OTHER]---------------------------------------------------------------------------------------------------------------\n");
-  printf("  -d,       --debug             : Enable debug prints\n");
+  printf("¹ -d,       --debug             : Enable debug prints\n");
   printf("  -configr N                    : Read back N bytes from a write config command, use _before_ `-config`\n");
   printf("                                  Example: `cfg_usbsid -configr 1 -config CMD`\n");
   printf("  -config   --config-command    : Send custom config command, requires followup hex strings\n");
@@ -2205,6 +2244,12 @@ void print_help(const char * help)
   printf("Usage:\n");
   printf("$ cfg_usbsid [arguments]\n");
   printf("\n");
+  printf("Some commands can be combined in a single call, there is no need to run the tool once per command.\n");
+  printf("Commands marked with a ¹ can be combined and run in the order given, for example:\n");
+  printf("  $ cfg_usbsid -sc 1 -lc 1 -sau 1 -s\n");
+  printf("Commands without a ¹ run alone or must come last, they end the run or reboot the board.\n");
+  printf("A '-s' is deferred: it saves once after all other commands, wherever it is given.\n");
+  printf("\n");
 
   if (help != NULL) {
     // const char *argument_to_check = help;
@@ -2230,10 +2275,27 @@ void print_help(const char * help)
   return;
 }
 
+/* Deferred '-s': runs once after all other commands, or before a command that reboots the board */
+static bool pending_save = false;
+
+/**
+ * @brief: Send the deferred save config command when '-s' was given.
+ *
+ */
+static void flush_pending_save(void)
+{
+  if (!pending_save) return;
+  pending_save = false;
+  printf("Sending save config command\n");
+  save_config(0);
+  return;
+}
+
 void config_usbsidpico(int argc, char **argv)
 {
   for (int param_count = 1; param_count < argc; param_count++) {
     if (!strcmp(argv[param_count], "-h") || !strcmp(argv[param_count], "--help")) {
+      pending_save = false;
       print_help(argv[2]);
       break;
     }
@@ -2244,7 +2306,7 @@ void config_usbsidpico(int argc, char **argv)
       print_version_int();
       printf("Reading PCB version: ");
       read_version(US_PCB_VERSION, 1);
-      break;
+      continue;
     }
 
     if (!strcmp(argv[param_count], "-d") || !strcmp(argv[param_count], "--debug")) {
@@ -2283,13 +2345,11 @@ void config_usbsidpico(int argc, char **argv)
 
     if (!strcmp(argv[param_count], "--config-defaults")) {
       printf("Reset USBSID-Pico config to defaults\n");
-      if (argc >= param_count) {
-        param_count++;
-        write_config_command(RESET_CONFIG, atoi(argv[param_count]), 0 ,0 ,0);
-      } else {
-        write_config_command(RESET_CONFIG, 0, 0 ,0 ,0);
-      }
-      goto exit;
+      int reboot = ((argv[param_count+1] != NULL) && !startsWith(argv[param_count+1], "-")) ? atoi(argv[++param_count]) : 0;
+      if (reboot) flush_pending_save();
+      write_config_command(RESET_CONFIG, reboot, 0 ,0 ,0);
+      if (reboot) goto exit; /* Board reboots, nothing after this can run */
+      continue;
     }
     if (!strcmp(argv[param_count], "-single") || !strcmp(argv[param_count], "--single-sid")) {
       printf("Set USBSID-Pico config to single SID @ Socket One\n");
@@ -2362,7 +2422,7 @@ void config_usbsidpico(int argc, char **argv)
     if (!strcmp(argv[param_count], "-flip") || !strcmp(argv[param_count], "--hotflip-sockets")) {
       printf("Hot-flip USBSID-Pico sockets One <-> Two\n");
       write_config_command(HOTFLIP_SOCKETS, 0, 0 ,0 ,0);
-      goto exit;
+      continue;
     }
 
     if (!strcmp(argv[param_count], "-r") || !strcmp(argv[param_count], "--read-config")) {
@@ -2381,14 +2441,14 @@ void config_usbsidpico(int argc, char **argv)
         if (!strcmp(argv[pc], "-d")) debug = 1;
       }
       if (debug) print_socket_config();
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-rc") || !strcmp(argv[param_count], "--read-clock-speed")) {
       printf("Reading SID clock speed\n");
       read_sid_clockspeed();
       printf("Printing SID clock speed\n");
       print_sid_clockspeed();
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-sc") || !strcmp(argv[param_count], "--set-clock")) {
       param_count++;
@@ -2399,7 +2459,7 @@ void config_usbsidpico(int argc, char **argv)
       }
       printf("Set SID clockrate to %d\n", clockrates[clockrate]);
       write_config_command(SET_CLOCK, clockrate, 0x0, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-lc") || !strcmp(argv[param_count], "--lock-clockrate")) {
       param_count++;
@@ -2410,7 +2470,7 @@ void config_usbsidpico(int argc, char **argv)
       }
       printf("Locking and saving the clockrate from being changed\n");
       write_config_command(LOCK_CLOCK, lock, 0x1, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-rs") || !strcmp(argv[param_count], "--read-sock-config")) {
       apply_default_socket_settings();
@@ -2422,7 +2482,7 @@ void config_usbsidpico(int argc, char **argv)
       read_socket_config();
       printf("Printing socket config\n");
       print_socket_config();
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-rn") || !strcmp(argv[param_count], "--read-num-sids")) {
       printf("Reading number of SID's\n");
@@ -2431,24 +2491,24 @@ void config_usbsidpico(int argc, char **argv)
       len = read_chars(read_data, count_of(read_data));
       if (debug == 1) printf("Read %d byte of data, byte 0 = %02X\n", len, read_data[0]);
       printf("USBSID-Pico is configured to use %d SID's\n", read_data[0]);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-ack") || !strcmp(argv[param_count], "--acknowledge")) {
       printf("Acknowledging the detected/current configuration!\n");
       write_config_command(CONFIG_ACK, 0x0, 0x0, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-tau") || !strcmp(argv[param_count], "--toggle-audio")) {
       printf("Toggling mono/stereo audio switch\n");
       write_config_command(TOGGLE_AUDIO, 0x0, 0x0, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-sau") || !strcmp(argv[param_count], "--set-audio")) {
       param_count++;
       int sw = atoi(argv[param_count]);
       printf("Set mono/stereo audio switch to '%s' and save config\n", mono_stereo[sw]);
       write_config_command(SET_AUDIO, sw, 0x1, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-lau") || !strcmp(argv[param_count], "--lock-audio")) {
       param_count++;
@@ -2459,23 +2519,23 @@ void config_usbsidpico(int argc, char **argv)
       }
       printf("Lock audio switch from being changed set to '%s'\n", truefalse[lock]);
       write_config_command(LOCK_AUDIO, lock, 0x0, 0x0, 0x0);
-      break;
+      continue;
     }
 
     if (!strcmp(argv[param_count], "-mls") || !strcmp(argv[param_count], "--midi-load-state")) {
       printf("Loading MIDI config from flash\n");
       write_config_command(LOAD_MIDI_STATE, 0x0, 0x0, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-mss") || !strcmp(argv[param_count], "--midi-save-state")) {
       printf("Saving MIDI config to flash\n");
       write_config_command(SAVE_MIDI_STATE, 0x0, 0x0, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-mrs") || !strcmp(argv[param_count], "--midi-reset-state")) {
       printf("Resetting MIDI config to defaults and erasing its flash slots\n");
       write_config_command(RESET_MIDI_STATE, 0x0, 0x0, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-sapp") || !strcmp(argv[param_count], "--set-c64-app")) {
       if (++param_count >= argc) {
@@ -2490,38 +2550,38 @@ void config_usbsidpico(int argc, char **argv)
       if (!require_emulator_support()) goto exit;
       printf("Set C64 MIDI app to '%s' and save config\n", c64_midiapps[app]);
       write_config_command(SET_C64_MIDIAPP, app, 0x1, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-startapp") || !strcmp(argv[param_count], "--start-c64-app")) {
       if (!require_emulator_support()) goto exit;
       printf("Starting C64 MIDI app\n");
       write_config_command(START_C64_MIDIAPP, 0x0, 0x0, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-stopapp") || !strcmp(argv[param_count], "--stop-c64-app")) {
       if (!require_emulator_support()) goto exit;
       printf("Stopping C64 MIDI app\n");
       write_config_command(STOP_C64_MIDIAPP, 0x0, 0x0, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-restartapp") || !strcmp(argv[param_count], "--restart-c64-app")) {
       if (!require_emulator_support()) goto exit;
       printf("Restarting C64 MIDI app\n");
       write_config_command(RESTART_C64_MIDIAPP, 0x0, 0x0, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-wifis") || !strcmp(argv[param_count], "--wifi-status")) {
       if (!require_net_support()) goto exit;
       printf("Reading WiFi/NSD status\n");
       print_wifi_status();
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-rnc") || !strcmp(argv[param_count], "--read-net-config")) {
       if (!require_net_support()) goto exit;
       printf("Reading network config\n");
       read_net_config();
       print_net_config();
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-ssid") || !strcmp(argv[param_count], "--wifi-ssid")) {
       if (!require_wifi_support()) goto exit;
@@ -2532,7 +2592,7 @@ void config_usbsidpico(int argc, char **argv)
       }
       printf("Setting WiFi SSID\n");
       write_net_string_command(WIFI_SET_SSID, argv[param_count]);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-psk") || !strcmp(argv[param_count], "--wifi-psk")) {
       if (!require_wifi_support()) goto exit;
@@ -2543,7 +2603,7 @@ void config_usbsidpico(int argc, char **argv)
       }
       printf("Setting WiFi PSK\n"); /* Never log or print the value itself */
       write_net_string_command(WIFI_SET_PSK, argv[param_count]);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-host") || !strcmp(argv[param_count], "--wifi-hostname")) {
       if (!require_wifi_support()) goto exit;
@@ -2554,7 +2614,7 @@ void config_usbsidpico(int argc, char **argv)
       }
       printf("Setting WiFi hostname\n");
       write_net_string_command(WIFI_SET_HOSTNAME, argv[param_count]);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-wen") || !strcmp(argv[param_count], "--wifi-enable")) {
       if (!require_wifi_support()) goto exit;
@@ -2566,7 +2626,7 @@ void config_usbsidpico(int argc, char **argv)
       }
       printf("Set WiFi to: %s\n", enabled[en]);
       write_config_command(WIFI_ENABLE, en, 0x0, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-nsden") || !strcmp(argv[param_count], "--nsd-enable")) {
       if (!require_nsd_support()) goto exit;
@@ -2578,7 +2638,7 @@ void config_usbsidpico(int argc, char **argv)
       }
       printf("Set Network SID Device to: %s\n", enabled[en]);
       write_config_command(NSD_ENABLE, en, 0x0, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-discen") || !strcmp(argv[param_count], "--disc-enable")) {
       if (!require_net_support()) goto exit;
@@ -2594,7 +2654,7 @@ void config_usbsidpico(int argc, char **argv)
       }
       printf("Set Discovery to: %s\n", enabled[en]);
       write_config_command(DISCOVERY_ENABLE, en, 0x0, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-nsdp") || !strcmp(argv[param_count], "--nsd-port")) {
       if (!require_nsd_support()) goto exit;
@@ -2606,7 +2666,7 @@ void config_usbsidpico(int argc, char **argv)
       }
       printf("Set Network SID Device port to: %d\n", port);
       write_config_command(NSD_SET_PORT, ((port >> 8) & 0xFF), (port & 0xFF), 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-unipm") || !strcmp(argv[param_count], "--usbnet-ip-mode")) {
       if (!require_usbnet_support("-unipm")) goto exit;
@@ -2623,9 +2683,9 @@ void config_usbsidpico(int argc, char **argv)
         printf("%s is not an IP mode, use dhcp, static or server!\n", argv[param_count]);
         goto exit;
       }
-      printf("Set USB network IP mode to: %s (use -wapply to persist and apply)\n", usbnet_ip_modes[mode]);
+      printf("Set USB network IP mode to: %s (use -unapply to persist and apply)\n", usbnet_ip_modes[mode]);
       write_config_command(USBNET_IP_MODE, mode, 0x0, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-unst") || !strcmp(argv[param_count], "--usbnet-static")) {
       if (!require_usbnet_support("-unst")) goto exit;
@@ -2640,29 +2700,41 @@ void config_usbsidpico(int argc, char **argv)
         printf("IP address %u.%u.%u.%u is not usable!\n", addr[0], addr[1], addr[2], addr[3]);
         goto exit;
       }
-      printf("Set USB network static IP to: %u.%u.%u.%u netmask %u.%u.%u.%u gateway %u.%u.%u.%u (use -wapply to persist and apply)\n",
+      printf("Set USB network static IP to: %u.%u.%u.%u netmask %u.%u.%u.%u gateway %u.%u.%u.%u (use -unapply to persist and apply)\n",
         addr[0], addr[1], addr[2], addr[3], addr[4], addr[5], addr[6], addr[7], addr[8], addr[9], addr[10], addr[11]);
       uint8_t buf[14] = { (uint8_t)((COMMAND << 6) | CONFIG), USBNET_SET_STATIC };
       memcpy(&buf[2], addr, 12);
       write_chars(buf, count_of(buf));
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-unipc") || !strcmp(argv[param_count], "--usbnet-ipcfg")) {
       if (!require_usbnet_support("-unipc")) goto exit;
       print_usbnet_ipcfg();
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-wapply") || !strcmp(argv[param_count], "--wifi-apply")) {
       if (!require_net_support()) goto exit;
       printf("Persisting and applying network config\n");
       write_config_command(WIFI_APPLY, 0x0, 0x0, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-wforget") || !strcmp(argv[param_count], "--wifi-forget")) {
       if (!require_net_support()) goto exit;
       printf("Erasing stored WiFi credentials\n");
       write_config_command(WIFI_FORGET, 0x0, 0x0, 0x0, 0x0);
-      break;
+      continue;
+    }
+    if (!strcmp(argv[param_count], "-unapply") || !strcmp(argv[param_count], "--usbnet-apply")) {
+      if (!require_usbnet_support("-unapply")) goto exit;
+      printf("Persisting and applying network config\n");
+      write_config_command(WIFI_APPLY, 0x0, 0x0, 0x0, 0x0);
+      continue;
+    }
+    if (!strcmp(argv[param_count], "-unforget") || !strcmp(argv[param_count], "--usbnet-forget")) {
+      if (!require_usbnet_support("-unforget")) goto exit;
+      printf("Resetting network config to defaults\n");
+      write_config_command(WIFI_FORGET, 0x0, 0x0, 0x0, 0x0);
+      continue;
     }
     if (!strcmp(argv[param_count], "-bten") || !strcmp(argv[param_count], "--bt-nsd-enable")) {
       if (!require_wifi_support()) goto exit;
@@ -2674,7 +2746,7 @@ void config_usbsidpico(int argc, char **argv)
       }
       printf("Set Bluetooth Network SID Device to: %s\n", enabled[en]);
       write_config_command(BT_NSD_ENABLE, en, 0x0, 0x0, 0x0);
-      break;
+      continue;
     }
 
     if (!strcmp(argv[param_count], "-sad") || !strcmp(argv[param_count], "--sock-autodetect")) {
@@ -2686,7 +2758,7 @@ void config_usbsidpico(int argc, char **argv)
       }
       printf("Disable automatic socket change detection on boot set to '%s'\n", enabled[det]);
       write_config_command(SOCKET_DETECT, det, 0x0, 0x0, 0x0);
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-pad") || !strcmp(argv[param_count], "--preset-detect")) {
       param_count++;
@@ -2697,7 +2769,7 @@ void config_usbsidpico(int argc, char **argv)
       }
       printf("Disable silent automatic detection on preset select set to '%s'\n", enabled[det]);
       write_config_command(PRESET_DETECT, det, det, 0x0, 0x0);  /* Send value in both bytes, firmware reads buffer[2] */
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-lclk") || !strcmp(argv[param_count], "--link-clock")) {
       param_count++;
@@ -2712,6 +2784,7 @@ void config_usbsidpico(int argc, char **argv)
         cfg_exit_code = 1;
         goto exit;
       }
+      flush_pending_save();
       printf("Clock link set to '%s', the board saves and reboots when the value changes\n", enabled[lnk]);
       write_config_command(LINK_CLOCK, lnk, 0x0, 0x0, 0x0);
       break;
@@ -2734,6 +2807,7 @@ void config_usbsidpico(int argc, char **argv)
         cfg_exit_code = 1;
         goto exit;
       }
+      flush_pending_save();
       printf("USB RX ringbuffer set to '%s', the board saves and reboots when the value changes\n", (rx ? "On" : "Off"));
       write_config_command(SET_RX_RING, rx, 0x0, 0x0, 0x0);
       break;
@@ -2789,13 +2863,13 @@ void config_usbsidpico(int argc, char **argv)
       printf("Muting all SID's\n");
       uint8_t buf[5] = { ((COMMAND << 6) | MUTE), 1, 0, 0, 0 };
       write_chars(buf, count_of(buf));
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-unmute")) {
       printf("Unmuting all SID's\n");
       uint8_t buf[5] = { ((COMMAND << 6) | UNMUTE), 1, 0, 0, 0 };
       write_chars(buf, count_of(buf));
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-command")) {
       param_count++;  /* skip usbsid executable and -config self */
@@ -2876,11 +2950,11 @@ void config_usbsidpico(int argc, char **argv)
     }
     if (!strcmp(argv[param_count], "-dsid") || !strcmp(argv[param_count], "--detect-sid-types")) {
       uint8_t detection_routine = 255;
-      if (argv[param_count+1] != NULL) {
+      if (argv[param_count+1] != NULL && !startsWith(argv[param_count+1], "-")) {
         detection_routine = strtol(argv[++param_count], NULL, 10);
       }
       uint8_t address = 255;
-      if (argv[param_count+1] != NULL) {
+      if (argv[param_count+1] != NULL && !startsWith(argv[param_count+1], "-")) {
         address = strtol(argv[++param_count], NULL, 16);
       } else { address = 0x00; }
       if (detection_routine == 255) {
@@ -2893,17 +2967,18 @@ void config_usbsidpico(int argc, char **argv)
       }
       printf("Printing config\n");
       print_config();
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-dclone") || !strcmp(argv[param_count], "--detect-clone-types")) {
       printf("Sending autodetect clone command to USBSID-Pico and reading config\n");
       clone_autodetect();
       printf("Printing config\n");
       print_config();
-      break;
+      continue;
     }
     if (!strcmp(argv[param_count], "-auto") || !strcmp(argv[param_count], "--auto-detect-all")) {
       bool reboot = ((argv[param_count+1] != NULL) && !startsWith(argv[param_count+1], "-")) ? atoi(argv[++param_count]) : 1;
+      if (reboot) flush_pending_save();
       printf("Sending start autodetection and reboot command to USBSID-Pico (%s)\n", (reboot?"with reboot":"without reboot"));
       run_autodetection(reboot);
       if (reboot) {
@@ -2917,7 +2992,7 @@ void config_usbsidpico(int argc, char **argv)
       }
       printf("Printing config\n");
       print_config();
-      break;
+      continue;
     }
 
     if (!strcmp(argv[param_count], "-w") || !strcmp(argv[param_count], "--write-config")) {
@@ -3269,11 +3344,11 @@ void config_usbsidpico(int argc, char **argv)
       continue;
     }
     if (!strcmp(argv[param_count], "-s") || !strcmp(argv[param_count], "--save-config")) {
-      printf("Sending save config command\n");
-      save_config(0);
+      pending_save = true;
       continue;
     }
     if (!strcmp(argv[param_count], "-sr") || !strcmp(argv[param_count], "--save-reboot")) {
+      pending_save = false; /* The save and reboot command saves as well */
       printf("Sending save config and reboot command\n");
       save_config(1);
       continue;
@@ -3286,25 +3361,28 @@ void config_usbsidpico(int argc, char **argv)
     if (!strcmp(argv[param_count], "-reset") || !strcmp(argv[param_count], "--reset-sids")) {
       printf("Sending reset command\n");
       write_command(RESET_SID);
-      goto exit;
+      continue;
     }
     if (!strcmp(argv[param_count], "--reset-sid-registers")) {
       printf("Sending reset registers command\n");
       command_buffer[1] = 1;
       write_command(RESET_SID);
-      goto exit;
+      continue;
     }
     if (!strcmp(argv[param_count], "-reboot") || !strcmp(argv[param_count], "--reboot-usp")) {
+      flush_pending_save();
       printf("Sending reboot command\n");
       write_command(RESET_MCU);
       goto exit;
     }
     if (!strcmp(argv[param_count], "-boot") || !strcmp(argv[param_count], "--bootloader")) {
+      flush_pending_save();
       printf("Sending reboot to bootloader command\n");
       write_command(BOOTLOADER);
       goto exit;
     }
   }
+  flush_pending_save();
 exit:;
 };
 

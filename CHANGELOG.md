@@ -78,6 +78,20 @@ Please refer to the [releases page](https://github.com/LouDnl/USBSID-Pico/releas
   - use `UPLOAD_FILE_PRG` for the PRG upload check in `config.c`
   - include `usbsid_protocol.h` in the config tool example and remove its duplicated command, sub-command and `SOCKET_BUFFER_SIZE` definitions from `cfg_usbsid.h`
   - replace the local file type enum in `send_sid.c` with the `USBSID_UPLOAD_FILE_*` macros from `USBSIDInterface.h`
+* Allow combining cfg_usbsid commands in a single call
+  - run combinable commands in the order given instead of stopping after the first one: reads, clock, audio, socket and preset detection, mute, reset, flip, MIDI and app, network, detect and auto
+  - keep the commands that end the run or reboot the board last: reboot, bootloader, save and reboot, clock link, rx ring, presets and ini import, export and default
+  - defer `-s` to run once after all other commands wherever it is given, and run it before a command that reboots the board
+  - drop the deferred save on a failed command or on help, nothing is saved after an error
+  - fix `-dsid` swallowing a following option as its routine or address
+  - fix `--config-defaults` reading past the argument list when the reboot value is missing
+  - mark combinable commands with a superscript 1 in the help and explain the marking, the combining and the deferred save at the top
+  - add a Save section to the config help listing which commands save themselves, which need `-s` and which have their own save
+  - add combine examples to the config, features, network, manual and MIDI help sections
+  - split the network help into WiFi/Bluetooth, NSD and USB Net sections, in that order
+  - add `-unapply`/`--usbnet-apply` and `-unforget`/`--usbnet-forget` for USB Net builds, sending the same commands as `-wapply` and `-wforget`
+  - point the USB network IP mode and static IP hints to `-unapply`
+  - update the README help output to match `cfg_usbsid -h`
 * Add debug logging for USB Ethernet compilation option
 * Build tools in full static without dependencies
 * Fix regex tag catching in release workflows by changing them to globs
