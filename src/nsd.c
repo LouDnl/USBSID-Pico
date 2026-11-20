@@ -178,6 +178,22 @@ static inline uint16_t nsd_quad_cycles(const uint8_t quad[4])
 }
 
 /**
+ * @brief Delay word for a bus access, the access itself takes one cycle
+ *
+ * The delay timer PIO waits N + 1 PHI2 cycles for a delay word N: the access
+ * costs the extra one. Subtract it to keep a client delay equal to the spec
+ * delay between two events. A client delay of 0 cannot go lower and stays 0.
+ * Cycle accounting (BUSY) keeps the client delay.
+ *
+ * @param cycles client delay cycles before the access
+ * @return uint16_t delay word for the bus
+ */
+static inline uint16_t nsd_bus_delay(uint16_t cycles)
+{
+  return (cycles > 0) ? (uint16_t)(cycles - 1) : 0;
+}
+
+/**
  * @brief Cycles queued in the write ring, core 0 only
  *
  * Counts the entry core 1 is writing until it returns, and the carry not
@@ -360,7 +376,7 @@ static bool nsd_sid_active(uint16_t addr)
 static void nsd_emit(uint8_t reg, uint8_t data, uint16_t cycles, bool direct)
 {
   if (direct) {
-    cycled_write_operation((uint8_t)(reg & 0x7F), data, cycles);
+    cycled_write_operation((uint8_t)(reg & 0x7F), data, nsd_bus_delay(cycles));
     return;
   }
   uint8_t quad[4] = {
@@ -585,16 +601,26 @@ static bool nsd_chiptype_for_base(uint8_t base_address, uint8_t *chiptype_out)
  * Every handler writes into `resp_buf` and returns the total response
  * length (including the leading response-code byte). */
 
+
+/**
+ * @brief Silence every configured SID and the FM OPL device
+ *
+ * Skipped when USB holds the bus, USB wins the claim (bus.c).
+ */
+static void nsd_silence(void)
+{
+  if (!bus_try_claim(BUS_OWNER_NET)) return;
+  mute_sid();
+  if (nsd_fmopl_socket_active()) {
+    clear_fmopl_registers_at_addr(nsd_fmopl_base());
+  }
+  bus_release(BUS_OWNER_NET);
+}
+
 static uint16_t handle_flush(uint8_t *resp_buf)
 {
   nsd_ring_reset();
-  if (bus_try_claim(BUS_OWNER_NET)) { /* USB still wins, see bus.c */
-    mute_sid();
-    if (nsd_fmopl_socket_active()) {
-      clear_fmopl_registers_at_addr(nsd_fmopl_base());
-    }
-    bus_release(BUS_OWNER_NET);
-  }
+  nsd_silence();
   resp_buf[0] = NSD_RESP_OK;
   return 1;
 }
@@ -670,6 +696,8 @@ static uint16_t handle_try_reset(uint8_t volume, uint8_t *resp_buf)
   }
   for (uint8_t sid = 0; sid < nsd_sid_count; sid++) {
     uint8_t base = (uint8_t)(sid * 0x20);
+    /* Clone chips can keep registers over a RES pulse, clear them as the USB reset does */
+    if (nsd_sid_active(base)) clear_sid_registers_at_addr(base);
     /* "The volume value does not apply to FM OPL" (spec), base+0x18 is
      * its data port */
     if (nsd_sid_active(base)) cycled_write_operation((uint8_t)(base + 0x18), volume, 0);
@@ -754,7 +782,7 @@ static uint16_t handle_try_read(const uint8_t *payload, uint16_t payload_len, ui
    * returns READ followed by 0x00" (spec). */
   uint8_t value = 0x00;
   if (nsd_sid_active(reg)) {
-    value = cycled_read_operation(reg, nsd_lead(reg, read_cycles, true));
+    value = cycled_read_operation(reg, nsd_bus_delay(nsd_lead(reg, read_cycles, true)));
   } else {
     nsd_carry_delay(reg, read_cycles, true);
   }
@@ -866,7 +894,7 @@ static uint16_t handle_try_read_ex(const uint8_t *payload, uint16_t payload_len,
   uint16_t read_addr   = (uint16_t)((tail[2] << 8) | tail[3]);
   uint8_t value = 0x00;
   if (nsd_sid_active(read_addr)) {
-    value = cycled_read_operation((uint8_t)read_addr, nsd_lead(read_addr, read_cycles, true));
+    value = cycled_read_operation((uint8_t)read_addr, nsd_bus_delay(nsd_lead(read_addr, read_cycles, true)));
   } else {
     /* The read target's own address range dropped FM OPL in the spec
      * (network_sid_device_V5.adoc, TRY_READ_EX no longer lists
@@ -942,7 +970,9 @@ static uint16_t handle_try_set_sid_model(uint8_t sid_number, const uint8_t *payl
       /* set_sidemu_sidtype() (sid_cloneconfig.c) is itself unfinished
        * upstream. The NSD model index (0=6581, 1=8580) is passed through. */
       if (bus_try_claim(BUS_OWNER_NET)) {
-        set_sidemu_sidtype(base_address, payload[0]);
+        if (chiptype == CHIP_SIDEMU || chiptype == CHIP_UNKNOWN) {
+          set_sidemu_sidtype(base_address, payload[0]);
+        }
         bus_release(BUS_OWNER_NET);
       }
     }
@@ -981,22 +1011,8 @@ static uint16_t handle_try_set_fm_opl(const uint8_t *payload, uint16_t payload_l
     resp_buf[0] = NSD_RESP_ERROR;
     return 1;
   }
-  if (!nsd_quiescent()) {
-    resp_buf[0] = NSD_RESP_BUSY;
-    return 1;
-  }
 
   bool enable = (payload[0] != 0);
-
-  if (enable && nsd_fmopl_socket_active()) {
-    /* spec: "enabling a disabled device resets it" */
-    if (!bus_try_claim(BUS_OWNER_NET)) {
-      resp_buf[0] = NSD_RESP_BUSY;
-      return 1;
-    }
-    clear_fmopl_registers_at_addr(nsd_fmopl_base());
-    bus_release(BUS_OWNER_NET);
-  }
 
   if (enable == nsd_fmopl_active) {
     /* "enabling an already enabled device or disabling an already disabled
@@ -1012,6 +1028,22 @@ static uint16_t handle_try_set_fm_opl(const uint8_t *payload, uint16_t payload_l
      * (spec) */
     resp_buf[0] = NSD_RESP_ERROR;
     return 1;
+  }
+
+  if (!nsd_quiescent()) { /* "returns BUSY until audio quiescent" (spec) */
+    resp_buf[0] = NSD_RESP_BUSY;
+    return 1;
+  }
+
+  if (nsd_fmopl_socket_active()) {
+    /* "enabling a disabled device resets it", "disabling it stops both
+     * processing and audio" (spec): clear the OPL registers either way */
+    if (!bus_try_claim(BUS_OWNER_NET)) {
+      resp_buf[0] = NSD_RESP_BUSY;
+      return 1;
+    }
+    clear_fmopl_registers_at_addr(nsd_fmopl_base());
+    bus_release(BUS_OWNER_NET);
   }
 
   nsd_fmopl_active = enable;
@@ -1204,6 +1236,7 @@ void nsd_session_close(void)
   session_active = false;
   g_transport = NULL;
   nsd_ring_reset();
+  nsd_silence(); /* A client that drops the link without FLUSH leaves its tones on */
   nsd_fmopl_active = false;
   if (bus_current_owner() == BUS_OWNER_NET) {
     bus_release(BUS_OWNER_NET);
@@ -1278,7 +1311,7 @@ void nsd_drain_task(void)
         nsd_cycles_out += f;
         t -= f;
       }
-      cycled_write_operation((uint8_t)(reg & 0x7F), quad[3], (uint16_t)t);
+      cycled_write_operation((uint8_t)(reg & 0x7F), quad[3], nsd_bus_delay((uint16_t)t));
       nsd_cycles_out += t;
       nsd_drain_carry = 0;
       /* MUTE came in while this write was under way: silence again */
