@@ -247,8 +247,13 @@ The register byte the NSD protocol sends is the USBSID-Pico SID address space (`
 ==== Write buffer
 The board queues up to 4096 writes. It answers `BUSY` when about 160 ms (PAL) of cycles are queued and accepts writes again below about 120 ms. Reads, resets and clock changes wait until the queued writes are played, a SID detect read cannot overtake the writes before it.
 
+==== Timing and reset
+The delay of a write is the number of C64 cycles since the previous event, as the NSD protocol describes it. Firmware v0.9.1 and newer takes one cycle off the delay of every write and read it plays, the cycle the bus access itself costs, a client needs no correction of its own. A delay of `0` stays `0`. `TRY_DELAY` adds idle time without a bus write. `TRY_RESET` pulses the reset line, clears the registers of every configured SID and sets the volume. A clone chip can keep its registers over a reset pulse alone. +
+`FLUSH` and the end of an NSD session mute the SID chips and clear the FM OPL device, also when a client drops the link without sending `FLUSH`. The mute is skipped while USB holds the SID bus. +
+A clock change with `TRY_SET_CLOCK` stays in force until another change, as it does over USB.
+
 ==== FM OPL
-The FM OPL socket is reached with `TRY_WRITE_EX` address `$DF40` is the FM OPL address/index port and `$DF50` the data port, one entry per port write, a register write is two entries. The client enables the device with `TRY_SET_FM_OPL`, which resets the chip when it turns a disabled device on. Other `$DFxx` addresses are ignored but keep their delay. USBSID-Player v1.4.0 and older do not play FM OPL over NSD against this firmware.
+The FM OPL socket is reached with `TRY_WRITE_EX` address `$DF40` is the FM OPL address/index port and `$DF50` the data port, one entry per port write, a register write is two entries. The client enables the device with `TRY_SET_FM_OPL`, which resets the chip when it turns a disabled device on and clears it when it turns an enabled device off. Enabling an enabled device or disabling a disabled one answers OK and leaves the chip alone. Enabling on a board without an FM OPL socket answers an error. Other `$DFxx` addresses are ignored but keep their delay. USBSID-Player v1.4.0 and older do not play FM OPL over NSD against this firmware.
 
 ==== Audio-domain settings
 Commands that only make sense for a software SID emulator (sample rate, stereo positioning, per-channel level, fade in/out) are accepted and acknowledged but have no effect on real hardware. The audio path (mono/stereo switch, SID socket configuration) is controlled over USB/WebUSB.

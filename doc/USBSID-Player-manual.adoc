@@ -37,6 +37,12 @@ Firmware release v0.7.0 and up supports the send sid mode on the USBSID-Pico con
 Multi-subtune PSID/RSID files are supported, you can switch to the following or previous subtune while a tune is playing.
 
 
+=== Playing over the network with usplayer
+`usplayer --output=nsd --net-host <ip> tune.sid` plays a tune on a Network SID Device (NSD) server, port `6581` unless `--net-port` says otherwise. The server can be a USBSID-Pico `_w` board with `_net` firmware or a software server such as JSidplay2 or sid-device. The player sends the same requests to both: batches of writes that grow with the round trip of the link (half a frame on a fast link, up to 45000 cycles over WiFi), idle time on the following write or as `TRY_DELAY` once it fills a batch, and the chip count, panning, model and clock of the tune at the start of a tune. +
+When the server cannot be reached the player falls back to software audio. +
+Firmware v0.9.1 and newer takes one cycle off the delay of every write it plays, the cycle the bus access itself costs. The player sends the delay between two events as the protocol describes it and `--output=nsd` defaults to `--overhead 0`. Use `--overhead 1` against older firmware. The `--overhead` option is meant for USBSID-Pico hardware, software servers need `0`. +
+A reset from the player (`TRY_RESET`) also clears the registers of every SID, as the USB reset does. A tune that does not write every register then starts from the same state on every play.
+
 === Keyboard controls of the usplayer CLI
 While a tune plays, the `usplayer` command line player reads single key presses without Enter. Keys are lowercase, up and down arrows are ignored. +
 On Linux and macOS the keys are active when stdin is a terminal. With stdin on a pipe or script the keys are off, the player prints `press ctrl-c to stop` and ctrl-c stops it. On Windows the keys are on and read from the console. +
